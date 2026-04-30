@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -30,6 +31,7 @@ import { batchStatusConfig, orderStatusConfig, StatusBadge } from './delivery-op
 import { PrintSummary } from './print-summary';
 
 export function DispatchBatchDetailsPage({ id }: { id: string }) {
+  const router = useRouter();
   const batchId = Number(id);
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [batch, setBatch] = useState<DispatchBatch | null>(null);
@@ -258,23 +260,36 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           }
         }
       `}} />
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      {/* Mobile Header */}
+      <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between bg-white px-4 py-3 border-b border-slate-100 lg:hidden">
+        <button
+          onClick={() => router.push('/delivery-ops')}
+          className="flex items-center gap-2 font-bold text-slate-900"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span className="text-sm">Back</span>
+        </button>
+        <h1 className="text-sm font-black uppercase tracking-widest text-slate-900">{batch.batchNo}</h1>
+        <div className="w-10" /> {/* Spacer */}
+      </div>
+
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between pt-12 lg:pt-0">
         <div className="flex items-start gap-4">
           <Link
             href="/delivery-ops"
-            className="rounded-2xl border border-slate-200 bg-white p-3 text-slate-600 shadow-sm transition hover:bg-slate-50"
+            className="hidden lg:flex rounded-2xl border border-slate-200 bg-white p-3 text-slate-600 shadow-sm transition hover:bg-slate-50"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div>
+          <div className="flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-black tracking-tight text-slate-900">
+              <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-slate-900">
                 {batch.batchNo}
               </h1>
               <StatusBadge {...batchStatus} />
             </div>
-            <p className="mt-2 text-sm font-medium text-slate-500">
-              {formatDate(batch.dispatchDate)} · Delivery Man: {batch.deliveryPerson.name} · Route: {batch.route.name}
+            <p className="mt-2 text-xs lg:text-sm font-medium text-slate-500">
+              {formatDate(batch.dispatchDate)} · {batch.deliveryPerson.name} · {batch.route.name}
             </p>
             {batch.status === 'SETTLED' && (
               <div className="mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600">
@@ -286,35 +301,32 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         </div>
 
         {batch.status === 'DRAFT' && (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => handlePrintMorning()}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
-              Print Morning Sheet
+              <Printer className="h-4 w-4" />
+              Morning Sheet
             </button>
             <button
               onClick={handleDispatch}
-              className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600"
             >
-              <span className="inline-flex items-center gap-2">
-                <Send className="h-4 w-4" />
-                Dispatch to Field
-              </span>
+              <Send className="h-4 w-4" />
+              Dispatch to Field
             </button>
           </div>
         )}
 
         {['DISPATCHED', 'RETURN_PENDING', 'PARTIALLY_SETTLED', 'SETTLED'].includes(batch.status) && (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handlePrintFinalSettlement}
-              className="rounded-2xl border-2 border-slate-900 bg-white px-5 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl border-2 border-slate-900 bg-white px-5 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
             >
-              <span className="inline-flex items-center gap-2">
-                <Printer className="h-4 w-4" />
-                Print Final Settlement
-              </span>
+              <Printer className="h-4 w-4" />
+              Print Final Settlement
             </button>
           </div>
         )}
@@ -339,11 +351,11 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       {activeTab === 'sheet' && (
         <PageCard 
           title="Field Delivery Sheet" 
-          description="Consolidated view for manual record keeping in the field."
+          description="Consolidated view for field record keeping."
           action={
             <button
               onClick={handlePrintFieldSheet}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="hidden lg:flex rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               <span className="inline-flex items-center gap-2">
                 <Printer className="h-4 w-4" />
@@ -353,7 +365,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           }
           noPadding
         >
-          <div className="overflow-x-auto">
+          <div className="hidden lg:block overflow-x-auto">
             {aggregatedItems.length === 0 ? (
               <div className="p-12 text-center text-slate-400 font-bold">No products in this batch</div>
             ) : (
@@ -389,26 +401,42 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               </table>
             )}
           </div>
+
+          {/* Mobile Field Sheet View */}
+          <div className="lg:hidden divide-y divide-slate-100">
+            {aggregatedItems.map((item, index) => (
+              <div key={item.productId} className="p-4 space-y-3">
+                 <div className="flex items-start justify-between">
+                    <div className="flex gap-3">
+                       <span className="text-xs font-black text-slate-300">{index + 1}</span>
+                       <p className="font-bold text-slate-900">{item.name}</p>
+                    </div>
+                    <p className="text-xs font-black text-slate-400">{item.unit}</p>
+                 </div>
+                 <div className="flex items-center justify-between">
+                    <div className="bg-slate-100 rounded-xl px-4 py-2">
+                       <p className="text-[8px] font-black uppercase text-slate-400">Target Qty</p>
+                       <p className="text-lg font-black text-slate-900">{formatNumber(item.totalQty)}</p>
+                    </div>
+                    <div className="text-right">
+                       <p className="text-[8px] font-black uppercase text-slate-400">Unit Price</p>
+                       <p className="text-sm font-bold text-slate-600">{formatCurrency(item.price)}</p>
+                    </div>
+                 </div>
+              </div>
+            ))}
+            {aggregatedItems.length === 0 && <div className="p-12 text-center text-slate-400 font-bold">No products</div>}
+          </div>
         </PageCard>
       )}
 
       {activeTab === 'entry' && (
         <PageCard 
-          title="Data Entry" 
-          description="Enter actual field returns and damaged units here."
+          title="Return Entry" 
+          description="Enter actual field returns and damages."
+          className="lg:no-padding"
           action={
-            <div className="flex gap-2">
-              {['RETURN_PENDING', 'PARTIALLY_SETTLED', 'SETTLED'].includes(batch.status) && (
-                <button
-                  onClick={handlePrintFinalSettlement}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Printer className="h-3.5 w-3.5" />
-                    Print Settlement
-                  </span>
-                </button>
-              )}
+            <div className="hidden lg:flex gap-2">
               <button
                 onClick={handleSaveReturns}
                 disabled={isSavingReturns || batch.status === 'SETTLED' || !['DISPATCHED', 'RETURN_PENDING', 'PARTIALLY_SETTLED'].includes(batch.status)}
@@ -416,14 +444,14 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               >
                 <span className="inline-flex items-center gap-2">
                   {isSavingReturns ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {batch.status === 'SETTLED' ? 'Entry Locked' : 'Save & Proceed'}
+                  {batch.status === 'SETTLED' ? 'Locked' : 'Save Returns'}
                 </span>
               </button>
             </div>
           }
           noPadding
         >
-          <div className="overflow-x-auto">
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -486,35 +514,96 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Entry Form */}
+          <div className="lg:hidden divide-y divide-slate-100">
+            {aggregatedItems.map((item, index) => {
+              const state = batchReturnState[item.productId] || { returned: '0', damaged: '0' };
+              const deliveredQty = item.totalQty - Number(state.returned || 0) - Number(state.damaged || 0);
+              return (
+                <div key={item.productId} className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-slate-900">{item.name}</p>
+                    <div className="bg-slate-100 rounded-lg px-2 py-1 text-[10px] font-black text-slate-500 uppercase">
+                      Target: {formatNumber(item.totalQty)}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-slate-400">Returned</label>
+                        <input
+                          type="number"
+                          value={state.returned}
+                          disabled={batch.status === 'SETTLED'}
+                          onChange={(e) => setBatchReturnState(prev => ({
+                            ...prev,
+                            [item.productId]: { ...state, returned: e.target.value }
+                          }))}
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-black text-rose-600 outline-none disabled:opacity-50"
+                        />
+                     </div>
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-slate-400">Damaged</label>
+                        <input
+                          type="number"
+                          value={state.damaged}
+                          disabled={batch.status === 'SETTLED'}
+                          onChange={(e) => setBatchReturnState(prev => ({
+                            ...prev,
+                            [item.productId]: { ...state, damaged: e.target.value }
+                          }))}
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-black text-amber-600 outline-none disabled:opacity-50"
+                        />
+                     </div>
+                  </div>
+                  <div className={`rounded-2xl p-3 flex justify-between items-center ${deliveredQty < 0 ? 'bg-rose-50' : 'bg-emerald-50'}`}>
+                     <p className="text-xs font-black uppercase tracking-widest text-slate-400">Actual Delivered</p>
+                     <p className={`text-lg font-black ${deliveredQty < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>{formatNumber(Math.max(0, deliveredQty))}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          <div className="lg:hidden p-4 border-t border-slate-100">
+             <button
+                onClick={handleSaveReturns}
+                disabled={isSavingReturns || batch.status === 'SETTLED' || !['DISPATCHED', 'RETURN_PENDING', 'PARTIALLY_SETTLED'].includes(batch.status)}
+                className="w-full flex items-center justify-center gap-3 rounded-2xl bg-cyan-700 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-cyan-100 disabled:opacity-50 disabled:bg-slate-300"
+              >
+                {isSavingReturns ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                Save Field Records
+              </button>
+          </div>
         </PageCard>
       )}
 
       {/* Final Summary - Simplified 'Not Fancy' Style */}
-      <div className="mt-10 pt-10 border-t-2 border-slate-900">
+      <div className="mt-10 pt-10 border-t-2 border-slate-900 pb-24">
         <h2 className="text-base font-black uppercase tracking-widest text-slate-900 mb-6">Final Batch Summary</h2>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 border-2 border-slate-900 divide-x-2 divide-y-2 md:divide-y-0 divide-slate-900">
-          <div className="p-6 bg-white">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 border-2 border-slate-900 divide-x-2 divide-y-2 md:divide-y-0 divide-slate-900">
+          <div className="p-4 lg:p-6 bg-white">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Qty</p>
-            <p className="text-2xl font-black text-slate-900">{formatNumber(finalMetrics?.totalOrder || 0)}</p>
+            <p className="text-xl lg:text-2xl font-black text-slate-900">{formatNumber(finalMetrics?.totalOrder || 0)}</p>
           </div>
-          <div className="p-6 bg-white">
-            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-1">Total Returned</p>
-            <p className="text-2xl font-black text-rose-600">{formatNumber(finalMetrics?.totalReturned || 0)}</p>
+          <div className="p-4 lg:p-6 bg-white">
+            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-1">Returned</p>
+            <p className="text-xl lg:text-2xl font-black text-rose-600">{formatNumber(finalMetrics?.totalReturned || 0)}</p>
           </div>
-          <div className="p-6 bg-white">
-            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Total Sold</p>
-            <p className="text-2xl font-black text-emerald-700">{formatNumber(finalMetrics?.totalSold || 0)}</p>
+          <div className="p-4 lg:p-6 bg-white">
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Final Sold</p>
+            <p className="text-xl lg:text-2xl font-black text-emerald-700">{formatNumber(finalMetrics?.totalSold || 0)}</p>
           </div>
-          <div className="p-6 bg-slate-900 text-white">
+          <div className="p-4 lg:p-6 bg-slate-900 text-white col-span-2 md:col-span-1">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Final Amount</p>
-            <p className="text-2xl font-black">{formatCurrency(finalMetrics?.totalAmount || 0)}</p>
+            <p className="text-xl lg:text-2xl font-black truncate">{formatCurrency(finalMetrics?.totalAmount || 0)}</p>
           </div>
         </div>
 
         {batch.status !== 'SETTLED' && (
           <div className="mt-12 flex flex-col items-center justify-center space-y-6">
-            <div className="text-center">
+            <div className="text-center px-4">
               <p className="text-sm font-black uppercase tracking-widest text-slate-900">Settlement Status</p>
               <p className="text-xs font-bold text-slate-500 mt-1 uppercase">Ready to close batch & update ledger</p>
             </div>
@@ -522,7 +611,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             <button
               onClick={handleSettle}
               disabled={isSettling}
-              className="flex items-center gap-3 rounded-none border-4 border-slate-900 bg-slate-900 px-12 py-4 text-lg font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900 disabled:opacity-50"
+              className="w-full max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-slate-900 px-12 py-4 text-base lg:text-lg font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900 disabled:opacity-50"
             >
               {isSettling ? <RefreshCw className="h-5 w-5 animate-spin" /> : <HandCoins className="h-5 w-5" />}
               {isSettling ? 'Processing...' : 'Complete Settlement'}
@@ -532,22 +621,21 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
         {batch.status === 'SETTLED' && (
           <div className="mt-12 flex flex-col items-center justify-center space-y-6">
-            <div className="text-center">
+            <div className="text-center px-4">
               <p className="text-sm font-black uppercase tracking-widest text-emerald-600">Batch Fully Settled</p>
               <p className="text-xs font-bold text-slate-500 mt-1 uppercase">Ledger updated and inventory finalized</p>
             </div>
             
             <button
               onClick={handlePrintFinalSettlement}
-              className="flex items-center gap-3 rounded-none border-4 border-slate-900 bg-white px-12 py-4 text-lg font-black uppercase tracking-widest text-slate-900 transition hover:bg-slate-900 hover:text-white"
+              className="w-full max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-white px-12 py-4 text-base lg:text-lg font-black uppercase tracking-widest text-slate-900 transition hover:bg-slate-900 hover:text-white"
             >
               <Printer className="h-5 w-5" />
-              Print Final Settlement Report
+              Print Final Settlement
             </button>
           </div>
         )}
       </div>
-
     </div>
   );
 }

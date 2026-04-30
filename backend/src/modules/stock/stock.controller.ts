@@ -41,4 +41,9 @@ export class StockController {
       search,
     );
   }
+
+  @Post('backfill')
+  backfill() {
+    return this.stockService.backfillStock();
+  }
 }

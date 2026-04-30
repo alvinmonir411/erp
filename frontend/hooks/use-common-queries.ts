@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getCompanies } from '@/lib/api/companies';
 import { getRoutes } from '@/lib/api/routes';
 import { getShops } from '@/lib/api/shops';
-import { Company, Route, Shop } from '@/types/api';
+import { getProducts } from '@/lib/api/products';
+import { Company, Route, Shop, Product } from '@/types/api';
 
 export function useCompanies() {
   return useQuery({
@@ -25,5 +26,13 @@ export function useShops(routeId?: number | null) {
     queryKey: ['shops', routeId],
     queryFn: () => getShops(routeId ?? undefined) as Promise<Shop[]>,
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useProducts() {
+  return useQuery({
+    queryKey: ['products'],
+    queryFn: () => getProducts() as Promise<Product[]>,
+    staleTime: 5 * 60 * 1000,
   });
 }

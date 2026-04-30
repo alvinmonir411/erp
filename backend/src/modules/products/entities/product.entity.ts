@@ -51,6 +51,15 @@ export class Product {
   })
   salePrice: number;
 
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: numericColumnTransformer,
+  })
+  currentStock: number;
+
   @Column({ default: true })
   isActive: boolean;
 

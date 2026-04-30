@@ -3,7 +3,7 @@
 import { ReactNode } from 'react';
 import {
   AlertTriangle,
-  CheckCircle2,
+  CheckCircle,
   Clock3,
   HandCoins,
   Printer,
@@ -25,7 +25,7 @@ export const orderStatusConfig: Record<
   CONFIRMED: {
     label: 'Confirmed',
     className: 'bg-blue-100 text-blue-700',
-    icon: CheckCircle2,
+    icon: CheckCircle,
   },
   ASSIGNED: {
     label: 'Assigned',
@@ -45,7 +45,7 @@ export const orderStatusConfig: Record<
   DELIVERED: {
     label: 'Delivered',
     className: 'bg-emerald-100 text-emerald-700',
-    icon: CheckCircle2,
+    icon: CheckCircle,
   },
   RETURNED_PARTIAL: {
     label: 'Returned Partial',
@@ -96,7 +96,7 @@ export const batchStatusConfig: Record<
   SETTLED: {
     label: 'Settled',
     className: 'bg-emerald-100 text-emerald-700',
-    icon: CheckCircle2,
+    icon: CheckCircle,
   },
   CANCELLED: {
     label: 'Cancelled',

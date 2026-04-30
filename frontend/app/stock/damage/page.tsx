@@ -100,7 +100,7 @@ export default function DamageEntryPage() {
   const maxStock = selectedProduct ? (stockSummary[selectedProduct.id] || 0) : 0;
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
+    <div className="max-w-4xl mx-auto py-8">
       <PageCard
         title="Damage Entry"
         description="Record damaged stock. Damaged items will be deducted from your available inventory."

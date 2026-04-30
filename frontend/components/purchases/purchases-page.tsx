@@ -28,7 +28,7 @@ import {
   DollarSign,
   Wallet,
   AlertCircle,
-  CheckCircle2,
+  CheckCircle,
   ChevronRight,
   TrendingDown,
   ArrowUpRight

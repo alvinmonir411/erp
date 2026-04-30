@@ -9,11 +9,27 @@ import { getProducts } from '@/lib/api/products';
 import { getDeliveryPeople } from '@/lib/api/delivery-ops';
 import { getStockSummary } from '@/lib/api/stock';
 import { createOrder, getOrder, updateOrder } from '@/lib/api/orders';
-import { PageCard } from '@/components/ui/page-card';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { useToastNotification } from '@/components/ui/toast-provider';
 import { formatCurrency, getTodayBD, formatBDDate } from '@/lib/utils/format';
 import type { Company, Route, Shop, Product, DeliveryPerson } from '@/types/api';
+import {
+  Plus,
+  Trash2,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  MapPin,
+  Store,
+  User,
+  Building2,
+  ShoppingCart,
+  Receipt,
+  CheckCircle,
+  ArrowLeft,
+  LogOut
+} from 'lucide-react';
 
 interface OrderLine {
   productId: number;
@@ -24,7 +40,6 @@ interface OrderLine {
   discountType: 'FIXED' | 'PERCENT';
   discountValue: number;
   lineTotal: number;
-  // Search state
   searchText?: string;
   showResults?: boolean;
 }
@@ -36,7 +51,6 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Master Data
   const [companies, setCompanies] = useState<Company[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
@@ -44,22 +58,19 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([]);
   const [stockMap, setStockMap] = useState<Record<number, number>>({});
 
-  // Form Header
   const [orderDate, setOrderDate] = useState(() => formatBDDate(getTodayBD()));
   const [companyId, setCompanyId] = useState<number | ''>('');
   const [routeId, setRouteId] = useState<number | ''>('');
   const [shopId, setShopId] = useState<number | ''>('');
   const [deliveryPersonId, setDeliveryPersonId] = useState<number | ''>('');
 
-  // Invoice Discount
   const [invDiscountType, setInvDiscountType] = useState<'FIXED' | 'PERCENT'>('FIXED');
   const [invDiscountValue, setInvDiscountValue] = useState(0);
   const [note, setNote] = useState('');
+  const [showDiscount, setShowDiscount] = useState(false);
 
-  // Lines
   const [lines, setLines] = useState<OrderLine[]>([]);
 
-  // Search visibility
   const [showCompResults, setShowCompResults] = useState(false);
   const [showRouteResults, setShowRouteResults] = useState(false);
   const [showShopResults, setShowShopResults] = useState(false);
@@ -67,21 +78,17 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   const [routeSearch, setRouteSearch] = useState('');
   const [shopSearch, setShopSearch] = useState('');
 
-  // Refs for click outside
   const compRef = useRef<HTMLDivElement>(null);
   const routeRef = useRef<HTMLDivElement>(null);
   const shopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Don't close if clicking inside one of the main header selects
       if (compRef.current?.contains(event.target as Node) ||
-          routeRef.current?.contains(event.target as Node) ||
-          shopRef.current?.contains(event.target as Node)) {
+        routeRef.current?.contains(event.target as Node) ||
+        shopRef.current?.contains(event.target as Node)) {
         return;
       }
-
-      // Check if clicking inside a product row input or its results
       const isProductClick = (event.target as HTMLElement).closest('.product-row-container');
       if (isProductClick) return;
 
@@ -90,7 +97,6 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
       setShowShopResults(false);
       setLines(prev => prev.map(l => ({ ...l, showResults: false })));
     };
-
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
@@ -98,9 +104,37 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   useToastNotification({ message: error, title: 'Error', tone: 'error' });
   useToastNotification({ message: success, title: 'Success', tone: 'success' });
 
-  // Clear after toast fires
   useEffect(() => { if (error) { const t = setTimeout(() => setError(null), 100); return () => clearTimeout(t); } }, [error]);
   useEffect(() => { if (success) { const t = setTimeout(() => setSuccess(null), 100); return () => clearTimeout(t); } }, [success]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    // If it's a new order and there's more than 1 line, or the first line has data
+    if (!orderId) {
+      if (lines.length > 1) return true;
+      if (lines.length === 1) {
+        const l = lines[0];
+        if (l.productId !== 0 || (l.searchText && l.searchText.trim() !== '')) return true;
+      }
+      if (note.trim() !== '' || invDiscountValue !== 0 || shopId !== '' || routeId !== '' || companyId !== '') return true;
+    }
+    // For edit mode, it's harder to track without storing initial state, 
+    // but we can assume if they touched anything they might want to save.
+    // For now, let's keep it simple for the user request.
+    return false;
+  }, [orderId, lines, note, invDiscountValue, shopId, routeId, companyId]);
+
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (!window.confirm('You have unsaved order data. Are you sure you want to leave?')) {
+        return;
+      }
+    }
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/orders');
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -145,6 +179,8 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
               searchText: item.product?.name || ''
             })));
           }
+        } else if (lines.length === 0) {
+          addLine();
         }
       } catch (e) {
         setError('Failed to load initial data');
@@ -153,7 +189,6 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
       }
     }
     void load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   const filteredShops = useMemo(() => {
@@ -182,8 +217,6 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
     void loadStock();
   }, [companyId]);
 
-  // filteredProducts used inline in product dropdown
-
   const calculateLineTotal = (line: OrderLine) => {
     const gross = line.quantity * line.unitPrice;
     let disc = 0;
@@ -209,14 +242,23 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   };
 
   const removeLine = (index: number) => {
-    setLines(lines.filter((_, i) => i !== index));
+    const newLines = lines.filter((_, i) => i !== index);
+    setLines(newLines.length > 0 ? newLines : [{
+      productId: 0,
+      productName: '',
+      quantity: 0,
+      freeQuantity: 0,
+      unitPrice: 0,
+      discountType: 'FIXED',
+      discountValue: 0,
+      lineTotal: 0
+    }]);
   };
 
   const updateLine = (index: number, updates: Partial<OrderLine>) => {
     const newLines = [...lines];
     const line = { ...newLines[index], ...updates };
-    
-    // Auto-price if product changes
+
     if (updates.productId) {
       const prod = allProducts.find(p => p.id === updates.productId);
       if (prod) {
@@ -230,12 +272,11 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
     setLines(newLines);
   };
 
-  // Summary Calculations
   const subtotal = lines.reduce((sum, l) => sum + l.lineTotal, 0);
   const totalQty = lines.reduce((sum, l) => sum + Number(l.quantity), 0);
   const totalFreeQty = lines.reduce((sum, l) => sum + Number(l.freeQuantity), 0);
-  
-  const invoiceDiscountAmount = invDiscountType === 'PERCENT' 
+
+  const invoiceDiscountAmount = invDiscountType === 'PERCENT'
     ? subtotal * (invDiscountValue / 100)
     : invDiscountValue;
 
@@ -247,17 +288,14 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
       return;
     }
 
-    if (lines.length === 0) {
+    if (lines.length === 0 || lines.every(l => l.productId === 0)) {
       setError('Please add at least one product');
       return;
     }
 
-    if (lines.some(l => l.productId === 0)) {
-      setError('Please select a product for all rows or remove empty rows');
-      return;
-    }
+    const validLines = lines.filter(l => l.productId !== 0);
 
-    const insufficientStock = lines.find(l => {
+    const insufficientStock = validLines.find(l => {
       const stock = stockMap[l.productId] || 0;
       return (Number(l.quantity) + Number(l.freeQuantity)) > stock;
     });
@@ -278,7 +316,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
         discountType: invDiscountType,
         discountValue: invDiscountValue,
         note: note.trim() || undefined,
-        items: lines.map(l => ({
+        items: validLines.map(l => ({
           productId: l.productId,
           quantity: Number(l.quantity),
           freeQuantity: Number(l.freeQuantity),
@@ -295,7 +333,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
         await createOrder(payload);
         setSuccess('Order created successfully');
       }
-      router.push('/orders'); // Redirect to order management page
+      router.push('/orders');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save order');
     } finally {
@@ -306,373 +344,535 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   if (isLoading) return <LoadingBlock label="Initializing Order Form..." />;
 
   return (
-    <div className="space-y-6">
-      <PageCard title={orderId ? "Edit Order" : "New Order"} description={orderId ? "Update existing order details." : "Create a new order for a shop."}>
-        <div className="grid gap-4 md:grid-cols-5">
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Order Date</span>
-            <input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm" />
-          </label>
-          
-          <div className="relative space-y-1" ref={compRef}>
-            <span className="text-xs font-semibold text-slate-500 uppercase">Company</span>
-            <input
-              type="text"
-              placeholder="Search Company..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm"
-              value={compSearch}
-              onChange={e => { 
-                const val = e.target.value;
-                setCompSearch(val); 
-                setCompanyId(''); 
-                setShowCompResults(true); 
-              }}
-              onFocus={() => setShowCompResults(true)}
-            />
-            {showCompResults && (
-              <div className="absolute z-50 mt-1 max-h-40 w-full overflow-y-auto rounded-xl border border-slate-100 bg-white p-1 shadow-xl">
-                {companies.filter(c => c.name.toLowerCase().includes(compSearch.toLowerCase())).map(c => (
-                  <button 
-                    key={c.id} 
-                    type="button"
-                    onClick={() => { 
-                      setCompanyId(c.id); 
-                      setCompSearch(c.name); 
-                      setShowCompResults(false); 
-                      setLines([]); 
-                    }} 
-                    className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    {c.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+    <><div className="space-y-8 pb-32">
 
-          <div className="relative space-y-1" ref={routeRef}>
-            <span className="text-xs font-semibold text-slate-500 uppercase">Route</span>
-            <input
-              type="text"
-              placeholder="Search Route..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm"
-              value={routeSearch}
-              onChange={e => { 
-                const val = e.target.value;
-                setRouteSearch(val); 
-                setRouteId(''); 
-                setShowRouteResults(true); 
-              }}
-              onFocus={() => setShowRouteResults(true)}
-            />
-            {showRouteResults && (
-              <div className="absolute z-50 mt-1 max-h-40 w-full overflow-y-auto rounded-xl border border-slate-100 bg-white p-1 shadow-xl">
-                {routes.filter(r => r.name.toLowerCase().includes(routeSearch.toLowerCase())).map(r => (
-                  <button 
-                    key={r.id} 
-                    type="button"
-                    onClick={() => { 
-                      setRouteId(r.id); 
-                      setRouteSearch(r.name); 
-                      setShowRouteResults(false); 
-                      setShopId(''); 
-                      setShopSearch(''); 
-                    }} 
-                    className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    {r.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+      <div className="lg:grid lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] lg:items-start lg:gap-8">
+        {/* Main Form Area */}
+        <div className="space-y-6">
+          {/* Header Section */}
+          <div className="modern-card p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Info className="h-4 w-4 text-accent" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Order Details</h2>
+            </div>
 
-          <div className="relative space-y-1" ref={shopRef}>
-            <span className="text-xs font-semibold text-slate-500 uppercase">Shop</span>
-            <input
-              type="text"
-              placeholder={routeId ? "Search Shop..." : "Select Route First..."}
-              className={`w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm ${!routeId ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50 cursor-pointer'}`}
-              value={shopSearch}
-              disabled={!routeId}
-              onChange={e => { 
-                const val = e.target.value;
-                setShopSearch(val); 
-                setShopId(''); 
-                setShowShopResults(true); 
-              }}
-              onFocus={() => routeId && setShowShopResults(true)}
-            />
-            {routeId && showShopResults && (
-              <div className="absolute z-50 mt-1 max-h-40 w-full overflow-y-auto rounded-xl border border-slate-100 bg-white p-1 shadow-xl">
-                {filteredShops.filter(s => s.name.toLowerCase().includes(shopSearch.toLowerCase())).map(s => (
-                  <button 
-                    key={s.id} 
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      setShopId(s.id); 
-                      setShopSearch(s.name); 
-                      setShowShopResults(false); 
-                    }} 
-                    className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    {s.name}
-                  </button>
-                ))}
-                {filteredShops.length === 0 && (
-                  <div className="p-4 text-center text-xs text-slate-400 font-medium">No shops on this route</div>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {/* Date */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
+                  <Calendar className="h-3 w-3" /> Date
+                </label>
+                <input
+                  type="date"
+                  value={orderDate}
+                  onChange={e => setOrderDate(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-accent/20 outline-none transition" />
+              </div>
+
+              {/* Company */}
+              <div className="relative space-y-1.5" ref={compRef}>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
+                  <Building2 className="h-3 w-3" /> Company
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-accent/20 outline-none transition"
+                  value={compSearch}
+                  onChange={e => {
+                    setCompSearch(e.target.value);
+                    setCompanyId('');
+                    setShowCompResults(true);
+                  }}
+                  onFocus={() => setShowCompResults(true)} />
+                {showCompResults && (
+                  <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-xl">
+                    {companies.filter(c => c.name.toLowerCase().includes(compSearch.toLowerCase())).map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          setCompanyId(c.id);
+                          setCompSearch(c.name);
+                          setShowCompResults(false);
+                          setLines([]);
+                        }}
+                        className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-secondary transition"
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-            )}
+
+              {/* Route */}
+              <div className="relative space-y-1.5" ref={routeRef}>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
+                  <MapPin className="h-3 w-3" /> Route
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-accent/20 outline-none transition"
+                  value={routeSearch}
+                  onChange={e => {
+                    setRouteSearch(e.target.value);
+                    setRouteId('');
+                    setShowRouteResults(true);
+                  }}
+                  onFocus={() => setShowRouteResults(true)} />
+                {showRouteResults && (
+                  <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-xl">
+                    {routes.filter(r => r.name.toLowerCase().includes(routeSearch.toLowerCase())).map(r => (
+                      <button
+                        key={r.id}
+                        onClick={() => {
+                          setRouteId(r.id);
+                          setRouteSearch(r.name);
+                          setShowRouteResults(false);
+                          setShopId('');
+                          setShopSearch('');
+                        }}
+                        className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-secondary transition"
+                      >
+                        {r.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Shop */}
+              <div className="relative space-y-1.5" ref={shopRef}>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
+                  <Store className="h-3 w-3" /> Shop
+                </label>
+                <input
+                  type="text"
+                  placeholder={routeId ? "Search..." : "Select route first"}
+                  disabled={!routeId}
+                  className={`w-full rounded-lg border border-border px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition ${!routeId ? 'bg-secondary/30 cursor-not-allowed opacity-50' : 'bg-secondary/50 focus:bg-white'}`}
+                  value={shopSearch}
+                  onChange={e => {
+                    setShopSearch(e.target.value);
+                    setShopId('');
+                    setShowShopResults(true);
+                  }}
+                  onFocus={() => routeId && setShowShopResults(true)} />
+                {routeId && showShopResults && (
+                  <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-xl">
+                    {filteredShops.filter(s => s.name.toLowerCase().includes(shopSearch.toLowerCase())).map(s => (
+                      <button
+                        key={s.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setShopId(s.id);
+                          setShopSearch(s.name);
+                          setShowShopResults(false);
+                        }}
+                        className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-secondary transition"
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <label className="block space-y-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Delivery Man</span>
-            <select
-              value={deliveryPersonId}
-              onChange={e => setDeliveryPersonId(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm"
-            >
-              <option value="">-- Optional --</option>
-              {deliveryPeople.map(person => (
-                <option key={person.id} value={person.id}>{person.name}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </PageCard>
+          {/* Products Section */}
+          <div className="modern-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border bg-secondary/30 px-6 py-4">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-accent" />
+                <h2 className="text-sm font-bold text-foreground">Order Items</h2>
+              </div>
+              <span className="text-xs font-medium text-muted">{lines.length} {lines.length === 1 ? 'item' : 'items'}</span>
+            </div>
 
-      <PageCard title="Order Items">
-        <div>
-          <table className="w-full text-sm text-left">
-            <thead>
-              <tr className="text-slate-500 border-b border-slate-100">
-                <th className="py-3 pr-4 font-semibold">Product</th>
-                <th className="py-3 px-2 font-semibold w-24 text-center">Qty</th>
-                <th className="py-3 px-2 font-semibold w-24 text-center">Free</th>
-                <th className="py-3 px-2 font-semibold w-32 text-center">Price</th>
-                <th className="py-3 px-2 font-semibold w-40 text-center">Discount</th>
-                <th className="py-3 px-2 font-semibold w-32 text-right">Total</th>
-                <th className="py-3 pl-4 font-semibold w-12"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-secondary/10 text-[10px] font-bold uppercase tracking-wider text-muted border-b border-border">
+                    <th className="px-6 py-3 text-left">Product</th>
+                    <th className="px-3 py-3 text-center w-24">Qty</th>
+                    <th className="px-3 py-3 text-center w-24">Free</th>
+                    <th className="px-3 py-3 text-center w-32">Price</th>
+                    <th className="px-3 py-3 text-right w-32">Total</th>
+                    <th className="px-4 py-3 text-center w-12"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {lines.map((line, idx) => (
+                    <tr key={idx} className="group hover:bg-secondary/20 transition-colors">
+                      <td className="px-6 py-4 min-w-[250px]">
+                        <div className="relative product-row-container">
+                          <input
+                            type="text"
+                            placeholder="Search product..."
+                            className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition"
+                            value={line.productId ? line.productName : line.searchText || ''}
+                            onChange={(e) => {
+                              updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
+                            }}
+                            onFocus={() => {
+                              updateLine(idx, { showResults: true });
+                            }} />
+                          {line.showResults && (
+                            <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-full min-w-[300px] overflow-y-auto rounded-xl border border-border bg-white p-1 shadow-2xl">
+                              {allProducts
+                                .filter(p => !companyId || p.companyId === companyId)
+                                .filter(p => p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) ||
+                                  p.sku.toLowerCase().includes((line.searchText || '').toLowerCase())
+                                )
+                                .map(p => (
+                                  <button
+                                    key={p.id}
+                                    disabled={(stockMap[p.id] || 0) <= 0}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      if ((stockMap[p.id] || 0) <= 0) return;
+                                      if (!companyId) {
+                                        setCompanyId(p.companyId);
+                                        const comp = companies.find(c => c.id === p.companyId);
+                                        if (comp) setCompSearch(comp.name);
+                                      }
+                                      updateLine(idx, {
+                                        productId: p.id,
+                                        productName: p.name,
+                                        unitPrice: p.salePrice,
+                                        showResults: false,
+                                        searchText: p.name
+                                      });
+                                    }}
+                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${(stockMap[p.id] || 0) <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-secondary'}`}
+                                  >
+                                    <div className="flex-1">
+                                      <div className="font-bold text-foreground">{p.name}</div>
+                                      <div className="flex items-center gap-2 text-[10px] text-muted font-bold">
+                                        <span>{p.sku}</span>
+                                        <span>•</span>
+                                        <span className={(stockMap[p.id] || 0) <= 10 ? 'text-rose-500' : 'text-emerald-600'}>
+                                          Stock: {stockMap[p.id] || 0}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="font-bold text-accent">{formatCurrency(p.salePrice)}</div>
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-4">
+                        <input
+                          type="number"
+                          value={line.quantity || ''}
+                          onChange={e => updateLine(idx, { quantity: Number(e.target.value) })}
+                          className="w-full rounded-lg border border-border bg-white px-3 py-2 text-center text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
+                      </td>
+                      <td className="px-3 py-4">
+                        <input
+                          type="number"
+                          value={line.freeQuantity || ''}
+                          onChange={e => updateLine(idx, { freeQuantity: Number(e.target.value) })}
+                          className="w-full rounded-lg border border-border bg-white px-3 py-2 text-center text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
+                      </td>
+                      <td className="px-3 py-4">
+                        <input
+                          type="number"
+                          value={line.unitPrice || ''}
+                          onChange={e => updateLine(idx, { unitPrice: Number(e.target.value) })}
+                          className="w-full rounded-lg border border-border bg-white px-3 py-2 text-center text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
+                      </td>
+                      <td className="px-3 py-4 text-right font-bold text-foreground">
+                        {formatCurrency(line.lineTotal)}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <button
+                          onClick={() => removeLine(idx)}
+                          className="text-muted hover:text-rose-600 transition-colors p-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-border">
               {lines.map((line, idx) => (
-                <tr key={idx}>
-                  <td className="py-3 pr-4 relative">
-                    <div className="relative product-row-container">
+                <div key={idx} className="p-4 space-y-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 relative product-row-container">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1 block">Product</label>
                       <input
                         type="text"
                         placeholder="Search product..."
-                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2"
+                        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition"
                         value={line.productId ? line.productName : line.searchText || ''}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          const newLines = [...lines];
-                          newLines[idx] = { ...newLines[idx], searchText: val, showResults: true, productId: 0 };
-                          setLines(newLines);
+                          updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
                         }}
                         onFocus={() => {
-                          const newLines = [...lines];
-                          newLines[idx] = { ...newLines[idx], showResults: true };
-                          setLines(newLines);
-                        }}
-                      />
+                          updateLine(idx, { showResults: true });
+                        }} />
                       {line.showResults && (
-                        <div className="absolute left-0 top-full z-[9999] mt-1 max-h-60 w-full min-w-[300px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl shadow-slate-200/50">
+                        <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-full min-w-[280px] overflow-y-auto rounded-xl border border-border bg-white p-1 shadow-2xl">
                           {allProducts
                             .filter(p => !companyId || p.companyId === companyId)
-                            .filter(p => 
-                              p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) || 
+                            .filter(p => p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) ||
                               p.sku.toLowerCase().includes((line.searchText || '').toLowerCase())
                             )
                             .map(p => (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  disabled={(stockMap[p.id] || 0) <= 0}
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    if ((stockMap[p.id] || 0) <= 0) return;
-                                    // Always try to select company if it's empty
-                                    if (!companyId) {
-                                      setCompanyId(p.companyId);
-                                      const comp = companies.find(c => c.id === p.companyId);
-                                      if (comp) {
-                                        setCompSearch(comp.name);
-                                      }
-                                    }
-                                    updateLine(idx, { 
-                                      productId: p.id, 
-                                      productName: p.name, 
-                                      unitPrice: p.salePrice,
-                                      showResults: false,
-                                      searchText: p.name
-                                    });
-                                  }}
-                                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition border-b border-slate-50 last:border-0 ${
-                                    (stockMap[p.id] || 0) <= 0 ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-50 cursor-pointer'
-                                  }`}
-                                >
+                              <button
+                                key={p.id}
+                                disabled={(stockMap[p.id] || 0) <= 0}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  if ((stockMap[p.id] || 0) <= 0) return;
+                                  if (!companyId) {
+                                    setCompanyId(p.companyId);
+                                    const comp = companies.find(c => c.id === p.companyId);
+                                    if (comp) setCompSearch(comp.name);
+                                  }
+                                  updateLine(idx, {
+                                    productId: p.id,
+                                    productName: p.name,
+                                    unitPrice: p.salePrice,
+                                    showResults: false,
+                                    searchText: p.name
+                                  });
+                                }}
+                                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${(stockMap[p.id] || 0) <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-secondary'}`}
+                              >
                                 <div className="flex-1">
-                                  <div className="font-medium text-slate-900">{p.name}</div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-slate-400">{p.sku} | {p.company?.name}</span>
-                                    <span className={`text-[10px] font-bold ${
-                                      (stockMap[p.id] || 0) <= 0 ? 'text-rose-600' : 
-                                      (stockMap[p.id] || 0) <= 10 ? 'text-amber-600' : 'text-emerald-600'
-                                    }`}>
+                                  <div className="font-bold text-foreground">{p.name}</div>
+                                  <div className="flex items-center gap-2 text-[10px] text-muted font-bold">
+                                    <span>{p.sku}</span>
+                                    <span>•</span>
+                                    <span className={(stockMap[p.id] || 0) <= 10 ? 'text-rose-500' : 'text-emerald-600'}>
                                       Stock: {stockMap[p.id] || 0}
                                     </span>
                                   </div>
                                 </div>
-                                <div className="text-emerald-600 font-bold">{formatCurrency(p.salePrice)}</div>
                               </button>
                             ))}
-                          {allProducts.filter(p => !companyId || p.companyId === companyId).filter(p => p.name.toLowerCase().includes((line.searchText || '').toLowerCase())).length === 0 && (
-                            <div className="p-4 text-center text-xs text-slate-400">No products found</div>
-                          )}
                         </div>
                       )}
                     </div>
-                  </td>
-                  <td className="py-3 px-2">
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={line.quantity === 0 ? '' : line.quantity} 
-                      onChange={e => updateLine(idx, { quantity: e.target.value === '' ? 0 : Number(e.target.value) })} 
-                      className={`w-full rounded-lg border bg-white px-3 py-2 text-center focus:ring-1 outline-none transition ${
-                        line.productId && (Number(line.quantity) + Number(line.freeQuantity)) > (stockMap[line.productId] || 0)
-                          ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500 text-rose-600'
-                          : 'border-slate-200 focus:border-slate-900 focus:ring-slate-900'
-                      }`} 
-                    />
-                    {line.productId && (Number(line.quantity) + Number(line.freeQuantity)) > (stockMap[line.productId] || 0) && (
-                      <div className="text-[10px] font-bold text-rose-600 mt-1">Short: {(Number(line.quantity) + Number(line.freeQuantity)) - (stockMap[line.productId] || 0)}</div>
-                    )}
-                  </td>
-                  <td className="py-3 px-2">
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={line.freeQuantity === 0 ? '' : line.freeQuantity} 
-                      onChange={e => updateLine(idx, { freeQuantity: e.target.value === '' ? 0 : Number(e.target.value) })} 
-                      className={`w-full rounded-lg border bg-white px-3 py-2 text-center focus:ring-1 outline-none transition ${
-                        line.productId && (Number(line.quantity) + Number(line.freeQuantity)) > (stockMap[line.productId] || 0)
-                          ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500 text-rose-600'
-                          : 'border-slate-200 focus:border-slate-900 focus:ring-slate-900'
-                      }`} 
-                    />
-                  </td>
-                  <td className="py-3 px-2">
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={line.unitPrice === 0 ? '' : line.unitPrice} 
-                      onChange={e => updateLine(idx, { unitPrice: e.target.value === '' ? 0 : Number(e.target.value) })} 
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-center focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none transition" 
-                    />
-                  </td>
-                  <td className="py-3 px-2">
-                    <div className="flex gap-1">
-                      <input 
-                        type="number" 
-                        placeholder="0"
-                        value={line.discountValue === 0 ? '' : line.discountValue} 
-                        onChange={e => updateLine(idx, { discountValue: e.target.value === '' ? 0 : Number(e.target.value) })} 
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-center focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none transition" 
-                      />
-                      <select value={line.discountType} onChange={e => updateLine(idx, { discountType: e.target.value as 'FIXED' | 'PERCENT' })} className="rounded-lg border border-slate-200 bg-slate-50 px-1 text-[10px]">
-                        <option value="FIXED">৳</option>
-                        <option value="PERCENT">%</option>
-                      </select>
-                    </div>
-                  </td>
-                  <td className="py-3 px-2 text-right font-semibold">
-                    {formatCurrency(line.lineTotal)}
-                  </td>
-                  <td className="py-3 pl-4">
-                    <button onClick={() => removeLine(idx)} className="text-rose-500 hover:text-rose-700">✕</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <button onClick={addLine} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-3 text-sm font-medium text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition cursor-pointer">
-          <span className="text-lg">+</span> Add Product Row
-        </button>
-      </PageCard>
+                    <button
+                      onClick={() => removeLine(idx)}
+                      className="mt-6 p-2 text-muted hover:text-rose-600 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-6">
-          <PageCard title="Invoice Discount">
-            <div className="flex items-center gap-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted block">Qty</label>
+                      <input
+                        type="number"
+                        value={line.quantity || ''}
+                        onChange={e => updateLine(idx, { quantity: Number(e.target.value) })}
+                        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted block">Free</label>
+                      <input
+                        type="number"
+                        value={line.freeQuantity || ''}
+                        onChange={e => updateLine(idx, { freeQuantity: Number(e.target.value) })}
+                        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted block">Price</label>
+                      <input
+                        type="number"
+                        value={line.unitPrice || ''}
+                        onChange={e => updateLine(idx, { unitPrice: Number(e.target.value) })}
+                        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Line Total</span>
+                    <span className="font-bold text-foreground">{formatCurrency(line.lineTotal)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-6 bg-secondary/10">
+              <button
+                onClick={addLine}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-4 text-sm font-bold text-muted hover:border-accent hover:text-accent hover:bg-accent/5 transition-all"
+              >
+                <Plus className="h-4 w-4" /> Add Product Row
+              </button>
+            </div>
+          </div>
+
+          {/* Additional Info Section */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="modern-card p-6">
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setShowDiscount(!showDiscount)}
+              >
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-accent" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Invoice Discount</h2>
+                </div>
+                {showDiscount ? <ChevronUp className="h-4 w-4 text-muted" /> : <ChevronDown className="h-4 w-4 text-muted" />}
+              </div>
+
+              {showDiscount && (
+                <div className="mt-6 flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex-1 space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Value</label>
+                    <input
+                      type="number"
+                      value={invDiscountValue || ''}
+                      onChange={e => setInvDiscountValue(Number(e.target.value))}
+                      className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
+                  </div>
+                  <div className="w-32 space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Type</label>
+                    <select
+                      value={invDiscountType}
+                      onChange={e => setInvDiscountType(e.target.value as 'FIXED' | 'PERCENT')}
+                      className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="FIXED">Fixed (৳)</option>
+                      <option value="PERCENT">Percent (%)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modern-card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Info className="h-4 w-4 text-accent" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Additional Note</h2>
+              </div>
+              <textarea
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder="Notes for this order..."
+                className="w-full h-11 rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition resize-none" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Sticky Summary Area */}
+      <div className="mt-8 lg:mt-0">
+        <div className="sticky top-24 space-y-6">
+          <div className="modern-card p-8 bg-primary text-white shadow-2xl">
+            <h2 className="text-sm font-bold uppercase tracking-widest opacity-60 mb-8">Order Summary</h2>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center text-sm">
+                <span className="opacity-60">Items Total</span>
+                <span className="font-bold">{formatCurrency(subtotal)}</span>
+              </div>
+
+              <div className="flex justify-between items-center text-sm">
+                <span className="opacity-60">Total Quantity</span>
+                <div className="text-right">
+                  <p className="font-bold">{totalQty} Units</p>
+                  {totalFreeQty > 0 && <p className="text-[10px] font-bold text-accent">+ {totalFreeQty} Free</p>}
+                </div>
+              </div>
+
+              {invoiceDiscountAmount > 0 && (
+                <div className="flex justify-between items-center text-sm text-accent">
+                  <span className="font-medium">Discount</span>
+                  <span className="font-bold">- {formatCurrency(invoiceDiscountAmount)}</span>
+                </div>
+              )}
+
+              <div className="pt-6 mt-2 border-t border-white/10">
+                <div className="flex justify-between items-end">
+                  <span className="text-xs font-bold uppercase tracking-widest opacity-60">Grand Total</span>
+                  <span className="text-4xl font-black text-white">{formatCurrency(grandTotal)}</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="mt-8 w-full rounded-xl bg-accent py-4 text-white font-black shadow-lg shadow-accent/20 hover:bg-accent/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3"
+            >
+              {isSaving ? (
+                <>
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-5 w-5" />
+                  {orderId ? 'Update Order' : 'Complete Order'}
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="modern-card p-6 bg-white border border-border">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-secondary rounded-lg">
+                <User className="h-4 w-4 text-primary" />
+              </div>
               <div className="flex-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase mb-1 block">Value</label>
-                <input 
-                  type="number" 
-                  placeholder="0"
-                  value={invDiscountValue === 0 ? '' : invDiscountValue} 
-                  onChange={e => setInvDiscountValue(e.target.value === '' ? 0 : Number(e.target.value))} 
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none transition" 
-                />            </div>
-              <div className="w-32">
-                <label className="text-xs font-semibold text-slate-500 uppercase mb-1 block">Type</label>
-                <select value={invDiscountType} onChange={e => setInvDiscountType(e.target.value as 'FIXED' | 'PERCENT')} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm">
-                  <option value="FIXED">Fixed (৳)</option>
-                  <option value="PERCENT">Percent (%)</option>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Assign Delivery</p>
+                <select
+                  value={deliveryPersonId}
+                  onChange={e => setDeliveryPersonId(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full bg-transparent text-sm font-bold text-foreground outline-none cursor-pointer"
+                >
+                  <option value="">No Personnel Assigned</option>
+                  {deliveryPeople.map(person => (
+                    <option key={person.id} value={person.id}>{person.name}</option>
+                  ))}
                 </select>
               </div>
             </div>
-          </PageCard>
-
-          <PageCard title="Additional Note">
-            <textarea
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder="Add special instructions for this order..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none transition h-24 resize-none"
-            />
-          </PageCard>
-        </div>
-
-        <PageCard title="Summary">
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Total Quantity</span>
-              <span className="font-semibold">{totalQty} {totalFreeQty > 0 ? `(+ ${totalFreeQty} Free)` : ''}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Subtotal</span>
-              <span className="font-semibold">{formatCurrency(subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-sm text-rose-600">
-              <span>Invoice Discount</span>
-              <span>- {formatCurrency(invoiceDiscountAmount)}</span>
-            </div>
-            <div className="border-t border-slate-100 pt-2 flex justify-between text-lg font-bold text-slate-900">
-              <span>Grand Total</span>
-              <span>{formatCurrency(grandTotal)}</span>
-            </div>
-            <button 
-              onClick={handleSave} 
-              disabled={isSaving}
-              className="mt-4 w-full rounded-2xl bg-slate-900 py-4 text-white font-bold hover:bg-slate-800 transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {isSaving && (
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
-              {isSaving ? (orderId ? 'Updating Order...' : 'Saving Order...') : (orderId ? 'Update Order' : 'Complete Order')}
-            </button>
           </div>
-        </PageCard>
+        </div>
       </div>
     </div>
+    <button
+      onClick={addLine}
+      className="fixed bottom-24 right-6 lg:hidden z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white shadow-2xl hover:scale-110 active:scale-95 transition-all"
+    >
+      <Plus className="h-5 w-5" />
+    </button>
+
+      {/* Quick Summary Bar for Mobile */ }
+  <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border px-6 py-4 flex items-center justify-between lg:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+    <div className="flex flex-col">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Grand Total</span>
+      <span className="text-xl font-black text-primary">{formatCurrency(grandTotal)}</span>
+    </div>
+    <button
+      onClick={handleSave}
+      disabled={isSaving}
+      className="bg-accent text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg shadow-accent/20 active:scale-95 transition-all disabled:opacity-50"
+    >
+      {isSaving ? '...' : 'Complete Order'}
+    </button>
+  </div>
+</>
   );
 }
+

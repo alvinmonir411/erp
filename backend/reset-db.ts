@@ -5,19 +5,14 @@ import { AppModule } from './src/app.module';
 async function resetDatabase() {
   const app = await NestFactory.createApplicationContext(AppModule);
   const dataSource = app.get(DataSource);
-  
+
   console.log('Starting database reset...');
-  
+
   const queryRunner = dataSource.createQueryRunner();
   await queryRunner.connect();
   await queryRunner.startTransaction();
-  
+
   try {
-    // Disable foreign key checks for truncation (Postgres uses TRUNCATE ... CASCADE)
-    console.log('Clearing transaction and logistics data...');
-    
-    // Order matters if not using CASCADE, but CASCADE is safer for deep relations
-    // We clear everything EXCEPT: Routes, Shops, Companies, Products, Users
     await queryRunner.query('TRUNCATE TABLE delivery_summary_items RESTART IDENTITY CASCADE');
     await queryRunner.query('TRUNCATE TABLE delivery_summaries RESTART IDENTITY CASCADE');
     await queryRunner.query('TRUNCATE TABLE sale_items RESTART IDENTITY CASCADE');
@@ -27,7 +22,7 @@ async function resetDatabase() {
     await queryRunner.query('TRUNCATE TABLE purchase_payments RESTART IDENTITY CASCADE');
     await queryRunner.query('TRUNCATE TABLE purchases RESTART IDENTITY CASCADE');
     await queryRunner.query('TRUNCATE TABLE stock_movements RESTART IDENTITY CASCADE');
-    
+
     await queryRunner.commitTransaction();
     console.log('Database reset successful! Kept: Routes, Shops, Companies, Products, and Users.');
   } catch (err) {

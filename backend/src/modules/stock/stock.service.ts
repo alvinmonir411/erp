@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { getBDDayRange } from '../../common/utils/date.utils';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, DataSource } from 'typeorm';
 import { StockMovement } from './entities/stock-movement.entity';
 import { StockMovementType } from './stock.constants';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
@@ -11,7 +11,7 @@ import { OrderStatus } from '../orders/orders.constants';
 import { DispatchBatch, DispatchBatchStatus } from '../delivery-ops/entities/dispatch-batch.entity';
 
 @Injectable()
-export class StockService {
+export class StockService implements OnModuleInit {
   constructor(
     @InjectRepository(StockMovement)
     private readonly movementRepository: Repository<StockMovement>,
@@ -23,37 +23,110 @@ export class StockService {
     private readonly orderItemRepository: Repository<OrderItem>,
     @InjectRepository(DispatchBatch)
     private readonly batchRepository: Repository<DispatchBatch>,
+    private readonly dataSource: DataSource,
   ) {}
+
+  async onModuleInit() {
+    this.logger.log('Ensuring database schema: products.currentStock and enum values');
+    try {
+      // 1. Ensure currentStock column
+      await this.dataSource.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS "currentStock" DECIMAL(12,2) DEFAULT 0');
+      
+      // 2. Ensure enum values for stock movements
+      // Postgres doesn't support IF NOT EXISTS for ADD VALUE directly in older versions, 
+      // but we can check if it exists first.
+      const enumValues = ['OPENING', 'STOCK_IN', 'STOCK_OUT', 'ADJUSTMENT', 'RETURN_IN', 'DAMAGE', 'SALE'];
+      for (const val of enumValues) {
+        try {
+          // This query checks if the value exists in the enum type and adds it if not.
+          // Note: This assumes the enum type is named 'stock_movements_type_enum' (standard TypeORM naming)
+          await this.dataSource.query(`
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid WHERE t.typname = 'stock_movements_type_enum' AND e.enumlabel = '${val}') THEN
+                ALTER TYPE stock_movements_type_enum ADD VALUE '${val}';
+              END IF;
+            END
+            $$;
+          `);
+        } catch (innerError) {
+          // If the type name is different or something else fails, we just log it
+          this.logger.warn(`Could not ensure enum value ${val}: ${innerError.message}`);
+        }
+      }
+
+      this.logger.log('Database schema: products.currentStock and enums ensured.');
+    } catch (e) {
+      this.logger.warn('Error during onModuleInit schema check: ' + e.message);
+    }
+  }
 
   private readonly logger = new Logger(StockService.name);
 
   async create(dto: CreateStockMovementDto, username: string = 'Admin', manager?: any) {
-    const repo = manager ? manager.getRepository(StockMovement) : this.movementRepository;
-    
-    // Prevent negative stock if it's an outgoing movement
-    if (Number(dto.quantity) < 0) {
-      const currentStock = await this.getProductStock(dto.productId, manager);
-      if (currentStock + Number(dto.quantity) < 0) {
-        throw new Error(`Insufficient stock for product ${dto.productId}. Current: ${currentStock}, Requested: ${Math.abs(Number(dto.quantity))}`);
+    if (manager) {
+      return this.executeMovement(dto, username, manager);
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const result = await this.executeMovement(dto, username, queryRunner.manager);
+      await queryRunner.commitTransaction();
+      return result;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  private async executeMovement(dto: CreateStockMovementDto, username: string, manager: any) {
+    const productRepo = manager.getRepository(Product);
+    const movementRepo = manager.getRepository(StockMovement);
+
+    // 1. Lock product for update
+    const product = await productRepo.findOne({
+      where: { id: dto.productId },
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Product ${dto.productId} not found`);
+    }
+
+    const qty = Number(dto.quantity);
+
+    // 2. Prevent negative stock if it's an outgoing movement
+    if (qty < 0) {
+      if (Number(product.currentStock) + qty < 0) {
+        throw new BadRequestException(`Insufficient stock for product ${product.name}. Current: ${product.currentStock}, Requested: ${Math.abs(qty)}`);
       }
     }
 
-    const movement = repo.create({
+    // 3. Create StockMovement audit record
+    const movement = movementRepo.create({
       ...dto,
       user: username,
     });
-    return repo.save(movement);
+    await movementRepo.save(movement);
+
+    // 4. Update Product currentStock
+    product.currentStock = Number(product.currentStock) + qty;
+    await productRepo.save(product);
+
+    return movement;
   }
 
-  async getProductStock(productId: number, manager?: any): Promise<number> {
-    const repo = manager ? manager.getRepository(StockMovement) : this.movementRepository;
-    const result = await repo
-      .createQueryBuilder('m')
-      .select('SUM(m.quantity)', 'sum')
-      .where('m.productId = :productId', { productId })
-      .getRawOne();
-    
-    return Number(result?.sum || 0);
+  async getProductStock(productId: number): Promise<number> {
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+      select: ['currentStock']
+    });
+    return Number(product?.currentStock || 0);
   }
 
   async getHistory(query: { 
@@ -101,15 +174,8 @@ export class StockService {
     
     const products = await qb.getMany();
 
-    const movements = await this.movementRepository.find({
-      where: companyId ? { companyId } : {},
-    });
-
-    const stockMap = new Map<number, number>();
-    movements.forEach(m => {
-      const current = stockMap.get(m.productId) || 0;
-      stockMap.set(m.productId, current + Number(m.quantity));
-    });
+    // Check for negative stocks and provide a "fix" flag if requested
+    // (In this system, reading from p.currentStock is now standard)
 
     // Check for negative stocks and provide a "fix" flag if requested
     // (In this system, recalculating is already the way it works, 
@@ -168,10 +234,10 @@ export class StockService {
 
     const summary = {
       totalProducts: products.length,
-      totalStockQty: products.reduce((sum, p) => sum + (stockMap.get(p.id) || 0), 0),
-      totalStockValue: products.reduce((sum, p) => sum + ((stockMap.get(p.id) || 0) * p.buyPrice), 0),
-      lowStockCount: products.filter(p => (stockMap.get(p.id) || 0) > 0 && (stockMap.get(p.id) || 0) <= 10).length,
-      outOfStockCount: products.filter(p => (stockMap.get(p.id) || 0) <= 0).length,
+      totalStockQty: products.reduce((sum, p) => sum + Number(p.currentStock || 0), 0),
+      totalStockValue: products.reduce((sum, p) => sum + (Number(p.currentStock || 0) * p.buyPrice), 0),
+      lowStockCount: products.filter(p => Number(p.currentStock || 0) > 0 && Number(p.currentStock || 0) <= 10).length,
+      outOfStockCount: products.filter(p => Number(p.currentStock || 0) <= 0).length,
       todaySoldQty,
       todayReturnQty,
       todayDeliveryAmount,
@@ -182,10 +248,40 @@ export class StockService {
 
     const currentStockList = products.map(p => ({
       ...p,
-      currentStock: stockMap.get(p.id) || 0,
-      stockValue: (stockMap.get(p.id) || 0) * p.buyPrice,
+      stockValue: Number(p.currentStock || 0) * p.buyPrice,
     }));
 
     return { summary, currentStockList };
+  }
+
+  async backfillStock() {
+    this.logger.log('Starting stock backfill...');
+    
+    // Ensure column exists in case synchronize:false
+    try {
+      await this.dataSource.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS "currentStock" DECIMAL(12,2) DEFAULT 0');
+      this.logger.log('Schema update: "currentStock" column ensured.');
+    } catch (e) {
+      this.logger.warn('Could not run ALTER TABLE (might already exist or permission issue): ' + e.message);
+    }
+
+    const products = await this.productRepository.find();
+    let updatedCount = 0;
+
+    for (const product of products) {
+      const result = await this.movementRepository
+        .createQueryBuilder('m')
+        .select('SUM(m.quantity)', 'sum')
+        .where('m.productId = :productId', { productId: product.id })
+        .getRawOne();
+      
+      const actualStock = Number(result?.sum || 0);
+      product.currentStock = actualStock;
+      await this.productRepository.save(product);
+      updatedCount++;
+    }
+
+    this.logger.log(`Backfill completed. Updated ${updatedCount} products.`);
+    return { updatedCount };
   }
 }

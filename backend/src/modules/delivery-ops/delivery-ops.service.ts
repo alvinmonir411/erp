@@ -27,6 +27,7 @@ import { Product } from '../products/entities/product.entity';
 import { StockService } from '../stock/stock.service';
 import { StockMovementType } from '../stock/stock.constants';
 import { StockMovement } from '../stock/entities/stock-movement.entity';
+import { isTodayBD } from '../../common/utils/date.utils';
 
 type CalculatedOrderSettlement = {
   orderId: number;
@@ -668,15 +669,12 @@ export class DeliveryOpsService {
 
     if (
       ![
+        DispatchBatchStatus.DISPATCHED,
         DispatchBatchStatus.RETURN_PENDING,
         DispatchBatchStatus.PARTIALLY_SETTLED,
       ].includes(batch.status)
     ) {
       throw new BadRequestException('Batch is not ready for settlement');
-    }
-
-    if (batch.orders.some((batchOrder) => batchOrder.isSettled)) {
-      throw new BadRequestException('Duplicate settlement is not allowed');
     }
 
     return this.dataSource.transaction(async (manager) => {
@@ -885,38 +883,45 @@ export class DeliveryOpsService {
   }
 
   async getDashboard(date?: string) {
-    const batches = await this.getDispatchBatches({
-      dispatchDate: date,
-    });
+    const queryDate = date || new Date().toISOString().split('T')[0];
+    
+    // Total batches (all time)
+    const allBatches = await this.getDispatchBatches({});
+    // Today's batches
+    const todayBatches = await this.getDispatchBatches({ dispatchDate: queryDate });
+
+    const calcSum = (arr: any[], key: string) => arr.reduce((sum, item) => sum + Number(item[key] || 0), 0);
+    const filterStatus = (arr: any[], statuses: string[]) => arr.filter(b => statuses.includes(b.status));
 
     return {
-      totalBatches: batches.length,
-      draftBatches: batches.filter((batch) => batch.status === DispatchBatchStatus.DRAFT)
-        .length,
-      dispatchedBatches: batches.filter(
-        (batch) => batch.status === DispatchBatchStatus.DISPATCHED,
-      ).length,
-      returnPending: batches.filter(
-        (batch) => batch.status === DispatchBatchStatus.RETURN_PENDING,
-      ).length,
-      settledBatches: batches.filter((batch) => batch.status === DispatchBatchStatus.SETTLED)
-        .length,
-      grossDispatchedValue: batches.reduce(
-        (sum, batch) => sum + Number(batch.grossDispatchedValue || 0),
-        0,
-      ),
-      finalSoldValue: batches.reduce(
-        (sum, batch) => sum + Number(batch.finalSoldValue || 0),
-        0,
-      ),
-      totalDueAmount: batches.reduce(
-        (sum, batch) => sum + Number(batch.totalDueAmount || 0),
-        0,
-      ),
-      totalCollections: batches.reduce(
-        (sum, batch) => sum + Number(batch.totalCollectedAmount || 0),
-        0,
-      ),
+      totalBatches: allBatches.length,
+      todayBatches: todayBatches.length,
+      draftBatches: filterStatus(allBatches, [DispatchBatchStatus.DRAFT, DispatchBatchStatus.PRINTED]).length,
+      dispatchedBatches: filterStatus(allBatches, [DispatchBatchStatus.DISPATCHED]).length,
+      returnPending: filterStatus(allBatches, [DispatchBatchStatus.RETURN_PENDING]).length,
+      settledBatches: filterStatus(allBatches, [DispatchBatchStatus.SETTLED, DispatchBatchStatus.PARTIALLY_SETTLED]).length,
+      todaySettled: todayBatches.filter(b => b.settledAt && isTodayBD(b.settledAt)).length, // rough estimate if settledAt is present
+      
+      totalDispatchAmount: calcSum(allBatches, 'grossDispatchedValue'),
+      todayDispatchAmount: calcSum(todayBatches, 'grossDispatchedValue'),
+      
+      totalFinalSold: calcSum(allBatches, 'finalSoldValue'),
+      todayFinalSold: calcSum(todayBatches, 'finalSoldValue'),
+      
+      totalReturnedQty: allBatches.reduce((sum, b) => sum + (b.items?.reduce((s: any, i: any) => s + Number(i.totalReturnedQty || 0), 0) || 0), 0),
+      todayReturnedQty: todayBatches.reduce((sum, b) => sum + (b.items?.reduce((s: any, i: any) => s + Number(i.totalReturnedQty || 0), 0) || 0), 0),
+      
+      totalCollected: calcSum(allBatches, 'totalCollectedAmount'),
+      todayCollected: calcSum(todayBatches, 'totalCollectedAmount'),
+      
+      totalDue: calcSum(allBatches, 'totalDueAmount'),
+      todayDue: calcSum(todayBatches, 'totalDueAmount'),
+
+      // Fallback old keys
+      grossDispatchedValue: calcSum(allBatches, 'grossDispatchedValue'),
+      finalSoldValue: calcSum(allBatches, 'finalSoldValue'),
+      totalDueAmount: calcSum(allBatches, 'totalDueAmount'),
+      totalCollections: calcSum(allBatches, 'totalCollectedAmount'),
     };
   }
 

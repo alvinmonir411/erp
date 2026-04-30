@@ -9,6 +9,7 @@ import { SettleOrderDto } from './dto/settle-order.dto';
 import { StockMovement } from '../stock/entities/stock-movement.entity';
 import { StockMovementType } from '../stock/stock.constants';
 import { Product } from '../products/entities/product.entity';
+import { StockService } from '../stock/stock.service';
 
 @Injectable()
 export class OrdersService {
@@ -17,6 +18,7 @@ export class OrdersService {
     private readonly ordersRepository: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly orderItemsRepository: Repository<OrderItem>,
+    private readonly stockService: StockService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -180,27 +182,44 @@ export class OrdersService {
 
     // Card 13: Waiting Orders (Confirmed or Assigned but not dispatched)
     const waitingOrders = allOrders.filter(o => [OrderStatus.CONFIRMED, OrderStatus.ASSIGNED].includes(o.status)).length;
+    const confirmedOrders = allOrders.filter(o => o.status === OrderStatus.CONFIRMED).length;
+    const outForDeliveryOrders = allOrders.filter(o => o.status === OrderStatus.OUT_FOR_DELIVERY).length;
+    const settledOrdersCount = allOrders.filter(o => o.status === OrderStatus.SETTLED).length;
 
     // Card 14: Due Collection (From settled orders)
     const dueCollection = allOrders.filter(o => o.status === OrderStatus.SETTLED).reduce((sum, o) => 
+      sum + safeNum(o.dueAmount), 0);
+    const todayDueCollection = allOrders.filter(o => o.status === OrderStatus.SETTLED && isTodayBD(o.updatedAt)).reduce((sum, o) => 
       sum + safeNum(o.dueAmount), 0);
 
     return {
       totalOrders,
       todayOrders,
+      totalOrderValue: totalOrderCutValue, // Renamed from totalOrderCutValue
+      todayOrderValue: todayOrderCutValue,
+      waitingOrders,
+      confirmedOrders,
+      outForDelivery: outForDeliveryOrders,
+      settledOrders: settledOrdersCount,
+      cancelledOrders: totalCancelled,
+      todayCancelled,
+      totalReturnLoss, // Return Value
+      todayReturnLoss, // Today Return Value
+      totalFinalSold: totalActualSoldValue,
+      todayFinalSold: todayActualSoldValue,
+      totalDue: dueCollection,
+      todayDue: todayDueCollection,
+      
+      // Keep old for backward compatibility just in case
       totalOrderCutValue,
       todayOrderCutValue,
       totalActualSoldValue,
       todayActualSoldValue,
-      totalReturnLoss,
-      todayReturnLoss,
       totalDispatch,
       todayDispatch,
       totalSettlement,
       todaySettlement,
       totalCancelled,
-      todayCancelled,
-      waitingOrders,
       dueCollection
     };
   }
@@ -253,31 +272,33 @@ export class OrdersService {
 
         // 1. Restore stock for returned items (only)
         if (returnedQty > 0) {
-          await manager.save(
-            manager.create(StockMovement, {
+          await this.stockService.create(
+            {
               productId: orderItem.productId,
               companyId: order.companyId,
-              type: StockMovementType.ADJUSTMENT,
+              type: StockMovementType.RETURN_IN,
               quantity: returnedQty,
               reference: `Order Settlement #${id}`,
-              user: 'Admin',
               note: `Returned ${returnedQty} units from order #${id}`,
-            }),
+            },
+            'Admin',
+            manager,
           );
         }
 
         // 2. Damage record (stock stays out, but marked)
         if (damagedQty > 0) {
-          await manager.save(
-            manager.create(StockMovement, {
+          await this.stockService.create(
+            {
               productId: orderItem.productId,
               companyId: order.companyId,
-              type: StockMovementType.ADJUSTMENT,
+              type: StockMovementType.DAMAGE,
               quantity: 0,
               reference: `Order Settlement #${id}`,
-              user: 'Admin',
               note: `Damaged ${damagedQty} units from order #${id}`,
-            }),
+            },
+            'Admin',
+            manager,
           );
         }
 
@@ -339,9 +360,11 @@ export class OrdersService {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      // Remove old stock movements and items
-      await manager.delete(StockMovement, { reference: `Order #${id}` });
+      // Remove old items
       await manager.delete(OrderItem, { orderId: id });
+      // Note: Stock movements for orders are usually created at dispatch/settlement.
+      // If we had movements for this order, we would need to reverse them here.
+      // In this ERP, they are currently handled in DeliveryOps or settleOrder.
 
       const { items, subtotal, grandTotal } = this.buildOrderItems(dto.items, manager);
       
@@ -405,8 +428,6 @@ export class OrdersService {
       throw new BadRequestException('Dispatched orders cannot be deleted');
     }
     return this.dataSource.transaction(async (manager) => {
-      // Restore stock movements (if any direct ones were created)
-      await manager.delete(StockMovement, { reference: `Order #${id}` });
       // Delete order (cascades or manual delete items)
       await manager.delete(OrderItem, { orderId: id });
       return manager.delete(Order, id);
@@ -470,12 +491,10 @@ export class OrdersService {
   }
 
   private async getProductStock(productId: number, manager: DataSource['manager']): Promise<number> {
-    const result = await manager
-      .createQueryBuilder(StockMovement, 'm')
-      .select('SUM(m.quantity)', 'sum')
-      .where('m.productId = :productId', { productId })
-      .getRawOne();
-    
-    return Number(result?.sum || 0);
+    const product = await manager.findOne(Product, {
+      where: { id: productId },
+      select: ['currentStock']
+    });
+    return Number(product?.currentStock || 0);
   }
 }

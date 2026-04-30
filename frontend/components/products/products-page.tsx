@@ -203,7 +203,7 @@ export function ProductsPage() {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_400px]">
+    <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
       <PageCard
         title="Products"
         description="View products by company and verify pricing, unit, and active status from the backend."

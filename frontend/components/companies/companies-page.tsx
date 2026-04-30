@@ -182,7 +182,7 @@ export function CompaniesPage() {
                 + Add Company
               </button>
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="mt-5 grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
               <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Total</p>
                 <p className="mt-2 text-2xl font-bold text-white">{companies.length}</p>
@@ -197,7 +197,7 @@ export function CompaniesPage() {
           </div>
         </section>
 
-        <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
+        <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
           {/* ── Left: List ── */}
           <div className="space-y-4">
             {/* Filter bar */}

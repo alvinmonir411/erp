@@ -1,6 +1,6 @@
-import { getBDDayRange, isTodayBD, isTodayBDDate } from '../../common/utils/date.utils';
+import { getBDDayRange, isTodayBD, isTodayBDDate, getBDTodayString } from '../../common/utils/date.utils';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Not, Repository } from 'typeorm';
+import { Between, In, Not, Repository, DataSource } from 'typeorm';
 import { Order, OrderItem } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/orders.constants';
 import { Product } from '../products/entities/product.entity';
@@ -18,10 +18,30 @@ export class DashboardService {
     private readonly productsRepository: Repository<Product>,
     @InjectRepository(StockMovement)
     private readonly movementsRepository: Repository<StockMovement>,
+    private readonly dataSource: DataSource,
   ) { }
   private readonly logger = new Logger(DashboardService.name);
+  private static schemaSynced = false;
 
   async getDashboardData(companyId?: number) {
+    if (!DashboardService.schemaSynced) {
+      try {
+        this.logger.log('Running failsafe schema sync for "currentStock"...');
+        await this.dataSource.query(`
+          DO $$ 
+          BEGIN 
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products' AND column_name='currentStock') THEN
+              ALTER TABLE products ADD COLUMN "currentStock" DECIMAL(12,2) DEFAULT 0;
+            END IF;
+          END $$;
+        `);
+        DashboardService.schemaSynced = true;
+        this.logger.log('Failsafe schema sync completed.');
+      } catch (err) {
+        this.logger.error('Failsafe schema sync failed:', err.message);
+      }
+    }
+
     const { startUtc: todayStartUTC, endUtc: todayEndUTC } = getBDDayRange();
     
     this.logger.log(`[DEBUG DASHBOARD] BD TODAY RANGE: ${todayStartUTC.toISOString()} to ${todayEndUTC.toISOString()}`);
@@ -179,8 +199,42 @@ export class DashboardService {
       this.logger.log(`[DEBUG DASHBOARD] Recent Orders (Top 3): ${recentOrders.slice(0, 3).map(o => `ID=${o.id}(${o.createdAt.toISOString()})`).join(' | ')}`);
     }
     
-    const todayMatchedOrders = allOrders.filter(o => isTodayBD(o.createdAt) && o.status !== OrderStatus.CANCELLED);
+    // Total counts
+    const totalOrders = allOrders.length;
+    const waitingOrders = allOrders.filter(o => [OrderStatus.DRAFT, OrderStatus.CONFIRMED].includes(o.status)).length;
     
+    // Dispatch Batches
+    const batches = await this.dataSource.query('SELECT * FROM dispatch_batches' + (companyId ? ` WHERE "companyId" = ${companyId}` : ''));
+    const totalBatches = batches.length;
+    const todayBatches = batches.filter((b: any) => isTodayBD(b.createdAt)).length;
+    const dispatchedBatches = batches.filter((b: any) => b.status === 'DISPATCHED').length;
+    const returnPendingBatches = batches.filter((b: any) => b.status === 'RETURN_PENDING').length;
+    const settledBatches = batches.filter((b: any) => b.status === 'SETTLED' || b.status === 'PARTIALLY_SETTLED').length;
+    const todaySettledBatches = batches.filter((b: any) => (b.status === 'SETTLED' || b.status === 'PARTIALLY_SETTLED') && b.settledAt && isTodayBD(b.settledAt)).length;
+
+    // Money
+    const totalCollected = batches.reduce((sum: number, b: any) => sum + safeNum(b.totalCollectedAmount), 0);
+    const todayCollected = batches.filter((b: any) => b.settledAt && isTodayBD(b.settledAt)).reduce((sum: number, b: any) => sum + safeNum(b.totalCollectedAmount), 0);
+    
+    // Stock quantities
+    const totalProducts = products.length;
+    const totalStockQty = Array.from(stockMap.values()).reduce((sum, qty) => sum + qty, 0);
+    
+    const todaySoldQty = settledItems.filter(i => i.order?.settledAt && isTodayBD(i.order.settledAt)).reduce((sum, i) => sum + safeNum(i.deliveredQuantity), 0);
+    const todayReturnQty = allOrders.filter(o => o.status === OrderStatus.SETTLED && isTodayBD(o.settledAt)).reduce((sum, o) => sum + (o.items?.reduce((s: number, i: OrderItem) => s + safeNum(i.returnedQuantity), 0) || 0), 0);
+    const totalSoldQty = settledItems.reduce((sum, i) => sum + safeNum(i.deliveredQuantity), 0);
+    // Optimized Free Qty calculation using query builder instead of in-memory filter
+    const freeQtyResults = await this.orderItemsRepository.createQueryBuilder('item')
+      .leftJoin('item.order', 'order')
+      .select('SUM(CAST(item.freeQuantity AS DECIMAL))', 'total_free')
+      .addSelect('SUM(CASE WHEN order.orderDate = :today THEN CAST(item.freeQuantity AS DECIMAL) ELSE 0 END)', 'today_free')
+      .where('item.freeQuantity > 0')
+      .andWhere(companyId ? 'order.companyId = :companyId' : '1=1', { companyId, today: getBDTodayString() })
+      .getRawOne();
+
+    const totalFreeQty = safeNum(freeQtyResults?.total_free);
+    const todayFreeQty = safeNum(freeQtyResults?.today_free);
+
     return {
       salesOverview: { totalOrderValue, netSales, totalProfit, returnRate },
       dailyOperations: { todayOrders, todayDispatch, todaySettled: todaySettledValue, todayReturn, todayCancelled },
@@ -195,7 +249,58 @@ export class DashboardService {
         status: o.status,
         orderDate: o.orderDate,
         createdAt: o.createdAt
-      }))
+      })),
+      
+      // NEW EXACT METRICS FOR UI
+      uiMetrics: {
+        orders: {
+          totalOrders,
+          todayOrdersCount: todayOrders.count,
+          totalOrderValue,
+          todayOrderValue: todayOrders.amount,
+          waitingOrders,
+          cancelledOrders: totalCancelledOrders,
+          todayCancelled
+        },
+        delivery: {
+          totalDispatch: totalBatches,
+          todayDispatch: todayBatches,
+          pendingDispatch: batches.filter((b: any) => b.status === 'DRAFT' || b.status === 'PRINTED').length,
+          returnPending: returnPendingBatches,
+          settledBatches,
+          todaySettledBatches
+        },
+        money: {
+          totalGrossAmount: totalOrderValue,
+          todayGrossAmount: todayOrders.amount,
+          totalFinalSold: netSales,
+          todayFinalSold: todaySettledValue,
+          totalCollected,
+          todayCollected,
+          totalDue: pendingAmount,
+          todayDue: allOrders.filter(o => isTodayBD(o.createdAt) && [OrderStatus.CONFIRMED, OrderStatus.ASSIGNED, OrderStatus.OUT_FOR_DELIVERY].includes(o.status)).reduce((sum, o) => sum + safeNum(o.grandTotal), 0),
+          totalProfit,
+          todayProfit: settledItems.filter(i => i.order?.settledAt && isTodayBD(i.order.settledAt)).reduce((sum: number, item: OrderItem) => {
+            const delivered = safeNum(item.deliveredQuantity);
+            const buyPrice = safeNum(item.product?.buyPrice);
+            const itemPrice = item.quantity > 0 ? item.lineTotal / item.quantity : item.unitPrice;
+            return sum + (delivered * (itemPrice - buyPrice));
+          }, 0)
+        },
+        stock: {
+          totalProducts,
+          totalStockQty,
+          stockValue,
+          lowStock: lowStockCount,
+          outOfStock: outOfStockCount,
+          todaySoldQty,
+          todayReturnQty,
+          totalSoldQty,
+          totalReturnQty: totalReturnedQty,
+          totalFreeQty,
+          todayFreeQty
+        }
+      }
     };
   }
 }

@@ -1,48 +1,34 @@
-import { DataSource } from 'typeorm';
-import { Order, OrderItem } from '../src/modules/orders/entities/order.entity';
-import { Company } from '../src/modules/companies/entities/company.entity';
-import { Route } from '../src/modules/routes/entities/route.entity';
-import { Shop } from '../src/modules/shops/entities/shop.entity';
-import { Product } from '../src/modules/products/entities/product.entity';
-import * as dotenv from 'dotenv';
+import { Client } from 'pg';
 
-dotenv.config();
-
-async function check() {
-  const ds = new DataSource({
-    type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    database: process.env.DB_NAME || 'inventory_db',
-    entities: [Order, OrderItem, Company, Route, Shop, Product],
-    synchronize: false,
+async function checkSchema() {
+  const client = new Client({
+    connectionString: 'postgresql://neondb_owner:npg_9ByhcsjYMR7H@ep-square-paper-an5uie01-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require',
   });
 
   try {
-    await ds.initialize();
-    console.log('DB Connected');
+    await client.connect();
+    console.log('Connected to database.');
+    
+    const res = await client.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'products' AND column_name = 'currentStock';
+    `);
 
-    const orders = await ds.getRepository(Order).find({
-      relations: ['items'],
-      take: 5,
-      order: { id: 'DESC' }
-    });
-
-    console.log('Orders found:', orders.length);
-    orders.forEach(o => {
-      console.log(`Order #${o.id}: Items Count = ${o.items?.length || 0}, Total = ${o.grandTotal}`);
-    });
-
-    const itemSample = await ds.getRepository(OrderItem).findOne({ where: {} });
-    console.log('Item Sample:', itemSample);
-
-  } catch (e) {
-    console.error('Error:', e);
+    if (res.rows.length > 0) {
+      console.log('SUCCESS: column "currentStock" exists.');
+    } else {
+      console.log('FAILURE: column "currentStock" does NOT exist.');
+      
+      console.log('Attempting manual fix...');
+      await client.query('ALTER TABLE products ADD COLUMN "currentStock" DECIMAL(12,2) DEFAULT 0;');
+      console.log('Manual fix applied.');
+    }
+  } catch (err) {
+    console.error('Error:', err.message);
   } finally {
-    await ds.destroy();
+    await client.end();
   }
 }
 
-check();
+checkSchema();

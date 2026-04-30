@@ -2,58 +2,97 @@
 
 import { useAuth } from '../auth/auth-provider';
 import { usePathname } from 'next/navigation';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Bell, Menu, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-export function Topbar() {
+export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
+
+  const isSubPage = pathname.split('/').filter(Boolean).length > 1;
   
   const getTitle = () => {
     const parts = pathname.split('/').filter(Boolean);
     if (parts.length === 0) return 'Dashboard';
     
     const first = parts[0];
-    if (first === 'orders') return 'Manage Order';
-    if (first === 'sales') return 'Sales Management';
-    if (first === 'products') return 'Products';
-    if (first === 'stock') return 'Inventory';
-    if (first === 'routes') return 'Routes';
-    if (first === 'shops') return 'Shops';
-    if (first === 'companies') return 'Companies';
+    if (first === 'orders') return 'Order Management';
+    if (first === 'delivery-ops') return 'Delivery Operations';
+    if (first === 'products') return 'Product Catalog';
+    if (first === 'stock') return 'Inventory Stock';
+    if (first === 'routes') return 'Route Management';
+    if (first === 'shops') return 'Shop Directory';
+    if (first === 'companies') return 'Partner Companies';
     
-    return first.charAt(0).toUpperCase() + first.slice(1);
+    return first.charAt(0).toUpperCase() + first.slice(1).replace(/-/g, ' ');
+  };
+
+  const handleBack = () => {
+    router.back();
   };
 
   return (
-    <header className="rounded-3xl border border-slate-200 bg-white px-6 py-4 shadow-sm flex items-center justify-between">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-800">
-          {getTitle()}
-        </h2>
-        <p className="text-sm font-medium text-slate-500">
-          {new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Dhaka', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+    <div className="flex w-full items-center justify-between">
+      <div className="flex items-center gap-3">
+        {isSubPage ? (
+          <button
+            onClick={handleBack}
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-primary lg:hidden"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        ) : (
+          <button
+            onClick={onMenuClick}
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-primary lg:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
+        <div>
+          <h1 className="text-lg font-black tracking-tight text-foreground md:text-xl">
+            {getTitle()}
+          </h1>
+          <p className="hidden text-[10px] font-bold uppercase tracking-wider text-muted md:block">
+            {new Date().toLocaleDateString('en-US', { 
+              timeZone: 'Asia/Dhaka', 
+              weekday: 'short', 
+              year: 'numeric', 
+              month: 'short', 
+              day: 'numeric' 
+            })}
+          </p>
+        </div>
       </div>
       
-      <div className="flex items-center gap-4">
-        <div className="hidden md:flex items-center gap-3 pr-4 border-r border-slate-200">
-          <div className="text-right">
-            <p className="text-sm font-semibold text-slate-800">{user?.name || 'User'}</p>
-            <p className="text-xs text-slate-500 capitalize">{user?.role?.toLowerCase() || 'Loading...'}</p>
+      <div className="flex items-center gap-2 md:gap-4">
+        <button className="flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-secondary hover:text-foreground">
+          <Bell className="h-5 w-5" />
+        </button>
+
+        <div className="h-8 w-[1px] bg-border mx-1 hidden md:block" />
+
+        <div className="flex items-center gap-3">
+          <div className="hidden text-right md:block">
+            <p className="text-sm font-semibold text-foreground leading-none">{user?.name || 'User'}</p>
+            <p className="mt-1 text-xs font-medium text-muted capitalize leading-none">{user?.role?.toLowerCase() || 'Admin'}</p>
           </div>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-100 to-blue-50 text-blue-600 flex items-center justify-center border border-blue-200">
-            <User className="w-5 h-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-primary border border-border">
+            <User className="h-5 w-5" />
           </div>
         </div>
         
         <button 
           onClick={logout}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600 transition-colors md:h-auto md:w-auto md:px-3 md:py-2 md:text-sm md:font-medium"
+          title="Logout"
         >
-          <LogOut className="w-4 h-4" />
-          <span className="hidden sm:inline">Logout</span>
+          <LogOut className="h-5 w-5" />
+          <span className="hidden md:ml-2 md:inline">Logout</span>
         </button>
       </div>
-    </header>
+    </div>
   );
 }
+
