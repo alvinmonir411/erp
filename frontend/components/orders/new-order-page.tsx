@@ -296,12 +296,17 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
     const validLines = lines.filter(l => l.productId !== 0);
 
     const insufficientStock = validLines.find(l => {
-      const stock = stockMap[l.productId] || 0;
+      const prod = allProducts.find(p => p.id === l.productId);
+      const stockFromSummary = stockMap[l.productId];
+      const stock = stockFromSummary !== undefined ? stockFromSummary : (prod?.currentStock || 0);
       return (Number(l.quantity) + Number(l.freeQuantity)) > stock;
     });
 
     if (insufficientStock) {
-      setError(`Insufficient stock for ${insufficientStock.productName}. Available: ${stockMap[insufficientStock.productId] || 0}`);
+      const prod = allProducts.find(p => p.id === insufficientStock.productId);
+      const stockFromSummary = stockMap[insufficientStock.productId];
+      const stock = stockFromSummary !== undefined ? stockFromSummary : (prod?.currentStock || 0);
+      setError(`Insufficient stock for ${insufficientStock.productName}. Available: ${stock} ${prod?.unit || ''}`);
       return;
     }
 
@@ -482,7 +487,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
           </div>
 
           {/* Products Section */}
-          <div className="modern-card overflow-hidden">
+          <div className="modern-card">
             <div className="flex items-center justify-between border-b border-border bg-secondary/30 px-6 py-4">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="h-4 w-4 text-accent" />
@@ -492,7 +497,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden md:block">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-secondary/10 text-[10px] font-bold uppercase tracking-wider text-muted border-b border-border">
@@ -511,8 +516,9 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                         <div className="relative product-row-container">
                           <input
                             type="text"
-                            placeholder="Search product..."
-                            className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition"
+                            placeholder={companyId ? "Search product..." : "Select company first"}
+                            disabled={!companyId}
+                            className={`w-full rounded-lg border border-border px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition ${!companyId ? 'bg-secondary/30 cursor-not-allowed opacity-50' : 'bg-white focus:bg-white'}`}
                             value={line.productId ? line.productName : line.searchText || ''}
                             onChange={(e) => {
                               updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
@@ -521,47 +527,53 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                               updateLine(idx, { showResults: true });
                             }} />
                           {line.showResults && (
-                            <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-full min-w-[300px] overflow-y-auto rounded-xl border border-border bg-white p-1 shadow-2xl">
+                            <div className="absolute left-0 top-full z-[9999] mt-2 max-h-80 w-full min-w-[350px] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-2 shadow-2xl shadow-black/20 ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2 duration-200">
                               {allProducts
                                 .filter(p => !companyId || p.companyId === companyId)
                                 .filter(p => p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) ||
                                   p.sku.toLowerCase().includes((line.searchText || '').toLowerCase())
                                 )
-                                .map(p => (
-                                  <button
-                                    key={p.id}
-                                    disabled={(stockMap[p.id] || 0) <= 0}
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      if ((stockMap[p.id] || 0) <= 0) return;
-                                      if (!companyId) {
-                                        setCompanyId(p.companyId);
-                                        const comp = companies.find(c => c.id === p.companyId);
-                                        if (comp) setCompSearch(comp.name);
-                                      }
-                                      updateLine(idx, {
-                                        productId: p.id,
-                                        productName: p.name,
-                                        unitPrice: p.salePrice,
-                                        showResults: false,
-                                        searchText: p.name
-                                      });
-                                    }}
-                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${(stockMap[p.id] || 0) <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-secondary'}`}
-                                  >
-                                    <div className="flex-1">
-                                      <div className="font-bold text-foreground">{p.name}</div>
-                                      <div className="flex items-center gap-2 text-[10px] text-muted font-bold">
-                                        <span>{p.sku}</span>
-                                        <span>•</span>
-                                        <span className={(stockMap[p.id] || 0) <= 10 ? 'text-rose-500' : 'text-emerald-600'}>
-                                          Stock: {stockMap[p.id] || 0}
-                                        </span>
+                                .map(p => {
+                                  const stockFromSummary = stockMap[p.id];
+                                  const availableStock = stockFromSummary !== undefined ? stockFromSummary : (p.currentStock || 0);
+                                  const isOutOfStock = availableStock <= 0;
+
+                                  return (
+                                    <button
+                                      key={p.id}
+                                      disabled={isOutOfStock}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        if (isOutOfStock) return;
+                                        if (!companyId) {
+                                          setCompanyId(p.companyId);
+                                          const comp = companies.find(c => c.id === p.companyId);
+                                          if (comp) setCompSearch(comp.name);
+                                        }
+                                        updateLine(idx, {
+                                          productId: p.id,
+                                          productName: p.name,
+                                          unitPrice: p.salePrice,
+                                          showResults: false,
+                                          searchText: p.name
+                                        });
+                                      }}
+                                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${isOutOfStock ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-zinc-100'}`}
+                                    >
+                                      <div className="flex-1">
+                                        <div className="font-bold text-foreground">{p.name}</div>
+                                        <div className="flex items-center gap-2 text-[10px] text-muted font-bold">
+                                          <span>{p.sku}</span>
+                                          <span>•</span>
+                                          <span className={availableStock <= 10 ? 'text-rose-500' : 'text-emerald-600'}>
+                                            Stock: {availableStock} {p.unit}
+                                          </span>
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div className="font-bold text-accent">{formatCurrency(p.salePrice)}</div>
-                                  </button>
-                                ))}
+                                      <div className="font-bold text-accent">{formatCurrency(p.salePrice)}</div>
+                                    </button>
+                                  );
+                                })}
                             </div>
                           )}
                         </div>
@@ -613,8 +625,9 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                       <label className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1 block">Product</label>
                       <input
                         type="text"
-                        placeholder="Search product..."
-                        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition"
+                        placeholder={companyId ? "Search product..." : "Select company first"}
+                        disabled={!companyId}
+                        className={`w-full rounded-lg border border-border px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition ${!companyId ? 'bg-secondary/30 cursor-not-allowed opacity-50' : 'bg-white focus:bg-white'}`}
                         value={line.productId ? line.productName : line.searchText || ''}
                         onChange={(e) => {
                           updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
@@ -623,46 +636,53 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                           updateLine(idx, { showResults: true });
                         }} />
                       {line.showResults && (
-                        <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-full min-w-[280px] overflow-y-auto rounded-xl border border-border bg-white p-1 shadow-2xl">
+                        <div className="absolute left-0 top-full z-[9999] mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white p-2 shadow-2xl shadow-black/20 ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2 duration-200">
                           {allProducts
                             .filter(p => !companyId || p.companyId === companyId)
                             .filter(p => p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) ||
                               p.sku.toLowerCase().includes((line.searchText || '').toLowerCase())
                             )
-                            .map(p => (
-                              <button
-                                key={p.id}
-                                disabled={(stockMap[p.id] || 0) <= 0}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  if ((stockMap[p.id] || 0) <= 0) return;
-                                  if (!companyId) {
-                                    setCompanyId(p.companyId);
-                                    const comp = companies.find(c => c.id === p.companyId);
-                                    if (comp) setCompSearch(comp.name);
-                                  }
-                                  updateLine(idx, {
-                                    productId: p.id,
-                                    productName: p.name,
-                                    unitPrice: p.salePrice,
-                                    showResults: false,
-                                    searchText: p.name
-                                  });
-                                }}
-                                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${(stockMap[p.id] || 0) <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-secondary'}`}
-                              >
-                                <div className="flex-1">
-                                  <div className="font-bold text-foreground">{p.name}</div>
-                                  <div className="flex items-center gap-2 text-[10px] text-muted font-bold">
-                                    <span>{p.sku}</span>
-                                    <span>•</span>
-                                    <span className={(stockMap[p.id] || 0) <= 10 ? 'text-rose-500' : 'text-emerald-600'}>
-                                      Stock: {stockMap[p.id] || 0}
-                                    </span>
+                            .map(p => {
+                              const stockFromSummary = stockMap[p.id];
+                              const availableStock = stockFromSummary !== undefined ? stockFromSummary : (p.currentStock || 0);
+                              const isOutOfStock = availableStock <= 0;
+
+                              return (
+                                <button
+                                  key={p.id}
+                                  disabled={isOutOfStock}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    if (isOutOfStock) return;
+                                    if (!companyId) {
+                                      setCompanyId(p.companyId);
+                                      const comp = companies.find(c => c.id === p.companyId);
+                                      if (comp) setCompSearch(comp.name);
+                                    }
+                                    updateLine(idx, {
+                                      productId: p.id,
+                                      productName: p.name,
+                                      unitPrice: p.salePrice,
+                                      showResults: false,
+                                      searchText: p.name
+                                    });
+                                  }}
+                                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${isOutOfStock ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-secondary'}`}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-foreground truncate">{p.name}</div>
+                                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted font-bold mt-0.5">
+                                      <span className="truncate max-w-[80px]">{p.sku}</span>
+                                      <span>•</span>
+                                      <span className={availableStock <= 10 ? 'text-rose-500' : 'text-emerald-600'}>
+                                        Stock: {availableStock} {p.unit}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                              </button>
-                            ))}
+                                  <div className="font-bold text-accent whitespace-nowrap">{formatCurrency(p.salePrice)}</div>
+                                </button>
+                              );
+                            })}
                         </div>
                       )}
                     </div>
@@ -851,28 +871,28 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
         </div>
       </div>
     </div>
-    <button
-      onClick={addLine}
-      className="fixed bottom-24 right-6 lg:hidden z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white shadow-2xl hover:scale-110 active:scale-95 transition-all"
-    >
-      <Plus className="h-5 w-5" />
-    </button>
+      <button
+        onClick={addLine}
+        className="fixed bottom-24 right-6 lg:hidden z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white shadow-2xl hover:scale-110 active:scale-95 transition-all"
+      >
+        <Plus className="h-5 w-5" />
+      </button>
 
-      {/* Quick Summary Bar for Mobile */ }
-  <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border px-6 py-4 flex items-center justify-between lg:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-    <div className="flex flex-col">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Grand Total</span>
-      <span className="text-xl font-black text-primary">{formatCurrency(grandTotal)}</span>
-    </div>
-    <button
-      onClick={handleSave}
-      disabled={isSaving}
-      className="bg-accent text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg shadow-accent/20 active:scale-95 transition-all disabled:opacity-50"
-    >
-      {isSaving ? '...' : 'Complete Order'}
-    </button>
-  </div>
-</>
+      {/* Quick Summary Bar for Mobile */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border px-6 py-4 flex items-center justify-between lg:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Grand Total</span>
+          <span className="text-xl font-black text-primary">{formatCurrency(grandTotal)}</span>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="bg-accent text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg shadow-accent/20 active:scale-95 transition-all disabled:opacity-50"
+        >
+          {isSaving ? '...' : 'Complete Order'}
+        </button>
+      </div>
+    </>
   );
 }
 

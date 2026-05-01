@@ -179,11 +179,7 @@ export class StockService implements OnModuleInit {
 
     // Check for negative stocks and provide a "fix" flag if requested
     // (In this system, recalculating is already the way it works, 
-    // so we just ensure the map is accurate)
-
     const { startUtc: todayStartUTC, endUtc: todayEndUTC } = getBDDayRange();
-    
-    this.logger.debug(`Stock Summary Filter [BD Today]: Start=${todayStartUTC.toISOString()}, End=${todayEndUTC.toISOString()}`);
     
     // Helper for safe numeric conversion
     const safeNum = (val: any) => {
@@ -210,8 +206,6 @@ export class StockService implements OnModuleInit {
     }, 0);
 
     const todayDeliveryAmount = todaySettledBatches.reduce((total, batch) => total + safeNum(batch.finalSoldValue), 0);
-
-    this.logger.log(`Stock Summary Matched: SettledBatches=${todaySettledBatches.length}, SoldQty=${todaySoldQty}, ReturnQty=${todayReturnQty}, Amount=${todayDeliveryAmount}`);
 
     // Calculate All-Time Settled Metrics from Dispatch Batches
     const allSettledBatches = await this.batchRepository.find({

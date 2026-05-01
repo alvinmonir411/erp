@@ -4,32 +4,45 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { SettleOrderDto } from './dto/settle-order.dto';
 import { OrderStatus } from './orders.constants';
 
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../../common/enums/role.enum';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+
 @Controller('orders')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Get('stats')
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  getStats() {
-    return this.ordersService.getStats();
+  getStats(@CurrentUser() user: any) {
+    return this.ordersService.getStats(user);
   }
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Post()
-  create(@Body() createOrderDto: CreateOrderDto) {
-    return this.ordersService.create(createOrderDto);
+  create(@Body() createOrderDto: CreateOrderDto, @CurrentUser() user: any) {
+    return this.ordersService.create(createOrderDto, user);
   }
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Get()
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  findAll(@Query() query: any) {
-    return this.ordersService.findAll(query);
+  findAll(@Query() query: any, @CurrentUser() user: any) {
+    return this.ordersService.findAll(query, user);
   }
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.ordersService.findOne(id, user);
   }
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Patch(':id/update')
   // General update route
   update(
@@ -39,6 +52,17 @@ export class OrdersController {
     return this.ordersService.update(id, updateOrderDto);
   }
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Patch('shop-link/:id')
+  updateShop(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('shopId') shopId: number,
+  ) {
+    console.log(`Updating shop for order ${id} to ${shopId}`);
+    return this.ordersService.updateShop(id, shopId);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
   @Patch(':id/status')
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
@@ -47,6 +71,8 @@ export class OrdersController {
     return this.ordersService.updateStatus(id, status);
   }
 
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
   @Post(':id/settle')
   settleOrder(
     @Param('id', ParseIntPipe) id: number,
@@ -55,6 +81,7 @@ export class OrdersController {
     return this.ordersService.settleOrder(id, dto);
   }
 
+  @Roles(Role.SUPER_ADMIN)
   @Delete(':id')
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.ordersService.delete(id);

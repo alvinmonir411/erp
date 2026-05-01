@@ -12,4 +12,8 @@ export const envValidationSchema = Joi.object({
   FRONTEND_URL: Joi.string().uri().required(),
   DB_SYNCHRONIZE: Joi.string().valid('true', 'false').default('false'),
   DB_DROP_SCHEMA: Joi.string().valid('true', 'false').default('false'),
+  SUPER_ADMIN_NAME: Joi.string().optional(),
+  SUPER_ADMIN_USERNAME: Joi.string().optional(),
+  SUPER_ADMIN_EMAIL: Joi.string().email().optional(),
+  SUPER_ADMIN_PASSWORD: Joi.string().min(6).optional(),
 });

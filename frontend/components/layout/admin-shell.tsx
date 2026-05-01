@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 import { ToastProvider } from '@/components/ui/toast-provider';
-import { AuthProvider } from '../auth/auth-provider';
+import { useAuth } from '../auth/auth-provider';
 import { useState } from 'react';
 
 type AdminShellProps = {
@@ -19,9 +19,10 @@ export function AdminShell({ children }: AdminShellProps) {
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
 
+  const { logout } = useAuth();
+
   return (
-    <AuthProvider>
-      <ToastProvider>
+    <ToastProvider>
         {isAuthPage ? (
           children
         ) : (
@@ -47,7 +48,6 @@ export function AdminShell({ children }: AdminShellProps) {
           </div>
         )}
       </ToastProvider>
-    </AuthProvider>
   );
 }
 

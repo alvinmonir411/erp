@@ -22,12 +22,16 @@ import {
   Gift
 } from 'lucide-react';
 import Link from 'next/link';
+import { SRDuesList } from './sr-dues-list';
+import { useAuth } from '../auth/auth-provider';
+import { Role } from '@/types/api';
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-xl bg-secondary ${className ?? ''}`} />;
 }
 
 export function DashboardPage() {
+  const { user } = useAuth();
   const { data: d, isLoading, error } = useQuery({
     queryKey: ['dashboard', 'metrics'],
     queryFn: () => getDashboardMetrics(),
@@ -62,14 +66,15 @@ export function DashboardPage() {
       <section>
         <div className="flex items-center gap-2 mb-4">
           <ShoppingCart className="h-5 w-5 text-indigo-500" />
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Orders</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">
+            {user?.role === Role.SR ? 'My Orders' : 'Orders Overview'}
+          </h2>
         </div>
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Total Orders" value={formatNumber(orders.totalOrders)} icon={ShoppingCart} colorTheme="primary" />
           <StatCard label="Today Orders" value={formatNumber(orders.todayOrdersCount)} icon={ShoppingCart} colorTheme="emerald" />
           <StatCard label="Total Order Value" value={formatCurrency(orders.totalOrderValue)} icon={DollarSign} colorTheme="primary" />
           <StatCard label="Today Order Value" value={formatCurrency(orders.todayOrderValue)} icon={TrendingUp} colorTheme="emerald" />
-          <StatCard label="Waiting Orders" value={formatNumber(orders.waitingOrders)} icon={Clock} colorTheme="amber" />
           <StatCard label="Cancelled Orders" value={formatNumber(orders.cancelledOrders)} icon={XCircle} colorTheme="rose" />
           <StatCard label="Today Cancelled" value={formatNumber(orders.todayCancelled)} icon={XCircle} colorTheme="rose" />
         </div>
@@ -79,15 +84,15 @@ export function DashboardPage() {
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Truck className="h-5 w-5 text-amber-500" />
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Delivery</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">
+            {user?.role === Role.SR ? 'My Deliveries' : 'Delivery Operations'}
+          </h2>
         </div>
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Total Dispatch" value={formatNumber(delivery.totalDispatch)} icon={Truck} colorTheme="indigo" />
           <StatCard label="Today Dispatch" value={formatNumber(delivery.todayDispatch)} icon={Truck} colorTheme="emerald" />
           <StatCard label="Pending Dispatch" value={formatNumber(delivery.pendingDispatch)} icon={Clock} colorTheme="amber" />
-          <StatCard label="Return Pending" value={formatNumber(delivery.returnPending)} icon={Undo2} colorTheme="amber" />
-          <StatCard label="Settled Batches" value={formatNumber(delivery.settledBatches)} icon={CheckCircle} colorTheme="primary" />
-          <StatCard label="Today Settled Batches" value={formatNumber(delivery.todaySettledBatches)} icon={CheckCircle} colorTheme="emerald" />
+          <StatCard label="Delivered" value={formatNumber(delivery.delivered)} icon={CheckCircle} colorTheme="primary" />
         </div>
       </section>
 
@@ -95,46 +100,58 @@ export function DashboardPage() {
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Wallet className="h-5 w-5 text-emerald-500" />
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Money</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">
+            {user?.role === Role.SR ? 'My Collections' : 'Financial Overview'}
+          </h2>
         </div>
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Gross Amount" value={formatCurrency(money.totalGrossAmount)} icon={DollarSign} colorTheme="primary" />
-          <StatCard label="Today Gross Amount" value={formatCurrency(money.todayGrossAmount)} icon={TrendingUp} colorTheme="emerald" />
           <StatCard label="Total Final Sold" value={formatCurrency(money.totalFinalSold)} icon={CheckCircle} colorTheme="indigo" />
           <StatCard label="Today Final Sold" value={formatCurrency(money.todayFinalSold)} icon={TrendingUp} colorTheme="emerald" />
-          <StatCard label="Total Collected" value={formatCurrency(money.totalCollected)} icon={Wallet} colorTheme="primary" />
-          <StatCard label="Today Collected" value={formatCurrency(money.todayCollected)} icon={Wallet} colorTheme="emerald" />
-          <StatCard label="Total Due" value={formatCurrency(money.totalDue)} icon={AlertCircle} colorTheme="rose" />
-          <StatCard label="Today Due" value={formatCurrency(money.todayDue)} icon={AlertCircle} colorTheme="amber" />
-          <StatCard label="Total Profit" value={formatCurrency(money.totalProfit)} icon={TrendingUp} colorTheme="emerald" />
-          <StatCard label="Today Profit" value={formatCurrency(money.todayProfit)} icon={TrendingUp} colorTheme="emerald" />
+          <StatCard label="Remaining Due" value={formatCurrency(money.totalDue)} icon={AlertCircle} colorTheme="rose" />
+          
+          {user?.role === Role.SR && (
+            <>
+              <StatCard label="Pending Approval" value={formatCurrency(money.pendingCollected)} icon={Clock} colorTheme="amber" />
+              <StatCard label="Approved Collection" value={formatCurrency(money.approvedCollected)} icon={CheckCircle} colorTheme="emerald" />
+              <StatCard label="Rejected Collection" value={formatCurrency(money.rejectedCollected)} icon={XCircle} colorTheme="rose" />
+            </>
+          )}
+
+          {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) && (
+            <>
+              <StatCard label="Total Profit" value={formatCurrency(money.totalProfit)} icon={TrendingUp} colorTheme="emerald" />
+            </>
+          )}
         </div>
       </section>
 
-      {/* Stock Section */}
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Package className="h-5 w-5 text-cyan-500" />
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Stock</h2>
-        </div>
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Products" value={formatNumber(stock.totalProducts)} icon={Layers} colorTheme="slate" />
-          <StatCard label="Total Stock Qty" value={formatNumber(stock.totalStockQty)} icon={Package} colorTheme="primary" />
-          <StatCard label="Stock Value" value={formatCurrency(stock.stockValue)} icon={DollarSign} colorTheme="indigo" />
-          <StatCard label="Low Stock" value={formatNumber(stock.lowStock)} icon={AlertCircle} colorTheme="amber" />
-          <StatCard label="Out of Stock" value={formatNumber(stock.outOfStock)} icon={AlertCircle} colorTheme="rose" />
-          <StatCard label="Today Sold Qty" value={formatNumber(stock.todaySoldQty)} icon={TrendingUp} colorTheme="emerald" />
-          <StatCard label="Total Sold Qty" value={formatNumber(stock.totalSoldQty)} icon={TrendingUp} colorTheme="primary" />
-          <StatCard label="Today Return Qty" value={formatNumber(stock.todayReturnQty)} icon={Undo2} colorTheme="amber" />
-          <StatCard label="Total Return Qty" value={formatNumber(stock.totalReturnQty)} icon={Undo2} colorTheme="rose" />
-          <Link href="/reports/free-quantity" className="block transition-transform hover:scale-[1.02] active:scale-[0.98]">
-            <StatCard label="Total Free Given" value={`${formatNumber(stock.totalFreeQty)} PCS`} icon={Gift} colorTheme="indigo" description="All time free quantity" />
-          </Link>
-          <Link href="/reports/free-quantity" className="block transition-transform hover:scale-[1.02] active:scale-[0.98]">
-            <StatCard label="Today Free Given" value={`${formatNumber(stock.todayFreeQty)} PCS`} icon={Gift} colorTheme="amber" description="Free quantity today" />
-          </Link>
-        </div>
-      </section>
+      {/* SR Specific Due List */}
+      {user?.role === Role.SR && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <AlertCircle className="h-5 w-5 text-rose-500" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted">
+              My Outstanding Dues
+            </h2>
+          </div>
+          <SRDuesList />
+        </section>
+      )}
+
+      {/* Stock Section - Restricted for SR */}
+      {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER || user?.role === Role.ADMIN) && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Package className="h-5 w-5 text-cyan-500" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Inventory</h2>
+          </div>
+          <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard label="Total Products" value={formatNumber(stock.totalProducts)} icon={Layers} colorTheme="slate" />
+            {money.stockValue > 0 && <StatCard label="Stock Value" value={formatCurrency(stock.stockValue)} icon={DollarSign} colorTheme="indigo" />}
+            <StatCard label="Low Stock Items" value={formatNumber(stock.lowStock || 0)} icon={AlertCircle} colorTheme="amber" />
+          </div>
+        </section>
+      )}
 
       {/* Main Chart */}
       <section className="modern-card p-4 sm:p-8">

@@ -29,6 +29,7 @@ import { formatCurrency, formatDate, formatNumber } from '@/lib/utils/format';
 import type { DispatchBatch } from '@/types/api';
 import { batchStatusConfig, orderStatusConfig, StatusBadge } from './delivery-ops-ui';
 import { PrintSummary } from './print-summary';
+import { DueModal } from './due-modal';
 
 const gcd = (a: number, b: number): number => {
   a = Math.abs(a);
@@ -56,6 +57,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const [isSettling, setIsSettling] = useState(false);
   const [activeTab, setActiveTab] = useState<'sheet' | 'entry' | 'settle'>('sheet');
   const [batchReturnState, setBatchReturnState] = useState<Record<number, { returned: string; damaged: string }>>({});
+  const [draftDues, setDraftDues] = useState<Record<number, number>>({});
+  const [dueModalProduct, setDueModalProduct] = useState<{ id: number; name: string } | null>(null);
 
   // No print logic here anymore, handled by dedicated routes
 
@@ -109,7 +112,6 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       setBatchReturnState(initialState);
     }
   }, [batch, aggregatedItems]);
-
   const finalMetrics = useMemo(() => {
     if (!batch || aggregatedItems.length === 0) return null;
     let totalOrder = 0;
@@ -132,8 +134,11 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       totalAmount += deliveredPaid * item.price;
     });
 
-    return { totalOrder, totalReturned, totalDamaged, totalSold: totalOrder - totalReturned - totalDamaged, totalAmount };
-  }, [batch, aggregatedItems, batchReturnState]);
+    const totalDueDraft = Object.values(draftDues).reduce((sum, val) => sum + val, 0);
+    const cashCollectable = Math.max(0, totalAmount - totalDueDraft);
+
+    return { totalOrder, totalReturned, totalDamaged, totalSold: totalOrder - totalReturned - totalDamaged, totalAmount, totalDueDraft, cashCollectable };
+  }, [batch, aggregatedItems, batchReturnState, draftDues]);
 
   const fetchBatch = async () => {
     try {
@@ -168,7 +173,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   };
 
   const handlePrintFinalSettlement = async () => {
-    window.open(`/delivery-ops/batches/${batchId}/print-final-settlement`, "_blank");
+    const draftQuery = encodeURIComponent(JSON.stringify(draftDues));
+    window.open(`/delivery-ops/batches/${batchId}/print-final-settlement?draftDues=${draftQuery}`, "_blank");
   };
 
   const handleDispatch = async () => {
@@ -282,16 +288,34 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
     try {
       setIsSettling(true);
-      // Simplify collection: full amount as cash for all orders
+      
+      // 1. Save Draft Dues first
+      const draftEntries = Object.entries(draftDues);
+      for (const [orderId, amount] of draftEntries) {
+        if (amount > 0) {
+           await upsertDue({
+             orderId: Number(orderId),
+             amount: amount,
+             note: 'Added during batch settlement'
+           });
+        }
+      }
+
+      // 2. Complete Settlement
       await settleDispatchBatch(batchId, {
-        collections: batch.orders.map((batchOrder) => ({
-          orderId: batchOrder.orderId,
-          collectedAmount: Number(batchOrder.finalSoldAmount || 0),
-          paymentMode: 'CASH',
-        })),
+        collections: batch.orders.map((batchOrder) => {
+          const draftDue = draftDues[batchOrder.orderId] || 0;
+          const finalAmount = Number(batchOrder.finalSoldAmount || 0);
+          return {
+            orderId: batchOrder.orderId,
+            collectedAmount: Math.max(0, finalAmount - draftDue),
+            paymentMode: 'CASH',
+          };
+        }),
       });
       
-      showSuccessToast('Batch marked as settled');
+      showSuccessToast('Batch marked as settled and dues recorded');
+      setDraftDues({});
       fetchBatch();
     } catch (error: any) {
       showErrorToast(error.message || 'Failed to settle batch');
@@ -524,6 +548,9 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   <th className="px-6 py-4 text-center w-32">Returned</th>
                   <th className="px-6 py-4 text-center w-32">Damaged</th>
                   <th className="px-6 py-4 text-center w-24">Delivered</th>
+                  <th className="px-6 py-4 text-center w-24">Due</th>
+                  <th className="px-6 py-4 text-center w-24">Cash</th>
+                  <th className="px-6 py-4 text-center w-24">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -570,6 +597,33 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                         <div className={`rounded-xl px-3 py-2 font-black ${deliveredQty < 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
                           {formatNumber(Math.max(0, deliveredQty))}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                         {/* Aggregating draft dues for this item's associated orders */}
+                         <div className="font-black text-amber-600">
+                            {formatCurrency(batch.orders
+                              .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                              .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0)
+                            )}
+                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                         <div className="font-black text-emerald-600">
+                            {formatCurrency(Math.max(0, 
+                               (deliveredQty * (item.totalPaidQty / (item.totalQty || 1)) * item.price) - 
+                               batch.orders
+                                .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                                .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0)
+                            ))}
+                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => setDueModalProduct({ id: item.productId, name: item.name })}
+                          className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black uppercase text-amber-600 hover:bg-amber-100 transition-colors"
+                        >
+                          {batch.orders.some(bo => bo.order.items.some(i => i.productId === item.productId) && draftDues[bo.orderId] > 0) ? 'Edit Due' : 'Due'}
+                        </button>
                       </td>
                     </tr>
                   );
@@ -619,9 +673,39 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                         />
                      </div>
                   </div>
-                  <div className={`rounded-2xl p-3 flex justify-between items-center ${deliveredQty < 0 ? 'bg-rose-50' : 'bg-emerald-50'}`}>
-                     <p className="text-xs font-black uppercase tracking-widest text-slate-400">Actual Delivered</p>
-                     <p className={`text-lg font-black ${deliveredQty < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>{formatNumber(Math.max(0, deliveredQty))}</p>
+                  <div className={`rounded-2xl p-3 space-y-3 ${deliveredQty < 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
+                     <div className="flex justify-between items-center">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Actual Delivered</p>
+                        <p className={`text-lg font-black ${deliveredQty < 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatNumber(Math.max(0, deliveredQty))}</p>
+                     </div>
+                     <div className="flex justify-between items-center border-t border-slate-200/50 pt-2">
+                        <div className="space-y-0.5">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-amber-500">Due/Baki</p>
+                           <p className="font-black text-amber-600">
+                              {formatCurrency(batch.orders
+                                .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                                .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0)
+                              )}
+                           </p>
+                        </div>
+                        <div className="text-right space-y-0.5">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Cash</p>
+                           <p className="font-black text-emerald-600">
+                              {formatCurrency(Math.max(0, 
+                                 (deliveredQty * (item.totalPaidQty / (item.totalQty || 1)) * item.price) - 
+                                 batch.orders
+                                  .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                                  .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0)
+                              ))}
+                           </p>
+                        </div>
+                     </div>
+                     <button 
+                        onClick={() => setDueModalProduct({ id: item.productId, name: item.name })}
+                        className="w-full py-2.5 rounded-xl bg-amber-500 text-[10px] font-black uppercase text-white shadow-sm flex items-center justify-center gap-2"
+                      >
+                        {batch.orders.some(bo => bo.order.items.some(i => i.productId === item.productId) && draftDues[bo.orderId] > 0) ? 'Edit Due' : 'Add Due'}
+                      </button>
                   </div>
                 </div>
               );
@@ -645,22 +729,30 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       <div className="mt-10 pt-10 border-t-2 border-slate-900 pb-24">
         <h2 className="text-base font-black uppercase tracking-widest text-slate-900 mb-6">Final Batch Summary</h2>
         
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 border-2 border-slate-900 divide-x-2 divide-y-2 md:divide-y-0 divide-slate-900">
-          <div className="p-4 lg:p-6 bg-white">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Qty</p>
+        <div className="flex flex-col lg:flex-row border-2 border-slate-900 divide-y-2 lg:divide-y-0 lg:divide-x-2 divide-slate-900">
+          <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 lg:mb-1">Total Qty</p>
             <p className="text-xl lg:text-2xl font-black text-slate-900">{formatNumber(finalMetrics?.totalOrder || 0)}</p>
           </div>
-          <div className="p-4 lg:p-6 bg-white">
-            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-1">Returned</p>
+          <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 lg:mb-1">Returned</p>
             <p className="text-xl lg:text-2xl font-black text-rose-600">{formatNumber(finalMetrics?.totalReturned || 0)}</p>
           </div>
-          <div className="p-4 lg:p-6 bg-white">
-            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Final Sold</p>
+          <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 lg:mb-1">Final Sold</p>
             <p className="text-xl lg:text-2xl font-black text-emerald-700">{formatNumber(finalMetrics?.totalSold || 0)}</p>
           </div>
-          <div className="p-4 lg:p-6 bg-slate-900 text-white col-span-2 md:col-span-1">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Final Amount</p>
+          <div className="flex-1 p-4 lg:p-6 bg-slate-900 text-white flex justify-between lg:block items-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 lg:mb-1">Final Amount</p>
             <p className="text-xl lg:text-2xl font-black truncate">{formatCurrency(finalMetrics?.totalAmount || 0)}</p>
+          </div>
+          <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 lg:mb-1">Due/Baki</p>
+            <p className="text-xl lg:text-2xl font-black text-amber-700">{formatCurrency(finalMetrics?.totalDueDraft || 0)}</p>
+          </div>
+          <div className="flex-1 p-4 lg:p-6 bg-emerald-950 text-white border-l-0 lg:border-l-4 border-emerald-500 flex justify-between lg:block items-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 lg:mb-1">Cash Collectable</p>
+            <p className="text-xl lg:text-2xl font-black truncate text-emerald-400">{formatCurrency(finalMetrics?.cashCollectable || 0)}</p>
           </div>
         </div>
 
@@ -674,7 +766,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             <button
               onClick={handleSettle}
               disabled={isSettling}
-              className="w-full max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-slate-900 px-12 py-4 text-base lg:text-lg font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900 disabled:opacity-50"
+              className="w-full sm:max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-slate-900 px-6 sm:px-12 py-4 text-base sm:text-lg font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900 disabled:opacity-50"
             >
               {isSettling ? <RefreshCw className="h-5 w-5 animate-spin" /> : <HandCoins className="h-5 w-5" />}
               {isSettling ? 'Processing...' : 'Complete Settlement'}
@@ -699,6 +791,25 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {dueModalProduct && (
+        <DueModal 
+          isOpen={!!dueModalProduct}
+          onClose={() => setDueModalProduct(null)}
+          productId={dueModalProduct.id}
+          productName={dueModalProduct.name}
+          batchOrders={batch.orders}
+          draftDues={draftDues}
+          route={batch.route}
+          onAddDraftDue={(orderId, amount) => {
+            setDraftDues(prev => ({
+              ...prev,
+              [orderId]: amount
+            }));
+          }}
+          onSuccess={() => fetchBatch()}
+        />
+      )}
     </div>
   );
 }

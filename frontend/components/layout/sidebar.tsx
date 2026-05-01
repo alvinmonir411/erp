@@ -16,26 +16,40 @@ import {
   Store,
   Building2,
   X,
-  FileText
+  FileText,
+  DollarSign
 } from 'lucide-react';
-import { useState } from 'react';
+import { useAuth } from '../auth/auth-provider';
+import { Role } from '@/types/api';
 
 const navigation = [
   {
     title: 'Main',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR],
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+      { href: '/manager-dashboard', label: 'Manager Dashboard', icon: LayoutDashboard, roles: [Role.MANAGER] },
+      { href: '/sr-dashboard', label: 'SR Dashboard', icon: LayoutDashboard, roles: [Role.SR] },
     ]
   },
   {
     title: 'Orders',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR],
     items: [
       { href: '/orders/new', label: 'New Order', icon: PlusCircle },
       { href: '/orders', label: 'Manage Order', icon: List },
     ]
   },
   {
+    title: 'Finance',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR],
+    items: [
+      { href: '/dues', label: 'Due', icon: DollarSign },
+    ]
+  },
+  {
     title: 'Delivery',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
       { href: '/delivery-ops', label: 'Delivery Report', icon: FileText },
       { href: '/delivery-ops/personnel', label: 'Delivery Person', icon: Users },
@@ -43,24 +57,42 @@ const navigation = [
   },
   {
     title: 'Inventory',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
       { href: '/products', label: 'Products', icon: Box },
       { href: '/stock', label: 'Stock', icon: BarChart3 },
     ]
   },
-
   {
     title: 'Setup',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
       { href: '/routes', label: 'Routes', icon: Map },
       { href: '/shops', label: 'Shops', icon: Store },
       { href: '/companies', label: 'Companies', icon: Building2 },
+    ]
+  },
+  {
+    title: 'System',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN],
+    items: [
+      { href: '/users', label: 'User Management', icon: Users },
+      { href: '/settings', label: 'Settings', icon: Settings, roles: [Role.SUPER_ADMIN] },
     ]
   }
 ];
 
 export function Sidebar({ isOpen, onToggle, onClose }: { isOpen: boolean, onToggle: () => void, onClose: () => void }) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+
+  const filteredNavigation = navigation
+    .filter(group => !group.roles || (user && group.roles.includes(user.role)))
+    .map(group => ({
+      ...group,
+      items: group.items.filter((item: any) => !item.roles || (user && item.roles.includes(user.role)))
+    }))
+    .filter(group => group.items.length > 0);
 
   return (
     <>
@@ -82,8 +114,8 @@ export function Sidebar({ isOpen, onToggle, onClose }: { isOpen: boolean, onTogg
           </div>
         </div>
 
-        <nav className="h-[calc(100vh-64px)] overflow-y-auto p-4 scrollbar-thin">
-          {navigation.map((group) => (
+        <nav className="h-[calc(100vh-128px)] overflow-y-auto p-4 scrollbar-thin">
+          {filteredNavigation.map((group) => (
             <div key={group.title} className="mb-6">
               <h3 className="mb-2 px-4 text-xs font-semibold uppercase tracking-wider text-muted">
                 {group.title}
@@ -112,6 +144,16 @@ export function Sidebar({ isOpen, onToggle, onClose }: { isOpen: boolean, onTogg
             </div>
           ))}
         </nav>
+
+        <div className="border-t border-border p-4">
+          <button
+            onClick={logout}
+            className="flex w-full items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-red-500 transition-all duration-200 hover:bg-red-50 hover:text-red-600"
+          >
+            <X className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
       </aside>
     </>
   );

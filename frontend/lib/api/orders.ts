@@ -67,3 +67,10 @@ export function settleOrder(id: number, payload: { items: any[], collectedAmount
     body: JSON.stringify(payload),
   });
 }
+
+export function updateOrderShop(id: number, shopId: number) {
+  return apiRequest<Order>(`orders/shop-link/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ shopId }),
+  });
+}

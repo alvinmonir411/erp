@@ -25,6 +25,7 @@ import { Order, OrderItem } from '../orders/entities/order.entity';
 import { DiscountType, OrderStatus } from '../orders/orders.constants';
 import { Product } from '../products/entities/product.entity';
 import { StockService } from '../stock/stock.service';
+import { DuesService } from '../dues/dues.service';
 import { StockMovementType } from '../stock/stock.constants';
 import { StockMovement } from '../stock/entities/stock-movement.entity';
 import { isTodayBD } from '../../common/utils/date.utils';
@@ -66,6 +67,7 @@ export class DeliveryOpsService {
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
     private readonly stockService: StockService,
+    private readonly duesService: DuesService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -536,8 +538,12 @@ export class DeliveryOpsService {
             );
           }
 
-          const deliveredQuantity =
-            dispatchedQuantity - returnedQuantity - damagedQuantity;
+          const deliveredQuantity = dispatchedQuantity - returnedQuantity - damagedQuantity;
+
+          // Split returns into paid and free components
+          const paidRatio = dispatchedQuantity > 0 ? Number(orderItem.quantity) / dispatchedQuantity : 0;
+          const paidReturnedQuantity = returnedQuantity * paidRatio;
+          const freeReturnedQuantity = returnedQuantity - paidReturnedQuantity;
 
           await manager.save(
             manager.create(DeliveryReturnItem, {
@@ -545,6 +551,8 @@ export class DeliveryOpsService {
               productId: itemEntry.productId,
               dispatchedQuantity,
               returnedQuantity,
+              paidReturnedQuantity,
+              freeReturnedQuantity,
               damagedQuantity,
               deliveredQuantity,
               note: itemEntry.note,
@@ -764,6 +772,9 @@ export class DeliveryOpsService {
                 ? OrderStatus.DELIVERED
                 : OrderStatus.PARTIALLY_DELIVERED,
         });
+
+        // Update Due Record via shared service
+        await this.duesService.upsertDue(order, dueAmount, manager);
 
         totalCollected += collectedAmount;
         totalDue += dueAmount;

@@ -14,6 +14,7 @@ import { Order, OrderItem } from '../orders/entities/order.entity';
 import { Product } from '../products/entities/product.entity';
 import { StockMovement } from '../stock/entities/stock-movement.entity';
 import { StockModule } from '../stock/stock.module';
+import { DuesModule } from '../dues/dues.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { StockModule } from '../stock/stock.module';
       StockMovement,
     ]),
     StockModule,
+    DuesModule
   ],
   controllers: [DeliveryOpsController],
   providers: [DeliveryOpsService],

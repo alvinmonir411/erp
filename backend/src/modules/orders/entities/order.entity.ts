@@ -93,6 +93,12 @@ export class Order {
   @Column({ default: 'Admin' })
   createdBy: string;
 
+  @Column({ nullable: true })
+  createdById: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  createdByRole: string;
+
   @Column({ type: 'text', nullable: true })
   settlementNote?: string;
 

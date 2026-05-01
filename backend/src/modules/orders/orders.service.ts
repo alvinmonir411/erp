@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { getBDDayRange, isTodayBD, isTodayBDDate } from '../../common/utils/date.utils';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -10,6 +10,10 @@ import { StockMovement } from '../stock/entities/stock-movement.entity';
 import { StockMovementType } from '../stock/stock.constants';
 import { Product } from '../products/entities/product.entity';
 import { StockService } from '../stock/stock.service';
+import { DuesService } from '../dues/dues.service';
+
+import { Role } from '../../common/enums/role.enum';
+import { Due, DueStatus } from '../dues/entities/due.entity';
 
 @Injectable()
 export class OrdersService {
@@ -18,13 +22,16 @@ export class OrdersService {
     private readonly ordersRepository: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly orderItemsRepository: Repository<OrderItem>,
+    @InjectRepository(Due)
+    private readonly duesRepository: Repository<Due>,
     private readonly stockService: StockService,
+    private readonly duesService: DuesService,
     private readonly dataSource: DataSource,
   ) {}
 
   private readonly logger = new Logger(OrdersService.name);
 
-  async create(dto: CreateOrderDto) {
+  async create(dto: CreateOrderDto, user?: any) {
     if (!dto.items || dto.items.length === 0) {
       throw new BadRequestException('Order must have at least one item');
     }
@@ -42,9 +49,10 @@ export class OrdersService {
         advancePaid: dto.advancePaid || 0,
         note: dto.note,
         status: dto.deliveryPersonId ? OrderStatus.ASSIGNED : OrderStatus.CONFIRMED,
-        createdBy: 'Admin',
+        createdBy: user?.name || user?.username || 'Admin',
+        createdById: user?.id || user?.sub,
+        createdByRole: user?.role || Role.SUPER_ADMIN,
       });
-
       const { items, subtotal, grandTotal } =
         this.buildOrderItems(dto.items, manager);
 
@@ -67,12 +75,13 @@ export class OrdersService {
       order.grandTotal = Math.max(0, grandTotal - order.discountAmount);
       order.actualSoldAmount = order.grandTotal;
       order.dueAmount = Math.max(0, order.grandTotal - Number(order.advancePaid || 0));
-
       const savedOrder = await manager.save(order);
       
       for (const item of items) {
         item.orderId = savedOrder.id;
       }
+      await manager.save(items);
+
       await manager.save(items);
 
       return manager.findOne(Order, {
@@ -82,14 +91,24 @@ export class OrdersService {
     });
   }
 
-  async findOne(id: number) {
-    return this.ordersRepository.findOne({
+  async findOne(id: number, user?: any) {
+    const order = await this.ordersRepository.findOne({
       where: { id },
       relations: ['items', 'items.product', 'company', 'route', 'shop', 'deliveryPerson'],
     });
+
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+
+    if (user && user.role === Role.SR && order.createdById !== user.id && order.createdById !== user.sub) {
+      throw new BadRequestException('You do not have permission to view this order');
+    }
+
+    return order;
   }
 
-  async findAll(query: Record<string, unknown> = {}) {
+  async findAll(query: Record<string, unknown> = {}, user?: any) {
     const qb = this.ordersRepository
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.company', 'company')
@@ -98,6 +117,10 @@ export class OrdersService {
       .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
       .leftJoinAndSelect('order.items', 'items')
       .leftJoinAndSelect('items.product', 'product');
+
+    if (user && user.role === Role.SR) {
+      qb.andWhere('order.createdById = :userId', { userId: user.id || user.sub });
+    }
 
     if (query.companyId) {
       qb.andWhere('order.companyId = :companyId', { companyId: query.companyId });
@@ -129,16 +152,18 @@ export class OrdersService {
     return qb.getMany();
   }
 
-  async getStats() {
-    const allOrders = await this.ordersRepository.find();
+  async getStats(user?: any) {
+    const isSR = user?.role === Role.SR;
+    const userId = user?.id || user?.sub;
+
+    const allOrders = await this.ordersRepository.find({
+      where: isSR ? { createdById: userId } : {}
+    });
     const { startUtc: todayStartUTC, endUtc: todayEndUTC } = getBDDayRange();
-    this.logger.log(`[DEBUG STATS API] BD TODAY RANGE: ${todayStartUTC.toISOString()} to ${todayEndUTC.toISOString()}`);
-    this.logger.log(`[DEBUG STATS API] Total Orders Fetched: ${allOrders.length}`);
     
     if (allOrders.length > 0) {
       const sorted = [...allOrders].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       const latest = sorted[0];
-      this.logger.log(`[DEBUG STATS API] Latest Order in DB: ID=${latest.id}, createdAt=${latest.createdAt.toISOString()}`);
     }
 
     const safeNum = (val: any) => {
@@ -149,7 +174,6 @@ export class OrdersService {
 
     const todayOrdersList = allOrders.filter(o => isTodayBD(o.createdAt) && o.status !== OrderStatus.CANCELLED);
     const todayOrders = todayOrdersList.length;
-    this.logger.log(`[DEBUG STATS API] Today Matched Count (createdAt): ${todayOrders}`);
     const todayOrderCutValue = todayOrdersList.reduce((sum, o) => sum + safeNum(o.grandTotal), 0);
     
     // Card 3 & 4: Order Value (Original / Cut Value)
@@ -177,8 +201,6 @@ export class OrdersService {
     // Card 11 & 12: Cancelled
     const totalCancelled = allOrders.filter(o => o.status === OrderStatus.CANCELLED).length;
     const todayCancelled = allOrders.filter(o => o.status === OrderStatus.CANCELLED && isTodayBD(o.updatedAt)).length;
-
-    this.logger.log(`Stats Matched: TodayOrders=${todayOrders}, TodayCut=${todayOrderCutValue}, TodaySold=${todayActualSoldValue}, TodaySettled=${todaySettlement}, TodayDispatch=${todayDispatch}, TodayCancelled=${todayCancelled}`);
 
     // Card 13: Waiting Orders (Confirmed or Assigned but not dispatched)
     const waitingOrders = allOrders.filter(o => [OrderStatus.CONFIRMED, OrderStatus.ASSIGNED].includes(o.status)).length;
@@ -352,17 +374,14 @@ export class OrdersService {
 
       // 5. Finalize order
       const collectedAmount = Number(dto.collectedAmount || 0);
-      const actualSoldAmount = totalSoldAmount; // Assuming invoice discount is already handled in unitPriceAfterDiscount or we should re-apply it?
-      // Actually, order.discountAmount was on the whole subtotal.
-      // We should probably re-calculate the final grand total.
       
-      const subtotal = totalSoldAmount;
-      const discountAmount = order.discountAmount; // Keep original discount? 
-      // Usually, if some items are returned, the discount might need adjustment, 
-      // but keeping it simple for now as requested.
-      
-      const grandTotal = Math.max(0, subtotal); // Already includes item-level discounts
-      const dueAmount = Math.max(0, grandTotal - collectedAmount);
+      // Proportionally apply invoice-level discount if any
+      const invoiceDiscountApplied = Number(order.subtotal) > 0
+        ? Number(order.discountAmount || 0) * (totalSoldAmount / Number(order.subtotal))
+        : 0;
+
+      const grandTotal = Math.max(0, Number((totalSoldAmount - invoiceDiscountApplied).toFixed(2)));
+      const dueAmount = Math.max(0, Number((grandTotal - (Number(order.advancePaid || 0) + collectedAmount)).toFixed(2)));
 
       await manager.update(Order, id, {
         actualSoldAmount: grandTotal,
@@ -373,6 +392,9 @@ export class OrdersService {
         status: OrderStatus.SETTLED,
         isLocked: true,
       });
+
+      // Update Due Record via shared service
+      await this.duesService.upsertDue(order, dueAmount, manager);
 
       return manager.findOne(Order, {
         where: { id },
@@ -527,5 +549,15 @@ export class OrdersService {
       select: ['currentStock']
     });
     return Number(product?.currentStock || 0);
+  }
+
+  async updateShop(id: number, shopId: number) {
+    const order = await this.findOne(id);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    
+    await this.ordersRepository.update(id, { shopId });
+    return this.findOne(id);
   }
 }

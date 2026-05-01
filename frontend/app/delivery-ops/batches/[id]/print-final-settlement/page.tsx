@@ -6,11 +6,18 @@ import { getFinalDispatchReport } from '@/lib/api/delivery-ops';
 import { PrintSummary } from '@/components/delivery-ops/print-summary';
 import { LoadingBlock } from '@/components/ui/loading-block';
 
+import { useSearchParams } from 'next/navigation';
+
 export default function PrintFinalSettlementPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = Number(params.id);
   const [report, setReport] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Parse draft dues from URL
+  const draftDuesStr = searchParams.get('draftDues');
+  const draftDues = draftDuesStr ? JSON.parse(draftDuesStr) : {};
 
   useEffect(() => {
     async function load() {
@@ -35,7 +42,7 @@ export default function PrintFinalSettlementPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <PrintSummary report={report} mode="final" />
+      <PrintSummary report={report} mode="final" draftDues={draftDues} />
     </div>
   );
 }

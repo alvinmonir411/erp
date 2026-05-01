@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Role } from '../../../common/enums/role.enum';
+import { UserStatus } from '../../../common/enums/user-status.enum';
 
 @Entity('users')
 export class User {
@@ -14,6 +15,9 @@ export class User {
 
   @Column({ unique: true })
   email: string;
+
+  @Column({ unique: true })
+  username: string;
 
   @Column({ nullable: true })
   passwordHash: string;
@@ -24,12 +28,23 @@ export class User {
   @Column({
     type: 'varchar',
     enum: Role,
-    default: Role.SALES,
+    default: Role.SR,
   })
   role: Role;
 
-  @Column({ default: true })
-  isActive: boolean;
+  @Column({
+    type: 'varchar',
+    enum: UserStatus,
+    default: UserStatus.ACTIVE,
+  })
+  status: UserStatus;
+
+  @Column({ type: 'simple-array', nullable: true })
+  allowedRouteIds: number[];
+
+  get isActive(): boolean {
+    return this.status === UserStatus.ACTIVE;
+  }
 
   @CreateDateColumn()
   createdAt: Date;

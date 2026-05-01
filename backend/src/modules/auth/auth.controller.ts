@@ -13,27 +13,11 @@ export class AuthController {
     private readonly usersService: UsersService
   ) { }
 
-  @Get('seed')
-  async seed() {
-    try {
-      await this.usersService.create({
-        email: 'admin@gamil.com',
-        password: '13663',
-        name: 'Admin User',
-        role: 'ADMIN' as any,
-      });
-      return { message: 'Seeded admin@gamil.com / 13663' };
-    } catch (e: any) {
-      if (e.status === 409) return { message: 'Already seeded admin@gamil.com / 13663' };
-      throw e;
-    }
-  }
-
   @Post('login')
   async login(@Body() validateUserDto: ValidateUserDto) {
     const user = await this.authService.validateUser(validateUserDto);
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Invalid credentials');
     }
     return this.authService.login(user);
   }

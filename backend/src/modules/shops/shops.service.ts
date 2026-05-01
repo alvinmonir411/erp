@@ -37,7 +37,7 @@ export class ShopsService {
     return this.shopsRepository.save(shop);
   }
 
-  async findAll(query: QueryShopsDto) {
+  async findAll(query: QueryShopsDto, user?: any) {
     const queryBuilder = this.shopsRepository
       .createQueryBuilder('shop')
       .leftJoinAndSelect('shop.route', 'route')
@@ -64,10 +64,36 @@ export class ShopsService {
 
     const shops = await queryBuilder.getMany();
 
+    let duesSummary: Record<number, number> = {};
+    if (shops.length > 0) {
+      const shopIds = shops.map(s => s.id);
+      
+      let dueQuery = `SELECT "shopId", SUM("remainingDue") as "totalDue" 
+         FROM dues 
+         WHERE "shopId" IN (${shopIds.join(',')}) 
+         AND status IN ('DUE', 'PARTIAL') 
+         AND "remainingDue" > 0`;
+
+      if (user) {
+        if (user.role === 'SR') {
+          dueQuery += ` AND "srId" = '${user.id || user.sub}'`;
+        } else if (user.role === 'MANAGER' && user.allowedRouteIds && user.allowedRouteIds.length > 0) {
+          dueQuery += ` AND "routeId" IN (${user.allowedRouteIds.join(',')})`;
+        }
+      }
+
+      dueQuery += ` GROUP BY "shopId"`;
+
+      const dues = await this.shopsRepository.manager.query(dueQuery);
+      dues.forEach((d: any) => {
+        duesSummary[d.shopId] = Number(d.totalDue || 0);
+      });
+    }
+
     return shops.map(shop => ({
       ...shop,
       totalOrders: 0,
-      totalDue: 0,
+      totalDue: duesSummary[shop.id] || 0,
     }));
   }
 

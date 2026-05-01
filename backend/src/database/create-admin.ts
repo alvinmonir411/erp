@@ -26,9 +26,10 @@ async function bootstrap() {
     } catch {
       await usersService.create({
         name: 'Super Admin',
+        username: 'admin',
         email: email,
         password: password,
-        role: Role.ADMIN,
+        role: Role.SUPER_ADMIN,
       });
       Logger.log(`Created admin user: ${email} / ${password}`, 'CreateAdmin');
     }

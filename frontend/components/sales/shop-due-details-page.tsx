@@ -1,87 +1,23 @@
-'use client';
-
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { getShopDueDetails, receiveSalePayment } from '@/lib/api/sales';
+import { useCallback, useEffect, useState } from 'react';
+import { DollarSign, History, Loader2, XCircle } from 'lucide-react';
+import { getShopDues } from '@/lib/api/dues';
+import { getShop } from '@/lib/api/shops';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { PageCard } from '@/components/ui/page-card';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/format';
-import type { ShopDueDetails } from '@/types/api';
-
-type PaymentFormState = {
-  amount: string;
-  paymentDate: string;
-  note: string;
-};
-
-function createPaymentFormState(amount: number): PaymentFormState {
-  return {
-    amount: amount.toFixed(2),
-    paymentDate: new Date().toISOString().slice(0, 16),
-    note: '',
-  };
-}
-
-function getOutstandingSaleStatus(sale: ShopDueDetails['dueSales'][number]) {
-  if (sale.paidAmount <= 0) {
-    return {
-      badge: 'Full due sale',
-      description: 'No payment collected yet.',
-      toneClassName: 'bg-rose-100 text-rose-700',
-    };
-  }
-
-  return {
-    badge: 'Partial payment received',
-    description: `${formatCurrency(sale.paidAmount)} already collected, ${formatCurrency(
-      sale.dueAmount,
-    )} still due.`,
-    toneClassName: 'bg-amber-100 text-amber-700',
-  };
-}
-
-function getPaymentEntryStatus(
-  payment: ShopDueDetails['paymentHistory'][number],
-) {
-  const isInitialPayment = payment.note === 'Initial payment at sale creation';
-
-  return {
-    paymentType: isInitialPayment ? 'Initial payment' : 'Due payment received',
-    saleStatus:
-      payment.saleDueAmount > 0
-        ? 'Currently due remaining'
-        : 'Currently cleared',
-  };
-}
+import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/api/client';
 
 export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
-  const [details, setDetails] = useState<ShopDueDetails | null>(null);
-  const [paymentForms, setPaymentForms] = useState<
-    Record<number, PaymentFormState>
-  >({});
+  const [shop, setShop] = useState<any>(null);
+  const [dues, setDues] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmittingSaleId, setIsSubmittingSaleId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
-
-  useToastNotification({
-    message: error,
-    title: 'Could not load shop ledger',
-    tone: 'error',
-  });
-  useToastNotification({
-    message: paymentError,
-    title: 'Could not receive payment',
-    tone: 'error',
-  });
-  useToastNotification({
-    message: paymentSuccess,
-    title: 'Payment saved',
-    tone: 'success',
-  });
+  const [selectedDue, setSelectedDue] = useState<any>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   const refreshDetails = useCallback(
     async (showLoader: boolean) => {
@@ -91,16 +27,12 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
         }
 
         setError(null);
-        const nextDetails = await getShopDueDetails(shopId);
-        setDetails(nextDetails);
-        setPaymentForms(
-          Object.fromEntries(
-            nextDetails.dueSales.map((sale) => [
-              sale.id,
-              createPaymentFormState(sale.dueAmount),
-            ]),
-          ),
-        );
+        const [shopData, duesData] = await Promise.all([
+          getShop(shopId),
+          getShopDues(shopId)
+        ]);
+        setShop(shopData);
+        setDues(duesData);
       } catch (loadError) {
         setError(
           loadError instanceof Error
@@ -120,66 +52,16 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
     void refreshDetails(true);
   }, [refreshDetails]);
 
-  async function handleReceivePayment(
-    event: FormEvent<HTMLFormElement>,
-    saleId: number,
-  ) {
-    event.preventDefault();
-    setPaymentError(null);
-    setPaymentSuccess(null);
-
-    const form = paymentForms[saleId];
-    if (!form) {
-      return;
-    }
-
-    try {
-      setIsSubmittingSaleId(saleId);
-      await receiveSalePayment(saleId, {
-        amount: Number(form.amount),
-        paymentDate: new Date(form.paymentDate).toISOString(),
-        note: form.note.trim() || undefined,
-      });
-
-      await refreshDetails(false);
-      setPaymentSuccess('Shop due payment received successfully.');
-    } catch (submitError) {
-      setPaymentError(
-        submitError instanceof Error
-          ? submitError.message
-          : 'Failed to receive payment.',
-      );
-    } finally {
-      setIsSubmittingSaleId(null);
-    }
-  }
-
-  function updatePaymentForm(
-    saleId: number,
-    patch: Partial<PaymentFormState>,
-  ) {
-    setPaymentForms((current) => ({
-      ...current,
-      [saleId]: {
-        ...current[saleId],
-        ...patch,
-      },
-    }));
-  }
+  const totalDueAmount = dues.reduce((sum, d) => sum + Number(d.remainingDue), 0);
+  const totalPaidAmount = dues.reduce((sum, d) => sum + Number(d.paidAmount), 0);
 
   return (
     <div className="space-y-6">
       <PageCard
         title="Shop Due Details"
-        description="Review outstanding due sales for one shop, collect payments quickly, and check the full payment history."
+        description="Review outstanding due for this shop, including order details and SR information."
         action={
           <div className="flex flex-wrap gap-3">
-            <Link
-              href="/sales"
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
-            >
-              Back to sales
-            </Link>
             <Link
               href="/shops"
               className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
@@ -191,252 +73,187 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
       >
         {isLoading ? <LoadingBlock label="Loading shop ledger..." /> : null}
 
-        {!isLoading && !error && details ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <InfoCard label="Shop" value={details.shop.name} />
+        {!isLoading && !error && shop ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <InfoCard label="Shop" value={shop.name} />
             <InfoCard
               label="Route"
-              value={details.shop.route?.name ?? `Route #${details.shop.routeId}`}
+              value={shop.route?.name ?? `Route #${shop.routeId}`}
             />
             <InfoCard
-              label="Total sales"
-              value={String(details.summary.saleCount)}
+              label="Total Paid"
+              value={formatCurrency(totalPaidAmount)}
             />
             <InfoCard
-              label="Collected amount"
-              value={formatCurrency(details.summary.totalPaid)}
-            />
-            <InfoCard
-              label="Outstanding due"
-              value={formatCurrency(details.summary.totalDue)}
+              label="Outstanding Due"
+              value={formatCurrency(totalDueAmount)}
             />
           </div>
         ) : null}
       </PageCard>
 
       <PageCard
-        title="Outstanding Due Sales"
-        description="Use the quick payment form on each sale to collect due without leaving the shop ledger."
+        title="Outstanding Orders"
+        description="List of orders with remaining due balance."
       >
-        {isLoading ? <LoadingBlock label="Loading due sales..." /> : null}
-        {!isLoading && !error && details ? (
-          details.dueSales.length > 0 ? (
+        {isLoading ? <LoadingBlock label="Loading dues..." /> : null}
+        {!isLoading && !error && dues ? (
+          dues.length > 0 ? (
             <div className="space-y-4">
-              {details.dueSales.map((sale) => {
-                const form = paymentForms[sale.id] ?? createPaymentFormState(sale.dueAmount);
-                const saleStatus = getOutstandingSaleStatus(sale);
-
-                return (
-                  <div
-                    key={sale.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
-                  >
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                      <div>
-                        <p className="text-lg font-semibold text-slate-900">
-                          {sale.invoiceNo}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {sale.company?.name ?? `Company #${sale.companyId}`} •{' '}
-                          {formatDate(sale.saleDate)}
-                        </p>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${saleStatus.toneClassName}`}
-                          >
-                            {saleStatus.badge}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            {saleStatus.description}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <SummaryPill label="Total" value={formatCurrency(sale.totalAmount)} />
-                        <SummaryPill label="Collected" value={formatCurrency(sale.paidAmount)} />
-                        <SummaryPill label="Due" value={formatCurrency(sale.dueAmount)} tone="amber" />
+              {dues.map((due) => (
+                <div
+                  key={due.id}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                >
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div>
+                      <p className="text-lg font-black text-slate-900 uppercase">
+                        Order #{due.orderId}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-500 uppercase">
+                         SR: {due.srName} • {formatDate(due.order?.orderDate || due.createdAt)}
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-black uppercase ${
+                            due.status === 'DUE' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {due.status}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500 uppercase">
+                          {due.remainingDue > 0 ? `${formatCurrency(due.remainingDue)} still due` : 'Paid'}
+                        </span>
                       </div>
                     </div>
-
-                    <form
-                      onSubmit={(event) => void handleReceivePayment(event, sale.id)}
-                      className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_0.9fr_auto]"
-                    >
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <label className="block space-y-2">
-                          <span className="text-sm font-medium text-slate-700">
-                            Payment amount
-                          </span>
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              max={sale.dueAmount}
-                              value={form.amount}
-                              onChange={(event) =>
-                                updatePaymentForm(sale.id, {
-                                  amount: event.target.value,
-                                })
-                              }
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                updatePaymentForm(sale.id, {
-                                  amount: sale.dueAmount.toFixed(2),
-                                })
-                              }
-                              className="rounded-2xl border border-slate-200 px-4 py-3 text-xs font-medium text-slate-700"
-                            >
-                              Full due
-                            </button>
-                          </div>
-                        </label>
-
-                        <label className="block space-y-2">
-                          <span className="text-sm font-medium text-slate-700">
-                            Payment date
-                          </span>
-                          <input
-                            type="datetime-local"
-                            value={form.paymentDate}
-                            onChange={(event) =>
-                              updatePaymentForm(sale.id, {
-                                paymentDate: event.target.value,
-                              })
-                            }
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                          />
-                        </label>
+                    <div className="grid gap-3 md:grid-cols-4">
+                      <SummaryPill label="Total Due" value={formatCurrency(due.dueAmount)} />
+                      <SummaryPill label="Paid" value={formatCurrency(due.paidAmount)} />
+                      <SummaryPill label="Remaining" value={formatCurrency(due.remainingDue)} tone="amber" />
+                      <div className="flex items-center justify-center">
+                         <button
+                            onClick={() => {
+                              setSelectedDue(due);
+                              setIsHistoryModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                          >
+                            <History className="w-4 h-4" />
+                            History
+                          </button>
                       </div>
-
-                      <label className="block space-y-2">
-                        <span className="text-sm font-medium text-slate-700">Note</span>
-                        <textarea
-                          value={form.note}
-                          onChange={(event) =>
-                            updatePaymentForm(sale.id, {
-                              note: event.target.value,
-                            })
-                          }
-                          rows={3}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-                          placeholder="Optional payment note"
-                        />
-                      </label>
-
-                      <div className="flex flex-col gap-2 xl:justify-end">
-                        <button
-                          type="submit"
-                          disabled={isSubmittingSaleId === sale.id}
-                          className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-60"
-                        >
-                          {isSubmittingSaleId === sale.id
-                            ? 'Saving payment...'
-                            : 'Receive payment'}
-                        </button>
-                        <Link
-                          href={`/sales/${sale.id}`}
-                          className="rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-medium text-slate-700"
-                        >
-                          Open sale
-                        </Link>
-                      </div>
-                    </form>
+                    </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           ) : (
             <StateMessage
               title="No due remaining"
-              description="This shop does not have any outstanding due sales right now."
+              description="This shop does not have any outstanding dues right now."
             />
           )
         ) : null}
       </PageCard>
 
-      <PageCard
-        title="Shop Payment History"
-        description="Every payment collected for this shop is listed here, including initial payments taken during sale creation."
-      >
-        {isLoading ? <LoadingBlock label="Loading payment history..." /> : null}
-        {!isLoading && !error && details ? (
-          details.paymentHistory.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead>
-                  <tr className="text-left text-slate-500">
-                    <th className="px-3 py-3 font-medium">Payment Date</th>
-                    <th className="px-3 py-3 font-medium">Invoice</th>
-                    <th className="px-3 py-3 font-medium">Company</th>
-                    <th className="px-3 py-3 font-medium">Route</th>
-                    <th className="px-3 py-3 font-medium">Amount</th>
-                    <th className="px-3 py-3 font-medium">Type / Current status</th>
-                    <th className="px-3 py-3 font-medium">Note</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {details.paymentHistory.map((payment) => {
-                    const paymentStatus = getPaymentEntryStatus(payment);
+      {isHistoryModalOpen && selectedDue && (
+        <HistoryModal 
+          due={selectedDue} 
+          onClose={() => setIsHistoryModalOpen(false)} 
+        />
+      )}
+    </div>
+  );
+}
 
-                    return (
-                    <tr key={payment.id}>
-                      <td className="px-3 py-4 text-slate-700">
-                        {formatDateTime(payment.paymentDate)}
-                      </td>
-                      <td className="px-3 py-4">
-                        <Link
-                          href={`/sales/${payment.saleId}`}
-                          className="font-medium text-slate-900 underline underline-offset-4"
-                        >
-                          {payment.invoiceNo}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-4 text-slate-700">
-                        {payment.companyName}
-                      </td>
-                      <td className="px-3 py-4 text-slate-700">
-                        {payment.routeName}
-                      </td>
-                      <td className="px-3 py-4 font-medium text-slate-900">
-                        {formatCurrency(payment.amount)}
-                      </td>
-                      <td className="px-3 py-4">
-                        <div className="flex flex-col gap-2">
-                          <span className="inline-flex w-fit rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-700">
-                            {paymentStatus.paymentType}
-                          </span>
-                          <span
-                            className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${
-                              paymentStatus.saleStatus === 'Currently cleared'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-amber-100 text-amber-700'
-                            }`}
-                          >
-                            {paymentStatus.saleStatus}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 text-slate-700">
-                        {payment.note || 'No note provided.'}
+function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
+  const { data: collections = [], isLoading } = useQuery({
+    queryKey: ['order-collections', due.orderId],
+    queryFn: () => apiRequest<any[]>(`/dues/order/${due.orderId}/collections`, { method: 'GET' }),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm">
+      <div className="w-full sm:max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden border border-border animate-in slide-in-from-bottom sm:zoom-in duration-200 text-left">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-zinc-50/50">
+          <div>
+            <h3 className="text-lg font-bold text-foreground leading-none">Collection History</h3>
+            <p className="text-xs font-bold text-muted uppercase mt-1">Shop: {due.shop?.name} · Order #{due.orderId}</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-zinc-200 rounded-lg transition-colors">
+            <XCircle className="w-5 h-5 text-muted" />
+          </button>
+        </div>
+        
+        <div className="p-6 overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+             <div className="rounded-xl bg-zinc-50 p-3 border border-zinc-100">
+                <p className="text-[10px] font-black uppercase text-muted">Original Due</p>
+                <p className="text-lg font-bold text-zinc-900">{formatCurrency(due.dueAmount)}</p>
+             </div>
+             <div className="rounded-xl bg-emerald-50 p-3 border border-emerald-100">
+                <p className="text-[10px] font-black uppercase text-emerald-600">Total Paid</p>
+                <p className="text-lg font-bold text-emerald-700">{formatCurrency(due.paidAmount)}</p>
+             </div>
+             <div className="rounded-xl bg-rose-50 p-3 border border-rose-100">
+                <p className="text-[10px] font-black uppercase text-rose-600">Remaining</p>
+                <p className="text-lg font-bold text-rose-700">{formatCurrency(due.remainingDue)}</p>
+             </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full min-w-[400px] text-left text-sm">
+              <thead className="bg-zinc-50/50 text-[10px] font-black uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">SR Name</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                  <th className="px-4 py-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
+                    </td>
+                  </tr>
+                ) : collections.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-muted">No history found.</td>
+                  </tr>
+                ) : (
+                  collections.map((c: any) => (
+                    <tr key={c.id} className="hover:bg-zinc-50/30">
+                      <td className="px-4 py-3 text-xs font-bold text-zinc-600">{new Date(c.collectionDate).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-zinc-700">{c.srName}</td>
+                      <td className="px-4 py-3 text-right font-black text-primary">{formatCurrency(c.collectedAmount)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-black border ${
+                          c.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                          c.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                          'bg-rose-50 text-rose-700 border-rose-100'
+                        }`}>
+                          {c.status}
+                        </span>
                       </td>
                     </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <StateMessage
-              title="No payments recorded"
-              description="Payments received for this shop will appear here."
-            />
-          )
-        ) : null}
-      </PageCard>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div className="px-6 py-4 bg-zinc-50/50 border-t border-border flex justify-end">
+          <button onClick={onClose} className="px-6 py-2 bg-zinc-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
     </div>
   );
 }

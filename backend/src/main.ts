@@ -22,5 +22,5 @@ async function bootstrap() {
 
   await app.listen(configService.get<number>('app.port') ?? 3001);
 }
-// Trigger nest reload (applied fixes for stock damage)
+// Trigger nest reload (applied fixes for shop assignment routing)
 void bootstrap();

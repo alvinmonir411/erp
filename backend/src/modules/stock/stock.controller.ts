@@ -3,7 +3,14 @@ import { StockService } from './stock.service';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
 import { StockMovementType } from './stock.constants';
 
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../../common/enums/role.enum';
+
 @Controller('stock')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 

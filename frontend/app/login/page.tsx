@@ -9,7 +9,7 @@ import Image from 'next/image';
 export default function LoginPage() {
   const SESSION_DURATION_MS = 60 * 60 * 1000;
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -20,7 +20,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const data = await login(email, password);
+      const data = await login(identifier, password);
       if (typeof window !== 'undefined') {
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
@@ -51,7 +51,7 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-zinc-100 to-zinc-400 bg-clip-text text-transparent">
             Welcome Back
           </h1>
-          <p className="text-zinc-400 mt-2">Sign in to manage your inventory</p>
+          <p className="text-zinc-400 mt-2">Sign in to manage your ERP</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
@@ -65,13 +65,12 @@ export default function LoginPage() {
             <div className="relative group">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 group-focus-within:text-blue-400 transition-colors" />
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl py-3.5 pl-12 pr-4 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
-                placeholder="Email address"
+                placeholder="Email or Username"
               />
             </div>
             <div className="relative group">
@@ -104,8 +103,8 @@ export default function LoginPage() {
           </button>
         </form>
         
-        <div className="mt-8 text-center">
-          <p className="text-zinc-500 text-sm">Use <strong>admin@erp.com</strong> / <strong>password123</strong></p>
+        <div className="mt-8 text-center border-t border-zinc-800 pt-6">
+          <p className="text-zinc-500 text-xs">Default Admin: <strong>admin@erp.com</strong> / <strong>admin123</strong></p>
         </div>
       </div>
     </div>

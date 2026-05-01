@@ -23,11 +23,11 @@ export class RolesGuard implements CanActivate {
         return false;
     }
     
-    // Admins can do everything
-    if (user.role === Role.ADMIN) {
+    // Super Admins can do everything
+    if (user.role === Role.SUPER_ADMIN) {
       return true;
     }
 
-    return requiredRoles.includes(user.role);
+    return requiredRoles.some((role) => user.role === role);
   }
 }

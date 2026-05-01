@@ -49,6 +49,24 @@ export class DeliveryReturnItem {
     default: 0,
     transformer: new ColumnNumericTransformer(),
   })
+  paidReturnedQuantity: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  freeReturnedQuantity: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   damagedQuantity: number;
 
   @Column({

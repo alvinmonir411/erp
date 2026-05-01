@@ -5,9 +5,10 @@ import { formatCurrency, formatNumber } from '@/lib/utils/format';
 interface PrintSummaryProps {
   report: any;
   mode: 'morning' | 'final' | 'field';
+  draftDues?: Record<number, number>;
 }
 
-export function PrintSummary({ report, mode }: PrintSummaryProps) {
+export function PrintSummary({ report, mode, draftDues = {} }: PrintSummaryProps) {
   if (!report) return null;
 
   const getTitle = () => {
@@ -20,61 +21,63 @@ export function PrintSummary({ report, mode }: PrintSummaryProps) {
   };
 
   return (
-    <div className="mx-auto bg-white p-4 text-[13px] text-black printable-report max-w-[210mm]">
+    <div className="mx-auto bg-white p-2 sm:p-4 text-[13px] text-black printable-report max-w-full md:max-w-[210mm]">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { size: A4; margin: 12mm; }
           body { -webkit-print-color-adjust: exact; }
-          .printable-report { p-0 !important; }
+          .printable-report { p-0 !important; max-width: none !important; }
         }
-        .printable-report table { border-collapse: collapse; width: 100%; }
+        .printable-report table { border-collapse: collapse; width: 100%; min-width: 600px; }
         .printable-report th, .printable-report td { border: 1px solid #000; padding: 6px 8px; }
       `}} />
 
       {/* Header Section */}
       <div className="text-center mb-6">
-        <div className="text-2xl font-bold uppercase mb-1">MS KORIM TRADERS</div>
-        <h1 className="text-sm uppercase tracking-[0.2em] font-medium border-b border-black pb-4 inline-block px-10">
+        <div className="text-2xl font-bold uppercase mb-1">{report.company?.name || 'Ka'}</div>
+        <h1 className="text-sm uppercase tracking-[0.2em] font-medium border-b border-black pb-4 inline-block px-4 sm:px-10">
           {getTitle()}
         </h1>
         
         {/* Info Row 1 */}
-        <div className="mt-6 flex justify-between text-left font-medium">
+        <div className="mt-6 flex flex-col sm:flex-row justify-between text-left font-medium gap-2 sm:gap-0">
           <div className="flex-1">
             <span className="font-bold">Batch Number:</span> {report.batchNo}
           </div>
-          <div className="flex-1 text-center">
+          <div className="flex-1 sm:text-center">
             <span className="font-bold">Delivery Date:</span> {new Date(report.dispatchDate).toLocaleDateString()}
           </div>
-          <div className="flex-1 text-right">
+          <div className="flex-1 sm:text-right">
             <span className="font-bold">Route:</span> {report.route.name}
           </div>
         </div>
 
         {/* Info Row 2 */}
-        <div className="mt-2 flex justify-between text-left font-medium border-b border-black/10 pb-4">
+        <div className="mt-2 flex flex-col sm:flex-row justify-between text-left font-medium border-b border-black/10 pb-4 gap-2 sm:gap-0">
           <div className="flex-1">
             <span className="font-bold">Delivery Personnel:</span> {report.deliveryPerson.name}
           </div>
-          <div className="flex-1 text-right text-xs text-slate-500">
+          <div className="flex-1 sm:text-right text-xs text-slate-500">
             <span className="font-bold">Print Date & Time:</span> {new Date().toLocaleString()}
           </div>
         </div>
       </div>
 
-      {mode === 'morning' && <MorningLayout report={report} />}
-      {mode === 'field' && <FieldLayout report={report} />}
-      {mode === 'final' && <FinalSettlementLayout report={report} />}
+      <div className="overflow-x-auto print:overflow-visible">
+        {mode === 'morning' && <MorningLayout report={report} />}
+        {mode === 'field' && <FieldLayout report={report} />}
+        {mode === 'final' && <FinalSettlementLayout report={report} draftDues={draftDues} />}
+      </div>
     </div>
   );
 }
 
-function FinalSettlementLayout({ report }: { report: any }) {
+function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: Record<number, number> }) {
   const products = report.productSummary || [];
   const sortedProducts = [...products].sort((a, b) => a.productName.localeCompare(b.productName));
 
   return (
-    <div className="mt-2">
+    <div className="mt-2 min-w-[700px]">
       <table className="w-full text-xs">
         <thead>
           <tr className="bg-slate-50 uppercase font-bold text-[10px]">
@@ -86,6 +89,8 @@ function FinalSettlementLayout({ report }: { report: any }) {
             <th className="w-14 text-center">Sold</th>
             <th className="w-20 text-center">Price</th>
             <th className="w-24 text-right">Total</th>
+            <th className="w-20 text-right">Due/Baki</th>
+            <th className="w-20 text-right">Cash</th>
             <th className="text-left min-w-[80px]">Remarks</th>
           </tr>
         </thead>
@@ -93,6 +98,20 @@ function FinalSettlementLayout({ report }: { report: any }) {
           {sortedProducts.map((item, index) => {
             const soldQty = Number(item.delivered || 0);
             const unitPrice = soldQty > 0 ? Number(item.finalSoldAmount) / soldQty : 0;
+            const totalAmount = Number(item.finalSoldAmount || 0);
+            
+            // Calculate due for this product row
+            const productDue = report.orders
+              .filter((order: any) => order.items.some((i: any) => i.productName === item.productName))
+              .reduce((sum: number, order: any) => {
+                if (draftDues[order.orderId] !== undefined) {
+                  return sum + draftDues[order.orderId];
+                }
+                return sum + Number(order.dueAmount || 0);
+              }, 0);
+            
+            const cash = Math.max(0, totalAmount - productDue);
+
             return (
               <tr key={item.productName}>
                 <td className="text-center text-slate-400">{index + 1}</td>
@@ -107,7 +126,13 @@ function FinalSettlementLayout({ report }: { report: any }) {
                   {formatCurrency(unitPrice)}
                 </td>
                 <td className="text-right font-bold bg-slate-50/50">
-                  {formatCurrency(item.finalSoldAmount)}
+                  {formatCurrency(totalAmount)}
+                </td>
+                <td className="text-right font-bold text-amber-600">
+                  {formatCurrency(productDue)}
+                </td>
+                <td className="text-right font-bold text-emerald-600">
+                  {formatCurrency(cash)}
                 </td>
                 <td></td>
               </tr>
@@ -139,8 +164,76 @@ function FinalSettlementLayout({ report }: { report: any }) {
             <span>GRAND TOTAL:</span>
             <span>{formatCurrency(report.summary.finalSoldValue)}</span>
           </div>
+          
+          {(() => {
+            const totalDue = report.orders.reduce((sum: number, order: any) => {
+              if (draftDues[order.orderId] !== undefined) {
+                return sum + draftDues[order.orderId];
+              }
+              return sum + Number(order.dueAmount || 0);
+            }, 0);
+            const cashCollectable = Math.max(0, Number(report.summary.finalSoldValue || 0) - totalDue);
+            
+            return (
+              <>
+                <div className="flex justify-between text-sm font-bold pt-1 text-amber-700">
+                  <span>Total Due/Baki:</span>
+                  <span>{formatCurrency(totalDue)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-black pt-2 border-t-2 border-black text-emerald-700">
+                  <span>CASH COLLECTABLE:</span>
+                  <span>{formatCurrency(cashCollectable)}</span>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
+
+      {(() => {
+        const ordersWithDue = report.orders.filter((order: any) => {
+          const due = draftDues[order.orderId] !== undefined ? draftDues[order.orderId] : Number(order.dueAmount || 0);
+          return due > 0;
+        });
+
+        if (ordersWithDue.length === 0) return null;
+
+        return (
+          <div className="mt-12 break-inside-avoid">
+            <h2 className="text-sm font-black uppercase tracking-widest border-b border-black mb-4 inline-block">Due / Baki Details</h2>
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 uppercase font-bold text-[10px]">
+                  <th className="w-8 text-center border border-black p-2">SL</th>
+                  <th className="text-left border border-black p-2">Shop</th>
+                  <th className="text-left border border-black p-2">Order</th>
+                  <th className="text-left border border-black p-2">SR</th>
+                  <th className="text-left border border-black p-2">Product</th>
+                  <th className="text-right border border-black p-2">Due Amount</th>
+                  <th className="text-left border border-black p-2">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ordersWithDue.map((order: any, idx: number) => {
+                  const due = draftDues[order.orderId] !== undefined ? draftDues[order.orderId] : Number(order.dueAmount || 0);
+                  const productNames = order.items.map((i: any) => i.productName).join(', ');
+                  return (
+                    <tr key={order.orderId}>
+                      <td className="text-center border border-black p-2">{idx + 1}</td>
+                      <td className="border border-black p-2 font-bold">{order.shopName}</td>
+                      <td className="border border-black p-2">#{order.orderId}</td>
+                      <td className="border border-black p-2">{report.deliveryPerson?.name}</td>
+                      <td className="border border-black p-2 text-slate-600">{productNames}</td>
+                      <td className="border border-black p-2 text-right font-bold text-amber-600">{formatCurrency(due)}</td>
+                      <td className="border border-black p-2"></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
 
       <div className="mt-20 grid grid-cols-3 gap-10">
         <div className="border-t border-black pt-2 text-center text-[10px] font-bold uppercase tracking-widest">
@@ -165,7 +258,7 @@ function FieldLayout({ report }: { report: any }) {
   const sortedItems = [...items].sort((a, b) => a.productName.localeCompare(b.productName));
 
   return (
-    <div className="mt-8">
+    <div className="mt-8 min-w-[700px]">
       <table className="w-full border-2 border-slate-900 border-collapse">
         <thead>
           <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest">
@@ -244,7 +337,7 @@ function FieldLayout({ report }: { report: any }) {
 
 function MorningLayout({ report }: { report: any }) {
   return (
-    <div className="mt-8 space-y-10">
+    <div className="mt-8 space-y-10 min-w-[600px]">
       {/* Item Summary Table */}
       <div>
         <h2 className="text-sm font-black uppercase tracking-widest border-l-4 border-slate-900 pl-3 mb-4">

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../auth/auth-provider';
 import {
   Search, Calendar, Filter, Download,
   Eye, Edit, Trash2, Printer, CheckCircle,
@@ -37,6 +38,7 @@ const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }>
 const PAGE_SIZE = 15;
 
 export function AllOrdersPage() {
+  const { user } = useAuth();
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   const router = useRouter();
 
@@ -360,7 +362,7 @@ export function AllOrdersPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        {order.status !== 'SETTLED' && (
+                        {user?.role !== 'SR' && order.status !== 'SETTLED' && (
                           <Link
                             href={`/orders/${order.id}/edit`}
                             className="p-2 text-muted hover:text-primary transition-colors"
@@ -369,13 +371,15 @@ export function AllOrdersPage() {
                             <Edit className="h-4 w-4" />
                           </Link>
                         )}
-                        <button
-                          onClick={() => handleDelete(order.id)}
-                          className="p-2 text-muted hover:text-rose-600 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {user?.role === 'SUPER_ADMIN' && (
+                          <button
+                            onClick={() => handleDelete(order.id)}
+                            className="p-2 text-muted hover:text-rose-600 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -429,8 +433,16 @@ export function AllOrdersPage() {
 
                 <div className="flex justify-end gap-2 pt-2">
                   <button className="text-[10px] font-bold uppercase text-primary px-3 py-1.5 bg-primary/5 rounded-lg">View Details</button>
-                  {order.status !== 'SETTLED' && (
+                  {user?.role !== 'SR' && order.status !== 'SETTLED' && (
                     <Link href={`/orders/${order.id}/edit`} className="text-[10px] font-bold uppercase text-amber-600 px-3 py-1.5 bg-amber-50 rounded-lg">Edit</Link>
+                  )}
+                  {user?.role === 'SUPER_ADMIN' && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDelete(order.id); }}
+                      className="text-[10px] font-bold uppercase text-rose-600 px-3 py-1.5 bg-rose-50 rounded-lg"
+                    >
+                      Delete
+                    </button>
                   )}
                 </div>
               </div>
@@ -460,9 +472,9 @@ export function AllOrdersPage() {
 
 function OrderModal({ order, onClose }: { order: any, onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+      <div className="relative w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 mb-0 pb-safe pb-4 sm:pb-0">
         <div className="bg-primary p-6 text-white flex items-center justify-between">
           <div>
             <h2 className="text-xl font-black">Order #{order.id.toString().padStart(6, '0')}</h2>
@@ -487,26 +499,28 @@ function OrderModal({ order, onClose }: { order: any, onClose: () => void }) {
             </div>
           </div>
 
-          <table className="w-full text-left mb-8">
-            <thead className="bg-secondary/30 text-[10px] font-bold uppercase tracking-wider text-muted">
-              <tr>
-                <th className="px-4 py-3">Product</th>
-                <th className="px-4 py-3 text-center">Qty</th>
-                <th className="px-4 py-3 text-right">Price</th>
-                <th className="px-4 py-3 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {order.items?.map((item: any, idx: number) => (
-                <tr key={idx} className="text-sm">
-                  <td className="px-4 py-3 font-bold text-foreground">{item.product?.name}</td>
-                  <td className="px-4 py-3 text-center font-bold">{item.quantity}</td>
-                  <td className="px-4 py-3 text-right font-medium text-muted">{formatCurrency(item.unitPrice)}</td>
-                  <td className="px-4 py-3 text-right font-bold text-foreground">{formatCurrency(item.lineTotal)}</td>
+          <div className="overflow-x-auto mb-8 rounded-xl border border-border">
+            <table className="w-full text-left min-w-[400px]">
+              <thead className="bg-secondary/30 text-[10px] font-bold uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3 text-center">Qty</th>
+                  <th className="px-4 py-3 text-right">Price</th>
+                  <th className="px-4 py-3 text-right">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {order.items?.map((item: any, idx: number) => (
+                  <tr key={idx} className="text-sm">
+                    <td className="px-4 py-3 font-bold text-foreground">{item.product?.name}</td>
+                    <td className="px-4 py-3 text-center font-bold">{item.quantity}</td>
+                    <td className="px-4 py-3 text-right font-medium text-muted">{formatCurrency(item.unitPrice)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-foreground">{formatCurrency(item.lineTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           <div className="bg-primary/5 rounded-2xl p-6 space-y-3">
             <div className="flex justify-between text-sm">
@@ -606,9 +620,9 @@ function SettlementModal({ order, onClose, onSettled }: { order: any, onClose: (
   };
 
   return (
-    <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[10001] flex items-end sm:items-center justify-center sm:p-6">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-4xl rounded-[2.5rem] bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-4xl rounded-t-[2.5rem] sm:rounded-[2.5rem] bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95 mb-0 pb-safe pb-4 sm:pb-0">
         <div className="bg-violet-900 px-8 py-6 text-white flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-black">Settle Order #{order.id.toString().padStart(6, '0')}</h2>
@@ -621,8 +635,8 @@ function SettlementModal({ order, onClose, onSettled }: { order: any, onClose: (
 
         <div className="flex-1 overflow-y-auto p-8">
           <div className="space-y-6">
-            <div className="overflow-hidden rounded-3xl border border-slate-100">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto rounded-3xl border border-slate-100">
+              <table className="w-full text-left text-xs min-w-[600px]">
                 <thead className="bg-slate-50">
                   <tr className="font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
                     <th className="px-6 py-4">Product</th>
