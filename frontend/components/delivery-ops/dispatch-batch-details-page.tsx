@@ -30,6 +30,22 @@ import type { DispatchBatch } from '@/types/api';
 import { batchStatusConfig, orderStatusConfig, StatusBadge } from './delivery-ops-ui';
 import { PrintSummary } from './print-summary';
 
+const gcd = (a: number, b: number): number => {
+  a = Math.abs(a);
+  b = Math.abs(b);
+  while (b) {
+    a %= b;
+    [a, b] = [b, a];
+  }
+  return a;
+};
+
+const getBundleSize = (paid: number, free: number): number => {
+  if (!free || free === 0) return 1;
+  const common = gcd(paid, free);
+  return (paid / common) + (free / common);
+};
+
 export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const router = useRouter();
   const batchId = Number(id);
@@ -46,19 +62,22 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   // Aggregate items across all orders in the batch
   const aggregatedItems = useMemo(() => {
     if (!batch) return [];
-    const map = new Map<number, { productId: number; name: string; unit: string; totalQty: number; price: number }>();
+    const map = new Map<number, { productId: number; name: string; unit: string; totalQty: number; totalPaidQty: number; price: number }>();
     batch.orders.forEach(bo => {
       bo.order.items.forEach(item => {
         const existing = map.get(item.productId);
         const qty = Number(item.quantity) + Number(item.freeQuantity || 0);
+        const paidQty = Number(item.quantity);
         if (existing) {
           existing.totalQty += qty;
+          existing.totalPaidQty += paidQty;
         } else {
           map.set(item.productId, {
             productId: item.productId,
             name: item.product.name,
             unit: item.product.unit,
             totalQty: qty,
+            totalPaidQty: paidQty,
             price: Number(item.unitPrice)
           });
         }
@@ -104,10 +123,13 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       const dam = Number(state.damaged || 0);
       const delivered = Math.max(0, item.totalQty - ret - dam);
       
+      const ratio = item.totalQty > 0 ? (item.totalPaidQty / item.totalQty) : 0;
+      const deliveredPaid = delivered * ratio;
+
       totalOrder += item.totalQty;
       totalReturned += ret;
       totalDamaged += dam;
-      totalAmount += delivered * item.price;
+      totalAmount += deliveredPaid * item.price;
     });
 
     return { totalOrder, totalReturned, totalDamaged, totalSold: totalOrder - totalReturned - totalDamaged, totalAmount };
@@ -162,47 +184,88 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const handleSaveReturns = async () => {
     if (!batch) return;
 
-    // Validate returns against dispatched quantities
+    const productBundleSizes: Record<number, number> = {};
     for (const item of aggregatedItems) {
       const state = batchReturnState[item.productId] || { returned: '0', damaged: '0' };
       const returned = Number(state.returned || 0);
       const damaged = Number(state.damaged || 0);
+      const totalReturn = returned + damaged;
+
+      // Find bundle size from order items
+      let bundleSize = 1;
+      for (const bo of batch.orders) {
+        const oi = bo.order.items.find((i) => i.productId === item.productId);
+        if (oi && Number(oi.freeQuantity) > 0) {
+          bundleSize = getBundleSize(Number(oi.quantity), Number(oi.freeQuantity));
+          break;
+        }
+      }
+      productBundleSizes[item.productId] = bundleSize;
 
       if (returned < 0 || damaged < 0) {
         showErrorToast(`Negative values are not allowed for ${item.name}`);
         return;
       }
 
-      if (returned + damaged > item.totalQty) {
-        showErrorToast(`Total returns (${returned + damaged}) for ${item.name} cannot exceed total dispatched quantity (${item.totalQty})`);
+      if (totalReturn > item.totalQty) {
+        showErrorToast(
+          `Total returns (${totalReturn}) for ${item.name} cannot exceed total dispatched quantity (${item.totalQty})`,
+        );
+        return;
+      }
+
+      if (totalReturn % bundleSize !== 0) {
+        showErrorToast(
+          `Return quantity for ${item.name} must include the matching free product for this offer.`,
+        );
         return;
       }
     }
 
+    // Distribute returns to individual orders in multiples of bundle size
+    const remainingReturned: Record<number, number> = {};
+    const remainingDamaged: Record<number, number> = {};
+    Object.entries(batchReturnState).forEach(([pid, s]) => {
+      remainingReturned[Number(pid)] = Number(s.returned || 0);
+      remainingDamaged[Number(pid)] = Number(s.damaged || 0);
+    });
+
+    const ordersToUpdate = batch.orders.map((bo) => {
+      return {
+        orderId: bo.orderId,
+        items: bo.order.items.map((item) => {
+          const bSize = productBundleSizes[item.productId] || 1;
+          const dispatchedInThisOrder = Number(item.quantity) + Number(item.freeQuantity || 0);
+
+          let orderReturned = 0;
+          if (remainingReturned[item.productId] > 0) {
+            const canTake = Math.min(remainingReturned[item.productId], dispatchedInThisOrder);
+            orderReturned = Math.floor(canTake / bSize) * bSize;
+            remainingReturned[item.productId] -= orderReturned;
+          }
+
+          let orderDamaged = 0;
+          if (remainingDamaged[item.productId] > 0) {
+            const canTake = Math.min(
+              remainingDamaged[item.productId],
+              dispatchedInThisOrder - orderReturned,
+            );
+            orderDamaged = Math.floor(canTake / bSize) * bSize;
+            remainingDamaged[item.productId] -= orderDamaged;
+          }
+
+          return {
+            productId: item.productId,
+            dispatchedQuantity: dispatchedInThisOrder,
+            returnedQuantity: orderReturned,
+            damagedQuantity: orderDamaged,
+          };
+        }),
+      };
+    });
+
     try {
       setIsSavingReturns(true);
-      
-      const ordersToUpdate = batch.orders.map(bo => {
-        return {
-          orderId: bo.orderId,
-          items: bo.order.items.map(item => {
-            const state = batchReturnState[item.productId] || { returned: '0', damaged: '0' };
-            const totalDispatchedForThisProduct = aggregatedItems.find(ai => ai.productId === item.productId)?.totalQty || 1;
-            const dispatchedInThisOrder = Number(item.quantity) + Number(item.freeQuantity || 0);
-            const ratio = dispatchedInThisOrder / totalDispatchedForThisProduct;
-            
-            // Proportional distribution of returns
-            return {
-              productId: item.productId,
-              dispatchedQuantity: dispatchedInThisOrder,
-              returnedQuantity: Math.round(Number(state.returned) * ratio),
-              damagedQuantity: Math.round(Number(state.damaged) * ratio),
-              // deliveredQuantity is calculated by backend or frontend-only, do not send
-            };
-          })
-        };
-      });
-
       await recordBatchReturns(batchId, { orders: ordersToUpdate });
       showSuccessToast('Returns recorded successfully');
       fetchBatch();

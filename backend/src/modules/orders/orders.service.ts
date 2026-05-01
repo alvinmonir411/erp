@@ -261,6 +261,22 @@ export class OrdersService {
     return this.dataSource.transaction(async (manager) => {
       let totalSoldAmount = 0;
 
+      const gcd = (a: number, b: number): number => {
+        a = Math.abs(a);
+        b = Math.abs(b);
+        while (b) {
+          a %= b;
+          [a, b] = [b, a];
+        }
+        return a;
+      };
+
+      const getBundleSize = (paid: number, free: number): number => {
+        if (!free || free === 0) return 1;
+        const common = gcd(paid, free);
+        return (paid / common) + (free / common);
+      };
+
       for (const itemDto of dto.items) {
         const orderItem = order.items.find(i => i.productId === itemDto.productId);
         if (!orderItem) continue;
@@ -268,6 +284,19 @@ export class OrdersService {
         const dispatchedQty = Number(orderItem.quantity) + Number(orderItem.freeQuantity || 0);
         const returnedQty = Number(itemDto.returnedQuantity || 0);
         const damagedQty = Number(itemDto.damagedQuantity || 0);
+
+        // Bundle validation
+        const paid = Number(orderItem.quantity);
+        const free = Number(orderItem.freeQuantity || 0);
+        if (free > 0) {
+          const bundleSize = getBundleSize(paid, free);
+          if ((returnedQty + damagedQty) % bundleSize !== 0) {
+            throw new BadRequestException(
+              `Return quantity for ${orderItem.product.name} must include the matching free product for this offer.`,
+            );
+          }
+        }
+
         const deliveredQty = Math.max(0, dispatchedQty - returnedQty - damagedQty);
 
         // 1. Restore stock for returned items (only)
@@ -307,7 +336,9 @@ export class OrdersService {
           ? Number(orderItem.lineTotal) / Number(orderItem.quantity) 
           : 0;
         
-        const chargeableDelivered = Math.max(0, Math.min(Number(orderItem.quantity), deliveredQty));
+        const chargeableDelivered = dispatchedQty > 0 
+          ? deliveredQty * (Number(orderItem.quantity) / dispatchedQty)
+          : 0;
         const itemSoldAmount = chargeableDelivered * unitPriceAfterDiscount;
         totalSoldAmount += itemSoldAmount;
 

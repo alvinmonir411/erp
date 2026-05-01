@@ -412,6 +412,22 @@ export class DeliveryOpsService {
     });
   }
 
+  private gcd(a: number, b: number): number {
+    a = Math.abs(a);
+    b = Math.abs(b);
+    while (b) {
+      a %= b;
+      [a, b] = [b, a];
+    }
+    return a;
+  }
+
+  private getBundleSize(paid: number, free: number): number {
+    if (!free || free === 0) return 1;
+    const common = this.gcd(paid, free);
+    return (paid / common) + (free / common);
+  }
+
   async recordReturns(id: number, dto: RecordBatchReturnsDto) {
     const batch = await this.getDispatchBatch(id);
 
@@ -501,6 +517,19 @@ export class DeliveryOpsService {
           if (returnedQuantity < 0 || damagedQuantity < 0) {
             throw new BadRequestException('Return and damage quantities must be zero or more');
           }
+
+          // Bundle validation
+          const paid = Number(orderItem.quantity);
+          const free = Number(orderItem.freeQuantity || 0);
+          if (free > 0) {
+            const bundleSize = this.getBundleSize(paid, free);
+            if ((returnedQuantity + damagedQuantity) % bundleSize !== 0) {
+              throw new BadRequestException(
+                `Return quantity for ${orderItem.product.name} must include the matching free product for this offer.`,
+              );
+            }
+          }
+
           if (returnedQuantity + damagedQuantity > dispatchedQuantity) {
             throw new BadRequestException(
               `Returned + damaged quantity cannot exceed dispatched quantity for ${orderItem.product.name}`,
@@ -1000,10 +1029,9 @@ export class DeliveryOpsService {
       const returned = Number(item.returnedQuantity || 0);
       const damaged = Number(item.damagedQuantity || 0);
       const delivered = dispatched - returned - damaged;
-      const deliveredChargeableQuantity = Math.max(
-        0,
-        Math.min(Number(item.quantity), delivered),
-      );
+      const deliveredChargeableQuantity = dispatched > 0 
+        ? delivered * (Number(item.quantity) / dispatched)
+        : 0;
       const itemNetPerPaidUnit =
         Number(item.quantity) > 0
           ? Number(item.lineTotal) / Number(item.quantity)
