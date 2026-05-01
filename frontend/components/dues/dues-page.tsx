@@ -20,8 +20,10 @@ import {
   History
 } from 'lucide-react';
 import { getDues, collectDue, getDueStats } from '@/lib/api/dues';
+import { apiRequest } from '../../lib/api/client';
 import { formatCurrency } from '@/lib/utils/format';
 import { useAuth } from '../auth/auth-provider';
+import { useToast } from '@/components/ui/toast-provider';
 import { Role } from '@/types/api';
 
 import Link from 'next/link';

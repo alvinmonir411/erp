@@ -289,19 +289,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     try {
       setIsSettling(true);
       
-      // 1. Save Draft Dues first
-      const draftEntries = Object.entries(draftDues);
-      for (const [orderId, amount] of draftEntries) {
-        if (amount > 0) {
-           await upsertDue({
-             orderId: Number(orderId),
-             amount: amount,
-             note: 'Added during batch settlement'
-           });
-        }
-      }
-
-      // 2. Complete Settlement
+      // Complete Settlement
       await settleDispatchBatch(batchId, {
         collections: batch.orders.map((batchOrder) => {
           const draftDue = draftDues[batchOrder.orderId] || 0;

@@ -1,8 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { DollarSign, History, Loader2, XCircle } from 'lucide-react';
 import { getShopDues } from '@/lib/api/dues';
-import { getShop } from '@/lib/api/shops';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { PageCard } from '@/components/ui/page-card';
 import { StateMessage } from '@/components/ui/state-message';
@@ -27,12 +28,12 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
         }
 
         setError(null);
-        const [shopData, duesData] = await Promise.all([
-          getShop(shopId),
-          getShopDues(shopId)
-        ]);
-        setShop(shopData);
+        const duesData = await getShopDues(shopId);
         setDues(duesData);
+        // Derive shop info from the first due's shop relation if available
+        if (duesData.length > 0 && duesData[0].shop) {
+          setShop(duesData[0].shop);
+        }
       } catch (loadError) {
         setError(
           loadError instanceof Error
@@ -111,13 +112,12 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
                         Order #{due.orderId}
                       </p>
                       <p className="mt-1 text-sm font-bold text-slate-500 uppercase">
-                         SR: {due.srName} • {formatDate(due.order?.orderDate || due.createdAt)}
+                        SR: {due.srName} • {formatDate(due.order?.orderDate || due.createdAt)}
                       </p>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-black uppercase ${
-                            due.status === 'DUE' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
-                          }`}
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-black uppercase ${due.status === 'DUE' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                            }`}
                         >
                           {due.status}
                         </span>
@@ -131,16 +131,16 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
                       <SummaryPill label="Paid" value={formatCurrency(due.paidAmount)} />
                       <SummaryPill label="Remaining" value={formatCurrency(due.remainingDue)} tone="amber" />
                       <div className="flex items-center justify-center">
-                         <button
-                            onClick={() => {
-                              setSelectedDue(due);
-                              setIsHistoryModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
-                          >
-                            <History className="w-4 h-4" />
-                            History
-                          </button>
+                        <button
+                          onClick={() => {
+                            setSelectedDue(due);
+                            setIsHistoryModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                        >
+                          <History className="w-4 h-4" />
+                          History
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -157,9 +157,9 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
       </PageCard>
 
       {isHistoryModalOpen && selectedDue && (
-        <HistoryModal 
-          due={selectedDue} 
-          onClose={() => setIsHistoryModalOpen(false)} 
+        <HistoryModal
+          due={selectedDue}
+          onClose={() => setIsHistoryModalOpen(false)}
         />
       )}
     </div>
@@ -184,21 +184,21 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
             <XCircle className="w-5 h-5 text-muted" />
           </button>
         </div>
-        
+
         <div className="p-6 overflow-y-auto">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-             <div className="rounded-xl bg-zinc-50 p-3 border border-zinc-100">
-                <p className="text-[10px] font-black uppercase text-muted">Original Due</p>
-                <p className="text-lg font-bold text-zinc-900">{formatCurrency(due.dueAmount)}</p>
-             </div>
-             <div className="rounded-xl bg-emerald-50 p-3 border border-emerald-100">
-                <p className="text-[10px] font-black uppercase text-emerald-600">Total Paid</p>
-                <p className="text-lg font-bold text-emerald-700">{formatCurrency(due.paidAmount)}</p>
-             </div>
-             <div className="rounded-xl bg-rose-50 p-3 border border-rose-100">
-                <p className="text-[10px] font-black uppercase text-rose-600">Remaining</p>
-                <p className="text-lg font-bold text-rose-700">{formatCurrency(due.remainingDue)}</p>
-             </div>
+            <div className="rounded-xl bg-zinc-50 p-3 border border-zinc-100">
+              <p className="text-[10px] font-black uppercase text-muted">Original Due</p>
+              <p className="text-lg font-bold text-zinc-900">{formatCurrency(due.dueAmount)}</p>
+            </div>
+            <div className="rounded-xl bg-emerald-50 p-3 border border-emerald-100">
+              <p className="text-[10px] font-black uppercase text-emerald-600">Total Paid</p>
+              <p className="text-lg font-bold text-emerald-700">{formatCurrency(due.paidAmount)}</p>
+            </div>
+            <div className="rounded-xl bg-rose-50 p-3 border border-rose-100">
+              <p className="text-[10px] font-black uppercase text-rose-600">Remaining</p>
+              <p className="text-lg font-bold text-rose-700">{formatCurrency(due.remainingDue)}</p>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-border">
@@ -229,11 +229,10 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
                       <td className="px-4 py-3 text-xs font-medium text-zinc-700">{c.srName}</td>
                       <td className="px-4 py-3 text-right font-black text-primary">{formatCurrency(c.collectedAmount)}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-black border ${
-                          c.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-black border ${c.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                           c.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                          'bg-rose-50 text-rose-700 border-rose-100'
-                        }`}>
+                            'bg-rose-50 text-rose-700 border-rose-100'
+                          }`}>
                           {c.status}
                         </span>
                       </td>
@@ -244,7 +243,7 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
             </table>
           </div>
         </div>
-        
+
         <div className="px-6 py-4 bg-zinc-50/50 border-t border-border flex justify-end">
           <button onClick={onClose} className="px-6 py-2 bg-zinc-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest">
             Close
@@ -254,9 +253,7 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
     </div>
   );
 }
-    </div>
-  );
-}
+
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
