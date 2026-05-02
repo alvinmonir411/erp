@@ -122,7 +122,7 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
                           {due.status}
                         </span>
                         <span className="text-xs font-bold text-slate-500 uppercase">
-                          {due.remainingDue > 0 ? `${formatCurrency(due.remainingDue)} still due` : 'Paid'}
+                          {Number(due.remainingDue) > 0 ? `${formatCurrency(due.remainingDue)} still due` : 'Paid'}
                         </span>
                       </div>
                     </div>

@@ -355,7 +355,7 @@ export function DispatchBatchCreatePage() {
                             {formatNumber(qty)}
                           </td>
                           <td className="px-6 py-4 text-right text-sm font-black text-slate-900">
-                            {formatCurrency(order.grandTotal)}
+                            {formatCurrency(Number(order.grandTotal))}
                           </td>
                         </tr>
                       );
@@ -393,7 +393,7 @@ export function DispatchBatchCreatePage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <p className="text-xs font-black text-slate-900">#{String(order.id).padStart(6, '0')}</p>
-                          <p className="text-sm font-black text-slate-900">{formatCurrency(order.grandTotal)}</p>
+                          <p className="text-sm font-black text-slate-900">{formatCurrency(Number(order.grandTotal))}</p>
                         </div>
                         <p className="text-sm font-bold text-slate-700 truncate">{order.shop?.name || 'Direct Order'}</p>
                         <div className="flex items-center justify-between mt-1">
@@ -426,7 +426,7 @@ export function DispatchBatchCreatePage() {
               <div className="flex items-center justify-between border-t border-white/10 pt-5">
                 <span className="text-sm font-bold text-slate-300">Estimated Value</span>
                 <span className="text-3xl font-black text-cyan-300">
-                  {formatCurrency(totals.amount)}
+                  {formatCurrency(Number(totals.amount))}
                 </span>
               </div>
             </div>
@@ -449,7 +449,7 @@ export function DispatchBatchCreatePage() {
                         #{String(order.id).padStart(6, '0')}
                       </p>
                       <p className="mt-1 text-xs font-medium text-slate-500">
-                        {order.shop?.name || 'Direct Order'} · {formatCurrency(order.grandTotal)}
+                        {order.shop?.name || 'Direct Order'} · {formatCurrency(Number(order.grandTotal))}
                       </p>
                     </div>
                   ))
@@ -473,7 +473,7 @@ export function DispatchBatchCreatePage() {
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Value</span>
-            <span className="text-lg font-black text-cyan-400">{formatCurrency(totals.amount)}</span>
+            <span className="text-lg font-black text-cyan-400">{formatCurrency(Number(totals.amount))}</span>
           </div>
           <button
             onClick={handleCreateBatch}

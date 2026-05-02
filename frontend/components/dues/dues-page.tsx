@@ -384,7 +384,7 @@ function CollectModal({ due, onClose, onSuccess }: { due: any, onClose: () => vo
     .filter((c: any) => c.status === 'PENDING')
     .reduce((sum: number, c: any) => sum + Number(c.collectedAmount), 0);
 
-  const maxCollectable = Math.max(0, due.remainingDue - pendingAmount);
+  const maxCollectable = Math.max(0, Number(due.remainingDue) - pendingAmount);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

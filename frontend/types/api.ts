@@ -13,7 +13,6 @@ export enum UserStatus {
 }
 
 export type Company = {
-  [key: string]: any;
   id: number;
   name: string;
   code: string;
@@ -37,7 +36,6 @@ export type UpdateCompanyPayload = Partial<CreateCompanyPayload>;
 export type ProductUnit = 'PCS' | 'KG' | 'LITER' | 'PACK' | 'DOZEN' | 'OTHER';
 
 export type Product = {
-  [key: string]: any;
   id: number;
   companyId: number;
   name: string;
@@ -65,7 +63,6 @@ export type CreateProductPayload = {
 export type UpdateProductPayload = Partial<CreateProductPayload>;
 
 export type Route = {
-  [key: string]: any;
   id: number;
   name: string;
   area: string | null;
@@ -75,7 +72,6 @@ export type Route = {
 };
 
 export type Shop = {
-  [key: string]: any;
   id: number;
   routeId: number;
   name: string;
@@ -157,18 +153,18 @@ export type OrderItem = {
   id: number;
   orderId: number;
   productId: number;
-  quantity: number;
-  freeQuantity: number;
-  unitPrice: number;
+  quantity: number | string;
+  freeQuantity: number | string;
+  unitPrice: number | string;
   discountType?: DiscountType;
-  discountValue?: number;
-  lineTotal: number;
+  discountValue?: number | string;
+  lineTotal: number | string;
   product?: Product;
-  deliveredQuantity?: number;
-  returnedQuantity?: number;
-  damagedQuantity?: number;
-  paidReturnedQuantity?: number;
-  freeReturnedQuantity?: number;
+  deliveredQuantity?: number | string;
+  returnedQuantity?: number | string;
+  damagedQuantity?: number | string;
+  paidReturnedQuantity?: number | string;
+  freeReturnedQuantity?: number | string;
 };
 
 export type Order = {
@@ -179,15 +175,15 @@ export type Order = {
   shopId: number;
   deliveryPersonId: number | null;
   marketArea: string | null;
-  subtotal: number;
+  subtotal: number | string;
   discountType: DiscountType;
-  discountValue: number;
-  discountAmount: number;
-  grandTotal: number;
-  actualSoldAmount: number;
-  collectedAmount: number;
-  dueAmount: number;
-  advancePaid: number;
+  discountValue: number | string;
+  discountAmount: number | string;
+  grandTotal: number | string;
+  actualSoldAmount: number | string;
+  collectedAmount: number | string;
+  dueAmount: number | string;
+  advancePaid: number | string;
   status: OrderStatus;
   note: string | null;
   settlementNote: string | null;
@@ -200,6 +196,42 @@ export type Order = {
   route?: Route;
   shop?: Shop;
   deliveryPerson?: DeliveryPerson;
+};
+
+export type Due = {
+  id: number;
+  orderId: number;
+  routeId?: number | null;
+  shopId?: number | null;
+  srId?: string | null;
+  dueAmount: number | string;
+  paidAmount: number | string;
+  remainingDue: number | string;
+  originalDueAmount?: number | string;
+  status: string;
+  note?: string | null;
+  srName?: string;
+  shop?: Shop;
+  order?: Order;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DueCollection = {
+  id: number;
+  dueId: number;
+  orderId: number;
+  routeId?: number | null;
+  collectedAmount: number | string;
+  amount: number | string;
+  status: string;
+  note?: string | null;
+  collectedBy: string;
+  collectionDate: string;
+  approvedAt?: string | null;
+  rejectedAt?: string | null;
+  rejectionReason?: string | null;
+  due?: Due;
 };
 
 export type DeliveryPerson = {
@@ -240,20 +272,24 @@ export type ReceivePurchasePaymentPayload = {
   note?: string;
 };
 
+export type DeliveryReturnItem = {
+  productId: number;
+  dispatchedQuantity: number | string;
+  returnedQuantity: number | string;
+  damagedQuantity: number | string;
+  paidReturnedQuantity?: number | string;
+  freeReturnedQuantity?: number | string;
+  reason?: string;
+  note?: string;
+};
+
 export type RecordReturnPayload = {
   note?: string;
   orders: {
     orderId: number;
     returnReason?: string;
     note?: string;
-    items: {
-      productId: number;
-      dispatchedQuantity: number;
-      returnedQuantity: number;
-      damagedQuantity: number;
-      reason?: string;
-      note?: string;
-    }[];
+    items: DeliveryReturnItem[];
   }[];
 };
 
@@ -314,13 +350,13 @@ export type DispatchBatch = {
   marketArea?: string;
   status: DispatchBatchStatus;
   totalOrders: number;
-  grossDispatchedValue: number;
-  returnAdjustedValue: number;
-  finalSoldValue: number;
-  totalAdvancePaid: number;
-  totalCollectedAmount: number;
-  totalDueAmount: number;
-  shortageOrExcess: number;
+  grossDispatchedValue: number | string;
+  returnAdjustedValue: number | string;
+  finalSoldValue: number | string;
+  totalAdvancePaid: number | string;
+  totalCollectedAmount: number | string;
+  totalDueAmount: number | string;
+  shortageOrExcess: number | string;
   isMorningPrinted: boolean;
   isFinalPrinted: boolean;
   morningPrintedAt?: string;
@@ -338,9 +374,9 @@ export type Purchase = {
   referenceNo?: string | null;
   companyId: number;
   purchaseDate: string;
-  totalAmount: number;
-  paidAmount: number;
-  payableAmount: number;
+  totalAmount: number | string;
+  paidAmount: number | string;
+  payableAmount: number | string;
   note?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -352,9 +388,9 @@ export type PurchaseItem = {
   id: number;
   purchaseId: number;
   productId: number;
-  quantity: number;
-  unitPrice: number;
-  lineTotal: number;
+  quantity: number | string;
+  unitPrice: number | string;
+  lineTotal: number | string;
   product?: Product;
 };
 
@@ -364,10 +400,35 @@ export type CompanyWisePayableSummary = {
   companyCode?: string;
   purchaseCount: number;
   payablePurchaseCount: number;
-  totalAmount: number;
-  totalPaid: number;
-  totalPayable: number;
+  totalAmount: number | string;
+  totalPaid: number | string;
+  totalPayable: number | string;
   lastPurchaseDate?: string | null;
+};
+
+export type PurchaseQuery = {
+  companyId?: number;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+};
+
+export type ReceivePurchasePaymentPayload = {
+  amount: number;
+  paymentDate: string;
+  note?: string;
+};
+
+export type CreatePurchasePayload = {
+  companyId: number;
+  purchaseDate: string;
+  referenceNo?: string;
+  note?: string;
+  items: {
+    productId: number;
+    quantity: number;
+    unitPrice: number;
+  }[];
 };
 
 export type CompanyPayableLedger = {
@@ -378,8 +439,8 @@ export type CompanyPayableLedger = {
   };
   summary: {
     purchaseCount: number;
-    totalPaid: number;
-    totalPayable: number;
+    totalPaid: number | string;
+    totalPayable: number | string;
   };
   payablePurchases: Purchase[];
   paymentHistory: CompanyPayableHistoryEntry[];
@@ -390,10 +451,10 @@ export type CompanyPayableHistoryEntry = {
   paymentDate: string;
   purchaseId: number;
   referenceNo?: string | null;
-  amount: number;
-  purchaseTotalAmount: number;
-  purchasePaidAmount: number;
-  purchasePayableAmount: number;
+  amount: number | string;
+  purchaseTotalAmount: number | string;
+  purchasePaidAmount: number | string;
+  purchasePayableAmount: number | string;
   note?: string | null;
 };
 

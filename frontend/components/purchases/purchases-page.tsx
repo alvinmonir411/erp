@@ -413,7 +413,7 @@ export function PurchasesPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {paginatedPurchases.map((purchase) => {
-                      const isPayable = purchase.payableAmount > 0;
+                      const isPayable = Number(purchase.payableAmount) > 0;
                       return (
                         <tr
                           key={purchase.id}

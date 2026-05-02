@@ -165,17 +165,17 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
             setShopSearch(order.shop?.name || '');
             setDeliveryPersonId(order.deliveryPersonId || '');
             setInvDiscountType(order.discountType || 'FIXED');
-            setInvDiscountValue(order.discountValue || 0);
+            setInvDiscountValue(Number(order.discountValue || 0));
             setNote(order.note || '');
             setLines(order.items.map((item) => ({
               productId: item.productId,
               productName: item.product?.name || '',
-              quantity: item.quantity,
-              freeQuantity: item.freeQuantity,
-              unitPrice: item.unitPrice,
-              discountType: item.discountType,
-              discountValue: item.discountValue,
-              lineTotal: item.lineTotal,
+              quantity: Number(item.quantity),
+              freeQuantity: Number(item.freeQuantity || 0),
+              unitPrice: Number(item.unitPrice),
+              discountType: item.discountType as 'FIXED' | 'PERCENT',
+              discountValue: Number(item.discountValue || 0),
+              lineTotal: Number(item.lineTotal),
               searchText: item.product?.name || ''
             })));
           }
@@ -263,7 +263,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
       const prod = allProducts.find(p => p.id === updates.productId);
       if (prod) {
         line.productName = prod.name;
-        line.unitPrice = prod.salePrice;
+        line.unitPrice = Number(prod.salePrice);
       }
     }
 

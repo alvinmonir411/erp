@@ -165,7 +165,7 @@ export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
               title="Settle Purchase Payable"
               description="Record a payment against this purchase and keep the outstanding payable accurate over time."
             >
-              {purchase.payableAmount > 0 ? (
+              {Number(purchase.payableAmount) > 0 ? (
                 <form onSubmit={handleReceivePayment} className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-3">
                     <label className="block space-y-2">
@@ -177,7 +177,7 @@ export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
                           type="number"
                           min="0.01"
                           step="0.01"
-                          max={purchase.payableAmount}
+                          max={Number(purchase.payableAmount)}
                           value={paymentAmount}
                           onChange={(event) => setPaymentAmount(event.target.value)}
                           className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
@@ -187,7 +187,7 @@ export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
                         <button
                           type="button"
                           onClick={() =>
-                            setPaymentAmount(purchase.payableAmount.toFixed(2))
+                            setPaymentAmount(Number(purchase.payableAmount).toFixed(2))
                           }
                           className="rounded-2xl border border-slate-200 px-4 py-3 text-xs font-medium text-slate-700"
                         >
@@ -310,7 +310,7 @@ export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
                         {formatNumber(item.quantity)} {item.product?.unit ?? ''}
                       </td>
                       <td className="px-3 py-4 text-slate-700">
-                        {formatCurrency(item.unitCost)}
+                        {formatCurrency(item.unitPrice || item.unitCost)}
                       </td>
                       <td className="px-3 py-4 font-medium text-slate-900">
                         {formatCurrency(item.lineTotal)}

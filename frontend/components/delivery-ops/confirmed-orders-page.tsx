@@ -286,7 +286,7 @@ export function ConfirmedOrdersPage() {
                         {formatNumber(totalQty)}
                       </td>
                       <td className="px-6 py-4 text-right text-sm font-black text-slate-900">
-                        {formatCurrency(order.grandTotal)}
+                        {formatCurrency(Number(order.grandTotal))}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <StatusBadge {...config} />
@@ -351,7 +351,7 @@ export function ConfirmedOrdersPage() {
                 <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                    <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Grand Total</p>
-                      <p className="text-lg font-black text-emerald-600">{formatCurrency(order.grandTotal)}</p>
+                      <p className="text-lg font-black text-emerald-600">{formatCurrency(Number(order.grandTotal))}</p>
                    </div>
                    <div className="text-right">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Dispatch Qty</p>

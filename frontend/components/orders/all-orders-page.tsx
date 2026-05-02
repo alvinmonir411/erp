@@ -346,7 +346,7 @@ export function AllOrdersPage() {
                       <p className="text-[10px] font-bold text-muted uppercase">Units</p>
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-foreground">
-                      {formatCurrency(order.grandTotal)}
+                      {formatCurrency(Number(order.grandTotal))}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${STATUS_CONFIG[order.status]?.color || 'bg-slate-100 text-slate-600'}`}>
@@ -427,7 +427,7 @@ export function AllOrdersPage() {
                   </div>
                   <div className="text-right flex flex-col">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Grand Total</span>
-                    <span className="text-sm font-black text-foreground">{formatCurrency(order.grandTotal)}</span>
+                    <span className="text-sm font-black text-foreground">{formatCurrency(Number(order.grandTotal))}</span>
                   </div>
                 </div>
 
@@ -514,8 +514,8 @@ function OrderModal({ order, onClose }: { order: any, onClose: () => void }) {
                   <tr key={idx} className="text-sm">
                     <td className="px-4 py-3 font-bold text-foreground">{item.product?.name}</td>
                     <td className="px-4 py-3 text-center font-bold">{item.quantity}</td>
-                    <td className="px-4 py-3 text-right font-medium text-muted">{formatCurrency(item.unitPrice)}</td>
-                    <td className="px-4 py-3 text-right font-bold text-foreground">{formatCurrency(item.lineTotal)}</td>
+                    <td className="px-4 py-3 text-right font-medium text-muted">{formatCurrency(Number(item.unitPrice))}</td>
+                    <td className="px-4 py-3 text-right font-bold text-foreground">{formatCurrency(Number(item.lineTotal))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -525,17 +525,17 @@ function OrderModal({ order, onClose }: { order: any, onClose: () => void }) {
           <div className="bg-primary/5 rounded-2xl p-6 space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted font-bold">Subtotal</span>
-              <span className="text-foreground font-bold">{formatCurrency(order.subtotal)}</span>
+              <span className="text-foreground font-bold">{formatCurrency(Number(order.subtotal))}</span>
             </div>
-            {order.discountAmount > 0 && (
+            {Number(order.discountAmount) > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-rose-500 font-bold">Discount</span>
-                <span className="text-rose-500 font-bold">-{formatCurrency(order.discountAmount)}</span>
+                <span className="text-rose-500 font-bold">-{formatCurrency(Number(order.discountAmount))}</span>
               </div>
             )}
             <div className="pt-3 border-t border-border flex justify-between items-end">
               <span className="text-xs font-black uppercase text-muted">Grand Total</span>
-              <span className="text-2xl font-black text-primary">{formatCurrency(order.grandTotal)}</span>
+              <span className="text-2xl font-black text-primary">{formatCurrency(Number(order.grandTotal))}</span>
             </div>
           </div>
         </div>

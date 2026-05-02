@@ -1,9 +1,11 @@
-export function formatCurrency(value: number) {
+export function formatCurrency(value: number | string) {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '৳0.00';
   return new Intl.NumberFormat('en-BD', {
     style: 'currency',
     currency: 'BDT',
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(num);
 }
 
 
@@ -35,10 +37,12 @@ export function formatDateTime(value: string | Date) {
   return `${formatDate(value)}, ${time}`;
 }
 
-export function formatNumber(value: number) {
+export function formatNumber(value: number | string) {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '0';
   return new Intl.NumberFormat('en-BD', {
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(num);
 }
 
 export function getTodayBD() {
