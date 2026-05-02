@@ -12,7 +12,7 @@ import { PageCard } from '@/components/ui/page-card';
 import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, toNumber } from '@/lib/utils/format';
 import type {
   Company,
   CompanyWisePayableSummary,
@@ -150,12 +150,15 @@ export function PurchasesPage() {
     () => ({
       purchaseCount: purchases.length,
       totalAmount: purchases.reduce(
-        (sum, purchase) => sum + purchase.totalAmount,
+        (sum, purchase) => sum + toNumber(purchase.totalAmount),
         0,
       ),
-      totalPaid: purchases.reduce((sum, purchase) => sum + purchase.paidAmount, 0),
+      totalPaid: purchases.reduce(
+        (sum, purchase) => sum + toNumber(purchase.paidAmount),
+        0,
+      ),
       totalPayable: purchases.reduce(
-        (sum, purchase) => sum + purchase.payableAmount,
+        (sum, purchase) => sum + toNumber(purchase.payableAmount),
         0,
       ),
     }),
@@ -413,7 +416,7 @@ export function PurchasesPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {paginatedPurchases.map((purchase) => {
-                      const isPayable = Number(purchase.payableAmount) > 0;
+                      const isPayable = toNumber(purchase.payableAmount) > 0;
                       return (
                         <tr
                           key={purchase.id}

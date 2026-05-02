@@ -8,6 +8,11 @@ export function formatCurrency(value: number | string) {
   }).format(num);
 }
 
+export const toNumber = (value: string | number | null | undefined): number => {
+  const num = Number(value ?? 0);
+  return Number.isFinite(num) ? num : 0;
+};
+
 
 
 export function formatDate(value: string | Date | undefined) {

@@ -167,7 +167,7 @@ export function CreatePurchasePage() {
         items: items.map((item) => ({
           productId: Number(item.productId),
           quantity: Number(item.quantity),
-          unitCost: Number(item.unitCost),
+          unitPrice: Number(item.unitCost),
         })),
       });
 

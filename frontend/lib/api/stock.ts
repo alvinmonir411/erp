@@ -40,7 +40,7 @@ export function getStockSummary(companyId?: number, search?: string) {
   });
 }
 
-export function getStockMovements(companyId: number, filters: Record<string, any> = {}) {
+export function getStockMovements(companyId?: number, filters: Record<string, any> = {}) {
   return getStockHistory({
     companyId,
     ...filters,

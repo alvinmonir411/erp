@@ -310,7 +310,7 @@ export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
                         {formatNumber(item.quantity)} {item.product?.unit ?? ''}
                       </td>
                       <td className="px-3 py-4 text-slate-700">
-                        {formatCurrency(item.unitPrice || item.unitCost)}
+                        {formatCurrency(item.unitPrice)}
                       </td>
                       <td className="px-3 py-4 font-medium text-slate-900">
                         {formatCurrency(item.lineTotal)}

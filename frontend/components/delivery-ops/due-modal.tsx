@@ -16,7 +16,7 @@ import {
   Loader2,
   ChevronRight
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, toNumber } from '@/lib/utils/format';
 import { getShops, createShop } from '@/lib/api/shops';
 import { updateOrderShop } from '@/lib/api/orders';
 // Removed unused upsertDue import
@@ -91,7 +91,7 @@ export function DueModal({
       // Auto-select if only one order
       if (relevantOrders.length === 1) {
         setSelectedOrderId(relevantOrders[0].orderId);
-        if (relevantOrders[0].dueAmount > 0) {
+        if (toNumber(relevantOrders[0].dueAmount) > 0) {
           setDueAmount(String(relevantOrders[0].dueAmount));
         }
       }

@@ -8,7 +8,7 @@ import { LoadingBlock } from '@/components/ui/loading-block';
 import { PageCard } from '@/components/ui/page-card';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
-import { formatCurrency, formatNumber } from '@/lib/utils/format';
+import { formatCurrency, formatNumber, toNumber } from '@/lib/utils/format';
 import type { Company, StockInvestmentSummary, StockSummaryItem } from '@/types/api';
 
 export function StockInvestmentPage() {
@@ -363,13 +363,13 @@ function InvestmentDetailTable({ items }: { items: StockSummaryItem[] }) {
               </td>
               <td className="px-3 py-4 text-slate-700">{item.unit}</td>
               <td className="px-3 py-4 text-slate-700">
-                {formatNumber(Math.max(item.currentStock, 0))}
+                {formatNumber(Math.max(toNumber(item.currentStock), 0))}
               </td>
               <td className="px-3 py-4 text-slate-700">
                 {formatCurrency(item.buyPrice)}
               </td>
               <td className="px-3 py-4 font-semibold text-emerald-800">
-                {formatCurrency(item.investmentValue)}
+                {formatCurrency(item.investmentValue ?? 0)}
               </td>
             </tr>
           ))}

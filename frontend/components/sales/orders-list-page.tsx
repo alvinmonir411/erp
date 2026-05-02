@@ -9,7 +9,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToast } from '@/components/ui/toast-provider';
 import { deleteSale } from '@/lib/api/sales';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, toNumber } from '@/lib/utils/format';
 import Link from 'next/link';
 import { 
   Search, Calendar, Building2, MapPin, 
@@ -320,16 +320,16 @@ export function OrdersListPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <p className="text-sm font-black text-slate-900">{formatCurrency(sale.totalAmount)}</p>
-                      {sale.dueAmount > 0 && (
+                      {toNumber(sale.dueAmount) > 0 && (
                         <p className="text-[10px] font-bold text-rose-600">Due: {formatCurrency(sale.dueAmount)}</p>
                       )}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex flex-col items-center gap-1.5">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
-                          sale.dueAmount > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                          toNumber(sale.dueAmount) > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
                         }`}>
-                          {sale.dueAmount > 0 ? 'Partial/Due' : 'Paid'}
+                          {toNumber(sale.dueAmount) > 0 ? 'Partial/Due' : 'Paid'}
                         </span>
                         {sale.deliveryStatus === 'DELIVERED' ? (
                           <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-black uppercase text-indigo-700">Delivered</span>

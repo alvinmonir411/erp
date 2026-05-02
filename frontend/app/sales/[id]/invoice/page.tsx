@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { getSale } from '@/lib/api/sales';
-import { formatCurrency, formatNumber, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatNumber, formatDate, toNumber } from '@/lib/utils/format';
 import type { Sale } from '@/types/api';
 
 export default function SaleInvoicePage({
@@ -27,6 +27,10 @@ export default function SaleInvoicePage({
   }, [id]);
 
   if (!sale) return <div className="p-8 text-center">Loading invoice...</div>;
+
+  const invoiceDiscountAmount = toNumber(sale.invoiceDiscountAmount);
+  const subtotal = toNumber(sale.totalAmount) + invoiceDiscountAmount;
+  const dueAmount = toNumber(sale.dueAmount);
 
   return (
     <div className="bg-white text-black p-8 max-w-4xl mx-auto printable-invoice text-sm m-0 min-h-screen">
@@ -65,21 +69,26 @@ export default function SaleInvoicePage({
           </tr>
         </thead>
         <tbody>
-          {(sale.items ?? []).map((item, index) => (
-            <tr key={index} className="border-b border-slate-100 last:border-0">
-              <td className="py-4">
-                <p className="font-bold text-slate-900">{item.product?.name}</p>
-                <p className="text-xs text-slate-500">SKU: {item.product?.sku}</p>
-              </td>
-              <td className="py-4 text-right font-medium text-slate-800">{formatNumber(item.quantity)} {item.product?.unit}</td>
-              <td className="py-4 text-right font-medium text-slate-500">{item.freeQuantity > 0 ? `${formatNumber(item.freeQuantity)} ${item.product?.unit}` : '-'}</td>
-              <td className="py-4 text-right font-medium text-slate-800">{formatCurrency(item.unitPrice)}</td>
-              <td className="py-4 text-right font-medium text-slate-500">
-                {item.discountAmount ? formatCurrency(item.discountAmount) : '-'}
-              </td>
-              <td className="py-4 text-right font-bold text-slate-900">{formatCurrency(item.lineTotal)}</td>
-            </tr>
-          ))}
+          {(sale.items ?? []).map((item, index) => {
+            const freeQuantity = toNumber(item.freeQuantity);
+            const discountAmount = toNumber(item.discountAmount);
+
+            return (
+              <tr key={index} className="border-b border-slate-100 last:border-0">
+                <td className="py-4">
+                  <p className="font-bold text-slate-900">{item.product?.name}</p>
+                  <p className="text-xs text-slate-500">SKU: {item.product?.sku}</p>
+                </td>
+                <td className="py-4 text-right font-medium text-slate-800">{formatNumber(item.quantity)} {item.product?.unit}</td>
+                <td className="py-4 text-right font-medium text-slate-500">{freeQuantity > 0 ? `${formatNumber(freeQuantity)} ${item.product?.unit}` : '-'}</td>
+                <td className="py-4 text-right font-medium text-slate-800">{formatCurrency(item.unitPrice)}</td>
+                <td className="py-4 text-right font-medium text-slate-500">
+                  {discountAmount > 0 ? formatCurrency(discountAmount) : '-'}
+                </td>
+                <td className="py-4 text-right font-bold text-slate-900">{formatCurrency(item.lineTotal)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
@@ -87,13 +96,13 @@ export default function SaleInvoicePage({
         <div className="w-64 space-y-3">
           <div className="flex justify-between text-slate-700">
             <span>Subtotal</span>
-            <span className="font-medium">{formatCurrency((sale.totalAmount + (sale.invoiceDiscountAmount || 0)))}</span>
+            <span className="font-medium">{formatCurrency(subtotal)}</span>
           </div>
           
-          {sale.invoiceDiscountAmount ? (
+          {invoiceDiscountAmount > 0 ? (
             <div className="flex justify-between text-emerald-600 font-medium">
               <span>Invoice Discount</span>
-              <span>-{formatCurrency(sale.invoiceDiscountAmount)}</span>
+              <span>-{formatCurrency(invoiceDiscountAmount)}</span>
             </div>
           ) : null}
 
@@ -107,10 +116,10 @@ export default function SaleInvoicePage({
             <span className="font-medium">{formatCurrency(sale.paidAmount)}</span>
           </div>
 
-          {sale.dueAmount > 0 && (
+          {dueAmount > 0 && (
             <div className="flex justify-between text-rose-600 font-bold pt-1">
               <span>Due Balance</span>
-              <span>{formatCurrency(sale.dueAmount)}</span>
+              <span>{formatCurrency(dueAmount)}</span>
             </div>
           )}
         </div>

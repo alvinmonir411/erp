@@ -12,6 +12,7 @@ import {
   formatDate,
   formatDateTime,
   formatNumber,
+  toNumber,
 } from '@/lib/utils/format';
 import type { Sale } from '@/types/api';
 
@@ -160,7 +161,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
                 <div className="absolute -right-6 -top-6 z-0 h-32 w-32 rounded-full bg-white/10 blur-2xl"></div>
               </div>
 
-              <div className={`relative overflow-hidden rounded-3xl p-6 shadow-lg transition-transform hover:-translate-y-1 ${sale.dueAmount > 0
+              <div className={`relative overflow-hidden rounded-3xl p-6 shadow-lg transition-transform hover:-translate-y-1 ${toNumber(sale.dueAmount) > 0
                 ? 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-amber-500/20 text-white'
                 : 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/20 text-white'
                 }`}>
@@ -169,7 +170,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
                   <p className="mt-2 text-3xl font-bold tracking-tight truncate">
                     {formatCurrency(sale.dueAmount)}
                   </p>
-                  {sale.dueAmount === 0 && (
+                  {toNumber(sale.dueAmount) === 0 && (
                     <p className="mt-2 text-xs font-medium opacity-90">Fully paid</p>
                   )}
                 </div>
@@ -180,7 +181,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
                 <div className="relative z-10">
                   <p className="text-sm font-medium opacity-90">Total profit</p>
                   <p className="mt-2 text-3xl font-bold tracking-tight truncate">
-                    {formatCurrency(sale.totalProfit)}
+                    {formatCurrency(sale.totalProfit ?? 0)}
                   </p>
                 </div>
                 <div className="absolute -right-6 -top-6 z-0 h-32 w-32 rounded-full bg-white/10 blur-2xl"></div>
@@ -218,13 +219,13 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
                           {formatCurrency(item.unitPrice)}
                         </td>
                         <td className="px-4 py-4 text-slate-500">
-                          {formatCurrency(item.buyPrice)}
+                          {formatCurrency(item.buyPrice ?? 0)}
                         </td>
                         <td className="px-4 py-4 font-bold text-slate-900">
                           {formatCurrency(item.lineTotal)}
                         </td>
                         <td className="px-4 py-4 font-bold text-emerald-600">
-                          {formatCurrency(item.lineProfit)}
+                          {formatCurrency(item.lineProfit ?? 0)}
                         </td>
                       </tr>
                     ))}
@@ -255,7 +256,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
               title="Receive Due Payment"
               description="Collect additional payment against this sale and keep the due balance updated."
             >
-              {sale.dueAmount > 0 ? (
+              {toNumber(sale.dueAmount) > 0 ? (
                 <form onSubmit={handleReceivePayment} className="space-y-5">
                   <div className="grid gap-5 md:grid-cols-3">
                     <label className="block space-y-2">
@@ -267,7 +268,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
                           type="number"
                           min="0.01"
                           step="0.01"
-                          max={sale.dueAmount}
+                          max={toNumber(sale.dueAmount)}
                           value={paymentAmount}
                           onChange={(event) => setPaymentAmount(event.target.value)}
                           className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
@@ -276,7 +277,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
                         />
                         <button
                           type="button"
-                          onClick={() => setPaymentAmount(sale.dueAmount.toFixed(2))}
+                          onClick={() => setPaymentAmount(toNumber(sale.dueAmount).toFixed(2))}
                           className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-all shadow-sm"
                         >
                           Full due

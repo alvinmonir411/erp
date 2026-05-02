@@ -28,7 +28,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToast, useToastNotification } from '@/components/ui/toast-provider';
 import { deleteSale } from '@/lib/api/sales';
-import { formatCurrency, formatDate, getTodayBD, formatBDDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, getTodayBD, formatBDDate, toNumber } from '@/lib/utils/format';
 import type { Sale } from '@/types/api';
 
 const salesPageSize = 10;
@@ -359,8 +359,8 @@ function SalesTable({ sales, isFetching, onDeleted }: { sales: Sale[], isFetchin
               </td>
               <td className="px-4 py-4 font-bold text-slate-900">{formatCurrency(sale.totalAmount)}</td>
               <td className="px-4 py-4">
-                <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${sale.dueAmount > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                  {sale.dueAmount > 0 ? `Due: ${formatCurrency(sale.dueAmount)}` : 'Paid'}
+                <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${toNumber(sale.dueAmount) > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  {toNumber(sale.dueAmount) > 0 ? `Due: ${formatCurrency(sale.dueAmount)}` : 'Paid'}
                 </span>
                 <p className="text-[10px] text-slate-500 mt-1">{formatDate(sale.saleDate)}</p>
               </td>

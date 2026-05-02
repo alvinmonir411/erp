@@ -14,7 +14,7 @@ import { useAuth } from '../auth/auth-provider';
 import { canViewProfit, canSeeBuyPrice } from '@/lib/utils/permissions';
 import { PageCard } from '@/components/ui/page-card';
 import { useToast, useToastNotification } from '@/components/ui/toast-provider';
-import { formatCurrency, formatDate, formatNumber } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatNumber, toNumber } from '@/lib/utils/format';
 import type { Company, CreateShopPayload, Product, Route, Sale, Shop } from '@/types/api';
 import { TrendingUp } from 'lucide-react';
 
@@ -235,7 +235,7 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
         setInvoiceNo(sale.invoiceNo);
         setInvoiceDiscountType(sale.invoiceDiscountType === 'percentage' ? 'percentage' : 'fixed');
         setInvoiceDiscountValue(String(sale.invoiceDiscountValue || ''));
-        setPaymentMode(sale.dueAmount > 0 ? 'due' : 'full');
+        setPaymentMode(toNumber(sale.dueAmount) > 0 ? 'due' : 'full');
         setPaidAmount(String(sale.paidAmount));
         setNote(sale.note || '');
 
@@ -566,7 +566,7 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
       return;
     }
 
-    if (totalAmount <= 0) {
+    if (toNumber(totalAmount) <= 0) {
       setFormError('Add at least one sale item with valid quantity and price.');
       return;
     }
@@ -576,12 +576,12 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
       return;
     }
 
-    if (dueAmount > 0 && !shopId) {
+    if (toNumber(dueAmount) > 0 && !shopId) {
       setFormError('Shop is required when due amount is greater than zero.');
       return;
     }
 
-    if (dueAmount < 0) {
+    if (toNumber(dueAmount) < 0) {
       setFormError('Paid amount cannot be greater than total amount.');
       return;
     }
@@ -807,12 +807,12 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
 
                       <label className="block space-y-2">
                         <span className="text-sm font-medium text-slate-700">
-                          Shop {dueAmount > 0 ? '(required for due)' : '(optional)'}
+                          Shop {toNumber(dueAmount) > 0 ? '(required for due)' : '(optional)'}
                         </span>
                         <select
                           value={shopId}
                           onChange={(event) => setShopId(event.target.value)}
-                          className={`w-full rounded-2xl border bg-slate-50 shadow-inner px-4 py-3 text-sm focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all hover:border-slate-300 ${dueAmount > 0 && !shopId
+                          className={`w-full rounded-2xl border bg-slate-50 shadow-inner px-4 py-3 text-sm focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all hover:border-slate-300 ${toNumber(dueAmount) > 0 && !shopId
                             ? 'border-amber-300'
                             : 'border-slate-200'
                             }`}
@@ -1510,7 +1510,7 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
                         />
                       </label>
 
-                      <div className={`p-4 rounded-2xl border ${dueAmount > 0 ? 'bg-amber-50 border-amber-100 text-amber-900' : 'bg-emerald-50 border-emerald-100 text-emerald-900'}`}>
+                      <div className={`p-4 rounded-2xl border ${toNumber(dueAmount) > 0 ? 'bg-amber-50 border-amber-100 text-amber-900' : 'bg-emerald-50 border-emerald-100 text-emerald-900'}`}>
                         <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Remaining Due</p>
                         <p className="text-xl font-black mt-1">{formatCurrency(dueAmount)}</p>
                       </div>
@@ -1549,7 +1549,7 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
                     <div className="relative z-10">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Estimated Profit</p>
                       <p className="text-3xl font-black mt-1">{formatCurrency(totalProfit)}</p>
-                      <p className="text-xs text-emerald-300/80 mt-2">Margin: {totalAmount > 0 ? ((totalProfit / totalAmount) * 100).toFixed(1) : 0}%</p>
+                      <p className="text-xs text-emerald-300/80 mt-2">Margin: {toNumber(totalAmount) > 0 ? ((totalProfit / toNumber(totalAmount)) * 100).toFixed(1) : 0}%</p>
                     </div>
                     <div className="absolute -right-4 -bottom-4 opacity-10">
                       <TrendingUp className="h-32 w-32" />

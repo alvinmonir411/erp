@@ -79,6 +79,8 @@ export type Shop = {
   phone: string | null;
   address: string | null;
   isActive: boolean;
+  totalOrders?: number | string;
+  totalDue?: number | string;
   createdAt: string;
   updatedAt: string;
   route?: Route;
@@ -149,6 +151,7 @@ export type DispatchBatchStatus =
   | 'CANCELLED';
 
 export type DiscountType = 'FIXED' | 'PERCENT';
+export type SaleDiscountType = 'fixed' | 'percentage';
 
 export type OrderItem = {
   id: number;
@@ -331,11 +334,11 @@ export type DispatchBatchOrder = {
   batchId: number;
   orderId: number;
   order: Order;
-  estimatedAmount: number;
-  finalSoldAmount: number;
-  collectedAmount: number;
-  dueAmount: number;
-  shortageOrExcess: number;
+  estimatedAmount: number | string;
+  finalSoldAmount: number | string;
+  collectedAmount: number | string;
+  dueAmount: number | string;
+  shortageOrExcess: number | string;
   isSettled: boolean;
 };
 
@@ -370,6 +373,44 @@ export type DispatchBatch = {
   orders: DispatchBatchOrder[];
 };
 
+export type DeliverySummariesQuery = {
+  companyId?: number;
+  routeId?: number;
+  date?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+  limit?: number;
+  search?: string;
+};
+
+export type DeliverySummary = {
+  id: number;
+  deliveryDate: string;
+  companyId: number;
+  company: Pick<Company, 'name'>;
+  routeId: number;
+  route: Pick<Route, 'name'>;
+  status: 'DRAFT' | 'COMPLETED' | string;
+  morningPrinted: boolean;
+  finalPrinted: boolean;
+  totalAmount: number | string;
+  note?: string | null;
+  items: DeliverySummaryItem[];
+  createdAt: string;
+};
+
+export type DeliverySummaryItem = {
+  id: number;
+  productId: number;
+  product: Pick<Product, 'name' | 'unit'>;
+  orderedQuantity: number | string;
+  returnedQuantity: number | string;
+  soldQuantity: number | string;
+  unitPrice: number | string;
+  lineTotal: number | string;
+};
+
 
 export type Purchase = {
   id: number;
@@ -384,6 +425,7 @@ export type Purchase = {
   updatedAt: string;
   company?: Company;
   items?: PurchaseItem[];
+  payments?: PurchasePayment[];
 };
 
 export type PurchaseItem = {
@@ -394,6 +436,16 @@ export type PurchaseItem = {
   unitPrice: number | string;
   lineTotal: number | string;
   product?: Product;
+};
+
+export type PurchasePayment = {
+  id: number;
+  purchaseId: number;
+  amount: number | string;
+  paymentDate: string;
+  note?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type CompanyWisePayableSummary = {
@@ -438,13 +490,14 @@ export type CompanyPayableHistoryEntry = {
 };
 
 export type StockMovementType =
-  | 'PURCHASE'
-  | 'SALE'
+  | 'OPENING'
+  | 'STOCK_IN'
+  | 'SALE_OUT'
+  | 'STOCK_OUT'
   | 'RETURN_IN'
-  | 'RETURN_OUT'
-  | 'DAMAGE'
   | 'ADJUSTMENT'
-  | 'OPENING';
+  | 'DAMAGE'
+  | 'SALE';
 
 export type StockMovement = {
   id: number;
@@ -459,23 +512,69 @@ export type StockMovement = {
   company?: Company;
 };
 
+export type StockMovementQuery = {
+  companyId?: number;
+  productId?: number;
+  type?: StockMovementType;
+  fromDate?: string;
+  toDate?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+};
+
 export type StockSummaryItem = {
   productId: number;
+  companyId: number;
   productName: string;
   sku: string;
   unit: ProductUnit;
-  currentStock: number;
-  buyPrice: number;
-  salePrice: number;
-  stockValue: number;
+  currentStock: number | string;
+  buyPrice: number | string;
+  salePrice?: number | string;
+  investmentValue?: number | string;
+  stockValue?: number | string;
+  isLowStock?: boolean;
+  isZeroStock?: boolean;
+  totalIn: number | string;
+  totalOut: number | string;
+  damagedQuantity: number | string;
   company?: Company;
 };
 
 export type StockInvestmentSummary = {
   totalProducts: number;
-  totalStockValue: number;
-  totalBuyValue: number;
-  totalSaleValue: number;
+  totalInvestment: number | string;
+  totalStockValue?: number | string;
+  totalBuyValue?: number | string;
+  totalSaleValue?: number | string;
+  companyCount: number;
+  inStockProducts: number;
+  lowStockProducts: number;
+  zeroStockProducts: number;
+  companies: StockInvestmentCompanySummary[];
+  units: StockInvestmentUnitSummary[];
+  items: StockSummaryItem[];
+};
+
+export type StockInvestmentCompanySummary = {
+  companyId: number;
+  companyName: string;
+  companyCode?: string | null;
+  productCount: number;
+  inStockProductCount: number;
+  lowStockProductCount: number;
+  zeroStockProductCount: number;
+  totalQuantity: number | string;
+  investmentValue: number | string;
+};
+
+export type StockInvestmentUnitSummary = {
+  unit: ProductUnit | string;
+  productCount: number;
+  inStockProductCount: number;
+  totalQuantity: number | string;
+  investmentValue: number | string;
 };
 
 
@@ -483,13 +582,15 @@ export type SaleItem = {
   id: number;
   saleId: number;
   productId: number;
-  quantity: number;
-  freeQuantity: number;
-  unitPrice: number;
-  discountType?: DiscountType;
-  discountValue?: number;
-  discountAmount?: number;
-  lineTotal: number;
+  quantity: number | string;
+  freeQuantity: number | string;
+  unitPrice: number | string;
+  buyPrice?: number | string;
+  discountType?: SaleDiscountType;
+  discountValue?: number | string;
+  discountAmount?: number | string;
+  lineTotal: number | string;
+  lineProfit?: number | string;
   product?: Product;
 };
 
@@ -500,18 +601,33 @@ export type Sale = {
   companyId: number;
   routeId: number;
   shopId?: number | null;
-  totalAmount: number;
-  invoiceDiscountAmount?: number;
-  paidAmount: number;
-  dueAmount: number;
+  totalAmount: number | string;
+  totalProfit?: number | string;
+  invoiceDiscountType?: SaleDiscountType;
+  invoiceDiscountValue?: number | string;
+  invoiceDiscountAmount?: number | string;
+  paidAmount: number | string;
+  dueAmount: number | string;
   note?: string | null;
   status: string;
+  deliveryStatus?: 'PENDING' | 'SHIPPED' | 'DELIVERED' | string;
   createdAt: string;
   updatedAt: string;
   items: SaleItem[];
+  payments?: SalePayment[];
   company?: Company;
   route?: Route;
   shop?: Shop;
+};
+
+export type SalePayment = {
+  id: number;
+  saleId: number;
+  amount: number | string;
+  paymentDate: string;
+  note?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type SalesQuery = {
@@ -523,6 +639,8 @@ export type SalesQuery = {
   search?: string;
   page?: number;
   pageSize?: number;
+  limit?: number;
+  dueOnly?: boolean;
   year?: number;
   month?: number;
 };
@@ -538,10 +656,10 @@ export type CreateSalePayload = {
     quantity: number;
     freeQuantity?: number;
     unitPrice: number;
-    discountType?: DiscountType;
+    discountType?: SaleDiscountType;
     discountValue?: number;
   }[];
-  invoiceDiscountType?: DiscountType;
+  invoiceDiscountType?: SaleDiscountType;
   invoiceDiscountValue?: number;
   paidAmount?: number;
 };
@@ -553,69 +671,74 @@ export type ReceiveSalePaymentPayload = {
 };
 
 export type TodaySalesSummary = {
+  saleCount?: number;
   totalSales: number;
-  totalAmount: number;
-  totalPaid: number;
-  totalDue: number;
+  totalAmount: number | string;
+  totalPaid: number | string;
+  totalDue: number | string;
 };
 
 export type TodayProfitSummary = {
-  totalRevenue: number;
-  totalCost: number;
-  profit: number;
+  totalRevenue: number | string;
+  totalCost: number | string;
+  profit: number | string;
+  totalProfit?: number | string;
 };
 
 export type MonthlySalesSummary = {
   year: number;
   month: number;
+  saleCount?: number;
   totalSales: number;
-  totalAmount: number;
+  totalAmount: number | string;
+  totalProfit?: number | string;
 };
 
 export type RouteWiseSalesSummary = {
   routeId: number;
   routeName: string;
   totalSales: number;
-  totalAmount: number;
+  totalAmount: number | string;
 };
 
 export type CompanyWiseSalesSummary = {
   companyId: number;
   companyName: string;
   totalSales: number;
-  totalAmount: number;
+  totalAmount: number | string;
 };
 
 export type RouteWiseDueSummary = {
   routeId: number;
   routeName: string;
-  totalDue: number;
+  totalDue: number | string;
 };
 
 export type ShopWiseDueSummary = {
   shopId: number;
   shopName: string;
-  totalDue: number;
+  totalDue: number | string;
 };
 
 export type CompanyWiseDueSummary = {
   companyId: number;
   companyName: string;
-  totalDue: number;
+  totalDue: number | string;
 };
 
 export type DueOverviewSummary = {
-  totalDue: number;
-  totalPaid: number;
-  totalRemaining: number;
+  totalDue: number | string;
+  totalPaid: number | string;
+  totalRemaining: number | string;
   totalShopsWithDue: number;
+  dueSaleCount?: number;
 };
 
 export type ShopDueDetails = {
   shopId: number;
   shopName: string;
-  totalDue: number;
-  totalPaid: number;
-  remainingDue: number;
+  totalDue: number | string;
+  totalPaid: number | string;
+  remainingDue: number | string;
   dues: any[];
 };

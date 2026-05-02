@@ -8,7 +8,7 @@ import { LoadingBlock } from '@/components/ui/loading-block';
 import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, toNumber } from '@/lib/utils/format';
 import type { Route, Shop } from '@/types/api';
 
 const PAGE_SIZE = 12;
@@ -72,8 +72,8 @@ export function ShopsPage() {
 
   const paginated = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
 
-  const totalOrders = filtered.reduce((s, sh) => s + (sh.totalOrders ?? 0), 0);
-  const totalDue = filtered.reduce((s, sh) => s + (sh.totalDue ?? 0), 0);
+  const totalOrders = filtered.reduce((s, sh) => s + toNumber(sh.totalOrders), 0);
+  const totalDue = filtered.reduce((s, sh) => s + toNumber(sh.totalDue), 0);
   const activeCount = shops.filter((s) => s.isActive).length;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -228,7 +228,7 @@ export function ShopsPage() {
               {paginated.map((shop) => {
                 const isEditing = editingShop?.id === shop.id;
                 const isToggling = isTogglingId === shop.id;
-                const hasDue = (shop.totalDue ?? 0) > 0;
+                const hasDue = toNumber(shop.totalDue) > 0;
 
                 return (
                   <div key={shop.id} className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition ${isEditing ? 'border-cyan-300 ring-2 ring-cyan-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-md'}`}>

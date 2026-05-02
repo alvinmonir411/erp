@@ -34,7 +34,7 @@ function getPurchaseReference(referenceNo: string | null, purchaseId: number) {
 function getOutstandingPurchaseStatus(
   purchase: CompanyPayableLedger['payablePurchases'][number],
 ) {
-  if (purchase.paidAmount <= 0) {
+  if (Number(purchase.paidAmount) <= 0) {
     return {
       badge: 'Full payable purchase',
       description: 'No settlement has been recorded yet.',
@@ -52,7 +52,7 @@ function getOutstandingPurchaseStatus(
 }
 
 function getPaymentEntryStatus(payment: CompanyPayableHistoryEntry) {
-  return payment.purchasePayableAmount > 0
+  return Number(payment.purchasePayableAmount) > 0
     ? {
         label: 'Payable remaining',
         toneClassName: 'bg-amber-100 text-amber-700',
@@ -300,7 +300,7 @@ export function CompanyPayableLedgerPage({
                               type="number"
                               min="0.01"
                               step="0.01"
-                              max={purchase.payableAmount}
+                              max={Number(purchase.payableAmount)}
                               value={form.amount}
                               onChange={(event) =>
                                 updatePaymentForm(purchase.id, {
@@ -313,7 +313,7 @@ export function CompanyPayableLedgerPage({
                               type="button"
                               onClick={() =>
                                 updatePaymentForm(purchase.id, {
-                                  amount: purchase.payableAmount.toFixed(2),
+                                  amount: Number(purchase.payableAmount).toFixed(2),
                                 })
                               }
                               className="rounded-2xl border border-slate-200 px-4 py-3 text-xs font-medium text-slate-700"

@@ -274,7 +274,7 @@ function FieldLayout({ report }: { report: any }) {
         </thead>
         <tbody>
           {sortedItems.map((item, index) => {
-            const unitPrice = item.quantity > 0 ? item.estimatedAmount / item.quantity : 0;
+            const unitPrice = Number(item.quantity) > 0 ? Number(item.estimatedAmount) / Number(item.quantity) : 0;
             return (
               <tr key={item.productName} className="font-bold">
                 <td className="border-2 border-slate-900 px-2 py-3 text-center text-slate-400 font-medium">
@@ -357,7 +357,7 @@ function MorningLayout({ report }: { report: any }) {
               <tr key={item.productName} className="font-medium">
                 <td className="py-3 font-bold text-slate-900">{item.productName}</td>
                 <td className="py-3 text-center font-black">{formatNumber(item.quantity)}</td>
-                <td className="py-3 text-right text-slate-500">{formatCurrency(item.estimatedAmount / item.quantity)}</td>
+                <td className="py-3 text-right text-slate-500">{formatCurrency(Number(item.estimatedAmount) / Number(item.quantity))}</td>
                 <td className="py-3 text-right font-bold">{formatCurrency(item.estimatedAmount)}</td>
               </tr>
             ))}

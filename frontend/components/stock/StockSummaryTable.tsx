@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, memo } from 'react';
-import { formatNumber } from '@/lib/utils/format';
+import { formatNumber, toNumber } from '@/lib/utils/format';
 import { StockSummaryItem } from '@/types/api';
 
 type StockSummaryTableProps = {
@@ -13,8 +13,8 @@ export const StockSummaryTable = memo(function StockSummaryTable({
   items,
   onQuickAction,
 }: StockSummaryTableProps) {
-  const totalQty = useMemo(() => items.reduce((sum, item) => sum + (item.currentStock || 0), 0), [items]);
-  const totalValue = useMemo(() => items.reduce((sum, item) => sum + (item.investmentValue || 0), 0), [items]);
+  const totalQty = useMemo(() => items.reduce((sum, item) => sum + toNumber(item.currentStock), 0), [items]);
+  const totalValue = useMemo(() => items.reduce((sum, item) => sum + toNumber(item.investmentValue), 0), [items]);
 
   if (items.length === 0) {
     return (
@@ -47,7 +47,7 @@ export const StockSummaryTable = memo(function StockSummaryTable({
                 </div>
               </div>
               <div className="text-right font-semibold text-slate-600">
-                {formatNumber(item.salePrice)}
+                {formatNumber(item.salePrice ?? 0)}
               </div>
               <div className="text-center">
                 <p className={`text-lg font-bold tabular-nums ${item.isZeroStock ? 'text-rose-600' : item.isLowStock ? 'text-amber-600' : 'text-emerald-700'}`}>
@@ -61,7 +61,7 @@ export const StockSummaryTable = memo(function StockSummaryTable({
                 </span>
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-700">Tk {formatNumber(item.investmentValue)}</p>
+                <p className="text-sm font-semibold text-slate-700">Tk {formatNumber(item.investmentValue ?? 0)}</p>
                 <p className="text-[10px] text-slate-400">@{formatNumber(item.buyPrice)}/unit</p>
               </div>
               <div className="flex flex-col gap-1">
