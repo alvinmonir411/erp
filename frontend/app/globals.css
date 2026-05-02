@@ -25,8 +25,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: Arial, Helvetica, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
   --radius-xl: var(--radius);
 }
 
@@ -42,7 +42,7 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: Arial, Helvetica, ui-sans-serif, system-ui, sans-serif;
 }
 
 .glass-card {
