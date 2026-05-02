@@ -289,17 +289,29 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     try {
       setIsSettling(true);
       
+      const collections = batch.orders.map((batchOrder) => {
+        const draftDue = draftDues[batchOrder.orderId] || 0;
+        const finalAmount = Number(batchOrder.finalSoldAmount || 0);
+        const advance = Number(batchOrder.order?.advancePaid || 0);
+        return {
+          orderId: batchOrder.orderId,
+          collectedAmount: Math.max(0, finalAmount - advance - draftDue),
+          paymentMode: 'CASH',
+        };
+      });
+
+      const dueEntries = Object.entries(draftDues)
+        .filter(([_, amount]) => amount > 0)
+        .map(([orderId, amount]) => ({
+          orderId: Number(orderId),
+          amount: amount,
+          note: 'Added during batch settlement'
+        }));
+
       // Complete Settlement
       await settleDispatchBatch(batchId, {
-        collections: batch.orders.map((batchOrder) => {
-          const draftDue = draftDues[batchOrder.orderId] || 0;
-          const finalAmount = Number(batchOrder.finalSoldAmount || 0);
-          return {
-            orderId: batchOrder.orderId,
-            collectedAmount: Math.max(0, finalAmount - draftDue),
-            paymentMode: 'CASH',
-          };
-        }),
+        collections,
+        dueEntries: dueEntries.length > 0 ? dueEntries : undefined
       });
       
       showSuccessToast('Batch marked as settled and dues recorded');

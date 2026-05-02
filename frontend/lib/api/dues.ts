@@ -1,19 +1,20 @@
 import { apiRequest } from './client';
+import type { Due, DueCollection } from '@/types/api';
 
 export async function getDues() {
-  return apiRequest<any[]>('/dues', {
+  return apiRequest<Due[]>('/dues', {
     method: 'GET',
   });
 }
 
 export async function getPendingCollections() {
-  return apiRequest<any[]>('/dues/pending-collections', {
+  return apiRequest<DueCollection[]>('/dues/pending-collections', {
     method: 'GET',
   });
 }
 
 export async function getCollections() {
-  return apiRequest<any[]>('/dues/collections', {
+  return apiRequest<DueCollection[]>('/dues/collections', {
     method: 'GET',
   });
 }
@@ -24,7 +25,7 @@ export async function collectDue(data: {
   note?: string;
   collectionDate?: string;
 }) {
-  return apiRequest<any>('/dues/collect', {
+  return apiRequest<DueCollection>('/dues/collect', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -35,20 +36,20 @@ export async function upsertDue(data: {
   amount: number;
   note?: string;
 }) {
-  return apiRequest<any>('/dues/upsert', {
+  return apiRequest<Due>('/dues/upsert', {
     method: 'POST',
     body: JSON.stringify(data),
   });
 }
 
 export async function approveCollection(id: number) {
-  return apiRequest<any>(`/dues/approve/${id}`, {
+  return apiRequest<DueCollection>(`/dues/approve/${id}`, {
     method: 'PATCH',
   });
 }
 
 export async function rejectCollection(id: number, reason: string) {
-  return apiRequest<any>(`/dues/reject/${id}`, {
+  return apiRequest<DueCollection>(`/dues/reject/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ reason }),
   });
@@ -61,13 +62,17 @@ export async function getSRDueSummary() {
 }
 
 export async function getDueStats() {
-  return apiRequest<any>('/dues/stats', {
+  return apiRequest<{
+    totalRemaining: number;
+    totalPaid: number;
+    pendingApproval: number;
+  }>('/dues/stats', {
     method: 'GET',
   });
 }
 
 export async function getShopDues(shopId: number) {
-  return apiRequest<any[]>(`/dues/shop/${shopId}`, {
+  return apiRequest<Due[]>(`/dues/shop/${shopId}`, {
     method: 'GET',
   });
 }

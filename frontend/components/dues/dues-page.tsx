@@ -20,7 +20,7 @@ import {
   History
 } from 'lucide-react';
 import { getDues, collectDue, getDueStats } from '@/lib/api/dues';
-import { apiRequest } from '../../lib/api/client';
+import { apiRequest } from '@/lib/api/client';
 import { formatCurrency } from '@/lib/utils/format';
 import { useAuth } from '../auth/auth-provider';
 import { useToast } from '@/components/ui/toast-provider';
@@ -46,16 +46,18 @@ export function DuesPage() {
     queryFn: getDueStats,
   });
 
+  const { success: showSuccessToast, error: showErrorToast } = useToast();
+
   const collectMutation = useMutation({
     mutationFn: collectDue,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dues'] });
       setIsCollectModalOpen(false);
       setSelectedDue(null);
-      alert('Collection request submitted for approval.');
+      showSuccessToast('Collection request submitted for approval.');
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || 'Failed to submit collection');
+      showErrorToast(error.response?.data?.message || 'Failed to submit collection');
     }
   });
 

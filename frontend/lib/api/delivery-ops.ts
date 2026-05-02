@@ -57,6 +57,11 @@ export type SettlementPayload = {
     paymentMode?: string;
     note?: string;
   }[];
+  dueEntries?: {
+    orderId: number;
+    amount: number;
+    note?: string;
+  }[];
 };
 
 export function getDeliveryDashboard(date?: string) {

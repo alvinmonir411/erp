@@ -118,6 +118,7 @@ export type User = {
   role: Role;
   status: UserStatus;
   isActive: boolean;
+  allowedRouteIds?: number[] | string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -208,6 +209,7 @@ export type Due = {
   paidAmount: number | string;
   remainingDue: number | string;
   originalDueAmount?: number | string;
+  totalDue?: number | string;
   status: string;
   note?: string | null;
   srName?: string;
@@ -268,7 +270,7 @@ export type CreatePurchasePayload = {
 
 export type ReceivePurchasePaymentPayload = {
   amount: number;
-  paymentDate?: string;
+  paymentDate: string;
   note?: string;
 };
 
@@ -406,30 +408,7 @@ export type CompanyWisePayableSummary = {
   lastPurchaseDate?: string | null;
 };
 
-export type PurchaseQuery = {
-  companyId?: number;
-  startDate?: string;
-  endDate?: string;
-  search?: string;
-};
-
-export type ReceivePurchasePaymentPayload = {
-  amount: number;
-  paymentDate: string;
-  note?: string;
-};
-
-export type CreatePurchasePayload = {
-  companyId: number;
-  purchaseDate: string;
-  referenceNo?: string;
-  note?: string;
-  items: {
-    productId: number;
-    quantity: number;
-    unitPrice: number;
-  }[];
-};
+// Purchase types defined above
 
 export type CompanyPayableLedger = {
   company: {

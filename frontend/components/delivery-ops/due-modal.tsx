@@ -19,7 +19,7 @@ import {
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { getShops, createShop } from '@/lib/api/shops';
 import { updateOrderShop } from '@/lib/api/orders';
-import { upsertDue } from '@/lib/api/dues';
+// Removed unused upsertDue import
 import { useToast } from '@/components/ui/toast-provider';
 import type { Order, Shop, Route } from '@/types/api';
 
