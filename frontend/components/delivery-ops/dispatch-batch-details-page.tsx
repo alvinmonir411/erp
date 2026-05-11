@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -68,6 +68,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const [draftDues, setDraftDues] = useState<Record<number, number>>({});
   const [dueModalProduct, setDueModalProduct] = useState<{ id: number; name: string } | null>(null);
   const [actualCashReceived, setActualCashReceived] = useState<string>('');
+  // Track whether admin has manually edited the cash field — if yes, never auto-overwrite it
+  const cashManuallyEdited = useRef(false);
 
   // No print logic here anymore, handled by dedicated routes
 
@@ -178,6 +180,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     setActualCashReceived('');
     setDraftDues({});
     setBatchReturnState({});
+    cashManuallyEdited.current = false; // allow auto-fill for fresh batch
   }, [batchId]);
 
   const fetchBatch = async () => {
@@ -196,13 +199,12 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     fetchBatch();
   }, [batchId]);
 
-  // Auto-fill actual cash received when metrics become available
+  // Auto-fill actual cash received ONCE when the batch first loads — never overwrites user-typed value
   useEffect(() => {
-    if (finalMetrics && finalMetrics.cashCollectable > 0 && actualCashReceived === '') {
-      console.log("[Settlement] Auto-filling with Cash Collectable:", finalMetrics.cashCollectable);
+    if (finalMetrics && finalMetrics.cashCollectable > 0 && !cashManuallyEdited.current && actualCashReceived === '') {
       setActualCashReceived(String(finalMetrics.cashCollectable));
     }
-  }, [finalMetrics?.cashCollectable, actualCashReceived]);
+  }, [finalMetrics?.cashCollectable]);
 
   const batchStatus = batch ? batchStatusConfig[batch.status] : null;
   const isBatchSettled = batch ? ['SETTLED', 'PARTIALLY_SETTLED'].includes(batch.status) : false;
@@ -323,11 +325,17 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         const draftDue = draftDues[batchOrder.orderId] || 0;
         const finalAmount = Number(batchOrder.finalSoldAmount || 0);
         const advance = Number(batchOrder.order?.advancePaid || 0);
-        const hasDeliveryResult = batchOrder.deliveryStatus === 'COMPLETED' || Number(batchOrder.collectedAmount || 0) > 0 || Number(batchOrder.dueAmount || 0) > 0;
+        // If cash was explicitly collected per-order, use it.
+        // Otherwise, assume full payment of the remaining balance (finalAmount - advance - draftDue).
+        // We do NOT blindly check deliveryStatus === 'COMPLETED' because recording a return
+        // sets status to COMPLETED but collectedAmount might still be 0, which would falsely
+        // trigger a full due amount during settlement.
+        const explicitCollected = Number(batchOrder.collectedAmount || 0);
+        
         return {
           orderId: batchOrder.orderId,
-          collectedAmount: hasDeliveryResult
-            ? Number(batchOrder.collectedAmount || 0)
+          collectedAmount: explicitCollected > 0 
+            ? explicitCollected 
             : Math.max(0, finalAmount - advance - draftDue),
           paymentMode: 'CASH',
           note: batchOrder.deliveryNote || undefined,
@@ -586,9 +594,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                 <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-black uppercase tracking-widest text-slate-400">
                   <th className="px-6 py-4 text-center w-16">SL</th>
                   <th className="px-6 py-4 text-left">Product Name</th>
-                  <th className="px-6 py-4 text-center w-24">Qty</th>
-                  <th className="px-6 py-4 text-center w-24">Free</th>
-                  <th className="px-6 py-4 text-center w-32">Return</th>
+                  <th className="px-6 py-4 text-center w-24">Paid Qty</th>
+                  <th className="px-6 py-4 text-center w-24" title="Total free items dispatched for this product">Free Sent</th>
+                  <th className="px-6 py-4 text-center w-32">Return (Paid)</th>
+                  <th className="px-6 py-4 text-center w-32">Return (Free)</th>
                   <th className="px-6 py-4 text-center w-32">Damage</th>
                   <th className="px-6 py-4 text-center w-24">Final Sold</th>
                   <th className="px-6 py-4 text-center w-24">Due</th>
@@ -614,25 +623,35 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                     .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0);
 
                   return (
-                    <tr key={item.productId} className="hover:bg-slate-50/30 transition-colors">
+                    <tr
+                      key={item.productId}
+                      className={`hover:bg-slate-50/30 transition-colors ${
+                        item.totalFreeQty > 0 ? 'bg-emerald-50/40 border-l-2 border-emerald-400' : ''
+                      }`}
+                    >
                       <td className="px-6 py-4 text-center font-bold text-slate-400">{index + 1}</td>
-                      <td className="px-6 py-4 font-bold text-slate-900">{item.name}</td>
+                      <td className="px-6 py-4 font-bold text-slate-900">
+                        {item.name}
+                        {item.totalFreeQty > 0 && (
+                          <span className="ml-2 text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-100 rounded px-1.5 py-0.5">
+                            +{formatNumber(item.totalFreeQty)} free
+                          </span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-center font-black text-slate-700">
                         {formatNumber(item.totalPaidQty)}
                       </td>
+                      {/* FREE SENT — read-only dispatched free qty so user knows which product has free items */}
                       <td className="px-6 py-4 text-center">
-                        <input
-                          type="number"
-                          min="0"
-                          value={state.free}
-                          disabled={isBatchSettled}
-                          onChange={(e) => setBatchReturnState(prev => ({
-                            ...prev,
-                            [item.productId]: { ...state, free: e.target.value }
-                          }))}
-                          className="w-20 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-center font-black text-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 outline-none"
-                        />
+                        {item.totalFreeQty > 0 ? (
+                          <span className="rounded-lg bg-emerald-100 px-3 py-1.5 font-black text-emerald-700 text-sm">
+                            {formatNumber(item.totalFreeQty)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-bold">—</span>
+                        )}
                       </td>
+                      {/* RETURN (PAID) */}
                       <td className="px-6 py-4 text-center">
                         <input
                           type="number"
@@ -647,6 +666,27 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                           className="w-20 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-center font-black text-rose-600 focus:bg-white focus:ring-2 focus:ring-rose-500/10 outline-none"
                         />
                       </td>
+                      {/* RETURN (FREE) */}
+                      <td className="px-6 py-4 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          max={item.totalFreeQty}
+                          value={state.free}
+                          disabled={isBatchSettled || item.totalFreeQty === 0}
+                          onChange={(e) => setBatchReturnState(prev => ({
+                            ...prev,
+                            [item.productId]: { ...state, free: e.target.value }
+                          }))}
+                          className={`w-20 rounded-xl border px-2 py-2 text-center font-black outline-none ${
+                            item.totalFreeQty > 0
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:bg-white focus:ring-2 focus:ring-emerald-500/10'
+                              : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                          }`}
+                          placeholder={item.totalFreeQty > 0 ? '0' : '—'}
+                        />
+                      </td>
+                      {/* DAMAGE */}
                       <td className="px-6 py-4 text-center">
                         <input
                           type="number"
@@ -859,7 +899,11 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                     <input
                       type="number"
                       value={actualCashReceived}
-                      onChange={(e) => setActualCashReceived(Math.max(0, Number(e.target.value)).toString())}
+                      onChange={(e) => {
+                        // Store exactly what the user typed — no Number() conversion that would corrupt commas
+                        cashManuallyEdited.current = true;
+                        setActualCashReceived(e.target.value);
+                      }}
                       placeholder="Enter amount..."
                       className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-5 py-4 text-2xl font-black text-slate-900 focus:border-slate-900 outline-none transition-all"
                     />

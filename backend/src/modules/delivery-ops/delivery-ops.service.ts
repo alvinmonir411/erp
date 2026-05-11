@@ -388,14 +388,24 @@ export class DeliveryOpsService {
       })),
     }));
 
-    const productSummary = (batch.items || []).map((bi: any) => ({
-      productName: bi.product?.name || 'Unknown',
-      dispatched: bi.totalDispatchedQty,
-      returned: bi.totalReturnedQty || 0,
-      damaged: bi.totalDamagedQty || 0,
-      delivered: bi.totalDeliveredQty,
-      finalSoldAmount: bi.finalSoldAmount,
-    }));
+    const productSummary = (batch.items || []).map((bi: any) => {
+      const paidDelivered = (batch.orders || []).reduce((sum: number, bo: any) => {
+        const orderItem = (bo.order?.items || []).find((oi: any) => oi.productId === bi.productId);
+        return sum + Number(orderItem?.deliveredPaidQuantity || 0);
+      }, 0);
+      const freeDelivered = Math.max(0, Number(bi.totalDeliveredQty || 0) - paidDelivered);
+
+      return {
+        productName: bi.product?.name || 'Unknown',
+        dispatched: bi.totalDispatchedQty,       // paid + free dispatched (physical)
+        returned: bi.totalReturnedQty || 0,       // paid + free returned (physical)
+        damaged: bi.totalDamagedQty || 0,
+        delivered: bi.totalDeliveredQty,          // paid + free delivered (physical)
+        deliveredPaid: paidDelivered,             // paid-only delivered → used for Sold Qty
+        freeDelivered,                            // free-only delivered (for reference)
+        finalSoldAmount: bi.finalSoldAmount,      // revenue (excludes free items)
+      };
+    });
 
     const summary = {
       totalDispatchedQty: (batch.items || []).reduce((sum: number, bi: any) => sum + Number(bi.totalDispatchedQty), 0),
@@ -484,13 +494,13 @@ export class DeliveryOpsService {
 
           const orderedPaidQty = Number(orderItem.quantity || 0);
           const orderedFreeQty = Number(orderItem.freeQuantity || 0);
-          
+
           const returnedPaidQty = Number(itemDto.returnedPaidQuantity || 0);
           const returnedFreeQty = Number(itemDto.returnedFreeQuantity || 0);
           const damagedPaidQty = Number(itemDto.damagedPaidQuantity || 0);
 
           const finalPaidDelivered = Math.max(0, orderedPaidQty - returnedPaidQty - damagedPaidQty);
-          const finalDeliveredFree = Math.max(0, orderedFreeQty - returnedFreeQty); 
+          const finalDeliveredFree = Math.max(0, orderedFreeQty - returnedFreeQty);
 
           finalSoldAmount += this.calculateItemSoldAmount(orderItem, finalPaidDelivered);
 
@@ -664,10 +674,10 @@ export class DeliveryOpsService {
       await manager.delete(DeliveryReturn, { batchOrderId: batchOrder.id });
       await manager.delete(DamageRecord, { batchId: batchOrder.batchId, orderId });
 
-      const returnItems = dto.items.filter((item) => 
-        Number(item.returnedPaidQty || 0) > 0 || 
-        Number(item.returnedFreeQty || 0) > 0 || 
-        Number(item.damagedPaidQty || 0) > 0 || 
+      const returnItems = dto.items.filter((item) =>
+        Number(item.returnedPaidQty || 0) > 0 ||
+        Number(item.returnedFreeQty || 0) > 0 ||
+        Number(item.damagedPaidQty || 0) > 0 ||
         Number(item.damagedFreeQty || 0) > 0
       );
       if (returnItems.length > 0) {
@@ -846,14 +856,23 @@ export class DeliveryOpsService {
         if (bo.isSettled || [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE].includes(bo.order?.status)) {
           throw new BadRequestException(`Order #${bo.orderId} is already settled. Batch settlement rejected.`);
         }
-        if (!bo.order?.shopId && bo.dueAmount > 0) {
-          throw new BadRequestException(`Order #${bo.orderId} has a due amount but no linked shop. Settlement rejected.`);
+        const requestedDue = dto.dueEntries?.find(d => d.orderId === bo.orderId)?.amount || 0;
+        if (!bo.order?.shopId && requestedDue > 0) {
+          throw new BadRequestException(`Order #${bo.orderId} is a direct order (no shop) and cannot have a due. Settlement rejected.`);
         }
       }
 
       let totalReportedCollected = 0;
       let totalExpectedCash = 0;
       let totalFinalValue = 0;
+
+      // Build a lookup map from dto.collections (what the frontend calculated per order)
+      const collectionMap = new Map<number, number>();
+      if (dto.collections && dto.collections.length > 0) {
+        for (const col of dto.collections) {
+          collectionMap.set(col.orderId, Number(col.collectedAmount || 0));
+        }
+      }
 
       // 3. Process each order with mathematical precision
       for (const batchOrder of currentBatch.orders) {
@@ -866,11 +885,20 @@ export class DeliveryOpsService {
           damagedQuantity: Number(item.damagedPaidQuantity || 0) + Number(item.damagedFreeQuantity || 0),
         }));
 
+        // Use collectedAmount from dto.collections if provided by frontend;
+        // fall back to batchOrder.collectedAmount (set during per-order delivery result submission)
+        const collectedFromDto = collectionMap.get(batchOrder.orderId);
+        const collectedAmount = collectedFromDto !== undefined
+          ? collectedFromDto
+          : Number(batchOrder.collectedAmount || 0);
+
+        const requestedDue = dto.dueEntries?.find(d => d.orderId === batchOrder.orderId)?.amount || 0;
+
         // Settle individual order (Calculates finalSoldAmount and returns stock)
         const settledOrder = await this.ordersService.settleOrder(order.id, {
           items: settlementItems,
-          collectedAmount: Number(batchOrder.collectedAmount || 0),
-          dueAmount: Number(batchOrder.dueAmount || 0),
+          collectedAmount,
+          dueAmount: requestedDue,
           settlementNote: dto.note || batchOrder.deliveryNote,
         } as any, manager);
 
@@ -879,7 +907,7 @@ export class DeliveryOpsService {
           deliveryStatus: 'COMPLETED',
         });
 
-        totalReportedCollected += Number(batchOrder.collectedAmount || 0);
+        totalReportedCollected += collectedAmount;
         totalFinalValue += Number(settledOrder.actualSoldAmount);
         totalExpectedCash += Math.max(0, Number(settledOrder.actualSoldAmount) - Number(settledOrder.advancePaid || 0));
       }

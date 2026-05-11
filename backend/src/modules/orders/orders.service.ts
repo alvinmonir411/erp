@@ -422,6 +422,11 @@ export class OrdersService {
         isLocked: true,
       });
 
+      // ── Update in-memory object so upsertDue sees the freshly-calculated values ──
+      // Without this, upsertDue reads stale order.actualSoldAmount / order.collectedAmount
+      // from the DB fetch above, and rejects legitimate dues with a false "amount > max" error.
+      order.actualSoldAmount = grandTotal;
+      order.collectedAmount = collectedAmount;
       await this.duesService.upsertDue(order, dueAmount, m, dto.settlementNote);
 
       return m.findOne(Order, {

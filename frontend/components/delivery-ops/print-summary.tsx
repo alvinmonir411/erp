@@ -100,9 +100,10 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
         </thead>
         <tbody>
           {sortedProducts.map((item, index) => {
-            const soldQty = Number(item.delivered || 0);
-            const unitPrice = soldQty > 0 ? Number(item.finalSoldAmount) / soldQty : 0;
+            // deliveredPaid = paid-only sold qty (excludes free items from revenue)
+            const soldQty = Number(item.deliveredPaid ?? item.delivered ?? 0);
             const totalAmount = Number(item.finalSoldAmount || 0);
+            const unitPrice = soldQty > 0 ? totalAmount / soldQty : 0;
 
             // Calculate due for this product row
             const productDue = report.orders
@@ -119,7 +120,12 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
             return (
               <tr key={item.productName}>
                 <td className="text-center text-slate-400">{index + 1}</td>
-                <td className="font-medium">{item.productName}</td>
+                <td className="font-medium">
+                  {item.productName}
+                  {Number(item.freeDelivered || 0) > 0 && (
+                    <span className="ml-1 text-[9px] text-emerald-600 font-bold">(+{item.freeDelivered} free)</span>
+                  )}
+                </td>
                 <td className="text-center">{formatNumber(item.dispatched)}</td>
                 <td className="text-center">{formatNumber(item.returned)}</td>
                 <td className="text-center">{formatNumber(item.damaged)}</td>
@@ -161,8 +167,9 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
             <span>{formatNumber(products.reduce((s, i) => s + Number(i.damaged), 0))}</span>
           </div>
           <div className="flex justify-between text-xs font-bold border-b border-black pb-2">
-            <span>Sold:</span>
-            <span>{formatNumber(products.reduce((s, i) => s + Number(i.delivered), 0))}</span>
+            <span>Sold (Paid):</span>
+            {/* paid-only delivered — excludes free items from sold count */}
+            <span>{formatNumber(products.reduce((s, i: any) => s + Number(i.deliveredPaid ?? i.delivered ?? 0), 0))}</span>
           </div>
           <div className="flex justify-between text-base font-bold pt-1">
             <span>GRAND TOTAL:</span>

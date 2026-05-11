@@ -202,10 +202,11 @@ export class DuesService {
 
     const finalAmount = Number(order.actualSoldAmount || order.grandTotal || 0);
     const advance = Number(order.advancePaid || 0);
-    const alreadyCollected = Number(order.collectedAmount || 0);
-    const maxAllowed = Math.max(0, finalAmount - advance - alreadyCollected);
+    // Note: do NOT subtract alreadyCollected here — the caller (settleOrder) already passes the
+    // correctly-calculated net dueAmount after collection. Double-subtracting causes false rejections.
+    const maxAllowed = Math.max(0, finalAmount - advance);
 
-    if (dueAmount > maxAllowed) {
+    if (dueAmount > maxAllowed + 0.01) {
       throw new BadRequestException(`Due amount cannot be greater than final amount. Max allowed is BDT ${maxAllowed}.`);
     }
 
