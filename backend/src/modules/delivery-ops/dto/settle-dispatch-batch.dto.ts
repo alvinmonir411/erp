@@ -1,12 +1,29 @@
 import { IsArray, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
+class SettleOrderItemDto {
+  @IsNumber()
+  productId: number;
+
+  @IsNumber()
+  returnedQuantity: number;
+
+  @IsNumber()
+  damagedQuantity: number;
+}
+
 class DispatchCollectionDto {
   @IsNumber()
   orderId: number;
 
   @IsNumber()
   collectedAmount: number;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => SettleOrderItemDto)
+  items?: SettleOrderItemDto[];
 
   @IsString()
   @IsOptional()
@@ -41,6 +58,10 @@ export class SettleDispatchBatchDto {
   @ValidateNested({ each: true })
   @Type(() => DueEntryDto)
   dueEntries?: DueEntryDto[];
+
+  @IsNumber()
+  @IsOptional()
+  actualCashReceived?: number;
 
   @IsString()
   @IsOptional()

@@ -38,7 +38,13 @@ export class StockMovement {
   reference: string; // Order ID, Invoice number, etc.
 
   @Column({ type: 'varchar', nullable: true })
-  user: string; // The person who performed the action
+  user: string;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  balanceAfter: number;
+
+  @Column({ type: 'varchar', unique: true, nullable: true })
+  idempotencyKey: string;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -1,10 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn, VersionColumn } from 'typeorm';
 import { Company } from '../../companies/entities/company.entity';
 import { Route } from '../../routes/entities/route.entity';
 import { Shop } from '../../shops/entities/shop.entity';
 import { Product } from '../../products/entities/product.entity';
 import { DiscountType, OrderStatus, ColumnNumericTransformer } from '../orders.constants';
 import { DeliveryPerson } from '../../delivery-ops/entities/delivery-person.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('orders')
 export class Order {
@@ -34,6 +35,13 @@ export class Order {
   @ManyToOne(() => DeliveryPerson, { nullable: true })
   @JoinColumn({ name: 'deliveryPersonId' })
   deliveryPerson?: DeliveryPerson;
+
+  @Column({ type: 'uuid', nullable: true })
+  assignedDeliveryManId: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'assignedDeliveryManId' })
+  assignedDeliveryMan: User;
 
   @Column({ type: 'varchar', length: 120, nullable: true })
   marketArea?: string;
@@ -93,8 +101,8 @@ export class Order {
   @Column({ default: 'Admin' })
   createdBy: string;
 
-  @Column({ nullable: true })
-  createdById: string;
+  @Column({ type: 'uuid', nullable: true })
+  createdById: string | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   createdByRole: string;
@@ -102,7 +110,10 @@ export class Order {
   @Column({ type: 'text', nullable: true })
   settlementNote?: string;
 
-  @OneToMany(() => OrderItem, (item) => item.order, { cascade: true, eager: true })
+  @Column({ type: 'text', nullable: true })
+  deliveryNote?: string;
+
+  @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items: OrderItem[];
 
   @CreateDateColumn()
@@ -110,6 +121,9 @@ export class Order {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @VersionColumn()
+  version: number;
 }
 
 @Entity('order_items')
@@ -127,7 +141,7 @@ export class OrderItem {
   @Column()
   productId: number;
 
-  @ManyToOne(() => Product, { eager: true })
+  @ManyToOne(() => Product)
   @JoinColumn({ name: 'productId' })
   product: Product;
 
@@ -153,11 +167,20 @@ export class OrderItem {
   lineTotal: number;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
-  deliveredQuantity: number;
+  deliveredPaidQuantity: number;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
-  returnedQuantity: number;
+  deliveredFreeQuantity: number;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
-  damagedQuantity: number;
+  returnedPaidQuantity: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  returnedFreeQuantity: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  damagedPaidQuantity: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  damagedFreeQuantity: number;
 }

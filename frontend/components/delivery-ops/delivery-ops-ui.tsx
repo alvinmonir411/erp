@@ -57,6 +57,11 @@ export const orderStatusConfig: Record<
     className: 'bg-rose-100 text-rose-700',
     icon: AlertTriangle,
   },
+  PARTIAL_DUE: {
+    label: 'Partial Due',
+    className: 'bg-amber-100 text-amber-700',
+    icon: HandCoins,
+  },
   SETTLED: {
     label: 'Settled',
     className: 'bg-violet-100 text-violet-700',

@@ -38,6 +38,12 @@ export class ProductsController {
   }
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Get('summary')
+  getSummary(@Query('companyId') companyId?: number) {
+    return this.productsService.getSummary(companyId);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.findOne(id);

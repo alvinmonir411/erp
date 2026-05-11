@@ -17,7 +17,8 @@ import {
   Building2,
   X,
   FileText,
-  DollarSign
+  DollarSign,
+  Truck
 } from 'lucide-react';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
@@ -65,11 +66,11 @@ const navigation = [
   },
   {
     title: 'Setup',
-    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR],
     items: [
-      { href: '/routes', label: 'Routes', icon: Map },
-      { href: '/shops', label: 'Shops', icon: Store },
-      { href: '/companies', label: 'Companies', icon: Building2 },
+      { href: '/routes', label: 'Routes', icon: Map, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+      { href: '/shops', label: 'Shops', icon: Store, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR] },
+      { href: '/companies', label: 'Companies', icon: Building2, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
     ]
   },
   {
@@ -78,6 +79,15 @@ const navigation = [
     items: [
       { href: '/users', label: 'User Management', icon: Users },
       { href: '/settings', label: 'Settings', icon: Settings, roles: [Role.SUPER_ADMIN] },
+    ]
+  },
+  {
+    title: 'Field Operations',
+    roles: [Role.DELIVERY_MAN],
+    items: [
+      { href: '/my-deliveries', label: 'My Deliveries', icon: Truck },
+      { href: '/my-deliveries/assigned', label: 'Assigned Orders', icon: List },
+      { href: '/my-deliveries/completed', label: 'Completed Deliveries', icon: CheckCircle },
     ]
   }
 ];

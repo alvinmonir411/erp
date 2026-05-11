@@ -42,6 +42,9 @@ export class CashCollection {
   @Column({ type: 'varchar', length: 40, default: 'CASH' })
   paymentMode: string;
 
+  @Column({ type: 'varchar', length: 30, default: 'PENDING' })
+  status: 'PENDING' | 'VERIFIED';
+
   @Column({ type: 'text', nullable: true })
   note?: string;
 

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DeliveryOpsController } from './delivery-ops.controller';
 import { DeliveryOpsService } from './delivery-ops.service';
@@ -13,8 +13,10 @@ import { DamageRecord } from './entities/damage-record.entity';
 import { Order, OrderItem } from '../orders/entities/order.entity';
 import { Product } from '../products/entities/product.entity';
 import { StockMovement } from '../stock/entities/stock-movement.entity';
+import { User } from '../users/entities/user.entity';
 import { StockModule } from '../stock/stock.module';
 import { DuesModule } from '../dues/dues.module';
+import { OrdersModule } from '../orders/orders.module';
 
 @Module({
   imports: [
@@ -31,9 +33,11 @@ import { DuesModule } from '../dues/dues.module';
       OrderItem,
       Product,
       StockMovement,
+      User,
     ]),
     StockModule,
-    DuesModule
+    DuesModule,
+    forwardRef(() => OrdersModule),
   ],
   controllers: [DeliveryOpsController],
   providers: [DeliveryOpsService],

@@ -7,6 +7,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  VersionColumn,
 } from 'typeorm';
 import { Company } from '../../companies/entities/company.entity';
 import { Route } from '../../routes/entities/route.entity';
@@ -14,6 +15,8 @@ import { DeliveryPerson } from './delivery-person.entity';
 import { DispatchBatchOrder } from './dispatch-batch-order.entity';
 import { DispatchBatchItem } from './dispatch-batch-item.entity';
 import { ColumnNumericTransformer } from '../../orders/orders.constants';
+import { User } from 'src/modules/users/entities/user.entity';
+
 
 export enum DispatchBatchStatus {
   DRAFT = 'DRAFT',
@@ -50,12 +53,19 @@ export class DispatchBatch {
   @JoinColumn({ name: 'routeId' })
   route: Route;
 
-  @Column()
+  @Column({ nullable: true })
   deliveryPersonId: number;
 
-  @ManyToOne(() => DeliveryPerson)
+  @ManyToOne(() => DeliveryPerson, { nullable: true })
   @JoinColumn({ name: 'deliveryPersonId' })
   deliveryPerson: DeliveryPerson;
+
+  @Column({ type: 'uuid', nullable: true })
+  assignedDeliveryManId: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'assignedDeliveryManId' })
+  assignedDeliveryMan: User;
 
   @Column({ type: 'varchar', length: 120, nullable: true })
   marketArea?: string;
@@ -170,4 +180,7 @@ export class DispatchBatch {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @VersionColumn()
+  version: number;
 }

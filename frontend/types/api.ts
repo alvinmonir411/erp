@@ -5,6 +5,7 @@ export enum Role {
   ADMIN = 'ADMIN',
   MANAGER = 'MANAGER',
   SR = 'SR',
+  DELIVERY_MAN = 'DELIVERY_MAN',
 }
 
 export enum UserStatus {
@@ -84,6 +85,8 @@ export type Shop = {
   createdAt: string;
   updatedAt: string;
   route?: Route;
+  companyId: number;
+  note?: string;
 };
 
 export type CreateRoutePayload = {
@@ -101,6 +104,8 @@ export type CreateShopPayload = {
   phone?: string;
   address?: string;
   isActive?: boolean;
+  companyId: number;
+  note?: string;
 };
 
 export type UpdateShopPayload = Partial<CreateShopPayload>;
@@ -139,6 +144,7 @@ export type OrderStatus =
   | 'DELIVERED'
   | 'RETURNED_PARTIAL'
   | 'CANCELLED'
+  | 'PARTIAL_DUE'
   | 'SETTLED';
 
 export type DispatchBatchStatus =
@@ -164,11 +170,12 @@ export type OrderItem = {
   discountValue?: number | string;
   lineTotal: number | string;
   product?: Product;
-  deliveredQuantity?: number | string;
-  returnedQuantity?: number | string;
-  damagedQuantity?: number | string;
-  paidReturnedQuantity?: number | string;
-  freeReturnedQuantity?: number | string;
+  deliveredPaidQuantity?: number | string;
+  deliveredFreeQuantity?: number | string;
+  returnedPaidQuantity?: number | string;
+  returnedFreeQuantity?: number | string;
+  damagedPaidQuantity?: number | string;
+  damagedFreeQuantity?: number | string;
 };
 
 export type Order = {
@@ -200,6 +207,10 @@ export type Order = {
   route?: Route;
   shop?: Shop;
   deliveryPerson?: DeliveryPerson;
+  assignedDeliveryManId?: string | null;
+  assignedDeliveryMan?: User | null;
+  deliveryNote?: string | null;
+  shopTotalDue?: number | string;
 };
 
 export type Due = {
@@ -246,6 +257,7 @@ export type DeliveryPerson = {
   email?: string | null;
   address?: string | null;
   notes?: string | null;
+  userId?: string | null;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -279,11 +291,13 @@ export type ReceivePurchasePaymentPayload = {
 
 export type DeliveryReturnItem = {
   productId: number;
-  dispatchedQuantity: number | string;
-  returnedQuantity: number | string;
-  damagedQuantity: number | string;
-  paidReturnedQuantity?: number | string;
-  freeReturnedQuantity?: number | string;
+  dispatchedQuantity?: number | string;
+  returnedPaidQuantity: number | string;
+  returnedFreeQuantity: number | string;
+  damagedPaidQuantity: number | string;
+  damagedFreeQuantity: number | string;
+  deliveredPaidQuantity?: number | string;
+  deliveredFreeQuantity?: number | string;
   reason?: string;
   note?: string;
 };
@@ -302,7 +316,8 @@ export type CreateDispatchBatchPayload = {
   dispatchDate: string;
   companyId?: number;
   routeId: number;
-  deliveryPersonId: number;
+  deliveryPersonId?: number;
+  assignedDeliveryManId: string;
   marketArea?: string;
   note?: string;
   orderIds: number[];
@@ -340,6 +355,9 @@ export type DispatchBatchOrder = {
   dueAmount: number | string;
   shortageOrExcess: number | string;
   isSettled: boolean;
+  deliveryStatus?: 'PENDING' | 'DRAFT' | 'COMPLETED';
+  deliveryNote?: string | null;
+  deliveryCompletedAt?: string | null;
 };
 
 export type DispatchBatch = {
@@ -371,6 +389,18 @@ export type DispatchBatch = {
   note?: string;
   settlementNote?: string;
   orders: DispatchBatchOrder[];
+  assignedDeliveryManId?: string | null;
+  assignedDeliveryMan?: User | null;
+  metrics?: {
+    completedOrders: number;
+    pendingOrders: number;
+    totalReturnedQty: number;
+    totalDamagedQty: number;
+    totalDeliveredQty: number;
+    totalCashExpected: number;
+    totalCashCollected: number;
+    totalDueCreated: number;
+  };
 };
 
 export type DeliverySummariesQuery = {
@@ -565,6 +595,7 @@ export type StockInvestmentCompanySummary = {
   inStockProductCount: number;
   lowStockProductCount: number;
   zeroStockProductCount: number;
+  inStockProducts?: number;
   totalQuantity: number | string;
   investmentValue: number | string;
 };

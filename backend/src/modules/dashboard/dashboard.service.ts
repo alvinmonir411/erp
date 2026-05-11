@@ -10,6 +10,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Role } from '../../common/enums/role.enum';
 import { Due } from '../dues/entities/due.entity';
 import { DueCollection, CollectionStatus } from '../dues/entities/due-collection.entity';
+import { ProductsService } from '../products/products.service';
 
 @Injectable()
 export class DashboardService {
@@ -26,6 +27,7 @@ export class DashboardService {
     private readonly duesRepository: Repository<Due>,
     @InjectRepository(DueCollection)
     private readonly collectionsRepository: Repository<DueCollection>,
+    private readonly productsService: ProductsService,
     private readonly dataSource: DataSource,
   ) { }
   private readonly logger = new Logger(DashboardService.name);
@@ -43,6 +45,7 @@ export class DashboardService {
 
     const where: any = companyId ? { companyId } : {};
     if (isSR) {
+      if (!userId) return { uiMetrics: null, charts: { last7Days: [] }, recentOrders: [] };
       where.createdById = userId;
     }
 
@@ -69,7 +72,7 @@ export class DashboardService {
     const settledItems = await itemsQuery.getMany();
 
     const totalProfit = settledItems.reduce((sum: number, item: OrderItem) => {
-      const delivered = safeNum(item.deliveredQuantity);
+      const delivered = safeNum(item.deliveredPaidQuantity);
       const buyPrice = safeNum(item.product?.buyPrice);
       const itemPrice = item.quantity > 0 ? item.lineTotal / item.quantity : item.unitPrice;
       return sum + (delivered * (itemPrice - buyPrice));
@@ -112,13 +115,10 @@ export class DashboardService {
 
     const todayCancelled = allOrders.filter(o => o.status === OrderStatus.CANCELLED && isTodayBD(o.updatedAt)).length;
 
-    // Stock metrics
-    let stockValue = 0;
-    let productsCount = 0;
+    // 5. Stock metrics from ProductsService (Unified Source)
+    let productMetrics: any = { totalProducts: 0, stockValue: 0, activeProducts: 0, inactiveProducts: 0, lowStockProducts: 0, outOfStockProducts: 0 };
     try {
-      const products = await this.productsRepository.find({ where: companyId ? { companyId } : {} });
-      stockValue = products.reduce((sum, p) => sum + (safeNum(p.currentStock) * safeNum(p.buyPrice)), 0);
-      productsCount = products.length;
+      productMetrics = await this.productsService.getSummary(companyId);
     } catch (err) {
       this.logger.error('Error fetching stock for dashboard:', err.message);
     }
@@ -174,8 +174,13 @@ export class DashboardService {
           totalProfit: (user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? totalProfit : 0,
         },
         stock: {
-          totalProducts: productsCount,
-          stockValue: (user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? stockValue : 0,
+          totalProducts: productMetrics.totalProducts,
+          activeProducts: productMetrics.activeProducts,
+          inactiveProducts: productMetrics.inactiveProducts,
+          lowStockProducts: productMetrics.lowStockProducts,
+          outOfStockProducts: productMetrics.outOfStockProducts,
+          inStockProducts: productMetrics.inStockProducts,
+          stockValue: (user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? productMetrics.totalStockValue : 0,
         }
       },
       charts: { last7Days },

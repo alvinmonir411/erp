@@ -49,8 +49,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const restrictedPaths: Record<Role, string[]> = {
       SUPER_ADMIN: [],
       ADMIN: ['/users', '/settings'], // Admin can't delete, but also maybe restricted from some settings
-      MANAGER: ['/users', '/settings', '/dashboard'], // Manager has own dashboard
+      MANAGER: ['/users', '/settings', '/dashboard'],
       SR: ['/dashboard', '/delivery-ops', '/products', '/stock', '/users', '/settings'],
+      DELIVERY_MAN: ['/dashboard', '/sr-dashboard', '/manager-dashboard', '/orders', '/dues', '/delivery-ops', '/products', '/stock', '/users', '/settings', '/routes', '/shops', '/companies'],
     };
 
     const restricted = restrictedPaths[userRole] || [];
@@ -71,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let target = '/dashboard';
           if (parsedUser.role === Role.SR) target = '/sr-dashboard';
           else if (parsedUser.role === Role.MANAGER) target = '/manager-dashboard';
+          else if (parsedUser.role === Role.DELIVERY_MAN) target = '/my-deliveries';
           
           router.push(target);
           return;
@@ -82,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let target = '/dashboard';
           if (parsedUser.role === Role.SR) target = '/sr-dashboard';
           else if (parsedUser.role === Role.MANAGER) target = '/manager-dashboard';
+          else if (parsedUser.role === Role.DELIVERY_MAN) target = '/my-deliveries';
           
           router.push(target);
         }

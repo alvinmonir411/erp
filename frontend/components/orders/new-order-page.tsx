@@ -28,8 +28,15 @@ import {
   Receipt,
   CheckCircle,
   ArrowLeft,
-  LogOut
+  LogOut,
+  Map,
+  Phone,
+  X,
+  UserCircle,
+  RefreshCw,
+  Save
 } from 'lucide-react';
+import { createShop } from '@/lib/api/shops';
 
 interface OrderLine {
   productId: number;
@@ -82,6 +89,17 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   const routeRef = useRef<HTMLDivElement>(null);
   const shopRef = useRef<HTMLDivElement>(null);
 
+  // Quick Shop Create State
+  const [isShopModalOpen, setIsShopModalOpen] = useState(false);
+  const [isCreatingShop, setIsCreatingShop] = useState(false);
+  const [newShop, setNewShop] = useState({
+    name: '',
+    ownerName: '',
+    phone: '',
+    address: '',
+    note: ''
+  });
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (compRef.current?.contains(event.target as Node) ||
@@ -104,8 +122,8 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   useToastNotification({ message: error, title: 'Error', tone: 'error' });
   useToastNotification({ message: success, title: 'Success', tone: 'success' });
 
-  useEffect(() => { if (error) { const t = setTimeout(() => setError(null), 100); return () => clearTimeout(t); } }, [error]);
-  useEffect(() => { if (success) { const t = setTimeout(() => setSuccess(null), 100); return () => clearTimeout(t); } }, [success]);
+  useEffect(() => { if (error) { const t = setTimeout(() => setError(null), 3000); return () => clearTimeout(t); } }, [error]);
+  useEffect(() => { if (success) { const t = setTimeout(() => setSuccess(null), 3000); return () => clearTimeout(t); } }, [success]);
 
   const hasUnsavedChanges = useMemo(() => {
     // If it's a new order and there's more than 1 line, or the first line has data
@@ -349,550 +367,782 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   if (isLoading) return <LoadingBlock label="Initializing Order Form..." />;
 
   return (
-    <><div className="space-y-8 pb-32">
-
-      <div className="lg:grid lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] lg:items-start lg:gap-8">
-        {/* Main Form Area */}
-        <div className="space-y-6">
-          {/* Header Section */}
-          <div className="modern-card p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <Info className="h-4 w-4 text-accent" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Order Details</h2>
+    <div className="min-h-screen bg-[#F9FAFB] pb-32">
+      <div className="max-w-[1200px] mx-auto px-4 py-8 space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              className="p-2 rounded-lg hover:bg-slate-200 transition-colors text-slate-600"
+              title="Go back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                {orderId ? 'Edit Order' : 'New Order'}
+              </h1>
+              <p className="text-sm text-slate-500 font-medium">Create a new sales order for your customer</p>
             </div>
+          </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-              {/* Date */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
-                  <Calendar className="h-3 w-3" /> Date
-                </label>
-                <input
-                  type="date"
-                  value={orderDate}
-                  onChange={e => setOrderDate(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-accent/20 outline-none transition" />
+          <div className="flex items-center gap-3 sm:hidden">
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Amount</p>
+              <p className="text-lg font-black text-blue-600 leading-none">{formatCurrency(grandTotal)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Main Form Section */}
+          <div className="lg:col-span-12 xl:col-span-9 space-y-6">
+            
+            {/* Order Header / Details */}
+            <div className="modern-card p-5 md:p-6 shadow-sm border-slate-200">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="h-2 w-2 rounded-full bg-blue-500" />
+                <h2 className="text-[14px] font-semibold text-slate-800">Order Header</h2>
               </div>
-
-              {/* Company */}
-              <div className="relative space-y-1.5" ref={compRef}>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
-                  <Building2 className="h-3 w-3" /> Company
-                </label>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-accent/20 outline-none transition"
-                  value={compSearch}
-                  onChange={e => {
-                    setCompSearch(e.target.value);
-                    setCompanyId('');
-                    setShowCompResults(true);
-                  }}
-                  onFocus={() => setShowCompResults(true)} />
-                {showCompResults && (
-                  <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-xl">
-                    {companies.filter(c => c.name.toLowerCase().includes(compSearch.toLowerCase())).map(c => (
-                      <button
-                        key={c.id}
-                        onClick={() => {
-                          setCompanyId(c.id);
-                          setCompSearch(c.name);
-                          setShowCompResults(false);
-                          setLines([]);
-                        }}
-                        className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-secondary transition"
-                      >
-                        {c.name}
-                      </button>
-                    ))}
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {/* Date */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Order Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="date"
+                      value={orderDate}
+                      onChange={e => setOrderDate(e.target.value)}
+                      className="w-full h-[42px] rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-medium focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                    />
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Route */}
-              <div className="relative space-y-1.5" ref={routeRef}>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
-                  <MapPin className="h-3 w-3" /> Route
-                </label>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm focus:bg-white focus:ring-2 focus:ring-accent/20 outline-none transition"
-                  value={routeSearch}
-                  onChange={e => {
-                    setRouteSearch(e.target.value);
-                    setRouteId('');
-                    setShowRouteResults(true);
-                  }}
-                  onFocus={() => setShowRouteResults(true)} />
-                {showRouteResults && (
-                  <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-xl">
-                    {routes.filter(r => r.name.toLowerCase().includes(routeSearch.toLowerCase())).map(r => (
-                      <button
-                        key={r.id}
-                        onClick={() => {
-                          setRouteId(r.id);
-                          setRouteSearch(r.name);
-                          setShowRouteResults(false);
-                          setShopId('');
-                          setShopSearch('');
-                        }}
-                        className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-secondary transition"
-                      >
-                        {r.name}
-                      </button>
-                    ))}
+                {/* Company */}
+                <div className="relative space-y-1.5" ref={compRef}>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Company</label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search company..."
+                      className="w-full h-[42px] rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-medium focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      value={compSearch}
+                      onChange={e => {
+                        setCompSearch(e.target.value);
+                        setCompanyId('');
+                        setShowCompResults(true);
+                      }}
+                      onFocus={() => setShowCompResults(true)}
+                    />
                   </div>
-                )}
-              </div>
+                  {showCompResults && (
+                    <div className="absolute z-[100] mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-200">
+                      {companies.filter(c => c.name.toLowerCase().includes(compSearch.toLowerCase())).map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            setCompanyId(c.id);
+                            setCompSearch(c.name);
+                            setShowCompResults(false);
+                            setLines([{
+                              productId: 0,
+                              productName: '',
+                              quantity: 0,
+                              freeQuantity: 0,
+                              unitPrice: 0,
+                              discountType: 'FIXED',
+                              discountValue: 0,
+                              lineTotal: 0
+                            }]);
+                          }}
+                          className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-blue-50 hover:text-blue-600 transition-all flex items-center gap-2"
+                        >
+                          <Building2 className="h-4 w-4 opacity-40" />
+                          {c.name}
+                        </button>
+                      ))}
+                      {companies.filter(c => c.name.toLowerCase().includes(compSearch.toLowerCase())).length === 0 && (
+                        <div className="px-3 py-4 text-center text-xs text-slate-400 font-medium">No companies found</div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-              {/* Shop */}
-              <div className="relative space-y-1.5" ref={shopRef}>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
-                  <Store className="h-3 w-3" /> Shop
-                </label>
-                <input
-                  type="text"
-                  placeholder={routeId ? "Search..." : "Select route first"}
-                  disabled={!routeId}
-                  className={`w-full rounded-lg border border-border px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition ${!routeId ? 'bg-secondary/30 cursor-not-allowed opacity-50' : 'bg-secondary/50 focus:bg-white'}`}
-                  value={shopSearch}
-                  onChange={e => {
-                    setShopSearch(e.target.value);
-                    setShopId('');
-                    setShowShopResults(true);
-                  }}
-                  onFocus={() => routeId && setShowShopResults(true)} />
-                {routeId && showShopResults && (
-                  <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-xl">
-                    {filteredShops.filter(s => s.name.toLowerCase().includes(shopSearch.toLowerCase())).map(s => (
+                {/* Route */}
+                <div className="relative space-y-1.5" ref={routeRef}>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Route</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search route..."
+                      className="w-full h-[42px] rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-medium focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                      value={routeSearch}
+                      onChange={e => {
+                        setRouteSearch(e.target.value);
+                        setRouteId('');
+                        setShowRouteResults(true);
+                      }}
+                      onFocus={() => setShowRouteResults(true)}
+                    />
+                  </div>
+                  {showRouteResults && (
+                    <div className="absolute z-[100] mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-200">
+                      {routes.filter(r => r.name.toLowerCase().includes(routeSearch.toLowerCase())).map(r => (
+                        <button
+                          key={r.id}
+                          onClick={() => {
+                            setRouteId(r.id);
+                            setRouteSearch(r.name);
+                            setShowRouteResults(false);
+                            setShopId('');
+                            setShopSearch('');
+                          }}
+                          className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-blue-50 hover:text-blue-600 transition-all flex items-center gap-2"
+                        >
+                          <MapPin className="h-4 w-4 opacity-40" />
+                          {r.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Shop */}
+                <div className="relative space-y-1.5" ref={shopRef}>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Shop / Customer</label>
+                  <div className="relative">
+                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder={routeId ? "Search shop..." : "Select route first"}
+                      disabled={!routeId}
+                      className={`w-full h-[42px] rounded-lg border border-slate-200 px-3 pl-10 pr-3 text-sm font-medium focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${!routeId ? 'bg-slate-100 cursor-not-allowed opacity-50' : 'bg-slate-50 focus:bg-white focus:border-blue-500'}`}
+                      value={shopSearch}
+                      onChange={e => {
+                        setShopSearch(e.target.value);
+                        setShopId('');
+                        setShowShopResults(true);
+                      }}
+                      onFocus={() => routeId && setShowShopResults(true)}
+                    />
+                  </div>
+                  {routeId && showShopResults && (
+                    <div className="absolute z-[100] mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-200">
                       <button
-                        key={s.id}
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          setShopId(s.id);
-                          setShopSearch(s.name);
+                          setIsShopModalOpen(true);
                           setShowShopResults(false);
                         }}
-                        className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-secondary transition"
+                        className="w-full mb-1 rounded-lg px-3 py-3 text-left text-xs font-black uppercase tracking-wider bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all flex items-center gap-2 border border-blue-100"
                       >
-                        {s.name}
+                        <Plus className="h-3.5 w-3.5" /> Create New Shop
                       </button>
+                      
+                      {filteredShops.filter(s => s.name.toLowerCase().includes(shopSearch.toLowerCase())).length === 0 ? (
+                        <div className="px-3 py-4 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          No shops found
+                        </div>
+                      ) : (
+                        filteredShops.filter(s => s.name.toLowerCase().includes(shopSearch.toLowerCase())).map(s => (
+                          <button
+                            key={s.id}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setShopId(s.id);
+                              setShopSearch(s.name);
+                              setShowShopResults(false);
+                            }}
+                            className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-slate-50 transition-all flex items-center gap-2"
+                          >
+                            <Store className="h-4 w-4 opacity-40" />
+                            {s.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Order Items Table */}
+            <div className="modern-card overflow-hidden shadow-sm border-slate-200">
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-blue-500" />
+                  <h2 className="text-[14px] font-semibold text-slate-800">Order Items</h2>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-full px-3 py-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  {lines.length} {lines.length === 1 ? 'Product' : 'Products'}
+                </div>
+              </div>
+
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-visible">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                      <th className="px-6 py-4 text-left">Product / Description</th>
+                      <th className="px-3 py-4 text-center w-24">Qty</th>
+                      <th className="px-3 py-4 text-center w-24">Free</th>
+                      <th className="px-3 py-4 text-center w-32">Unit Price</th>
+                      <th className="px-3 py-4 text-right w-36">Line Total</th>
+                      <th className="px-4 py-4 text-center w-14"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {lines.map((line, idx) => (
+                      <tr key={idx} className="group hover:bg-blue-50/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="relative product-row-container">
+                            <input
+                              type="text"
+                              placeholder={companyId ? "Type to search..." : "Select company first"}
+                              disabled={!companyId}
+                              className={`w-full h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${!companyId ? 'bg-slate-100 cursor-not-allowed opacity-50' : 'bg-white focus:border-blue-500'}`}
+                              value={line.productId ? line.productName : line.searchText || ''}
+                              onChange={(e) => {
+                                updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
+                              }}
+                              onFocus={() => {
+                                updateLine(idx, { showResults: true });
+                              }}
+                            />
+                            {line.showResults && (
+                              <div className="absolute left-0 top-full z-[9999] mt-2 max-h-[600px] w-full min-w-[600px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_25px_70px_rgba(0,0,0,0.2)] ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                                {allProducts
+                                  .filter(p => !companyId || p.companyId === companyId)
+                                  .filter(p => p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) ||
+                                    p.sku.toLowerCase().includes((line.searchText || '').toLowerCase())
+                                  )
+                                  .map(p => {
+                                    const stockFromSummary = stockMap[p.id];
+                                    const availableStock = stockFromSummary !== undefined ? stockFromSummary : (p.currentStock || 0);
+                                    const isOutOfStock = availableStock <= 0;
+
+                                    return (
+                                      <button
+                                        key={p.id}
+                                        disabled={isOutOfStock}
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          if (isOutOfStock) return;
+                                          if (!companyId) {
+                                            setCompanyId(p.companyId);
+                                            const comp = companies.find(c => c.id === p.companyId);
+                                            if (comp) setCompSearch(comp.name);
+                                          }
+                                          updateLine(idx, {
+                                            productId: p.id,
+                                            productName: p.name,
+                                            unitPrice: Number(p.salePrice),
+                                            showResults: false,
+                                            searchText: p.name
+                                          });
+                                        }}
+                                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all ${isOutOfStock ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-50 hover:text-blue-600'}`}
+                                      >
+                                        <div className="flex-1">
+                                          <div className="font-black text-[15px] text-slate-900 group-hover:text-blue-700 transition-colors">{p.name}</div>
+                                          <div className="flex items-center gap-3 mt-1 text-[11px] font-bold uppercase tracking-widest">
+                                            <span className="text-slate-400">SKU: {p.sku}</span>
+                                            <span className="text-slate-200">|</span>
+                                            <span className={availableStock <= 10 ? 'text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded' : 'text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded'}>
+                                              Stock: {availableStock} {p.unit}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="font-black text-slate-900">{formatCurrency(p.salePrice)}</div>
+                                      </button>
+                                    );
+                                  })}
+                                {allProducts.filter(p => (!companyId || p.companyId === companyId) && (p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) || p.sku.toLowerCase().includes((line.searchText || '').toLowerCase()))).length === 0 && (
+                                  <div className="px-4 py-8 text-center">
+                                    <ShoppingCart className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                                    <p className="text-xs text-slate-400 font-medium">No products found</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-4">
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={line.quantity || ''}
+                            onChange={e => updateLine(idx, { quantity: Number(e.target.value) })}
+                            className="w-full h-10 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                          />
+                        </td>
+                        <td className="px-3 py-4">
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={line.freeQuantity || ''}
+                            onChange={e => updateLine(idx, { freeQuantity: Number(e.target.value) })}
+                            className="w-full h-10 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold text-emerald-600 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                          />
+                        </td>
+                        <td className="px-3 py-4">
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={line.unitPrice || ''}
+                            onChange={e => updateLine(idx, { unitPrice: Number(e.target.value) })}
+                            className="w-full h-10 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+                          />
+                        </td>
+                        <td className="px-3 py-4 text-right">
+                          <span className="text-sm font-black text-slate-900">{formatCurrency(line.lineTotal)}</span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <button
+                            onClick={() => removeLine(idx)}
+                            className="p-2 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card Layout */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {lines.map((line, idx) => (
+                  <div key={idx} className="p-4 bg-white relative">
+                    <div className="flex flex-col gap-4">
+                      {/* Product Search */}
+                      <div className="relative product-row-container">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Product #{idx + 1}</label>
+                          <button
+                            onClick={() => removeLine(idx)}
+                            className="p-1 text-rose-500 hover:bg-rose-50 rounded"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder={companyId ? "Search product..." : "Select company first"}
+                          disabled={!companyId}
+                          className={`w-full h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${!companyId ? 'bg-slate-50 cursor-not-allowed opacity-50' : 'bg-white focus:border-blue-500'}`}
+                          value={line.productId ? line.productName : line.searchText || ''}
+                          onChange={(e) => {
+                            updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
+                          }}
+                          onFocus={() => {
+                            updateLine(idx, { showResults: true });
+                          }}
+                        />
+                        {line.showResults && (
+                          <div className="absolute left-0 top-full z-[9999] mt-2 max-h-[500px] w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_25px_70px_rgba(0,0,0,0.2)] ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1">
+                            {allProducts
+                              .filter(p => !companyId || p.companyId === companyId)
+                              .filter(p => p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) ||
+                                p.sku.toLowerCase().includes((line.searchText || '').toLowerCase())
+                              )
+                              .map(p => {
+                                const stockFromSummary = stockMap[p.id];
+                                const availableStock = stockFromSummary !== undefined ? stockFromSummary : (p.currentStock || 0);
+                                const isOutOfStock = availableStock <= 0;
+
+                                return (
+                                  <button
+                                    key={p.id}
+                                    disabled={isOutOfStock}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      if (isOutOfStock) return;
+                                      updateLine(idx, {
+                                        productId: p.id,
+                                        productName: p.name,
+                                        unitPrice: Number(p.salePrice),
+                                        showResults: false,
+                                        searchText: p.name
+                                      });
+                                    }}
+                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-all ${isOutOfStock ? 'opacity-40' : 'active:bg-slate-50'}`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-bold text-slate-800 truncate">{p.name}</div>
+                                      <div className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+                                        Stock: {availableStock} {p.unit}
+                                      </div>
+                                    </div>
+                                    <div className="font-bold text-slate-900">{formatCurrency(p.salePrice)}</div>
+                                  </button>
+                                );
+                              })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Inputs Grid */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={line.quantity || ''}
+                            onChange={e => updateLine(idx, { quantity: Math.max(0, Number(e.target.value)) })}
+                            className="w-full h-10 rounded-lg border border-slate-200 bg-slate-50 px-2 text-center text-sm font-bold focus:bg-white focus:border-blue-500 outline-none transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Free</label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={line.freeQuantity || ''}
+                            onChange={e => updateLine(idx, { freeQuantity: Math.max(0, Number(e.target.value)) })}
+                            className="w-full h-10 rounded-lg border border-slate-200 bg-slate-50 px-2 text-center text-sm font-bold text-emerald-600 focus:bg-white focus:border-blue-500 outline-none transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Price</label>
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={line.unitPrice || ''}
+                            onChange={e => updateLine(idx, { unitPrice: Number(e.target.value) })}
+                            className="w-full h-10 rounded-lg border border-slate-200 bg-slate-50 px-2 text-center text-sm font-bold focus:bg-white focus:border-blue-500 outline-none transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Line Total */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Line Total</span>
+                        <span className="text-base font-black text-slate-900">{formatCurrency(line.lineTotal)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Row Button */}
+              <div className="p-4 md:p-6 bg-slate-50/50 border-t border-slate-100">
+                <button
+                  onClick={addLine}
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-sm transition-all shadow-sm active:scale-95"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add New Product
+                </button>
+              </div>
+            </div>
+
+            {/* Note & Discount Container */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Note */}
+              <div className="modern-card p-6 shadow-sm border-slate-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-2 w-2 rounded-full bg-slate-400" />
+                  <h2 className="text-[14px] font-semibold text-slate-800">Order Note</h2>
+                </div>
+                <textarea
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  placeholder="Type any additional instructions or notes here..."
+                  className="w-full h-24 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all resize-none"
+                />
+              </div>
+
+              {/* Discount Section */}
+              <div className="modern-card p-6 shadow-sm border-slate-200">
+                <div 
+                  className="flex items-center justify-between cursor-pointer group"
+                  onClick={() => setShowDiscount(!showDiscount)}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-blue-500" />
+                    <h2 className="text-[14px] font-semibold text-slate-800">Invoice Discount</h2>
+                  </div>
+                  <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-slate-200 transition-colors">
+                    {showDiscount ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
+                  </div>
+                </div>
+
+                <div className={`overflow-hidden transition-all duration-300 ${showDiscount ? 'max-h-40 mt-6 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Value</label>
+                      <input
+                        type="number"
+                        placeholder="0.00"
+                        value={invDiscountValue || ''}
+                        onChange={e => setInvDiscountValue(Number(e.target.value))}
+                        className="w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold focus:bg-white focus:border-blue-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Type</label>
+                      <select
+                        value={invDiscountType}
+                        onChange={e => setInvDiscountType(e.target.value as 'FIXED' | 'PERCENT')}
+                        className="w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold focus:bg-white focus:border-blue-500 outline-none transition-all cursor-pointer"
+                      >
+                        <option value="FIXED">Fixed Amount (৳)</option>
+                        <option value="PERCENT">Percentage (%)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-[11px] text-slate-400 font-medium italic">
+                    The discount will be applied to the subtotal amount of the invoice.
+                  </p>
+                </div>
+                {!showDiscount && (
+                  <div className="mt-4 flex items-center justify-between px-4 py-3 rounded-xl bg-blue-50/50 border border-blue-100/50">
+                    <span className="text-xs font-medium text-slate-500">Current Discount</span>
+                    <span className="text-sm font-black text-blue-600">{invDiscountValue > 0 ? (invDiscountType === 'PERCENT' ? `${invDiscountValue}%` : `৳${invDiscountValue}`) : 'No discount applied'}</span>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Delivery Assignment */}
+            <div className="modern-card p-5 md:p-6 shadow-sm border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 rounded-xl">
+                  <User className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Assign Delivery Personnel</p>
+                  <select
+                    value={deliveryPersonId}
+                    onChange={e => setDeliveryPersonId(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full bg-transparent text-[15px] font-bold text-slate-800 outline-none cursor-pointer appearance-none"
+                  >
+                    <option value="">No Personnel Assigned</option>
+                    {deliveryPeople.map(person => (
+                      <option key={person.id} value={person.id}>{person.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <ChevronDown className="h-4 w-4 text-slate-400" />
               </div>
             </div>
           </div>
 
-          {/* Products Section */}
-          <div className="modern-card">
-            <div className="flex items-center justify-between border-b border-border bg-secondary/30 px-6 py-4">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="h-4 w-4 text-accent" />
-                <h2 className="text-sm font-bold text-foreground">Order Items</h2>
-              </div>
-              <span className="text-xs font-medium text-muted">{lines.length} {lines.length === 1 ? 'item' : 'items'}</span>
-            </div>
-
-            {/* Desktop Table View */}
-            <div className="hidden md:block">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-secondary/10 text-[10px] font-bold uppercase tracking-wider text-muted border-b border-border">
-                    <th className="px-6 py-3 text-left">Product</th>
-                    <th className="px-3 py-3 text-center w-24">Qty</th>
-                    <th className="px-3 py-3 text-center w-24">Free</th>
-                    <th className="px-3 py-3 text-center w-32">Price</th>
-                    <th className="px-3 py-3 text-right w-32">Total</th>
-                    <th className="px-4 py-3 text-center w-12"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {lines.map((line, idx) => (
-                    <tr key={idx} className="group hover:bg-secondary/20 transition-colors">
-                      <td className="px-6 py-4 min-w-[250px]">
-                        <div className="relative product-row-container">
-                          <input
-                            type="text"
-                            placeholder={companyId ? "Search product..." : "Select company first"}
-                            disabled={!companyId}
-                            className={`w-full rounded-lg border border-border px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition ${!companyId ? 'bg-secondary/30 cursor-not-allowed opacity-50' : 'bg-white focus:bg-white'}`}
-                            value={line.productId ? line.productName : line.searchText || ''}
-                            onChange={(e) => {
-                              updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
-                            }}
-                            onFocus={() => {
-                              updateLine(idx, { showResults: true });
-                            }} />
-                          {line.showResults && (
-                            <div className="absolute left-0 top-full z-[9999] mt-2 max-h-80 w-full min-w-[350px] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-2 shadow-2xl shadow-black/20 ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2 duration-200">
-                              {allProducts
-                                .filter(p => !companyId || p.companyId === companyId)
-                                .filter(p => p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) ||
-                                  p.sku.toLowerCase().includes((line.searchText || '').toLowerCase())
-                                )
-                                .map(p => {
-                                  const stockFromSummary = stockMap[p.id];
-                                  const availableStock = stockFromSummary !== undefined ? stockFromSummary : (p.currentStock || 0);
-                                  const isOutOfStock = availableStock <= 0;
-
-                                  return (
-                                    <button
-                                      key={p.id}
-                                      disabled={isOutOfStock}
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        if (isOutOfStock) return;
-                                        if (!companyId) {
-                                          setCompanyId(p.companyId);
-                                          const comp = companies.find(c => c.id === p.companyId);
-                                          if (comp) setCompSearch(comp.name);
-                                        }
-                                        updateLine(idx, {
-                                          productId: p.id,
-                                          productName: p.name,
-                                          unitPrice: p.salePrice,
-                                          showResults: false,
-                                          searchText: p.name
-                                        });
-                                      }}
-                                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${isOutOfStock ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-zinc-100'}`}
-                                    >
-                                      <div className="flex-1">
-                                        <div className="font-bold text-foreground">{p.name}</div>
-                                        <div className="flex items-center gap-2 text-[10px] text-muted font-bold">
-                                          <span>{p.sku}</span>
-                                          <span>•</span>
-                                          <span className={availableStock <= 10 ? 'text-rose-500' : 'text-emerald-600'}>
-                                            Stock: {availableStock} {p.unit}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <div className="font-bold text-accent">{formatCurrency(p.salePrice)}</div>
-                                    </button>
-                                  );
-                                })}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-4">
-                        <input
-                          type="number"
-                          value={line.quantity || ''}
-                          onChange={e => updateLine(idx, { quantity: Number(e.target.value) })}
-                          className="w-full rounded-lg border border-border bg-white px-3 py-2 text-center text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
-                      </td>
-                      <td className="px-3 py-4">
-                        <input
-                          type="number"
-                          value={line.freeQuantity || ''}
-                          onChange={e => updateLine(idx, { freeQuantity: Number(e.target.value) })}
-                          className="w-full rounded-lg border border-border bg-white px-3 py-2 text-center text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
-                      </td>
-                      <td className="px-3 py-4">
-                        <input
-                          type="number"
-                          value={line.unitPrice || ''}
-                          onChange={e => updateLine(idx, { unitPrice: Number(e.target.value) })}
-                          className="w-full rounded-lg border border-border bg-white px-3 py-2 text-center text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
-                      </td>
-                      <td className="px-3 py-4 text-right font-bold text-foreground">
-                        {formatCurrency(line.lineTotal)}
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <button
-                          onClick={() => removeLine(idx)}
-                          className="text-muted hover:text-rose-600 transition-colors p-2"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden divide-y divide-border">
-              {lines.map((line, idx) => (
-                <div key={idx} className="p-4 space-y-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 relative product-row-container">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1 block">Product</label>
-                      <input
-                        type="text"
-                        placeholder={companyId ? "Search product..." : "Select company first"}
-                        disabled={!companyId}
-                        className={`w-full rounded-lg border border-border px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition ${!companyId ? 'bg-secondary/30 cursor-not-allowed opacity-50' : 'bg-white focus:bg-white'}`}
-                        value={line.productId ? line.productName : line.searchText || ''}
-                        onChange={(e) => {
-                          updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
-                        }}
-                        onFocus={() => {
-                          updateLine(idx, { showResults: true });
-                        }} />
-                      {line.showResults && (
-                        <div className="absolute left-0 top-full z-[9999] mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-zinc-200 bg-white p-2 shadow-2xl shadow-black/20 ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2 duration-200">
-                          {allProducts
-                            .filter(p => !companyId || p.companyId === companyId)
-                            .filter(p => p.name.toLowerCase().includes((line.searchText || '').toLowerCase()) ||
-                              p.sku.toLowerCase().includes((line.searchText || '').toLowerCase())
-                            )
-                            .map(p => {
-                              const stockFromSummary = stockMap[p.id];
-                              const availableStock = stockFromSummary !== undefined ? stockFromSummary : (p.currentStock || 0);
-                              const isOutOfStock = availableStock <= 0;
-
-                              return (
-                                <button
-                                  key={p.id}
-                                  disabled={isOutOfStock}
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    if (isOutOfStock) return;
-                                    if (!companyId) {
-                                      setCompanyId(p.companyId);
-                                      const comp = companies.find(c => c.id === p.companyId);
-                                      if (comp) setCompSearch(comp.name);
-                                    }
-                                    updateLine(idx, {
-                                      productId: p.id,
-                                      productName: p.name,
-                                      unitPrice: p.salePrice,
-                                      showResults: false,
-                                      searchText: p.name
-                                    });
-                                  }}
-                                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${isOutOfStock ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-secondary'}`}
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-bold text-foreground truncate">{p.name}</div>
-                                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted font-bold mt-0.5">
-                                      <span className="truncate max-w-[80px]">{p.sku}</span>
-                                      <span>•</span>
-                                      <span className={availableStock <= 10 ? 'text-rose-500' : 'text-emerald-600'}>
-                                        Stock: {availableStock} {p.unit}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="font-bold text-accent whitespace-nowrap">{formatCurrency(p.salePrice)}</div>
-                                </button>
-                              );
-                            })}
-                        </div>
-                      )}
+          {/* Sidebar / Summary Section */}
+          <div className="lg:col-span-12 xl:col-span-3 space-y-6">
+            <div className="sticky top-24 space-y-6">
+              {/* Desktop Summary Card */}
+              <div className="modern-card overflow-hidden shadow-lg border-blue-100 bg-white">
+                <div className="bg-blue-600 p-6 text-white">
+                  <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-80 mb-6">Order Summary</h2>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium opacity-80">Subtotal</span>
+                      <span className="text-sm font-bold">{formatCurrency(subtotal)}</span>
                     </div>
-                    <button
-                      onClick={() => removeLine(idx)}
-                      className="mt-6 p-2 text-muted hover:text-rose-600 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted block">Qty</label>
-                      <input
-                        type="number"
-                        value={line.quantity || ''}
-                        onChange={e => updateLine(idx, { quantity: Number(e.target.value) })}
-                        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted block">Free</label>
-                      <input
-                        type="number"
-                        value={line.freeQuantity || ''}
-                        onChange={e => updateLine(idx, { freeQuantity: Number(e.target.value) })}
-                        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted block">Price</label>
-                      <input
-                        type="number"
-                        value={line.unitPrice || ''}
-                        onChange={e => updateLine(idx, { unitPrice: Number(e.target.value) })}
-                        className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
+                    {invoiceDiscountAmount > 0 && (
+                      <div className="flex justify-between items-center text-blue-200">
+                        <span className="text-sm font-medium">Discount</span>
+                        <span className="text-sm font-bold">- {formatCurrency(invoiceDiscountAmount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-blue-200">
+                      <span className="text-sm font-medium">Total Quantity</span>
+                      <span className="text-sm font-bold">{totalQty} Units</span>
                     </div>
                   </div>
-
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Line Total</span>
-                    <span className="font-bold text-foreground">{formatCurrency(line.lineTotal)}</span>
+                  <div className="mt-8 pt-6 border-t border-blue-500/50">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-80 mb-2">Grand Total</p>
+                    <p className="text-4xl font-black">{formatCurrency(grandTotal)}</p>
                   </div>
                 </div>
-              ))}
+                
+                <div className="p-4 bg-slate-50 border-t border-slate-100">
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="w-full h-12 rounded-xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2"
+                  >
+                    {isSaving ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                    ) : (
+                      <>
+                        <CheckCircle className="h-5 w-5" />
+                        <span>{orderId ? 'Update Order' : 'Complete Order'}</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="mt-3 text-[10px] text-center text-slate-400 font-bold uppercase tracking-wider">
+                    Double check details before saving
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={handleBack}
+                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 transition-all group"
+                >
+                  <ArrowLeft className="h-5 w-5 text-slate-400 group-hover:text-slate-600" />
+                  <span className="text-[10px] font-bold uppercase text-slate-500">Discard</span>
+                </button>
+                <button 
+                  onClick={() => router.push('/orders')}
+                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 transition-all group"
+                >
+                  <Receipt className="h-5 w-5 text-slate-400 group-hover:text-slate-600" />
+                  <span className="text-[10px] font-bold uppercase text-slate-500">View All</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Add Button for Mobile */}
+      <button
+        onClick={addLine}
+        className="fixed bottom-24 right-6 md:hidden z-50 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-2xl shadow-blue-500/40 hover:scale-110 active:scale-95 transition-all"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
+      {/* Mobile Sticky Bottom Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white border-t border-slate-200 px-6 py-4 md:hidden shadow-[0_-8px_30px_rgb(0,0,0,0.08)] animate-in slide-in-from-bottom duration-300">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Grand Total</span>
+            <span className="text-xl font-black text-slate-900">{formatCurrency(grandTotal)}</span>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex-1 h-12 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isSaving ? 'Saving...' : 'Complete Order'}
+          </button>
+        </div>
+      </div>
+      {/* Shop Creation Modal */}
+      {isShopModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsShopModalOpen(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-slate-900 px-6 py-5 text-white flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black uppercase tracking-wider">Create New Shop</h2>
+                <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Adding shop to {routes.find(r => r.id === routeId)?.name}</p>
+              </div>
+              <button onClick={() => setIsShopModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <div className="p-6 bg-secondary/10">
-              <button
-                onClick={addLine}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-4 text-sm font-bold text-muted hover:border-accent hover:text-accent hover:bg-accent/5 transition-all"
+            <div className="p-6 space-y-5">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Shop Name *</label>
+                  <div className="relative">
+                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      className="w-full h-11 rounded-xl bg-slate-50 border-0 px-3 pl-10 text-sm font-bold focus:ring-2 focus:ring-blue-500/20 outline-none"
+                      value={newShop.name}
+                      onChange={e => setNewShop({ ...newShop, name: e.target.value })}
+                      placeholder="e.g. Popular Store"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Owner Name</label>
+                  <div className="relative">
+                    <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      className="w-full h-11 rounded-xl bg-slate-50 border-0 px-3 pl-10 text-sm font-bold focus:ring-2 focus:ring-blue-500/20 outline-none"
+                      value={newShop.ownerName}
+                      onChange={e => setNewShop({ ...newShop, ownerName: e.target.value })}
+                      placeholder="e.g. Mr. Rahim"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Phone Number *</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="tel"
+                    className="w-full h-11 rounded-xl bg-slate-50 border-0 px-3 pl-10 text-sm font-bold focus:ring-2 focus:ring-blue-500/20 outline-none"
+                    value={newShop.phone}
+                    onChange={e => setNewShop({ ...newShop, phone: e.target.value })}
+                    placeholder="017xxxxxxxx"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Address</label>
+                <div className="relative">
+                  <Map className="absolute left-3 top-4 h-3.5 w-3.5 text-slate-400" />
+                  <textarea
+                    className="w-full rounded-xl bg-slate-50 border-0 p-3 pl-10 text-sm font-bold focus:ring-2 focus:ring-blue-500/20 outline-none h-20 resize-none"
+                    value={newShop.address}
+                    onChange={e => setNewShop({ ...newShop, address: e.target.value })}
+                    placeholder="Full shop address..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 px-6 py-4 flex gap-3 border-t border-slate-100">
+              <button 
+                onClick={() => setIsShopModalOpen(false)}
+                className="flex-1 h-11 rounded-xl text-sm font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
               >
-                <Plus className="h-4 w-4" /> Add Product Row
+                Cancel
+              </button>
+              <button 
+                disabled={isCreatingShop || !newShop.name || !newShop.phone || !companyId}
+                onClick={async () => {
+                  try {
+                    setIsCreatingShop(true);
+                    const shop = await createShop({
+                      ...newShop,
+                      routeId: Number(routeId),
+                      companyId: Number(companyId),
+                    });
+                    setShops(prev => [...prev, shop]);
+                    setShopId(shop.id);
+                    setShopSearch(shop.name);
+                    setIsShopModalOpen(false);
+                    setSuccess('Shop created and selected successfully');
+                  } catch (e: any) {
+                    setError(e.message || 'Failed to create shop');
+                  } finally {
+                    setIsCreatingShop(false);
+                  }
+                }}
+                className="flex-[2] h-11 rounded-xl bg-blue-600 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                {isCreatingShop ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save Shop
               </button>
             </div>
           </div>
-
-          {/* Additional Info Section */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="modern-card p-6">
-              <div
-                className="flex items-center justify-between cursor-pointer"
-                onClick={() => setShowDiscount(!showDiscount)}
-              >
-                <div className="flex items-center gap-2">
-                  <Receipt className="h-4 w-4 text-accent" />
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Invoice Discount</h2>
-                </div>
-                {showDiscount ? <ChevronUp className="h-4 w-4 text-muted" /> : <ChevronDown className="h-4 w-4 text-muted" />}
-              </div>
-
-              {showDiscount && (
-                <div className="mt-6 flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex-1 space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Value</label>
-                    <input
-                      type="number"
-                      value={invDiscountValue || ''}
-                      onChange={e => setInvDiscountValue(Number(e.target.value))}
-                      className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition" />
-                  </div>
-                  <div className="w-32 space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Type</label>
-                    <select
-                      value={invDiscountType}
-                      onChange={e => setInvDiscountType(e.target.value as 'FIXED' | 'PERCENT')}
-                      className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
-                    >
-                      <option value="FIXED">Fixed (৳)</option>
-                      <option value="PERCENT">Percent (%)</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="modern-card p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Info className="h-4 w-4 text-accent" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Additional Note</h2>
-              </div>
-              <textarea
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                placeholder="Notes for this order..."
-                className="w-full h-11 rounded-lg border border-border bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-accent/20 outline-none transition resize-none" />
-            </div>
-          </div>
         </div>
-
-      </div>
-
-      {/* Sticky Summary Area */}
-      <div className="mt-8 lg:mt-0">
-        <div className="sticky top-24 space-y-6">
-          <div className="modern-card p-8 bg-primary text-white shadow-2xl">
-            <h2 className="text-sm font-bold uppercase tracking-widest opacity-60 mb-8">Order Summary</h2>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-center text-sm">
-                <span className="opacity-60">Items Total</span>
-                <span className="font-bold">{formatCurrency(subtotal)}</span>
-              </div>
-
-              <div className="flex justify-between items-center text-sm">
-                <span className="opacity-60">Total Quantity</span>
-                <div className="text-right">
-                  <p className="font-bold">{totalQty} Units</p>
-                  {totalFreeQty > 0 && <p className="text-[10px] font-bold text-accent">+ {totalFreeQty} Free</p>}
-                </div>
-              </div>
-
-              {invoiceDiscountAmount > 0 && (
-                <div className="flex justify-between items-center text-sm text-accent">
-                  <span className="font-medium">Discount</span>
-                  <span className="font-bold">- {formatCurrency(invoiceDiscountAmount)}</span>
-                </div>
-              )}
-
-              <div className="pt-6 mt-2 border-t border-white/10">
-                <div className="flex justify-between items-end">
-                  <span className="text-xs font-bold uppercase tracking-widest opacity-60">Grand Total</span>
-                  <span className="text-4xl font-black text-white">{formatCurrency(grandTotal)}</span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="mt-8 w-full rounded-xl bg-accent py-4 text-white font-black shadow-lg shadow-accent/20 hover:bg-accent/90 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3"
-            >
-              {isSaving ? (
-                <>
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-5 w-5" />
-                  {orderId ? 'Update Order' : 'Complete Order'}
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="modern-card p-6 bg-white border border-border">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-secondary rounded-lg">
-                <User className="h-4 w-4 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Assign Delivery</p>
-                <select
-                  value={deliveryPersonId}
-                  onChange={e => setDeliveryPersonId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full bg-transparent text-sm font-bold text-foreground outline-none cursor-pointer"
-                >
-                  <option value="">No Personnel Assigned</option>
-                  {deliveryPeople.map(person => (
-                    <option key={person.id} value={person.id}>{person.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
-      <button
-        onClick={addLine}
-        className="fixed bottom-24 right-6 lg:hidden z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white shadow-2xl hover:scale-110 active:scale-95 transition-all"
-      >
-        <Plus className="h-5 w-5" />
-      </button>
-
-      {/* Quick Summary Bar for Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border px-6 py-4 flex items-center justify-between lg:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Grand Total</span>
-          <span className="text-xl font-black text-primary">{formatCurrency(grandTotal)}</span>
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="bg-accent text-white px-8 py-3 rounded-xl font-black text-sm shadow-lg shadow-accent/20 active:scale-95 transition-all disabled:opacity-50"
-        >
-          {isSaving ? '...' : 'Complete Order'}
-        </button>
-      </div>
-    </>
   );
 }
 

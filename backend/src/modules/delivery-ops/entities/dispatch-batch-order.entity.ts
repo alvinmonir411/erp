@@ -72,6 +72,15 @@ export class DispatchBatchOrder {
   @Column({ type: 'boolean', default: false })
   isSettled: boolean;
 
+  @Column({ type: 'varchar', length: 30, default: 'PENDING' })
+  deliveryStatus: 'PENDING' | 'DRAFT' | 'COMPLETED';
+
+  @Column({ type: 'text', nullable: true })
+  deliveryNote?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  deliveryCompletedAt?: Date;
+
   @OneToMany(() => DeliveryReturn, (deliveryReturn) => deliveryReturn.batchOrder)
   returns: DeliveryReturn[];
 

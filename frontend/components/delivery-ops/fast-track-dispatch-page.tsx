@@ -9,14 +9,15 @@ import { getCompanies } from '@/lib/api/companies';
 import { getRoutes } from '@/lib/api/routes';
 import { getShops } from '@/lib/api/shops';
 import { getProducts } from '@/lib/api/products';
-import { getDeliveryPeople, createDispatchBatch } from '@/lib/api/delivery-ops';
+import { createDispatchBatch } from '@/lib/api/delivery-ops';
+import { getDeliveryMen } from '@/lib/api/users';
 import { getStockSummary } from '@/lib/api/stock';
 import { createOrder } from '@/lib/api/orders';
 import { PageCard } from '@/components/ui/page-card';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { useToast } from '@/components/ui/toast-provider';
 import { formatCurrency, getTodayBD, formatBDDate, getTodayBDDate } from '@/lib/utils/format';
-import type { Company, Route, Shop, Product, DeliveryPerson } from '@/types/api';
+import type { Company, Route, Shop, Product, User } from '@/types/api';
 
 interface OrderLine {
   productId: number;
@@ -45,14 +46,14 @@ export function FastTrackDispatchPage() {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([]);
+  const [deliveryMen, setDeliveryMen] = useState<User[]>([]);
   const [stockMap, setStockMap] = useState<Record<number, number>>({});
 
   // Form Header
   const [orderDate, setOrderDate] = useState(() => getTodayBDDate());
   const [routeId, setRouteId] = useState<number | ''>('');
   const [shopId, setShopId] = useState<number | ''>('');
-  const [deliveryPersonId, setDeliveryPersonId] = useState<number | ''>('');
+  const [assignedDeliveryManId, setAssignedDeliveryManId] = useState('');
   const [marketArea, setMarketArea] = useState('');
   const [note, setNote] = useState('');
 
@@ -78,13 +79,13 @@ export function FastTrackDispatchPage() {
           getRoutes(),
           getShops(),
           getProducts(),
-          getDeliveryPeople(),
+          getDeliveryMen(),
         ]);
         setCompanies(c);
         setRoutes(r);
         setShops(s);
         setAllProducts(p);
-        setDeliveryPeople(d);
+        setDeliveryMen(d);
 
         // Pre-load all stock for all companies involved in products
         // (Actually getProducts might already have stock info if the API supports it, 
@@ -186,7 +187,7 @@ export function FastTrackDispatchPage() {
   const totalFreeQty = lines.reduce((sum, l) => sum + Number(l.freeQuantity), 0);
 
   const handleConfirmAndDispatch = async () => {
-    if (!orderDate || !routeId || !deliveryPersonId) {
+    if (!orderDate || !routeId || !assignedDeliveryManId) {
       showErrorToast('Please fill in Date, Route, and Delivery Man');
       return;
     }
@@ -230,7 +231,6 @@ export function FastTrackDispatchPage() {
           companyId,
           routeId: Number(routeId),
           shopId: shopId ? Number(shopId) : undefined,
-          deliveryPersonId: Number(deliveryPersonId),
           marketArea: marketArea || undefined,
           discountType: 'FIXED',
           discountValue: 0,
@@ -254,7 +254,7 @@ export function FastTrackDispatchPage() {
         dispatchDate: orderDate,
         companyId: companyGroups.size === 1 ? Array.from(companyGroups.keys())[0] : undefined,
         routeId: Number(routeId),
-        deliveryPersonId: Number(deliveryPersonId),
+        assignedDeliveryManId,
         marketArea: marketArea || undefined,
         note: note || undefined,
         orderIds: createdOrderIds,
@@ -364,12 +364,12 @@ export function FastTrackDispatchPage() {
                   Delivery Man
                 </label>
                 <select
-                  value={deliveryPersonId}
-                  onChange={e => setDeliveryPersonId(e.target.value === '' ? '' : Number(e.target.value))}
+                  value={assignedDeliveryManId}
+                  onChange={e => setAssignedDeliveryManId(e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-cyan-500/10 outline-none transition appearance-none"
                 >
                   <option value="">Select Personnel</option>
-                  {deliveryPeople.map(person => (
+                  {deliveryMen.map(person => (
                     <option key={person.id} value={person.id}>{person.name}</option>
                   ))}
                 </select>

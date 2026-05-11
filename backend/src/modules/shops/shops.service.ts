@@ -21,7 +21,7 @@ export class ShopsService {
     private readonly routesRepository: Repository<Route>,
   ) {}
 
-  async create(createShopDto: CreateShopDto) {
+  async create(createShopDto: CreateShopDto, user?: any) {
     const route = await this.findRouteOrFail(createShopDto.routeId);
     this.ensureRouteIsActive(route);
     await this.ensureUniqueShopName(createShopDto.routeId, createShopDto.name);
@@ -32,6 +32,7 @@ export class ShopsService {
       phone: createShopDto.phone ?? null,
       address: createShopDto.address ?? null,
       isActive: createShopDto.isActive ?? true,
+      createdById: user ? (user.id || user.sub) : null,
     });
 
     return this.shopsRepository.save(shop);

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { getCompanies } from '@/lib/api/companies';
-import { createProduct, getProducts, updateProduct } from '@/lib/api/products';
+import { createProduct, getProducts, updateProduct, deleteProduct, getProductsSummary } from '@/lib/api/products';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { Pagination } from '@/components/ui/pagination';
 import { PageCard } from '@/components/ui/page-card';
@@ -44,6 +44,11 @@ export function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
+  const [summary, setSummary] = useState<any>(null);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [stockLevelFilter, setStockLevelFilter] = useState<string>('all');
+  const [activeFilter, setActiveFilter] = useState<string>('all');
 
   useToastNotification({
     message: error,
@@ -66,15 +71,18 @@ export function ProductsPage() {
       try {
         setIsLoading(true);
         setError(null);
-        const companyData = await getCompanies();
+        const [companyData, summaryData] = await Promise.all([
+          getCompanies(),
+          getProductsSummary()
+        ]);
         setCompanies(companyData);
-        const firstCompanyId = companyData[0]?.id ?? null;
-        setSelectedCompanyId(firstCompanyId);
+        setSummary(summaryData);
+        setSelectedCompanyId(null); // Default to "All Companies" for better overview
       } catch (loadError) {
         setError(
           loadError instanceof Error
             ? loadError.message
-            : 'Failed to load companies.',
+            : 'Failed to load initial data.',
         );
       } finally {
         setIsLoading(false);
@@ -90,24 +98,22 @@ export function ProductsPage() {
         setIsLoading(true);
         setError(null);
         
-        // If searching, we search globally first to find the company
-        let searchCompanyId = selectedCompanyId;
-        if (searchTerm) {
-          const globalResults = await getProducts({ search: searchTerm });
-          if (globalResults.length > 0) {
-            const firstMatch = globalResults[0];
-            if (firstMatch.companyId !== selectedCompanyId) {
-              setSelectedCompanyId(firstMatch.companyId);
-              searchCompanyId = firstMatch.companyId;
-            }
-          }
-        }
-
-        const productData = await getProducts({
-          companyId: searchCompanyId || undefined,
+        const response = await getProducts({
+          companyId: selectedCompanyId || undefined,
           search: searchTerm || undefined,
+          stockLevel: stockLevelFilter !== 'all' ? (stockLevelFilter as any) : undefined,
+          isActive: activeFilter === 'active' ? true : activeFilter === 'inactive' ? false : undefined,
+          page: currentPage,
+          limit: productsPageSize,
         });
-        setProducts(productData);
+
+        if (Array.isArray(response)) {
+          setProducts(response);
+          setTotalProducts(response.length);
+        } else {
+          setProducts(response.items || []);
+          setTotalProducts(response.total || 0);
+        }
       } catch (loadError) {
         setError(
           loadError instanceof Error
@@ -120,7 +126,7 @@ export function ProductsPage() {
     }
 
     void loadProducts();
-  }, [selectedCompanyId, searchTerm]);
+  }, [selectedCompanyId, searchTerm, stockLevelFilter, activeFilter, currentPage]);
 
   useEffect(() => {
     if (editingProduct) {
@@ -142,17 +148,28 @@ export function ProductsPage() {
     });
   }, [editingProduct, selectedCompanyId]);
 
-  const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * productsPageSize;
-    return products.slice(startIndex, startIndex + productsPageSize);
-  }, [currentPage, products]);
+  const paginatedProducts = products; // Already paginated from backend now
 
-  async function refreshProducts(companyId: number | null) {
-    const productData = await getProducts({
-      companyId: companyId || undefined,
+  async function refreshProducts() {
+    const response = await getProducts({
+      companyId: selectedCompanyId || undefined,
       search: searchTerm || undefined,
+      stockLevel: stockLevelFilter !== 'all' ? (stockLevelFilter as any) : undefined,
+      isActive: activeFilter === 'active' ? true : activeFilter === 'inactive' ? false : undefined,
+      page: currentPage,
+      limit: productsPageSize,
     });
-    setProducts(productData);
+    
+    if (Array.isArray(response)) {
+      setProducts(response);
+      setTotalProducts(response.length);
+    } else {
+      setProducts(response.items || []);
+      setTotalProducts(response.total || 0);
+    }
+
+    const summaryData = await getProductsSummary();
+    setSummary(summaryData);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -192,7 +209,7 @@ export function ProductsPage() {
         companyId: formState.companyId,
       });
       setCurrentPage(1);
-      await refreshProducts(Number(formState.companyId));
+      await refreshProducts();
     } catch (saveError) {
       setFormError(
         saveError instanceof Error ? saveError.message : 'Failed to save product.',
@@ -202,42 +219,126 @@ export function ProductsPage() {
     }
   }
 
+  async function handleDelete(id: number, name: string) {
+    if (!window.confirm(`Are you sure you want to delete "${name}"?\nThis cannot be undone and will fail if the product is linked to existing stock or orders.`)) {
+      return;
+    }
+
+    try {
+      setIsDeletingId(id);
+      setFormError(null);
+      await deleteProduct(id);
+      setSuccessMessage(`Product "${name}" deleted successfully.`);
+      await refreshProducts();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to delete product.');
+    } finally {
+      setIsDeletingId(null);
+    }
+  }
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-      <PageCard
-        title="Products"
-        description="View products by company and verify pricing, unit, and active status from the backend."
-        action={
-          <div className="flex flex-col gap-3 md:flex-row">
-            <input
-              value={searchTerm}
-              onChange={(event) => {
-                setCurrentPage(1);
-                setSearchTerm(event.target.value);
-              }}
-              placeholder="Search by product name or SKU"
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
-            />
-            <select
-              value={selectedCompanyId ?? ''}
-              onChange={(event) => {
-                setEditingProduct(null);
-                setCurrentPage(1);
-                const val = event.target.value;
-                setSelectedCompanyId(val === '' ? null : Number(val));
-              }}
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
-            >
-              <option value="">All Companies</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
+    <div className="flex flex-col gap-6">
+      {/* 1. Summary Cards */}
+      {summary && (
+        <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-7">
+          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Products</div>
+            <div className="mt-1 text-2xl font-bold text-slate-900">{formatNumber(summary.totalProducts)}</div>
           </div>
-        }
-      >
+          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
+            <div className="text-xs font-medium text-emerald-700 uppercase tracking-wider">In Stock</div>
+            <div className="mt-1 text-2xl font-bold text-emerald-800">{formatNumber(summary.inStockProducts)}</div>
+          </div>
+          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Active</div>
+            <div className="mt-1 text-2xl font-bold text-emerald-700">{formatNumber(summary.activeProducts)}</div>
+          </div>
+          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="text-xs font-medium text-rose-600 uppercase tracking-wider">Inactive</div>
+            <div className="mt-1 text-2xl font-bold text-rose-700">{formatNumber(summary.inactiveProducts)}</div>
+          </div>
+          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
+            <div className="text-xs font-medium text-amber-700 uppercase tracking-wider">Low Stock</div>
+            <div className="mt-1 text-2xl font-bold text-amber-800">{formatNumber(summary.lowStockProducts)}</div>
+          </div>
+          <div className="rounded-3xl border border-rose-100 bg-rose-50 p-4 shadow-sm">
+            <div className="text-xs font-medium text-rose-700 uppercase tracking-wider">Out of Stock</div>
+            <div className="mt-1 text-2xl font-bold text-rose-800">{formatNumber(summary.outOfStockProducts)}</div>
+          </div>
+          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Stock Qty</div>
+            <div className="mt-1 text-xl font-bold text-slate-900">{formatNumber(summary.totalStockQuantity)}</div>
+          </div>
+          <div className="rounded-3xl border border-indigo-100 bg-indigo-50 p-4 shadow-sm">
+            <div className="text-xs font-medium text-indigo-700 uppercase tracking-wider">Stock Value</div>
+            <div className="mt-1 text-xl font-bold text-indigo-900">{formatCurrency(summary.totalStockValue)}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
+        <PageCard
+          title="Products"
+          description="View products by company and verify pricing, unit, and active status from the backend."
+          action={
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 md:flex-row">
+                <input
+                  value={searchTerm}
+                  onChange={(event) => {
+                    setCurrentPage(1);
+                    setSearchTerm(event.target.value);
+                  }}
+                  placeholder="Search name/SKU..."
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 min-w-[200px]"
+                />
+                <select
+                  value={selectedCompanyId ?? ''}
+                  onChange={(event) => {
+                    setEditingProduct(null);
+                    setCurrentPage(1);
+                    const val = event.target.value;
+                    setSelectedCompanyId(val === '' ? null : Number(val));
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900"
+                >
+                  <option value="">All Companies</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={activeFilter}
+                  onChange={(e) => {
+                    setCurrentPage(1);
+                    setActiveFilter(e.target.value);
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+                <select
+                  value={stockLevelFilter}
+                  onChange={(e) => {
+                    setCurrentPage(1);
+                    setStockLevelFilter(e.target.value);
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900"
+                >
+                  <option value="all">All Stock Levels</option>
+                  <option value="low">Low Stock</option>
+                  <option value="out">Out of Stock</option>
+                  <option value="normal">Normal Stock</option>
+                </select>
+              </div>
+            </div>
+          }
+        >
         {isLoading ? <LoadingBlock label="Loading products..." /> : null}
         {!isLoading && !error ? (
           <div className="overflow-x-auto">
@@ -246,11 +347,11 @@ export function ProductsPage() {
                 <tr className="text-left text-slate-500">
                   <th className="px-3 py-3 font-medium">Product</th>
                   <th className="px-3 py-3 font-medium">SKU</th>
-                  <th className="px-3 py-3 font-medium">Unit</th>
-                  <th className="px-3 py-3 font-medium">Buy Price</th>
-                  <th className="px-3 py-3 font-medium">Sale Price</th>
+                  <th className="px-3 py-3 font-medium text-right">Stock</th>
+                  <th className="px-3 py-3 font-medium text-right">Buy Price</th>
+                  <th className="px-3 py-3 font-medium text-right">Sale Price</th>
                   <th className="px-3 py-3 font-medium">Status</th>
-                  <th className="px-3 py-3 font-medium">Action</th>
+                  <th className="px-3 py-3 font-medium text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -263,9 +364,14 @@ export function ProductsPage() {
                       )}
                     </td>
                     <td className="px-3 py-4 font-mono text-xs">{product.sku}</td>
-                    <td className="px-3 py-4">{product.unit}</td>
-                    <td className="px-3 py-4">{formatCurrency(product.buyPrice)}</td>
-                    <td className="px-3 py-4">{formatCurrency(product.salePrice)}</td>
+                    <td className="px-3 py-4 text-right font-medium">
+                      <span className={Number(product.currentStock || 0) <= 0 ? 'text-rose-600' : Number(product.currentStock || 0) <= 10 ? 'text-amber-600' : 'text-slate-900'}>
+                        {formatNumber(product.currentStock)}
+                      </span>
+                      <span className="text-[10px] ml-1 text-slate-400">{product.unit}</span>
+                    </td>
+                    <td className="px-3 py-4 text-right">{formatCurrency(product.buyPrice)}</td>
+                    <td className="px-3 py-4 text-right">{formatCurrency(product.salePrice)}</td>
                     <td className="px-3 py-4">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -277,14 +383,24 @@ export function ProductsPage() {
                         {product.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-3 py-4">
-                      <button
-                        type="button"
-                        onClick={() => setEditingProduct(product)}
-                        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        Edit
-                      </button>
+                    <td className="px-3 py-4 text-center">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingProduct(product)}
+                          className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDeletingId === product.id}
+                          onClick={() => handleDelete(product.id, product.name)}
+                          className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                        >
+                          {isDeletingId === product.id ? '...' : 'Delete'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -298,9 +414,9 @@ export function ProductsPage() {
                 />
               </div>
             ) : null}
-            <Pagination
+             <Pagination
               currentPage={currentPage}
-              totalItems={products.length}
+              totalItems={totalProducts}
               pageSize={productsPageSize}
               onPageChange={setCurrentPage}
             />
@@ -460,6 +576,49 @@ export function ProductsPage() {
           </div>
         </form>
       </PageCard>
+    </div>
+
+    {/* 3. Company-wise Summary Table */}
+      {!selectedCompanyId && summary?.companyWiseProducts && (
+        <PageCard
+          title="Company-wise Product Summary"
+          description="Detailed breakdown of product counts, stock levels, and asset value per company."
+          className="xl:col-span-2"
+        >
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead>
+                <tr className="text-left text-slate-500">
+                  <th className="px-3 py-3 font-medium">Company</th>
+                  <th className="px-3 py-3 font-medium text-right">Total</th>
+                  <th className="px-3 py-3 font-medium text-right text-emerald-600">In Stock</th>
+                  <th className="px-3 py-3 font-medium text-right">Active</th>
+                  <th className="px-3 py-3 font-medium text-right">Inactive</th>
+                  <th className="px-3 py-3 font-medium text-right">Low Stock</th>
+                  <th className="px-3 py-3 font-medium text-right text-rose-600">Out</th>
+                  <th className="px-3 py-3 font-medium text-right">Stock Qty</th>
+                  <th className="px-3 py-3 font-medium text-right">Stock Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {summary.companyWiseProducts.map((c: any) => (
+                  <tr key={c.companyId} className="text-slate-700 hover:bg-slate-50 transition-colors">
+                    <td className="px-3 py-4 font-semibold text-slate-900">{c.companyName}</td>
+                    <td className="px-3 py-4 text-right">{formatNumber(c.totalProducts)}</td>
+                    <td className="px-3 py-4 text-right text-emerald-600 font-bold">{formatNumber(c.inStockProducts)}</td>
+                    <td className="px-3 py-4 text-right text-emerald-600 font-medium">{formatNumber(c.activeProducts)}</td>
+                    <td className="px-3 py-4 text-right text-slate-400">{formatNumber(c.inactiveProducts)}</td>
+                    <td className="px-3 py-4 text-right text-amber-600 font-medium">{formatNumber(c.lowStockProducts)}</td>
+                    <td className="px-3 py-4 text-right text-rose-600 font-bold">{formatNumber(c.outOfStockProducts)}</td>
+                    <td className="px-3 py-4 text-right">{formatNumber(c.totalStockQuantity)}</td>
+                    <td className="px-3 py-4 text-right font-medium text-indigo-700">{formatCurrency(c.totalStockValue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </PageCard>
+      )}
     </div>
   );
 }

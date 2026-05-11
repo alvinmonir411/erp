@@ -1,3 +1,4 @@
+// User Data Transfer Objects
 import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength, IsBoolean } from 'class-validator';
 import { Role } from '../../../common/enums/role.enum';
 import { UserStatus } from '../../../common/enums/user-status.enum';

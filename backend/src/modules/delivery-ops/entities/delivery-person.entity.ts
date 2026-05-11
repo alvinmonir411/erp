@@ -11,6 +11,9 @@ export class DeliveryPerson {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ type: 'uuid', nullable: true })
+  userId: string;
+
   @Column({ length: 120 })
   name: string;
 

@@ -29,14 +29,14 @@ export class OrdersController {
     return this.ordersService.create(createOrderDto, user);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get()
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
   findAll(@Query() query: any, @CurrentUser() user: any) {
     return this.ordersService.findAll(query, user);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.ordersService.findOne(id, user);
@@ -60,6 +60,16 @@ export class OrdersController {
   ) {
     console.log(`Updating shop for order ${id} to ${shopId}`);
     return this.ordersService.updateShop(id, shopId);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
+  @Patch(':id/delivery')
+  updateDelivery(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: any,
+    @CurrentUser() user: any,
+  ) {
+    return this.ordersService.updateDelivery(id, dto, user);
   }
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)

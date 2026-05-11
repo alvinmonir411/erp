@@ -4,18 +4,20 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { getRoutes } from '@/lib/api/routes';
 import { createShop, deleteShop, getShops, updateShop } from '@/lib/api/shops';
+import { getCompanies } from '@/lib/api/companies';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
 import { formatCurrency, toNumber } from '@/lib/utils/format';
-import type { Route, Shop } from '@/types/api';
+import type { Route, Shop, Company } from '@/types/api';
 
 const PAGE_SIZE = 12;
-const initialForm = { routeId: '', name: '', ownerName: '', phone: '', address: '', isActive: true };
+const initialForm = { routeId: '', companyId: '', name: '', ownerName: '', phone: '', address: '', isActive: true };
 type FilterStatus = 'all' | 'active' | 'inactive';
 
 export function ShopsPage() {
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
@@ -23,6 +25,7 @@ export function ShopsPage() {
   const [form, setForm] = useState(initialForm);
   const [search, setSearch] = useState('');
   const [filterRouteId, setFilterRouteId] = useState<number | null>(null);
+  const [filterCompanyId, setFilterCompanyId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,9 +46,14 @@ export function ShopsPage() {
     try {
       setIsLoading(true);
       setError(null);
-      const [routeData, shopData] = await Promise.all([getRoutes(), getShops(undefined, undefined)]);
+      const [routeData, shopData, companyData] = await Promise.all([
+        getRoutes(), 
+        getShops(undefined, undefined),
+        getCompanies()
+      ]);
       setRoutes(routeData);
       setShops(shopData);
+      setCompanies(companyData);
     } catch (e) { setError(e instanceof Error ? e.message : 'Failed to load.'); }
     finally { setIsLoading(false); }
   }
@@ -54,21 +62,34 @@ export function ShopsPage() {
 
   useEffect(() => {
     setForm(editingShop
-      ? { routeId: String(editingShop.routeId), name: editingShop.name, ownerName: editingShop.ownerName ?? '', phone: editingShop.phone ?? '', address: editingShop.address ?? '', isActive: editingShop.isActive }
-      : { ...initialForm, routeId: filterRouteId ? String(filterRouteId) : '' });
-  }, [editingShop, filterRouteId]);
+      ? { 
+          routeId: String(editingShop.routeId), 
+          companyId: String(editingShop.companyId),
+          name: editingShop.name, 
+          ownerName: editingShop.ownerName ?? '', 
+          phone: editingShop.phone ?? '', 
+          address: editingShop.address ?? '', 
+          isActive: editingShop.isActive 
+        }
+      : { 
+          ...initialForm, 
+          routeId: filterRouteId ? String(filterRouteId) : '',
+          companyId: filterCompanyId ? String(filterCompanyId) : ''
+        });
+  }, [editingShop, filterRouteId, filterCompanyId]);
 
   const filtered = useMemo(() => {
     let list = shops.filter((s) => {
       const q = search.toLowerCase();
       if (q && !s.name.toLowerCase().includes(q) && !(s.ownerName ?? '').toLowerCase().includes(q) && !(s.phone ?? '').includes(q)) return false;
       if (filterRouteId && s.routeId !== filterRouteId) return false;
+      if (filterCompanyId && s.companyId !== filterCompanyId) return false;
       if (filterStatus === 'active' && !s.isActive) return false;
       if (filterStatus === 'inactive' && s.isActive) return false;
       return true;
     });
     return list;
-  }, [shops, search, filterRouteId, filterStatus]);
+  }, [shops, search, filterRouteId, filterCompanyId, filterStatus]);
 
   const paginated = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
 
@@ -78,11 +99,22 @@ export function ShopsPage() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!form.routeId || !form.name.trim()) { setFormError('Route and shop name are required.'); return; }
+    if (!form.routeId || !form.companyId || !form.name.trim()) { 
+      setFormError('Route, company and shop name are required.'); 
+      return; 
+    }
     setFormError(null);
     try {
       setIsSaving(true);
-      const payload = { routeId: Number(form.routeId), name: form.name.trim(), ownerName: form.ownerName || undefined, phone: form.phone || undefined, address: form.address || undefined, isActive: form.isActive };
+      const payload = { 
+        routeId: Number(form.routeId), 
+        companyId: Number(form.companyId),
+        name: form.name.trim(), 
+        ownerName: form.ownerName || undefined, 
+        phone: form.phone || undefined, 
+        address: form.address || undefined, 
+        isActive: form.isActive 
+      };
       if (editingShop) {
         await updateShop(editingShop.id, payload);
         setSuccess(`"${payload.name}" updated.`);
@@ -90,7 +122,7 @@ export function ShopsPage() {
       } else {
         await createShop(payload);
         setSuccess(`"${payload.name}" added.`);
-        setForm({ ...initialForm, routeId: form.routeId });
+        setForm({ ...initialForm, routeId: form.routeId, companyId: form.companyId });
       }
       await load();
     } catch (err) { setFormError(err instanceof Error ? err.message : 'Failed to save.'); }
@@ -161,7 +193,7 @@ export function ShopsPage() {
                 <h1 className="mt-3 text-2xl font-bold tracking-tight text-white sm:text-3xl">Shops</h1>
                 <p className="mt-1.5 text-sm text-slate-400">Manage shops across routes, track orders and outstanding dues.</p>
               </div>
-              <button type="button" onClick={() => { setEditingShop(null); setForm({ ...initialForm, routeId: filterRouteId ? String(filterRouteId) : '' }); }}
+              <button type="button" onClick={() => { setEditingShop(null); setForm({ ...initialForm, routeId: filterRouteId ? String(filterRouteId) : '', companyId: filterCompanyId ? String(filterCompanyId) : '' }); }}
                 className="self-start rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20">
                 + Add Shop
               </button>
@@ -199,11 +231,18 @@ export function ShopsPage() {
               <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
                 <input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} placeholder="Search shop name, owner, phone..."
                   className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-300 focus:bg-white focus:ring-2 focus:ring-cyan-100" />
-                <select value={filterRouteId ?? ''} onChange={(e) => { setPage(1); setFilterRouteId(e.target.value ? Number(e.target.value) : null); }}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-cyan-300">
-                  <option value="">All routes</option>
-                  {routes.map((r) => <option key={r.id} value={r.id}>{r.name}{r.area ? ` — ${r.area}` : ''}</option>)}
-                </select>
+                <div className="flex flex-wrap gap-2">
+                  <select value={filterCompanyId ?? ''} onChange={(e) => { setPage(1); setFilterCompanyId(e.target.value ? Number(e.target.value) : null); }}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-cyan-300">
+                    <option value="">All Companies</option>
+                    {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <select value={filterRouteId ?? ''} onChange={(e) => { setPage(1); setFilterRouteId(e.target.value ? Number(e.target.value) : null); }}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-cyan-300">
+                    <option value="">All Routes</option>
+                    {routes.map((r) => <option key={r.id} value={r.id}>{r.name}{r.area ? ` — ${r.area}` : ''}</option>)}
+                  </select>
+                </div>
                 <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
                   {(['all', 'active', 'inactive'] as FilterStatus[]).map((s) => (
                     <button key={s} type="button" onClick={() => setFilterStatus(s)}
@@ -213,10 +252,10 @@ export function ShopsPage() {
                   ))}
                 </div>
               </div>
-              {(search || filterRouteId || filterStatus !== 'all') && (
+              {(search || filterRouteId || filterCompanyId || filterStatus !== 'all') && (
                 <div className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">
                   Showing {filtered.length} of {shops.length} shops
-                  <button type="button" onClick={() => { setSearch(''); setFilterRouteId(null); setFilterStatus('all'); }} className="ml-3 font-semibold text-rose-600 hover:underline">Clear filters</button>
+                  <button type="button" onClick={() => { setSearch(''); setFilterRouteId(null); setFilterCompanyId(null); setFilterStatus('all'); }} className="ml-3 font-semibold text-rose-600 hover:underline">Clear filters</button>
                 </div>
               )}
             </div>
@@ -229,6 +268,7 @@ export function ShopsPage() {
                 const isEditing = editingShop?.id === shop.id;
                 const isToggling = isTogglingId === shop.id;
                 const hasDue = toNumber(shop.totalDue) > 0;
+                const shopCompany = companies.find(c => c.id === shop.companyId);
 
                 return (
                   <div key={shop.id} className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition ${isEditing ? 'border-cyan-300 ring-2 ring-cyan-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-md'}`}>
@@ -242,6 +282,9 @@ export function ShopsPage() {
                             </span>
                             <span className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
                               {shop.route?.name ?? `Route #${shop.routeId}`}
+                            </span>
+                            <span className="rounded-lg bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold text-cyan-600">
+                              {shopCompany?.name ?? `Company #${shop.companyId}`}
                             </span>
                             {isEditing && <span className="rounded-full bg-cyan-100 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-700">Editing</span>}
                           </div>
@@ -298,14 +341,25 @@ export function ShopsPage() {
               </div>
               <div className="p-6">
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <label className="block space-y-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Route <span className="text-rose-500">*</span></span>
-                    <select value={form.routeId} onChange={(e) => setForm((c) => ({ ...c, routeId: e.target.value }))} required
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:bg-white focus:ring-2 focus:ring-cyan-100">
-                      <option value="">Select route</option>
-                      {routes.map((r) => <option key={r.id} value={r.id}>{r.name}{r.area ? ` — ${r.area}` : ''}</option>)}
-                    </select>
-                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Company <span className="text-rose-500">*</span></span>
+                      <select value={form.companyId} onChange={(e) => setForm((c) => ({ ...c, companyId: e.target.value }))} required
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+                        <option value="">Select company</option>
+                        {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </label>
+
+                    <label className="block space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Route <span className="text-rose-500">*</span></span>
+                      <select value={form.routeId} onChange={(e) => setForm((c) => ({ ...c, routeId: e.target.value }))} required
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-cyan-300 focus:bg-white focus:ring-2 focus:ring-cyan-100">
+                        <option value="">Select route</option>
+                        {routes.map((r) => <option key={r.id} value={r.id}>{r.name}{r.area ? ` — ${r.area}` : ''}</option>)}
+                      </select>
+                    </label>
+                  </div>
 
                   <label className="block space-y-1.5">
                     <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Shop Name <span className="text-rose-500">*</span></span>

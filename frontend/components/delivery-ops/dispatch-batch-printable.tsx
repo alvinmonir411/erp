@@ -14,12 +14,13 @@ export function DispatchBatchPrintable({ report, mode }: PrintableProps) {
     return (
       <div className="mx-auto bg-white p-8 text-sm text-black printable-report">
         <div className="border-b-2 border-slate-900 pb-5 text-center">
-          <h1 className="text-3xl font-black uppercase tracking-[0.25em]">Morning Delivery Summary</h1>
+          <div className="text-3xl font-black uppercase mb-1 tracking-widest">MS KARIM TRADERS</div>
+          <h1 className="text-xl font-bold uppercase tracking-[0.25em] text-slate-500">Morning Delivery Summary</h1>
           <p className="mt-2 font-medium text-slate-600">
             Batch {report.batchNo} · {new Date(report.dispatchDate).toLocaleDateString()}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Delivery Man: {report.deliveryPerson.name} · Route: {report.route.name}
+            Delivery Man: {report.assignedDeliveryMan?.name || report.deliveryPerson?.name} · Route: {report.route.name}
           </p>
         </div>
 
@@ -87,12 +88,13 @@ export function DispatchBatchPrintable({ report, mode }: PrintableProps) {
   return (
     <div className="mx-auto bg-white p-8 text-sm text-black printable-report">
       <div className="border-b-2 border-slate-900 pb-5 text-center">
-        <h1 className="text-3xl font-black uppercase tracking-[0.25em]">Final Delivery Settlement</h1>
+        <div className="text-3xl font-black uppercase mb-1 tracking-widest">MS KARIM TRADERS</div>
+        <h1 className="text-xl font-bold uppercase tracking-[0.25em] text-slate-500">Final Delivery Settlement</h1>
         <p className="mt-2 font-medium text-slate-600">
           Batch {report.batchNo} · {new Date(report.dispatchDate).toLocaleDateString()}
         </p>
         <p className="mt-1 text-xs text-slate-500">
-          Delivery Man: {report.deliveryPerson.name} · Route: {report.route.name}
+          Delivery Man: {report.assignedDeliveryMan?.name || report.deliveryPerson?.name} · Route: {report.route.name}
         </p>
       </div>
 

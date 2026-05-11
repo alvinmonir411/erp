@@ -12,13 +12,24 @@ class RecordBatchReturnItemDto {
   productId: number;
 
   @IsNumber()
-  dispatchedQuantity: number;
+  @IsOptional()
+  dispatchedQuantity?: number;
 
   @IsNumber()
-  returnedQuantity: number;
+  @IsOptional()
+  returnedPaidQuantity?: number;
 
   @IsNumber()
-  damagedQuantity: number;
+  @IsOptional()
+  returnedFreeQuantity?: number;
+
+  @IsNumber()
+  @IsOptional()
+  damagedPaidQuantity?: number;
+
+  @IsNumber()
+  @IsOptional()
+  damagedFreeQuantity?: number;
 
   @IsString()
   @IsOptional()

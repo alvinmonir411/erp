@@ -87,10 +87,12 @@ async function bootstrap() {
       let shop = await shopsRepository.findOne({ where: { name: seed.name } });
       if (!shop) {
         const route = routes.get(seed.routeKey);
-        if (route) {
+        const company = companies.get('keya'); // Assign to a default company
+        if (route && company) {
           await shopsService.create({
             name: seed.name,
             routeId: route.id,
+            companyId: company.id,
             ownerName: seed.ownerName,
             phone: seed.phone,
             address: seed.address,

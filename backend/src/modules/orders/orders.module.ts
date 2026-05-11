@@ -6,10 +6,11 @@ import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { StockModule } from '../stock/stock.module';
 import { DuesModule } from '../dues/dues.module';
+import { DispatchBatchOrder } from '../delivery-ops/entities/dispatch-batch-order.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderItem, Due]),
+    TypeOrmModule.forFeature([Order, OrderItem, Due, DispatchBatchOrder]),
     StockModule,
     DuesModule
   ],

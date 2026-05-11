@@ -7,6 +7,18 @@ export async function getUsers(): Promise<User[]> {
   });
 }
 
+export async function getUsersByRole(role: Role): Promise<User[]> {
+  return apiRequest<User[]>(`/users/role/${role}`, {
+    method: 'GET',
+  });
+}
+
+export async function getDeliveryMen(): Promise<User[]> {
+  return apiRequest<User[]>('/users/delivery-men', {
+    method: 'GET',
+  });
+}
+
 export async function createUser(data: {
   name: string;
   username: string;

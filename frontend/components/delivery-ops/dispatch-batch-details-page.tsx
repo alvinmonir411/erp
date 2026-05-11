@@ -47,6 +47,10 @@ const getBundleSize = (paid: number, free: number): number => {
   return (paid / common) + (free / common);
 };
 
+const safeMoney = (val: number) => {
+  return Math.round(val * 100) / 100;
+};
+
 export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const router = useRouter();
   const batchId = Number(id);
@@ -56,24 +60,31 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const [isSavingReturns, setIsSavingReturns] = useState(false);
   const [isSettling, setIsSettling] = useState(false);
   const [activeTab, setActiveTab] = useState<'sheet' | 'entry' | 'settle'>('sheet');
-  const [batchReturnState, setBatchReturnState] = useState<Record<number, { returned: string; damaged: string }>>({});
+  const [batchReturnState, setBatchReturnState] = useState<Record<number, {
+    returned: string;
+    damaged: string;
+    free: string;
+  }>>({});
   const [draftDues, setDraftDues] = useState<Record<number, number>>({});
   const [dueModalProduct, setDueModalProduct] = useState<{ id: number; name: string } | null>(null);
+  const [actualCashReceived, setActualCashReceived] = useState<string>('');
 
   // No print logic here anymore, handled by dedicated routes
 
   // Aggregate items across all orders in the batch
   const aggregatedItems = useMemo(() => {
     if (!batch) return [];
-    const map = new Map<number, { productId: number; name: string; unit: string; totalQty: number; totalPaidQty: number; price: number }>();
+    const map = new Map<number, { productId: number; name: string; unit: string; totalQty: number; totalPaidQty: number; totalFreeQty: number; price: number }>();
     batch.orders.forEach(bo => {
       bo.order.items.forEach(item => {
         const existing = map.get(item.productId);
-        const qty = Number(item.quantity) + Number(item.freeQuantity || 0);
-        const paidQty = Number(item.quantity);
+        const paidQty = Math.abs(Number(item.quantity || 0));
+        const freeQty = Math.abs(Number(item.freeQuantity || 0));
+        const qty = paidQty + freeQty;
         if (existing) {
           existing.totalQty += qty;
           existing.totalPaidQty += paidQty;
+          existing.totalFreeQty += freeQty;
         } else {
           map.set(item.productId, {
             productId: item.productId,
@@ -81,7 +92,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             unit: item.product.unit,
             totalQty: qty,
             totalPaidQty: paidQty,
-            price: Number(item.unitPrice)
+            totalFreeQty: freeQty,
+            price: Number(item.unitPrice || 0)
           });
         }
       });
@@ -92,53 +104,81 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   // Initialize return state from aggregated items
   useEffect(() => {
     if (batch && aggregatedItems.length > 0) {
-      const initialState: Record<number, { returned: string; damaged: string }> = {};
+      const initialState: Record<number, {
+        returned: string;
+        damaged: string;
+        free: string;
+      }> = {};
       aggregatedItems.forEach(item => {
-        // Try to find existing returns from the batch data if available
         let returned = 0;
         let damaged = 0;
+        let returnedFree = 0;
         batch.orders.forEach(bo => {
           const boItem = bo.order.items.find(i => i.productId === item.productId);
           if (boItem) {
-            returned += Number(boItem.returnedQuantity || 0);
-            damaged += Number(boItem.damagedQuantity || 0);
+            returned += Number(boItem.returnedPaidQuantity || 0);
+            damaged += Number(boItem.damagedPaidQuantity || 0);
+            returnedFree += Number(boItem.returnedFreeQuantity || 0);
           }
         });
         initialState[item.productId] = {
           returned: String(returned),
-          damaged: String(damaged)
+          damaged: String(damaged),
+          free: String(returnedFree)
         };
       });
       setBatchReturnState(initialState);
     }
   }, [batch, aggregatedItems]);
+
   const finalMetrics = useMemo(() => {
     if (!batch || aggregatedItems.length === 0) return null;
-    let totalOrder = 0;
-    let totalReturned = 0;
-    let totalDamaged = 0;
-    let totalAmount = 0;
+    let totalQty = 0;
+    let totalFree = 0;
+    let returned = 0;
+    let damaged = 0;
+    let finalSold = 0;
+    let finalAmount = 0;
 
     aggregatedItems.forEach(item => {
-      const state = batchReturnState[item.productId] || { returned: '0', damaged: '0' };
-      const ret = Number(state.returned || 0);
-      const dam = Number(state.damaged || 0);
-      const delivered = Math.max(0, item.totalQty - ret - dam);
-      
-      const ratio = item.totalQty > 0 ? (item.totalPaidQty / item.totalQty) : 0;
-      const deliveredPaid = delivered * ratio;
+      const state = batchReturnState[item.productId] || { returned: '0', damaged: '0', free: '0' };
+      const q = item.totalPaidQty;
+      const f = Number(state.free || 0);
+      const r = Number(state.returned || 0);
+      const d = Number(state.damaged || 0);
 
-      totalOrder += item.totalQty;
-      totalReturned += ret;
-      totalDamaged += dam;
-      totalAmount += deliveredPaid * item.price;
+      const sold = Math.max(0, q - r - d);
+      const deliveredFree = Math.max(0, item.totalFreeQty - f);
+
+      totalQty += q;
+      totalFree += deliveredFree;
+      returned += r;
+      damaged += d;
+      finalSold += sold;
+      finalAmount += sold * item.price;
     });
 
-    const totalDueDraft = Object.values(draftDues).reduce((sum, val) => sum + val, 0);
-    const cashCollectable = Math.max(0, totalAmount - totalDueDraft);
+    const totalDueDraft = Object.values(draftDues).reduce((a, b) => a + b, 0);
+    const cashCollectable = Math.max(0, finalAmount - totalDueDraft);
 
-    return { totalOrder, totalReturned, totalDamaged, totalSold: totalOrder - totalReturned - totalDamaged, totalAmount, totalDueDraft, cashCollectable };
+    return {
+      totalQty,
+      totalFree,
+      returned,
+      damaged,
+      finalSold,
+      finalAmount,
+      totalDueDraft,
+      cashCollectable,
+    };
   }, [batch, aggregatedItems, batchReturnState, draftDues]);
+
+  // Reset states when batch ID changes to prevent stale data from previous batches
+  useEffect(() => {
+    setActualCashReceived('');
+    setDraftDues({});
+    setBatchReturnState({});
+  }, [batchId]);
 
   const fetchBatch = async () => {
     try {
@@ -156,7 +196,16 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     fetchBatch();
   }, [batchId]);
 
+  // Auto-fill actual cash received when metrics become available
+  useEffect(() => {
+    if (finalMetrics && finalMetrics.cashCollectable > 0 && actualCashReceived === '') {
+      console.log("[Settlement] Auto-filling with Cash Collectable:", finalMetrics.cashCollectable);
+      setActualCashReceived(String(finalMetrics.cashCollectable));
+    }
+  }, [finalMetrics?.cashCollectable, actualCashReceived]);
+
   const batchStatus = batch ? batchStatusConfig[batch.status] : null;
+  const isBatchSettled = batch ? ['SETTLED', 'PARTIALLY_SETTLED'].includes(batch.status) : false;
 
   const handlePrintMorning = async () => {
     try {
@@ -167,7 +216,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       showErrorToast(error.message || 'Failed to print morning summary');
     }
   };
-  
+
   const handlePrintFieldSheet = async () => {
     window.open(`/delivery-ops/batches/${batchId}/print-field-sheet`, "_blank");
   };
@@ -190,81 +239,62 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const handleSaveReturns = async () => {
     if (!batch) return;
 
-    const productBundleSizes: Record<number, number> = {};
+    // Validation
     for (const item of aggregatedItems) {
-      const state = batchReturnState[item.productId] || { returned: '0', damaged: '0' };
-      const returned = Number(state.returned || 0);
-      const damaged = Number(state.damaged || 0);
-      const totalReturn = returned + damaged;
+      const state = batchReturnState[item.productId] || { returned: '0', damaged: '0', free: '0' };
+      const r = Number(state.returned || 0);
+      const d = Number(state.damaged || 0);
+      const f = Number(state.free || 0);
 
-      // Find bundle size from order items
-      let bundleSize = 1;
-      for (const bo of batch.orders) {
-        const oi = bo.order.items.find((i) => i.productId === item.productId);
-        if (oi && Number(oi.freeQuantity) > 0) {
-          bundleSize = getBundleSize(Number(oi.quantity), Number(oi.freeQuantity));
-          break;
-        }
-      }
-      productBundleSizes[item.productId] = bundleSize;
-
-      if (returned < 0 || damaged < 0) {
-        showErrorToast(`Negative values are not allowed for ${item.name}`);
+      if (r + d > item.totalPaidQty) {
+        showErrorToast(`Total return/damage for ${item.name} exceeds dispatched qty (${item.totalPaidQty})`);
         return;
       }
-
-      if (totalReturn > item.totalQty) {
-        showErrorToast(
-          `Total returns (${totalReturn}) for ${item.name} cannot exceed total dispatched quantity (${item.totalQty})`,
-        );
-        return;
-      }
-
-      if (totalReturn % bundleSize !== 0) {
-        showErrorToast(
-          `Return quantity for ${item.name} must include the matching free product for this offer.`,
-        );
+      if (f > item.totalFreeQty) {
+        showErrorToast(`Free return for ${item.name} exceeds dispatched free qty (${item.totalFreeQty})`);
         return;
       }
     }
 
-    // Distribute returns to individual orders in multiples of bundle size
-    const remainingReturned: Record<number, number> = {};
-    const remainingDamaged: Record<number, number> = {};
+    // Distribute returns to individual orders
+    const remRet: Record<number, number> = {};
+    const remDam: Record<number, number> = {};
+    const remFree: Record<number, number> = {};
+
     Object.entries(batchReturnState).forEach(([pid, s]) => {
-      remainingReturned[Number(pid)] = Number(s.returned || 0);
-      remainingDamaged[Number(pid)] = Number(s.damaged || 0);
+      const id = Number(pid);
+      remRet[id] = Number(s.returned || 0);
+      remDam[id] = Number(s.damaged || 0);
+      remFree[id] = Number(s.free || 0);
     });
 
     const ordersToUpdate = batch.orders.map((bo) => {
       return {
         orderId: bo.orderId,
         items: bo.order.items.map((item) => {
-          const bSize = productBundleSizes[item.productId] || 1;
-          const dispatchedInThisOrder = Number(item.quantity) + Number(item.freeQuantity || 0);
+          const productId = item.productId;
+          const orderPaid = Number(item.quantity || 0);
+          const orderFree = Number(item.freeQuantity || 0);
 
-          let orderReturned = 0;
-          if (remainingReturned[item.productId] > 0) {
-            const canTake = Math.min(remainingReturned[item.productId], dispatchedInThisOrder);
-            orderReturned = Math.floor(canTake / bSize) * bSize;
-            remainingReturned[item.productId] -= orderReturned;
-          }
+          // Return distribution
+          const takeRet = Math.min(orderPaid, remRet[productId] || 0);
+          remRet[productId] -= takeRet;
 
-          let orderDamaged = 0;
-          if (remainingDamaged[item.productId] > 0) {
-            const canTake = Math.min(
-              remainingDamaged[item.productId],
-              dispatchedInThisOrder - orderReturned,
-            );
-            orderDamaged = Math.floor(canTake / bSize) * bSize;
-            remainingDamaged[item.productId] -= orderDamaged;
-          }
+          // Damage distribution (from remaining paid)
+          const takeDam = Math.min(orderPaid - takeRet, remDam[productId] || 0);
+          remDam[productId] -= takeDam;
+
+          // Free Return distribution
+          const takeFreeRet = Math.min(orderFree, remFree[productId] || 0);
+          remFree[productId] -= takeFreeRet;
+          const takeFreeDelivered = orderFree - takeFreeRet;
 
           return {
-            productId: item.productId,
-            dispatchedQuantity: dispatchedInThisOrder,
-            returnedQuantity: orderReturned,
-            damagedQuantity: orderDamaged,
+            productId,
+            returnedPaidQuantity: takeRet,
+            returnedFreeQuantity: takeFreeRet,
+            damagedPaidQuantity: takeDam,
+            damagedFreeQuantity: 0,
           };
         }),
       };
@@ -275,7 +305,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       await recordBatchReturns(batchId, { orders: ordersToUpdate });
       showSuccessToast('Returns recorded successfully');
       fetchBatch();
-      setActiveTab('settle');
+      // Keep on entry tab to allow further edits until final settlement
     } catch (error: any) {
       showErrorToast(error.message || 'Failed to save returns');
     } finally {
@@ -288,15 +318,19 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
     try {
       setIsSettling(true);
-      
+
       const collections = batch.orders.map((batchOrder) => {
         const draftDue = draftDues[batchOrder.orderId] || 0;
         const finalAmount = Number(batchOrder.finalSoldAmount || 0);
         const advance = Number(batchOrder.order?.advancePaid || 0);
+        const hasDeliveryResult = batchOrder.deliveryStatus === 'COMPLETED' || Number(batchOrder.collectedAmount || 0) > 0 || Number(batchOrder.dueAmount || 0) > 0;
         return {
           orderId: batchOrder.orderId,
-          collectedAmount: Math.max(0, finalAmount - advance - draftDue),
+          collectedAmount: hasDeliveryResult
+            ? Number(batchOrder.collectedAmount || 0)
+            : Math.max(0, finalAmount - advance - draftDue),
           paymentMode: 'CASH',
+          note: batchOrder.deliveryNote || undefined,
         };
       });
 
@@ -311,11 +345,13 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       // Complete Settlement
       await settleDispatchBatch(batchId, {
         collections,
-        dueEntries: dueEntries.length > 0 ? dueEntries : undefined
+        dueEntries: dueEntries.length > 0 ? dueEntries : undefined,
+        actualCashReceived: actualCashReceived ? Number(actualCashReceived) : undefined
       });
-      
+
       showSuccessToast('Batch marked as settled and dues recorded');
       setDraftDues({});
+      setActualCashReceived('');
       fetchBatch();
     } catch (error: any) {
       showErrorToast(error.message || 'Failed to settle batch');
@@ -340,7 +376,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
   return (
     <div className="space-y-6 pb-20">
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @media print {
           .no-print {
             display: none !important;
@@ -376,9 +413,9 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               <StatusBadge {...batchStatus} />
             </div>
             <p className="mt-2 text-xs lg:text-sm font-medium text-slate-500">
-              {formatDate(batch.dispatchDate)} · {batch.deliveryPerson.name} · {batch.route.name}
+              {formatDate(batch.dispatchDate)} · {batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name} · {batch.route.name}
             </p>
-            {batch.status === 'SETTLED' && (
+            {isBatchSettled && (
               <div className="mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600">
                 <ShieldAlert className="h-3 w-3" />
                 Locked after settlement
@@ -424,11 +461,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
-              activeTab === tab.id
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
+            className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${activeTab === tab.id
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+              }`}
           >
             {tab.label}
           </button>
@@ -436,8 +472,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       </div>
 
       {activeTab === 'sheet' && (
-        <PageCard 
-          title="Field Delivery Sheet" 
+        <PageCard
+          title="Field Delivery Sheet"
           description="Consolidated view for field record keeping."
           action={
             <button
@@ -462,6 +498,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                     <th className="px-6 py-4 text-center w-16">SL</th>
                     <th className="px-6 py-4 text-left">Product Name</th>
                     <th className="px-6 py-4 text-center w-24">Qty</th>
+                    <th className="px-6 py-4 text-center w-20">Free</th>
                     <th className="px-6 py-4 text-center w-24">Return</th>
                     <th className="px-6 py-4 text-center w-24">Sales</th>
                     <th className="px-6 py-4 text-center w-24">Price</th>
@@ -475,7 +512,12 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                       <td className="px-6 py-4 font-bold text-slate-900">{item.name}</td>
                       <td className="px-6 py-4 text-center">
                         <span className="rounded-lg bg-slate-100 px-3 py-1.5 font-black text-slate-700">
-                          {formatNumber(item.totalQty)}
+                          {formatNumber(item.totalPaidQty)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="rounded-lg bg-emerald-50 px-3 py-1.5 font-black text-emerald-600">
+                          {formatNumber(item.totalFreeQty)}
                         </span>
                       </td>
                       <td className="px-6 py-4"></td>
@@ -493,23 +535,23 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           <div className="lg:hidden divide-y divide-slate-100">
             {aggregatedItems.map((item, index) => (
               <div key={item.productId} className="p-4 space-y-3">
-                 <div className="flex items-start justify-between">
-                    <div className="flex gap-3">
-                       <span className="text-xs font-black text-slate-300">{index + 1}</span>
-                       <p className="font-bold text-slate-900">{item.name}</p>
-                    </div>
-                    <p className="text-xs font-black text-slate-400">{item.unit}</p>
-                 </div>
-                 <div className="flex items-center justify-between">
-                    <div className="bg-slate-100 rounded-xl px-4 py-2">
-                       <p className="text-[8px] font-black uppercase text-slate-400">Target Qty</p>
-                       <p className="text-lg font-black text-slate-900">{formatNumber(item.totalQty)}</p>
-                    </div>
-                    <div className="text-right">
-                       <p className="text-[8px] font-black uppercase text-slate-400">Unit Price</p>
-                       <p className="text-sm font-bold text-slate-600">{formatCurrency(item.price)}</p>
-                    </div>
-                 </div>
+                <div className="flex items-start justify-between">
+                  <div className="flex gap-3">
+                    <span className="text-xs font-black text-slate-300">{index + 1}</span>
+                    <p className="font-bold text-slate-900">{item.name}</p>
+                  </div>
+                  <p className="text-xs font-black text-slate-400">{item.unit}</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="bg-slate-100 rounded-xl px-4 py-2">
+                    <p className="text-[8px] font-black uppercase text-slate-400">Target Qty</p>
+                    <p className="text-lg font-black text-slate-900">{formatNumber(item.totalQty)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[8px] font-black uppercase text-slate-400">Unit Price</p>
+                    <p className="text-sm font-bold text-slate-600">{formatCurrency(item.price)}</p>
+                  </div>
+                </div>
               </div>
             ))}
             {aggregatedItems.length === 0 && <div className="p-12 text-center text-slate-400 font-bold">No products</div>}
@@ -518,20 +560,20 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       )}
 
       {activeTab === 'entry' && (
-        <PageCard 
-          title="Return Entry" 
+        <PageCard
+          title="Return Entry"
           description="Enter actual field returns and damages."
           className="lg:no-padding"
           action={
             <div className="hidden lg:flex gap-2">
               <button
                 onClick={handleSaveReturns}
-                disabled={isSavingReturns || batch.status === 'SETTLED' || !['DISPATCHED', 'RETURN_PENDING', 'PARTIALLY_SETTLED'].includes(batch.status)}
+                disabled={isSavingReturns || isBatchSettled || !['DISPATCHED', 'RETURN_PENDING'].includes(batch.status)}
                 className="rounded-2xl bg-cyan-700 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-cyan-200 disabled:opacity-50 disabled:bg-slate-400 disabled:shadow-none"
               >
                 <span className="inline-flex items-center gap-2">
                   {isSavingReturns ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {batch.status === 'SETTLED' ? 'Locked' : 'Save Returns'}
+                  {isBatchSettled ? 'Locked' : 'Save Returns'}
                 </span>
               </button>
             </div>
@@ -545,9 +587,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   <th className="px-6 py-4 text-center w-16">SL</th>
                   <th className="px-6 py-4 text-left">Product Name</th>
                   <th className="px-6 py-4 text-center w-24">Qty</th>
-                  <th className="px-6 py-4 text-center w-32">Returned</th>
-                  <th className="px-6 py-4 text-center w-32">Damaged</th>
-                  <th className="px-6 py-4 text-center w-24">Delivered</th>
+                  <th className="px-6 py-4 text-center w-24">Free</th>
+                  <th className="px-6 py-4 text-center w-32">Return</th>
+                  <th className="px-6 py-4 text-center w-32">Damage</th>
+                  <th className="px-6 py-4 text-center w-24">Final Sold</th>
                   <th className="px-6 py-4 text-center w-24">Due</th>
                   <th className="px-6 py-4 text-center w-24">Cash</th>
                   <th className="px-6 py-4 text-center w-24">Action</th>
@@ -555,74 +598,90 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {aggregatedItems.map((item, index) => {
-                  const state = batchReturnState[item.productId] || { returned: '0', damaged: '0' };
-                  const deliveredQty = item.totalQty - Number(state.returned || 0) - Number(state.damaged || 0);
-                  
+                  const state = batchReturnState[item.productId] || {
+                    returned: '0',
+                    damaged: '0',
+                    free: '0'
+                  };
+
+                  const r = Number(state.returned || 0);
+                  const d = Number(state.damaged || 0);
+
+                  const sold = Math.max(0, item.totalPaidQty - r - d);
+                  const itemCashValue = sold * item.price;
+                  const itemDraftDue = batch.orders
+                    .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                    .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0);
+
                   return (
                     <tr key={item.productId} className="hover:bg-slate-50/30 transition-colors">
                       <td className="px-6 py-4 text-center font-bold text-slate-400">{index + 1}</td>
                       <td className="px-6 py-4 font-bold text-slate-900">{item.name}</td>
                       <td className="px-6 py-4 text-center font-black text-slate-700">
-                        {formatNumber(item.totalQty)}
+                        {formatNumber(item.totalPaidQty)}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <input
                           type="number"
                           min="0"
-                          max={item.totalQty}
+                          value={state.free}
+                          disabled={isBatchSettled}
+                          onChange={(e) => setBatchReturnState(prev => ({
+                            ...prev,
+                            [item.productId]: { ...state, free: e.target.value }
+                          }))}
+                          className="w-20 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-center font-black text-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 outline-none"
+                        />
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          max={item.totalPaidQty}
                           value={state.returned}
-                          disabled={batch.status === 'SETTLED'}
+                          disabled={isBatchSettled}
                           onChange={(e) => setBatchReturnState(prev => ({
                             ...prev,
                             [item.productId]: { ...state, returned: e.target.value }
                           }))}
-                          className="w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center font-black text-rose-600 focus:bg-white focus:ring-2 focus:ring-rose-500/10 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-20 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-center font-black text-rose-600 focus:bg-white focus:ring-2 focus:ring-rose-500/10 outline-none"
                         />
                       </td>
                       <td className="px-6 py-4 text-center">
                         <input
                           type="number"
                           min="0"
-                          max={item.totalQty}
+                          max={item.totalPaidQty - r}
                           value={state.damaged}
-                          disabled={batch.status === 'SETTLED'}
+                          disabled={isBatchSettled}
                           onChange={(e) => setBatchReturnState(prev => ({
                             ...prev,
                             [item.productId]: { ...state, damaged: e.target.value }
                           }))}
-                          className="w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center font-black text-amber-600 focus:bg-white focus:ring-2 focus:ring-amber-500/10 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-20 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-center font-black text-amber-600 focus:bg-white focus:ring-2 focus:ring-amber-500/10 outline-none"
                         />
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <div className={`rounded-xl px-3 py-2 font-black ${deliveredQty < 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                          {formatNumber(Math.max(0, deliveredQty))}
+                        <div className="bg-slate-900 rounded-xl px-2 py-2 font-black text-xs text-white">
+                          {formatNumber(sold)}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                         {/* Aggregating draft dues for this item's associated orders */}
-                         <div className="font-black text-amber-600">
-                            {formatCurrency(batch.orders
-                              .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                              .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0)
-                            )}
-                         </div>
+                        <div className="font-black text-amber-600">
+                          {formatCurrency(itemDraftDue)}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                         <div className="font-black text-emerald-600">
-                            {formatCurrency(Math.max(0, 
-                               (deliveredQty * (item.totalPaidQty / (item.totalQty || 1)) * item.price) - 
-                               batch.orders
-                                .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                                .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0)
-                            ))}
-                         </div>
+                        <div className="font-black text-emerald-600">
+                          {formatCurrency(Math.max(0, itemCashValue - itemDraftDue))}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button
                           onClick={() => setDueModalProduct({ id: item.productId, name: item.name })}
                           className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black uppercase text-amber-600 hover:bg-amber-100 transition-colors"
                         >
-                          {batch.orders.some(bo => bo.order.items.some(i => i.productId === item.productId) && draftDues[bo.orderId] > 0) ? 'Edit Due' : 'Due'}
+                          Due
                         </button>
                       </td>
                     </tr>
@@ -635,92 +694,103 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           {/* Mobile Entry Form */}
           <div className="lg:hidden divide-y divide-slate-100">
             {aggregatedItems.map((item, index) => {
-              const state = batchReturnState[item.productId] || { returned: '0', damaged: '0' };
-              const deliveredQty = item.totalQty - Number(state.returned || 0) - Number(state.damaged || 0);
+              const state = batchReturnState[item.productId] || { returned: '0', damaged: '0', free: '0' };
+              const q = item.totalPaidQty;
+              const f = item.totalFreeQty;
+              const r = Number(state.returned || 0);
+              const d = Number(state.damaged || 0);
+
+              const sold = Math.max(0, q - r - d);
+              const itemCashValue = sold * item.price;
+              const itemDraftDue = batch.orders
+                .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0);
+
               return (
                 <div key={item.productId} className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="font-bold text-slate-900">{item.name}</p>
                     <div className="bg-slate-100 rounded-lg px-2 py-1 text-[10px] font-black text-slate-500 uppercase">
-                      Target: {formatNumber(item.totalQty)}
+                      P: {q} | F: {item.totalFreeQty}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-slate-400">Returned</label>
-                        <input
-                          type="number"
-                          value={state.returned}
-                          disabled={batch.status === 'SETTLED'}
-                          onChange={(e) => setBatchReturnState(prev => ({
-                            ...prev,
-                            [item.productId]: { ...state, returned: e.target.value }
-                          }))}
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-black text-rose-600 outline-none disabled:opacity-50"
-                        />
-                     </div>
-                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-slate-400">Damaged</label>
-                        <input
-                          type="number"
-                          value={state.damaged}
-                          disabled={batch.status === 'SETTLED'}
-                          onChange={(e) => setBatchReturnState(prev => ({
-                            ...prev,
-                            [item.productId]: { ...state, damaged: e.target.value }
-                          }))}
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-black text-amber-600 outline-none disabled:opacity-50"
-                        />
-                     </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-rose-500">Return (P)</label>
+                      <input
+                        type="number"
+                        value={state.returned}
+                        disabled={isBatchSettled}
+                        onChange={(e) => setBatchReturnState(prev => ({
+                          ...prev,
+                          [item.productId]: { ...state, returned: e.target.value }
+                        }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-black text-rose-600 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-amber-500">Damage</label>
+                      <input
+                        type="number"
+                        value={state.damaged}
+                        disabled={isBatchSettled}
+                        onChange={(e) => setBatchReturnState(prev => ({
+                          ...prev,
+                          [item.productId]: { ...state, damaged: e.target.value }
+                        }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-black text-amber-600 outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-emerald-500">Return (F)</label>
+                      <input
+                        type="number"
+                        value={state.free}
+                        disabled={isBatchSettled}
+                        onChange={(e) => setBatchReturnState(prev => ({
+                          ...prev,
+                          [item.productId]: { ...state, free: e.target.value }
+                        }))}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-black text-emerald-600 outline-none"
+                      />
+                    </div>
                   </div>
-                  <div className={`rounded-2xl p-3 space-y-3 ${deliveredQty < 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
-                     <div className="flex justify-between items-center">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Actual Delivered</p>
-                        <p className={`text-lg font-black ${deliveredQty < 0 ? 'text-rose-600' : 'text-slate-900'}`}>{formatNumber(Math.max(0, deliveredQty))}</p>
-                     </div>
-                     <div className="flex justify-between items-center border-t border-slate-200/50 pt-2">
-                        <div className="space-y-0.5">
-                           <p className="text-[10px] font-black uppercase tracking-widest text-amber-500">Due/Baki</p>
-                           <p className="font-black text-amber-600">
-                              {formatCurrency(batch.orders
-                                .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                                .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0)
-                              )}
-                           </p>
-                        </div>
-                        <div className="text-right space-y-0.5">
-                           <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Cash</p>
-                           <p className="font-black text-emerald-600">
-                              {formatCurrency(Math.max(0, 
-                                 (deliveredQty * (item.totalPaidQty / (item.totalQty || 1)) * item.price) - 
-                                 batch.orders
-                                  .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                                  .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0)
-                              ))}
-                           </p>
-                        </div>
-                     </div>
-                     <button 
-                        onClick={() => setDueModalProduct({ id: item.productId, name: item.name })}
-                        className="w-full py-2.5 rounded-xl bg-amber-500 text-[10px] font-black uppercase text-white shadow-sm flex items-center justify-center gap-2"
-                      >
-                        {batch.orders.some(bo => bo.order.items.some(i => i.productId === item.productId) && draftDues[bo.orderId] > 0) ? 'Edit Due' : 'Add Due'}
-                      </button>
+                  <div className="bg-slate-900 rounded-2xl p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Final Sold (Paid)</p>
+                      <p className="text-xl font-black text-white">{formatNumber(sold)}</p>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                      <div className="text-left">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">Due</p>
+                        <p className="text-sm font-black text-white">{formatCurrency(itemDraftDue)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Cash</p>
+                        <p className="text-sm font-black text-white">{formatCurrency(Math.max(0, itemCashValue - itemDraftDue))}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setDueModalProduct({ id: item.productId, name: item.name })}
+                      className="w-full py-3 rounded-xl bg-amber-500 text-xs font-black uppercase text-white shadow-lg"
+                    >
+                      Manage Due
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
-          
+
           <div className="lg:hidden p-4 border-t border-slate-100">
-             <button
-                onClick={handleSaveReturns}
-                disabled={isSavingReturns || batch.status === 'SETTLED' || !['DISPATCHED', 'RETURN_PENDING', 'PARTIALLY_SETTLED'].includes(batch.status)}
-                className="w-full flex items-center justify-center gap-3 rounded-2xl bg-cyan-700 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-cyan-100 disabled:opacity-50 disabled:bg-slate-300"
-              >
-                {isSavingReturns ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                Save Field Records
-              </button>
+            <button
+              onClick={handleSaveReturns}
+              disabled={isSavingReturns || isBatchSettled || !['DISPATCHED', 'RETURN_PENDING'].includes(batch.status)}
+              className="w-full flex items-center justify-center gap-3 rounded-2xl bg-cyan-700 py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-cyan-100 disabled:opacity-50 disabled:bg-slate-300"
+            >
+              {isSavingReturns ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+              Save Field Records
+            </button>
           </div>
         </PageCard>
       )}
@@ -728,23 +798,31 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       {/* Final Summary - Simplified 'Not Fancy' Style */}
       <div className="mt-10 pt-10 border-t-2 border-slate-900 pb-24">
         <h2 className="text-base font-black uppercase tracking-widest text-slate-900 mb-6">Final Batch Summary</h2>
-        
+
         <div className="flex flex-col lg:flex-row border-2 border-slate-900 divide-y-2 lg:divide-y-0 lg:divide-x-2 divide-slate-900">
           <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 lg:mb-1">Total Qty</p>
-            <p className="text-xl lg:text-2xl font-black text-slate-900">{formatNumber(finalMetrics?.totalOrder || 0)}</p>
+            <p className="text-xl lg:text-2xl font-black text-slate-900">{formatNumber(finalMetrics?.totalQty || 0)}</p>
+          </div>
+          <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500 lg:mb-1">Delivered Free</p>
+            <p className="text-xl lg:text-2xl font-black text-emerald-600">{formatNumber(finalMetrics?.totalFree || 0)}</p>
           </div>
           <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 lg:mb-1">Returned</p>
-            <p className="text-xl lg:text-2xl font-black text-rose-600">{formatNumber(finalMetrics?.totalReturned || 0)}</p>
+            <p className="text-xl lg:text-2xl font-black text-rose-600">{formatNumber(finalMetrics?.returned || 0)}</p>
+          </div>
+          <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-500 lg:mb-1">Damaged</p>
+            <p className="text-xl lg:text-2xl font-black text-amber-600">{formatNumber(finalMetrics?.damaged || 0)}</p>
           </div>
           <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 lg:mb-1">Final Sold</p>
-            <p className="text-xl lg:text-2xl font-black text-emerald-700">{formatNumber(finalMetrics?.totalSold || 0)}</p>
+            <p className="text-xl lg:text-2xl font-black text-emerald-700">{formatNumber(finalMetrics?.finalSold || 0)}</p>
           </div>
           <div className="flex-1 p-4 lg:p-6 bg-slate-900 text-white flex justify-between lg:block items-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 lg:mb-1">Final Amount</p>
-            <p className="text-xl lg:text-2xl font-black truncate">{formatCurrency(finalMetrics?.totalAmount || 0)}</p>
+            <p className="text-xl lg:text-2xl font-black truncate">{formatCurrency(finalMetrics?.finalAmount || 0)}</p>
           </div>
           <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 lg:mb-1">Due/Baki</p>
@@ -756,31 +834,84 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
         </div>
 
-        {batch.status !== 'SETTLED' && (
-          <div className="mt-12 flex flex-col items-center justify-center space-y-6">
-            <div className="text-center px-4">
-              <p className="text-sm font-black uppercase tracking-widest text-slate-900">Settlement Status</p>
-              <p className="text-xs font-bold text-slate-500 mt-1 uppercase">Ready to close batch & update ledger</p>
+        {!isBatchSettled && (
+          <div className="mt-12 flex flex-col items-center justify-center space-y-8">
+            <div className="w-full max-w-md space-y-4">
+              <div className="text-center px-4 mb-4">
+                <p className="text-sm font-black uppercase tracking-widest text-slate-900">Settlement Verification</p>
+                <p className="text-xs font-bold text-slate-500 mt-1 uppercase">Enter actual cash received from delivery man</p>
+              </div>
+
+              <div className="rounded-3xl border-2 border-slate-900 bg-white p-6 shadow-xl shadow-slate-100">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-sm font-bold text-slate-500">
+                    <span>Final Amount (Sold):</span>
+                    <span className="text-slate-900">{formatCurrency(finalMetrics?.finalAmount || 0)}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm font-bold text-slate-500 border-b border-slate-100 pb-2">
+                    <span>Reported by Delivery Man:</span>
+                    <span className="text-blue-600">{formatCurrency(finalMetrics?.cashCollectable || 0)}</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Actual Cash Received by Admin</label>
+                    <input
+                      type="number"
+                      value={actualCashReceived}
+                      onChange={(e) => setActualCashReceived(Math.max(0, Number(e.target.value)).toString())}
+                      placeholder="Enter amount..."
+                      className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-5 py-4 text-2xl font-black text-slate-900 focus:border-slate-900 outline-none transition-all"
+                    />
+                  </div>
+
+                  {/* Live Calculation: Remaining Due/Baki */}
+                  <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100">
+                    <div className="flex justify-between items-center">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Remaining Due/Baki</p>
+                      <p className="text-xl font-black text-amber-700">
+                        {formatCurrency(Math.max(0, (finalMetrics?.finalAmount || 0) - Number(actualCashReceived || 0)))}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-[8px] font-bold text-amber-500 uppercase leading-relaxed">
+                      This amount will stay as customer due and stay assigned to the original SR and Shop.
+                    </p>
+                  </div>
+
+                  {/* Mismatch Warning: Only if admin input differs from delivery man report */}
+                  {actualCashReceived && Math.abs(Number(actualCashReceived) - (finalMetrics?.cashCollectable || 0)) > 0.01 && (
+                    <div className="rounded-2xl bg-rose-50 p-4 border border-rose-100 animate-pulse">
+                      <div className="flex items-center gap-2 text-rose-600">
+                        <ShieldAlert className="h-4 w-4" />
+                        <p className="text-xs font-black uppercase tracking-tight">Cash Mismatch Warning</p>
+                      </div>
+                      <p className="mt-1 text-[10px] font-bold text-rose-500 uppercase leading-relaxed">
+                        Delivery man reported {formatCurrency(finalMetrics?.cashCollectable || 0)}, but you are settling with {formatCurrency(Number(actualCashReceived))}.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            
+
             <button
               onClick={handleSettle}
               disabled={isSettling}
               className="w-full sm:max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-slate-900 px-6 sm:px-12 py-4 text-base sm:text-lg font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900 disabled:opacity-50"
             >
               {isSettling ? <RefreshCw className="h-5 w-5 animate-spin" /> : <HandCoins className="h-5 w-5" />}
-              {isSettling ? 'Processing...' : 'Complete Settlement'}
+              {isSettling ? 'Processing...' : 'Confirm & Settle Batch'}
             </button>
           </div>
         )}
 
-        {batch.status === 'SETTLED' && (
+        {isBatchSettled && (
           <div className="mt-12 flex flex-col items-center justify-center space-y-6">
             <div className="text-center px-4">
               <p className="text-sm font-black uppercase tracking-widest text-emerald-600">Batch Fully Settled</p>
               <p className="text-xs font-bold text-slate-500 mt-1 uppercase">Ledger updated and inventory finalized</p>
             </div>
-            
+
             <button
               onClick={handlePrintFinalSettlement}
               className="w-full max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-white px-12 py-4 text-base lg:text-lg font-black uppercase tracking-widest text-slate-900 transition hover:bg-slate-900 hover:text-white"
@@ -792,24 +923,19 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         )}
       </div>
 
-      {dueModalProduct && (
-        <DueModal 
-          isOpen={!!dueModalProduct}
-          onClose={() => setDueModalProduct(null)}
-          productId={dueModalProduct.id}
-          productName={dueModalProduct.name}
-          batchOrders={batch.orders}
-          draftDues={draftDues}
-          route={batch.route}
-          onAddDraftDue={(orderId, amount) => {
-            setDraftDues(prev => ({
-              ...prev,
-              [orderId]: amount
-            }));
-          }}
-          onSuccess={() => fetchBatch()}
-        />
-      )}
+      <DueModal
+        isOpen={!!dueModalProduct}
+        onClose={() => setDueModalProduct(null)}
+        productName={dueModalProduct?.name || ''}
+        productId={dueModalProduct?.id || 0}
+        batchOrders={batch.orders}
+        draftDues={draftDues}
+        route={batch.route}
+        onAddDraftDue={(orderId, amount) => {
+          setDraftDues(prev => ({ ...prev, [orderId]: amount }));
+        }}
+        onSuccess={fetchBatch}
+      />
     </div>
   );
 }

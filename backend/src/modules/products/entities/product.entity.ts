@@ -8,6 +8,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  VersionColumn,
 } from 'typeorm';
 import { numericColumnTransformer } from '../../../common/database/numeric.transformer';
 import { Company } from '../../companies/entities/company.entity';
@@ -68,6 +69,9 @@ export class Product {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @VersionColumn()
+  version: number;
 
   @ManyToOne(() => Company, (company) => company.products, {
     onDelete: 'RESTRICT',

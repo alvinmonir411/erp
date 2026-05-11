@@ -22,4 +22,20 @@ export class QueryProductsDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  stockLevel?: 'low' | 'out' | 'normal';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  limit?: number;
 }

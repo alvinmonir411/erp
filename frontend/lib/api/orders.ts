@@ -74,3 +74,10 @@ export function updateOrderShop(id: number, shopId: number) {
     body: JSON.stringify({ shopId }),
   });
 }
+
+export function updateOrderDelivery(id: number, payload: any) {
+  return apiRequest<Order>(`orders/${id}/delivery`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}

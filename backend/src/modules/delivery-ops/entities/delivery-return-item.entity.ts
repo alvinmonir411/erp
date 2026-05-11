@@ -40,7 +40,7 @@ export class DeliveryReturnItem {
     default: 0,
     transformer: new ColumnNumericTransformer(),
   })
-  returnedQuantity: number;
+  returnedPaidQuantity: number;
 
   @Column({
     type: 'decimal',
@@ -49,7 +49,7 @@ export class DeliveryReturnItem {
     default: 0,
     transformer: new ColumnNumericTransformer(),
   })
-  paidReturnedQuantity: number;
+  returnedFreeQuantity: number;
 
   @Column({
     type: 'decimal',
@@ -58,7 +58,7 @@ export class DeliveryReturnItem {
     default: 0,
     transformer: new ColumnNumericTransformer(),
   })
-  freeReturnedQuantity: number;
+  damagedPaidQuantity: number;
 
   @Column({
     type: 'decimal',
@@ -67,7 +67,7 @@ export class DeliveryReturnItem {
     default: 0,
     transformer: new ColumnNumericTransformer(),
   })
-  damagedQuantity: number;
+  damagedFreeQuantity: number;
 
   @Column({
     type: 'decimal',
@@ -76,7 +76,16 @@ export class DeliveryReturnItem {
     default: 0,
     transformer: new ColumnNumericTransformer(),
   })
-  deliveredQuantity: number;
+  deliveredPaidQuantity: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  deliveredFreeQuantity: number;
 
   @Column({ type: 'text', nullable: true })
   note?: string;

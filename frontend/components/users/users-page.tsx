@@ -17,15 +17,18 @@ import {
   XCircle,
   Loader2,
   Edit2,
-  Trash2
+  Trash2,
+  Truck
 } from 'lucide-react';
 import { getUsers, createUser, updateUser, deleteUser } from '@/lib/api/users';
 import { User, Role, UserStatus } from '@/types/api';
 import { useAuth } from '../auth/auth-provider';
+import { useToast } from '@/components/ui/toast-provider';
 
 export function UsersPage() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
+  const { success, error } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -41,7 +44,11 @@ export function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setIsModalOpen(false);
       setEditingUser(null);
+      success('User created successfully');
     },
+    onError: (err: any) => {
+      error(err.message || 'Failed to create user');
+    }
   });
 
   const updateMutation = useMutation({
@@ -50,16 +57,21 @@ export function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setIsModalOpen(false);
       setEditingUser(null);
+      success('User updated successfully');
     },
+    onError: (err: any) => {
+      error(err.message || 'Failed to update user');
+    }
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      success('User deleted successfully');
     },
-    onError: (error: any) => {
-      alert(error.message || 'Failed to delete user');
+    onError: (err: any) => {
+      error(err.message || 'Failed to delete user');
     }
   });
 
@@ -89,6 +101,7 @@ export function UsersPage() {
       case Role.ADMIN: return <ShieldCheck className="w-4 h-4 text-orange-500" />;
       case Role.MANAGER: return <ShieldCheck className="w-4 h-4 text-blue-500" />;
       case Role.SR: return <Shield className="w-4 h-4 text-emerald-500" />;
+      case Role.DELIVERY_MAN: return <Truck className="w-4 h-4 text-amber-600" />;
       default: return <UserIcon className="w-4 h-4 text-zinc-400" />;
     }
   };
@@ -372,6 +385,7 @@ export function UsersPage() {
                     <option value={Role.ADMIN}>Admin</option>
                     <option value={Role.MANAGER}>Manager</option>
                     <option value={Role.SR}>Sales Representative (SR)</option>
+                    <option value={Role.DELIVERY_MAN}>Delivery Man</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">

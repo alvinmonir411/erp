@@ -19,7 +19,11 @@ export class CreateDispatchBatchDto {
   routeId: number;
 
   @IsNumber()
+  @IsOptional()
   deliveryPersonId: number;
+
+  @IsString()
+  assignedDeliveryManId: string;
 
   @IsString()
   @IsOptional()

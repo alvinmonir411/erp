@@ -28,10 +28,10 @@ import { Role } from '../../common/enums/role.enum';
 export class ShopsController {
   constructor(private readonly shopsService: ShopsService) {}
 
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.SR)
   @Post()
-  create(@Body() createShopDto: CreateShopDto) {
-    return this.shopsService.create(createShopDto);
+  create(@Body() createShopDto: CreateShopDto, @CurrentUser() user: any) {
+    return this.shopsService.create(createShopDto, user);
   }
 
   @Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.SR)

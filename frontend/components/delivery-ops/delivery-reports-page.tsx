@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FileBarChart2, ArrowLeft, Filter, Calendar, Building2, User, MapPin, DollarSign, TrendingUp, Wallet, AlertCircle } from 'lucide-react';
+import { FileBarChart2, ArrowLeft, Filter, Calendar, Building2, MapPin, DollarSign, TrendingUp, Wallet, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { PageCard } from '@/components/ui/page-card';
 import { useToast } from '@/components/ui/toast-provider';
 import { useCompanies, useRoutes } from '@/hooks/use-common-queries';
-import { getDeliveryPeople, getDispatchReports } from '@/lib/api/delivery-ops';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
-import type { DeliveryPerson } from '@/types/api';
+import type { User } from '@/types/api';
+import { Role } from '@/types/api';
+import { getUsersByRole } from '@/lib/api/users';
 import { StateMessage } from '../ui/state-message';
+import { getDispatchReports } from '@/lib/api/delivery-ops';
 
 export function DeliveryReportsPage() {
   const router = useRouter();
@@ -20,7 +22,7 @@ export function DeliveryReportsPage() {
   const [routeId, setRouteId] = useState('');
   const [deliveryPersonId, setDeliveryPersonId] = useState('');
   const [report, setReport] = useState<any>(null);
-  const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([]);
+  const [deliveryMen, setDeliveryMen] = useState<User[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
   const { data: companies = [] } = useCompanies();
@@ -36,8 +38,8 @@ export function DeliveryReportsPage() {
 
   const fetchReport = async () => {
     try {
-      const [people, reportData] = await Promise.all([
-        getDeliveryPeople(),
+      const [men, reportData] = await Promise.all([
+        getUsersByRole(Role.DELIVERY_MAN),
         getDispatchReports({
           dispatchDate,
           companyId: companyId ? Number(companyId) : undefined,
@@ -45,7 +47,7 @@ export function DeliveryReportsPage() {
           deliveryPersonId: deliveryPersonId ? Number(deliveryPersonId) : undefined,
         }),
       ]);
-      setDeliveryPeople(people);
+      setDeliveryMen(men);
       setReport(reportData);
     } catch (error) {
       showErrorToast('Failed to load delivery reports');
@@ -135,9 +137,9 @@ export function DeliveryReportsPage() {
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none transition"
               >
                 <option value="">All Delivery Men</option>
-                {deliveryPeople.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.name}
+                {deliveryMen.map((man) => (
+                  <option key={man.id} value={man.id}>
+                    {man.name}
                   </option>
                 ))}
               </select>

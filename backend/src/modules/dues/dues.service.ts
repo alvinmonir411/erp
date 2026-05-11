@@ -35,6 +35,13 @@ export class DuesService {
       if (user.allowedRouteIds && user.allowedRouteIds.length > 0) {
         query.where('due.routeId IN (:...routeIds)', { routeIds: user.allowedRouteIds });
       }
+    } else if (role === Role.DELIVERY_MAN) {
+      const person = await this.dataSource.manager.findOne('delivery_people' as any, { where: { userId } } as any);
+      if (person) {
+        query.where('order.deliveryPersonId = :personId', { personId: (person as any).id });
+      } else {
+        query.where('due.id = -1');
+      }
     }
 
     return query.getMany();
@@ -56,6 +63,13 @@ export class DuesService {
       if (user.allowedRouteIds && user.allowedRouteIds.length > 0) {
         query.andWhere('collection.routeId IN (:...routeIds)', { routeIds: user.allowedRouteIds });
       }
+    } else if (role === Role.DELIVERY_MAN) {
+      const person = await this.dataSource.manager.findOne('delivery_people' as any, { where: { userId } } as any);
+      if (person) {
+        query.andWhere('order.deliveryPersonId = :personId', { personId: (person as any).id });
+      } else {
+        query.andWhere('collection.id = -1');
+      }
     }
 
     return query.getMany();
@@ -75,6 +89,13 @@ export class DuesService {
     } else if (role === Role.MANAGER) {
       if (user.allowedRouteIds && user.allowedRouteIds.length > 0) {
         query.where('collection.routeId IN (:...routeIds)', { routeIds: user.allowedRouteIds });
+      }
+    } else if (role === Role.DELIVERY_MAN) {
+      const person = await this.dataSource.manager.findOne('delivery_people' as any, { where: { userId } } as any);
+      if (person) {
+        query.where('order.deliveryPersonId = :personId', { personId: (person as any).id });
+      } else {
+        query.where('collection.id = -1');
       }
     }
 
@@ -358,13 +379,17 @@ export class DuesService {
     };
   }
 
-  async findShopDues(shopId: number) {
-    return this.duesRepository.createQueryBuilder('due')
+  async findShopDues(shopId: number, user: any) {
+    const query = this.duesRepository.createQueryBuilder('due')
       .leftJoinAndSelect('due.order', 'order')
       .leftJoinAndSelect('due.shop', 'shop')
       .leftJoinAndSelect('due.route', 'route')
-      .where('due.shopId = :shopId', { shopId })
-      .orderBy('due.createdAt', 'DESC')
-      .getMany();
+      .where('due.shopId = :shopId', { shopId });
+
+    if (user.role === Role.SR) {
+      query.andWhere('due.srId = :userId', { userId: user.id || user.sub });
+    }
+
+    return query.orderBy('due.createdAt', 'DESC').getMany();
   }
 }

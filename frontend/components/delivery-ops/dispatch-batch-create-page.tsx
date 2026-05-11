@@ -13,7 +13,8 @@ import {
   getEligibleDispatchOrders,
 } from '@/lib/api/delivery-ops';
 import { formatCurrency, formatDate, formatNumber, getTodayBDDate } from '@/lib/utils/format';
-import type { DeliveryPerson, Order } from '@/types/api';
+import type { Order, User } from '@/types/api';
+import { getDeliveryMen } from '@/lib/api/users';
 
 export function DispatchBatchCreatePage() {
   const router = useRouter();
@@ -22,13 +23,13 @@ export function DispatchBatchCreatePage() {
   const [dispatchDate, setDispatchDate] = useState(getTodayBDDate());
   const [companyId, setCompanyId] = useState('');
   const [routeId, setRouteId] = useState('');
-  const [deliveryPersonId, setDeliveryPersonId] = useState('');
+  const [assignedDeliveryManId, setAssignedDeliveryManId] = useState('');
   const [marketArea, setMarketArea] = useState('');
   const [note, setNote] = useState('');
   const [search, setSearch] = useState('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
-  const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([]);
+  const [deliveryMen, setDeliveryMen] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -47,8 +48,8 @@ export function DispatchBatchCreatePage() {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [people, eligibleOrders] = await Promise.all([
-        getDeliveryPeople(),
+      const [men, eligibleOrders] = await Promise.all([
+        getDeliveryMen(),
         getEligibleDispatchOrders({
           dispatchDate,
           companyId: companyId ? Number(companyId) : undefined,
@@ -56,7 +57,7 @@ export function DispatchBatchCreatePage() {
           search: search || undefined,
         }),
       ]);
-      setDeliveryPeople(people);
+      setDeliveryMen(men);
       setOrders(eligibleOrders);
     } catch (error) {
       showErrorToast('Failed to load dispatch creation data');
@@ -102,8 +103,8 @@ export function DispatchBatchCreatePage() {
   };
 
   const handleCreateBatch = async () => {
-    if (!routeId || !deliveryPersonId || selectedOrderIds.length === 0) {
-      showErrorToast('Select route, delivery person, and at least one order');
+    if (!routeId || !assignedDeliveryManId || selectedOrderIds.length === 0) {
+      showErrorToast(!assignedDeliveryManId ? 'Please select a delivery man' : 'Select route and at least one order');
       return;
     }
 
@@ -113,7 +114,7 @@ export function DispatchBatchCreatePage() {
         dispatchDate,
         companyId: companyId ? Number(companyId) : undefined,
         routeId: Number(routeId),
-        deliveryPersonId: Number(deliveryPersonId),
+        assignedDeliveryManId: assignedDeliveryManId,
         marketArea: marketArea || undefined,
         note: note || undefined,
         orderIds: selectedOrderIds,
@@ -214,16 +215,20 @@ export function DispatchBatchCreatePage() {
                     Delivery Man
                   </label>
                   <select
-                    value={deliveryPersonId}
-                    onChange={(event) => setDeliveryPersonId(event.target.value)}
+                    value={assignedDeliveryManId}
+                    onChange={(event) => setAssignedDeliveryManId(event.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
                   >
-                    <option value="">Select delivery person</option>
-                    {deliveryPeople.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {person.name}
-                      </option>
-                    ))}
+                    <option value="">Select delivery man</option>
+                    {deliveryMen.length === 0 ? (
+                      <option disabled>No delivery man found. Please create a DELIVERY_MAN user first.</option>
+                    ) : (
+                      deliveryMen.map((man) => (
+                        <option key={man.id} value={man.id}>
+                          {man.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
                 <div className="space-y-1.5">

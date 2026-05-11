@@ -10,7 +10,7 @@ import {
   TrendingUp, ShoppingCart, AlertCircle, RefreshCw,
   Lock, ShieldAlert, CreditCard, Save, ChevronDown, ChevronUp, Plus, DollarSign, Truck, Undo2,
   ArrowLeft, LogOut,
-  User
+  User, Info
 } from 'lucide-react';
 import { StatCard } from '@/components/ui/stat-card';
 import { Pagination } from '@/components/ui/pagination';
@@ -31,6 +31,7 @@ const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }>
   ASSIGNED: { label: 'Assigned', color: 'bg-indigo-100 text-indigo-700', icon: Package },
   OUT_FOR_DELIVERY: { label: 'Out for Delivery', color: 'bg-amber-100 text-amber-700', icon: Package },
   DELIVERED: { label: 'Delivered', color: 'bg-cyan-100 text-cyan-700', icon: ShoppingCart },
+  PARTIAL_DUE: { label: 'Partial Due', color: 'bg-amber-100 text-amber-700', icon: DollarSign },
   SETTLED: { label: 'Settled', color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle },
   CANCELLED: { label: 'Cancelled', color: 'bg-rose-100 text-rose-700', icon: XCircle },
 };
@@ -300,6 +301,7 @@ export function AllOrdersPage() {
                 <th className="px-6 py-4 text-center">Qty</th>
                 <th className="px-6 py-4 text-right">Amount</th>
                 <th className="px-6 py-4 text-center">Status</th>
+                <th className="px-6 py-4">Notes</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -353,6 +355,11 @@ export function AllOrdersPage() {
                         {order.status.replace(/_/g, ' ')}
                       </span>
                     </td>
+                    <td className="px-6 py-4">
+                      <p className="text-[11px] font-medium text-slate-500 max-w-[150px] truncate" title={order.note}>
+                        {order.note || '—'}
+                      </p>
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -362,7 +369,7 @@ export function AllOrdersPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        {user?.role !== 'SR' && order.status !== 'SETTLED' && (
+                        {user?.role !== 'SR' && !['SETTLED', 'PARTIAL_DUE'].includes(order.status) && (
                           <Link
                             href={`/orders/${order.id}/edit`}
                             className="p-2 text-muted hover:text-primary transition-colors"
@@ -433,7 +440,7 @@ export function AllOrdersPage() {
 
                 <div className="flex justify-end gap-2 pt-2">
                   <button className="text-[10px] font-bold uppercase text-primary px-3 py-1.5 bg-primary/5 rounded-lg">View Details</button>
-                  {user?.role !== 'SR' && order.status !== 'SETTLED' && (
+                  {user?.role !== 'SR' && !['SETTLED', 'PARTIAL_DUE'].includes(order.status) && (
                     <Link href={`/orders/${order.id}/edit`} className="text-[10px] font-bold uppercase text-amber-600 px-3 py-1.5 bg-amber-50 rounded-lg">Edit</Link>
                   )}
                   {user?.role === 'SUPER_ADMIN' && (
@@ -496,6 +503,31 @@ function OrderModal({ order, onClose }: { order: any, onClose: () => void }) {
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Route / Network</p>
               <p className="text-sm font-bold text-foreground">{order.route?.name}</p>
               <p className="text-xs font-medium text-muted">{order.company?.name}</p>
+            </div>
+          </div>
+
+          {order.note && (
+            <div className="mb-8 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3">
+              <Info className="h-5 w-5 text-amber-600 shrink-0" />
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Order Note</p>
+                <p className="text-sm font-medium text-amber-900 mt-0.5">{order.note}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-6 md:grid-cols-3 mb-8">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Status</p>
+              <p className="text-sm font-black text-slate-900 mt-1">{['SETTLED', 'PARTIAL_DUE'].includes(order.status) ? 'PAID / RECORDED' : 'DUE / PENDING'}</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Delivery Status</p>
+              <p className="text-sm font-black text-slate-900 mt-1">{order.status.replace(/_/g, ' ')}</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Delivery Man</p>
+              <p className="text-sm font-black text-slate-900 mt-1">{order.deliveryPerson?.name || 'NOT ASSIGNED'}</p>
             </div>
           </div>
 

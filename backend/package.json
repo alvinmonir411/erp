@@ -10,6 +10,7 @@
     "db:init": "node -r ts-node/register -r tsconfig-paths/register src/database/init.ts",
     "db:reset": "node -r ts-node/register -r tsconfig-paths/register src/database/reset.ts",
     "db:seed": "node -r ts-node/register -r tsconfig-paths/register src/database/seed.ts",
+    "db:clean-production-data": "node -r ts-node/register -r tsconfig-paths/register src/database/clean-production-data.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

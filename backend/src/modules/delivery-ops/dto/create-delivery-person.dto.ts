@@ -27,6 +27,10 @@ export class CreateDeliveryPersonDto {
   @IsOptional()
   notes?: string;
 
+  @IsString()
+  @IsOptional()
+  userId?: string;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

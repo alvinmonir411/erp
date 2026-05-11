@@ -76,6 +76,31 @@ export class UsersService implements OnApplicationBootstrap {
     })) as any;
   }
 
+  async findByRole(role: Role): Promise<User[]> {
+    const users = await this.userRepository.find({
+      where: { role },
+      select: ['id', 'email', 'username', 'name', 'role', 'status'],
+      order: { name: 'ASC' },
+    });
+    return users.map(user => ({
+      ...user,
+      isActive: user.isActive
+    })) as any;
+  }
+
+  async findActiveDeliveryMen(): Promise<User[]> {
+    const users = await this.userRepository.find({
+      where: { role: Role.DELIVERY_MAN, status: UserStatus.ACTIVE },
+      select: ['id', 'email', 'username', 'name', 'role', 'status'],
+      order: { name: 'ASC' },
+    });
+
+    return users.map(user => ({
+      ...user,
+      isActive: user.isActive
+    })) as any;
+  }
+
   async findOne(id: string): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {

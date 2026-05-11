@@ -71,7 +71,7 @@ export class DuesController {
 
   @Get('shop/:shopId')
   @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
-  getShopDues(@Param('shopId', ParseIntPipe) shopId: number) {
-    return this.duesService.findShopDues(shopId);
+  getShopDues(@Param('shopId', ParseIntPipe) shopId: number, @CurrentUser() user: any) {
+    return this.duesService.findShopDues(shopId, user);
   }
 }

@@ -7,9 +7,9 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  VersionColumn,
 } from 'typeorm';
 import { Route } from '../../routes/entities/route.entity';
-
 @Entity({ name: 'shops' })
 @Index(['routeId', 'name'])
 export class Shop {
@@ -36,6 +36,9 @@ export class Shop {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ type: 'uuid', nullable: true })
+  createdById: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -47,4 +50,9 @@ export class Shop {
   })
   @JoinColumn({ name: 'routeId' })
   route: Route;
+  @Column()
+  companyId: number;
+
+  @VersionColumn()
+  version: number;
 }

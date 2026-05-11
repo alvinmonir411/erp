@@ -12,7 +12,8 @@ import {
   getDeliveryPeople,
   updateDeliveryPerson,
 } from '@/lib/api/delivery-ops';
-import type { DeliveryPerson } from '@/types/api';
+import { getUsersByRole } from '@/lib/api/users';
+import { Role, type DeliveryPerson, type User } from '@/types/api';
 
 export function DeliveryPersonnelPage() {
   const router = useRouter();
@@ -304,14 +305,42 @@ function PersonnelFormModal({
 }) {
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({
     name: person?.name || '',
     phone: person?.phone || '',
     email: person?.email || '',
     address: person?.address || '',
     notes: person?.notes || '',
+    userId: person?.userId || '',
     isActive: person ? person.isActive : true,
   });
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const data = await getUsersByRole(Role.DELIVERY_MAN);
+        setUsers(data);
+      } catch (err) {
+        console.error('Failed to fetch delivery man users', err);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const handleUserSelect = (userId: string) => {
+    const selectedUser = users.find(u => u.id === userId);
+    if (selectedUser) {
+      setFormData({
+        ...formData,
+        userId,
+        name: selectedUser.name || formData.name,
+        email: selectedUser.email || formData.email,
+      });
+    } else {
+      setFormData({ ...formData, userId });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -344,8 +373,29 @@ function PersonnelFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 max-h-[85vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-8 max-h-[85vh] overflow-y-auto text-slate-900">
           <div className="grid gap-6">
+            <div className="space-y-1.5">
+              <label className="ml-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                Link to User Account (Optional)
+              </label>
+              <select
+                value={formData.userId}
+                onChange={(e) => handleUserSelect(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none appearance-none"
+              >
+                <option value="">Select a user account...</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.username})
+                  </option>
+                ))}
+              </select>
+              <p className="ml-1 text-[10px] font-bold text-slate-400">
+                Only users with DELIVERY_MAN role are listed here.
+              </p>
+            </div>
+
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="ml-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">

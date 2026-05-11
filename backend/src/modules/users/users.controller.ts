@@ -25,6 +25,18 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Get('role/:role')
+  findByRole(@Param('role') role: Role) {
+    return this.usersService.findByRole(role);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Get('delivery-men')
+  findDeliveryMen() {
+    return this.usersService.findActiveDeliveryMen();
+  }
+
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @Get(':id')
   async findOne(@Param('id') id: string) {

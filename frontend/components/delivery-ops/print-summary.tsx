@@ -22,7 +22,8 @@ export function PrintSummary({ report, mode, draftDues = {} }: PrintSummaryProps
 
   return (
     <div className="mx-auto bg-white p-2 sm:p-4 text-[13px] text-black printable-report max-w-full md:max-w-[210mm]">
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @media print {
           @page { size: A4; margin: 12mm; }
           body { -webkit-print-color-adjust: exact; }
@@ -34,11 +35,14 @@ export function PrintSummary({ report, mode, draftDues = {} }: PrintSummaryProps
 
       {/* Header Section */}
       <div className="text-center mb-6">
-        <div className="text-2xl font-bold uppercase mb-1">{report.company?.name || 'Ka'}</div>
+        <div className="text-3xl font-black uppercase mb-1 tracking-widest">MS KARIM TRADERS</div>
+        <div className="text-xs font-bold text-slate-500 uppercase mb-4 tracking-tighter">
+          {report.company?.name && report.company?.name !== 'MS KARIM TRADERS' ? report.company?.name : 'Authorized Distributor'}
+        </div>
         <h1 className="text-sm uppercase tracking-[0.2em] font-medium border-b border-black pb-4 inline-block px-4 sm:px-10">
           {getTitle()}
         </h1>
-        
+
         {/* Info Row 1 */}
         <div className="mt-6 flex flex-col sm:flex-row justify-between text-left font-medium gap-2 sm:gap-0">
           <div className="flex-1">
@@ -55,7 +59,7 @@ export function PrintSummary({ report, mode, draftDues = {} }: PrintSummaryProps
         {/* Info Row 2 */}
         <div className="mt-2 flex flex-col sm:flex-row justify-between text-left font-medium border-b border-black/10 pb-4 gap-2 sm:gap-0">
           <div className="flex-1">
-            <span className="font-bold">Delivery Personnel:</span> {report.deliveryPerson.name}
+            <span className="font-bold">Delivery Man:</span> {report.assignedDeliveryMan?.name || report.deliveryPerson?.name}
           </div>
           <div className="flex-1 sm:text-right text-xs text-slate-500">
             <span className="font-bold">Print Date & Time:</span> {new Date().toLocaleString()}
@@ -99,7 +103,7 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
             const soldQty = Number(item.delivered || 0);
             const unitPrice = soldQty > 0 ? Number(item.finalSoldAmount) / soldQty : 0;
             const totalAmount = Number(item.finalSoldAmount || 0);
-            
+
             // Calculate due for this product row
             const productDue = report.orders
               .filter((order: any) => order.items.some((i: any) => i.productName === item.productName))
@@ -109,7 +113,7 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
                 }
                 return sum + Number(order.dueAmount || 0);
               }, 0);
-            
+
             const cash = Math.max(0, totalAmount - productDue);
 
             return (
@@ -146,25 +150,25 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
         <div className="w-64 space-y-2 border-t border-black pt-4">
           <div className="flex justify-between text-xs font-medium">
             <span>Total Quantity:</span>
-            <span>{formatNumber(report.summary.totalDispatchedQty || products.reduce((s,i) => s+Number(i.dispatched),0))}</span>
+            <span>{formatNumber(report.summary.totalDispatchedQty || products.reduce((s, i) => s + Number(i.dispatched), 0))}</span>
           </div>
           <div className="flex justify-between text-xs font-medium">
             <span>Returned:</span>
-            <span>{formatNumber(products.reduce((s,i) => s+Number(i.returned),0))}</span>
+            <span>{formatNumber(products.reduce((s, i) => s + Number(i.returned), 0))}</span>
           </div>
           <div className="flex justify-between text-xs font-medium">
             <span>Damaged:</span>
-            <span>{formatNumber(products.reduce((s,i) => s+Number(i.damaged),0))}</span>
+            <span>{formatNumber(products.reduce((s, i) => s + Number(i.damaged), 0))}</span>
           </div>
           <div className="flex justify-between text-xs font-bold border-b border-black pb-2">
             <span>Sold:</span>
-            <span>{formatNumber(products.reduce((s,i) => s+Number(i.delivered),0))}</span>
+            <span>{formatNumber(products.reduce((s, i) => s + Number(i.delivered), 0))}</span>
           </div>
           <div className="flex justify-between text-base font-bold pt-1">
             <span>GRAND TOTAL:</span>
             <span>{formatCurrency(report.summary.finalSoldValue)}</span>
           </div>
-          
+
           {(() => {
             const totalDue = report.orders.reduce((sum: number, order: any) => {
               if (draftDues[order.orderId] !== undefined) {
@@ -173,19 +177,27 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
               return sum + Number(order.dueAmount || 0);
             }, 0);
             const cashCollectable = Math.max(0, Number(report.summary.finalSoldValue || 0) - totalDue);
-            
+
             return (
               <>
                 <div className="flex justify-between text-sm font-bold pt-1 text-amber-700">
                   <span>Total Due/Baki:</span>
                   <span>{formatCurrency(totalDue)}</span>
                 </div>
-                <div className="flex justify-between text-lg font-black pt-2 border-t-2 border-black text-emerald-700">
-                  <span>CASH COLLECTABLE:</span>
-                  <span>{formatCurrency(cashCollectable)}</span>
-                </div>
-              </>
-            );
+          <div className="flex justify-between text-lg font-black pt-2 border-t-2 border-black text-emerald-700">
+            <span>CASH COLLECTABLE:</span>
+            <span>{formatCurrency(cashCollectable)}</span>
+          </div>
+          <div className="flex justify-between text-sm font-bold pt-1">
+            <span>Cash Received:</span>
+            <span>{formatCurrency(report.summary.totalCollectedAmount || 0)}</span>
+          </div>
+          <div className="flex justify-between text-sm font-bold pt-1">
+            <span>Cash Expected:</span>
+            <span>{formatCurrency(report.summary.totalCashExpected || cashCollectable)}</span>
+          </div>
+        </>
+      );
           })()}
         </div>
       </div>
@@ -222,7 +234,7 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
                       <td className="text-center border border-black p-2">{idx + 1}</td>
                       <td className="border border-black p-2 font-bold">{order.shopName}</td>
                       <td className="border border-black p-2">#{order.orderId}</td>
-                      <td className="border border-black p-2">{report.deliveryPerson?.name}</td>
+                      <td className="border border-black p-2">{report.assignedDeliveryMan?.name || report.deliveryPerson?.name}</td>
                       <td className="border border-black p-2 text-slate-600">{productNames}</td>
                       <td className="border border-black p-2 text-right font-bold text-amber-600">{formatCurrency(due)}</td>
                       <td className="border border-black p-2"></td>
@@ -253,7 +265,7 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
 function FieldLayout({ report }: { report: any }) {
   // Aggregate items across all orders (though morning report usually already has itemWiseTotals)
   const items = report.itemWiseTotals || [];
-  
+
   // Sort alphabetically
   const sortedItems = [...items].sort((a, b) => a.productName.localeCompare(b.productName));
 

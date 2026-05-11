@@ -1,7 +1,10 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -21,24 +24,35 @@ import { CreateDispatchBatchDto } from './dto/create-dispatch-batch.dto';
 import { QueryDispatchBatchesDto } from './dto/query-dispatch-batches.dto';
 import { RecordBatchReturnsDto } from './dto/record-batch-returns.dto';
 import { SettleDispatchBatchDto } from './dto/settle-dispatch-batch.dto';
+import { DeliveryResultDto, DeliveryResultStatus } from './dto/delivery-result.dto';
+import { CreateShopForOrderDto } from './dto/create-shop-for-order.dto';
 import { Order, OrderItem } from '../orders/entities/order.entity';
 import { DiscountType, OrderStatus } from '../orders/orders.constants';
 import { Product } from '../products/entities/product.entity';
 import { StockService } from '../stock/stock.service';
 import { DuesService } from '../dues/dues.service';
+import { OrdersService } from '../orders/orders.service';
 import { StockMovementType } from '../stock/stock.constants';
 import { StockMovement } from '../stock/entities/stock-movement.entity';
-import { isTodayBD } from '../../common/utils/date.utils';
+import { Role } from '../../common/enums/role.enum';
+import { User } from '../users/entities/user.entity';
+import { UserStatus } from '../../common/enums/user-status.enum';
+import { Shop } from '../shops/entities/shop.entity';
 
-type CalculatedOrderSettlement = {
-  orderId: number;
-  dispatchedQuantity: number;
-  returnedQuantity: number;
-  damagedQuantity: number;
-  deliveredQuantity: number;
-  deliveredSubtotal: number;
-  invoiceDiscountApplied: number;
-  finalSoldAmount: number;
+const gcd = (a: number, b: number): number => {
+  a = Math.abs(a);
+  b = Math.abs(b);
+  while (b) {
+    a %= b;
+    [a, b] = [b, a];
+  }
+  return a;
+};
+
+const getBundleSize = (paid: number, free: number): number => {
+  if (!free || free === 0) return 1;
+  const common = gcd(paid, free);
+  return (paid / common) + (free / common);
 };
 
 @Injectable()
@@ -66,10 +80,46 @@ export class DeliveryOpsService {
     private readonly orderItemRepository: Repository<OrderItem>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly stockService: StockService,
     private readonly duesService: DuesService,
+    @Inject(forwardRef(() => OrdersService))
+    private readonly ordersService: OrdersService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
+
+  private readonly editableBatchStatuses = [
+    DispatchBatchStatus.DRAFT,
+    DispatchBatchStatus.PRINTED,
+    DispatchBatchStatus.DISPATCHED,
+    DispatchBatchStatus.RETURN_PENDING,
+  ];
+
+  private getUserId(user?: any): string | undefined {
+    return user?.id || user?.sub;
+  }
+
+  private isDeliveryMan(user?: any): boolean {
+    return user?.role === Role.DELIVERY_MAN;
+  }
+
+  private ensureDeliveryManOwnsBatch(batch: DispatchBatch, user?: any) {
+    if (!this.isDeliveryMan(user)) return;
+    const userId = this.getUserId(user);
+    if (!userId || batch.assignedDeliveryManId !== String(userId)) {
+      throw new ForbiddenException('You do not have permission to access this delivery batch');
+    }
+  }
+
+  private assertBatchEditableByDelivery(batch: DispatchBatch) {
+    if ([DispatchBatchStatus.SETTLED, DispatchBatchStatus.PARTIALLY_SETTLED].includes(batch.status)) {
+      throw new BadRequestException('This batch is settled and delivery entries are locked');
+    }
+    if (batch.status === DispatchBatchStatus.CANCELLED) {
+      throw new BadRequestException('Cannot update a cancelled batch');
+    }
+  }
 
   async getDeliveryPeople(includeInactive = false) {
     return this.deliveryPersonRepository.find({
@@ -80,17 +130,12 @@ export class DeliveryOpsService {
 
   async getDeliveryPersonById(id: number) {
     const person = await this.deliveryPersonRepository.findOne({ where: { id } });
-    if (!person) {
-      throw new NotFoundException('Delivery person not found');
-    }
+    if (!person) throw new NotFoundException('Delivery person not found');
     return person;
   }
 
   async createDeliveryPerson(dto: CreateDeliveryPersonDto) {
-    const person = this.deliveryPersonRepository.create({
-      ...dto,
-      isActive: dto.isActive ?? true,
-    });
+    const person = this.deliveryPersonRepository.create({ ...dto, isActive: dto.isActive ?? true });
     return this.deliveryPersonRepository.save(person);
   }
 
@@ -102,23 +147,19 @@ export class DeliveryOpsService {
 
   async deleteDeliveryPerson(id: number) {
     const person = await this.getDeliveryPersonById(id);
-    // Soft delete by marking inactive, or hard delete if not used in orders
     const usedInOrders = await this.orderRepository.findOne({ where: { deliveryPersonId: id } });
     const usedInBatches = await this.batchRepository.findOne({ where: { deliveryPersonId: id } });
-    
     if (usedInOrders || usedInBatches) {
       person.isActive = false;
       await this.deliveryPersonRepository.save(person);
-      return { deleted: true, softDelete: true, message: 'Delivery person deactivated because they have associated records.' };
+      return { deleted: true, softDelete: true };
     }
-    
     await this.deliveryPersonRepository.remove(person);
     return { deleted: true, softDelete: false };
   }
 
-  async getEligibleOrders(query: QueryDispatchBatchesDto) {
-    const qb = this.orderRepository
-      .createQueryBuilder('order')
+  async getEligibleOrders(query: QueryDispatchBatchesDto, user?: any) {
+    const qb = this.orderRepository.createQueryBuilder('order')
       .leftJoinAndSelect('order.company', 'company')
       .leftJoinAndSelect('order.route', 'route')
       .leftJoinAndSelect('order.shop', 'shop')
@@ -129,952 +170,831 @@ export class DeliveryOpsService {
         statuses: [OrderStatus.CONFIRMED, OrderStatus.ASSIGNED],
       });
 
-    if (query.companyId) {
-      qb.andWhere('order.companyId = :companyId', { companyId: query.companyId });
-    }
-    if (query.routeId) {
-      qb.andWhere('order.routeId = :routeId', { routeId: query.routeId });
-    }
-    if (query.deliveryPersonId) {
-      qb.andWhere('order.deliveryPersonId = :deliveryPersonId', {
-        deliveryPersonId: query.deliveryPersonId,
-      });
-    }
-    if (query.dispatchDate) {
-      qb.andWhere('order.orderDate = :dispatchDate', {
-        dispatchDate: query.dispatchDate,
-      });
-    }
-    if (query.search) {
-      qb.andWhere(
-        '(LOWER(shop.name) LIKE :search OR LOWER(company.name) LIKE :search OR LOWER(route.name) LIKE :search)',
-        { search: `%${query.search.toLowerCase()}%` },
-      );
+    if (user && user.role === Role.SR) {
+      qb.andWhere('order.createdById = :userId', { userId: user.id || user.sub });
     }
 
+    if (user && user.role === Role.DELIVERY_MAN) {
+      qb.andWhere('order.assignedDeliveryManId = :userId', { userId: user.id || user.sub });
+    }
+
+    if (query.companyId) qb.andWhere('order.companyId = :companyId', { companyId: query.companyId });
+    if (query.routeId) qb.andWhere('order.routeId = :routeId', { routeId: query.routeId });
+    if (query.deliveryPersonId) qb.andWhere('order.deliveryPersonId = :deliveryPersonId', { deliveryPersonId: query.deliveryPersonId });
+    if (query.dispatchDate) qb.andWhere('order.orderDate = :dispatchDate', { dispatchDate: query.dispatchDate });
     const orders = await qb.orderBy('order.createdAt', 'ASC').getMany();
     const activeOrderIds = await this.getActiveBatchOrderIds();
-
     return orders.filter((order) => !activeOrderIds.has(order.id));
   }
 
-  async getDispatchBatches(query: QueryDispatchBatchesDto) {
-    const qb = this.batchRepository
-      .createQueryBuilder('batch')
+  private async getActiveBatchOrderIds(): Promise<Set<number>> {
+    const activeBatches = await this.batchRepository.find({
+      where: { status: In([...this.editableBatchStatuses, DispatchBatchStatus.PARTIALLY_SETTLED]) },
+      relations: ['orders'],
+    });
+    const ids = new Set<number>();
+    activeBatches.forEach(b => b.orders.forEach(o => ids.add(o.orderId)));
+    return ids;
+  }
+
+  async getDispatchBatches(query: QueryDispatchBatchesDto, user?: any) {
+    const qb = this.batchRepository.createQueryBuilder('batch')
       .leftJoinAndSelect('batch.company', 'company')
       .leftJoinAndSelect('batch.route', 'route')
       .leftJoinAndSelect('batch.deliveryPerson', 'deliveryPerson')
+      .leftJoinAndSelect('batch.assignedDeliveryMan', 'assignedDeliveryMan')
       .leftJoinAndSelect('batch.orders', 'batchOrders')
+      .leftJoinAndSelect('batchOrders.order', 'order')
+      .leftJoinAndSelect('order.shop', 'shop')
+      .leftJoinAndSelect('order.route', 'orderRoute')
       .leftJoinAndSelect('batch.items', 'items')
       .orderBy('batch.dispatchDate', 'DESC')
       .addOrderBy('batch.createdAt', 'DESC');
 
-    if (query.companyId) {
-      qb.andWhere('batch.companyId = :companyId', { companyId: query.companyId });
+    if (user && user.role === Role.SR) {
+      const userId = user.id || user.sub;
+      if (userId) {
+        qb.andWhere('order.createdById = :userId', { userId });
+      }
     }
-    if (query.routeId) {
-      qb.andWhere('batch.routeId = :routeId', { routeId: query.routeId });
+
+    if (user && user.role === Role.DELIVERY_MAN) {
+      const userId = user.id || user.sub;
+      if (userId) {
+        qb.andWhere('batch.assignedDeliveryManId = :userId', { userId });
+      } else {
+        // If role is DELIVERY_MAN but no ID, return empty to be safe
+        qb.andWhere('batch.id = -1');
+      }
     }
-    if (query.deliveryPersonId) {
-      qb.andWhere('batch.deliveryPersonId = :deliveryPersonId', {
-        deliveryPersonId: query.deliveryPersonId,
-      });
-    }
-    if (query.dispatchDate) {
-      qb.andWhere('batch.dispatchDate = :dispatchDate', {
-        dispatchDate: query.dispatchDate,
-      });
-    }
-    if (query.status) {
-      qb.andWhere('batch.status = :status', { status: query.status });
-    }
+
+    if (query.companyId) qb.andWhere('batch.companyId = :companyId', { companyId: query.companyId });
+    if (query.routeId) qb.andWhere('batch.routeId = :routeId', { routeId: query.routeId });
     if (query.search) {
       qb.andWhere(
-        '(LOWER(batch.batchNo) LIKE :search OR LOWER(deliveryPerson.name) LIKE :search)',
-        { search: `%${query.search.toLowerCase()}%` },
+        '(batch.batchNo ILIKE :search OR CAST(order.id AS TEXT) ILIKE :search OR shop.name ILIKE :search OR shop.ownerName ILIKE :search OR shop.phone ILIKE :search)',
+        { search: `%${query.search}%` },
       );
+    }
+
+    if (query.status) {
+      if (query.status === 'ASSIGNED') {
+        qb.andWhere('batch.status IN (:...assignedStatuses)', {
+          assignedStatuses: this.editableBatchStatuses,
+        });
+      } else if (query.status === 'DELIVERED' || query.status === 'COMPLETED') {
+        qb.andWhere('(batch.status IN (:...settledStatuses) OR batchOrders.deliveryStatus = :completed)', {
+          settledStatuses: [DispatchBatchStatus.SETTLED, DispatchBatchStatus.PARTIALLY_SETTLED],
+          completed: 'COMPLETED',
+        });
+      } else if (Object.values(DispatchBatchStatus).includes(query.status as any)) {
+        qb.andWhere('batch.status = :status', { status: query.status });
+      } else {
+        // If unknown status, don't filter or return empty?
+        // Returning empty is safer to avoid showing everything.
+        qb.andWhere('batch.id = -1');
+      }
     }
 
     return qb.getMany();
   }
 
   async createDispatchBatch(dto: CreateDispatchBatchDto) {
-    const activeOrderIds = await this.getActiveBatchOrderIds();
-    for (const orderId of dto.orderIds) {
-      if (activeOrderIds.has(orderId)) {
-        throw new BadRequestException(
-          `Order #${orderId} is already part of another active dispatch batch`,
-        );
-      }
+    if (!dto.assignedDeliveryManId) {
+      throw new BadRequestException('Delivery man is required before creating a dispatch batch');
     }
 
-    const batchId = await this.dataSource.transaction(async (manager) => {
+    const deliveryMan = await this.userRepository.findOne({
+      where: {
+        id: dto.assignedDeliveryManId,
+        role: Role.DELIVERY_MAN,
+        status: UserStatus.ACTIVE,
+      },
+    });
+
+    if (!deliveryMan) {
+      throw new BadRequestException('Selected delivery man must be an active DELIVERY_MAN user');
+    }
+
+    const savedBatchId = await this.dataSource.transaction(async (manager) => {
       const orders = await manager.find(Order, {
         where: { id: In(dto.orderIds) },
-        relations: ['company', 'route', 'shop', 'items', 'items.product'],
+        relations: ['items', 'items.product'],
       });
 
       if (orders.length !== dto.orderIds.length) {
         throw new BadRequestException('One or more selected orders were not found');
       }
 
-      for (const order of orders) {
-        if (![OrderStatus.CONFIRMED, OrderStatus.ASSIGNED].includes(order.status)) {
-          throw new BadRequestException(
-            `Order #${order.id} is not eligible for dispatch batching`,
-          );
-        }
-        if (dto.companyId && order.companyId !== dto.companyId) {
-          throw new BadRequestException(
-            `Order #${order.id} belongs to a different company than the batch`,
-          );
-        }
-        if (order.routeId !== dto.routeId) {
-          throw new BadRequestException(
-            'All orders in a batch must belong to the same route',
-          );
-        }
-        if (order.deliveryPersonId && order.deliveryPersonId !== dto.deliveryPersonId) {
-          throw new BadRequestException(
-            `Order #${order.id} is already assigned to a different delivery person`,
-          );
-        }
+      const activeOrderIds = await this.getActiveBatchOrderIds();
+      const alreadyBatched = dto.orderIds.find((id) => activeOrderIds.has(id));
+      if (alreadyBatched) {
+        throw new BadRequestException(`Order #${alreadyBatched} is already in an active dispatch batch`);
       }
 
       const batch = manager.create(DispatchBatch, {
-        batchNo: await this.generateBatchNo(manager, dto.dispatchDate),
+        batchNo: this.generateBatchNo(manager, dto.dispatchDate),
         dispatchDate: new Date(dto.dispatchDate),
         companyId: dto.companyId,
         routeId: dto.routeId,
         deliveryPersonId: dto.deliveryPersonId,
+        assignedDeliveryManId: dto.assignedDeliveryManId,
         marketArea: dto.marketArea,
         note: dto.note,
         status: DispatchBatchStatus.DRAFT,
         totalOrders: orders.length,
-        grossDispatchedValue: orders.reduce(
-          (sum, order) => sum + Number(order.grandTotal),
-          0,
-        ),
-        totalAdvancePaid: orders.reduce(
-          (sum, order) => sum + Number(order.advancePaid || 0),
-          0,
-        ),
+        grossDispatchedValue: orders.reduce((sum, o) => sum + Number(o.grandTotal), 0),
+        totalAdvancePaid: orders.reduce((sum, o) => sum + Number(o.advancePaid || 0), 0),
       });
 
       const savedBatch = await manager.save(batch);
 
-      const batchOrders = orders.map((order) =>
-        manager.create(DispatchBatchOrder, {
-          batchId: savedBatch.id,
-          orderId: order.id,
-          estimatedAmount: order.grandTotal,
-          finalSoldAmount: order.grandTotal,
-          dueAmount: Math.max(0, Number(order.grandTotal) - Number(order.advancePaid || 0)),
-        }),
-      );
-
+      const batchOrders = orders.map(o => manager.create(DispatchBatchOrder, {
+        batchId: savedBatch.id,
+        orderId: o.id,
+        estimatedAmount: o.grandTotal,
+        finalSoldAmount: o.grandTotal,
+        dueAmount: Math.max(0, Number(o.grandTotal) - Number(o.advancePaid || 0)),
+      }));
       await manager.save(batchOrders);
 
-      const aggregate = new Map<
-        number,
-        { qty: number; amount: number }
-      >();
-
+      // Aggregate items for the batch load sheet
+      const aggregate = new Map<number, { qty: number; amount: number }>();
       for (const order of orders) {
         for (const item of order.items) {
-          const dispatchedQty = Number(item.quantity) + Number(item.freeQuantity || 0);
+          const qty = Number(item.quantity) + Number(item.freeQuantity || 0);
           const existing = aggregate.get(item.productId) ?? { qty: 0, amount: 0 };
-          aggregate.set(item.productId, {
-            qty: existing.qty + dispatchedQty,
-            amount: existing.amount + Number(item.lineTotal),
-          });
+          aggregate.set(item.productId, { qty: existing.qty + qty, amount: existing.amount + Number(item.lineTotal) });
         }
       }
 
-      const batchItems = Array.from(aggregate.entries()).map(([productId, value]) =>
-        manager.create(DispatchBatchItem, {
-          batchId: savedBatch.id,
-          productId,
-          totalDispatchedQty: value.qty,
-          totalDeliveredQty: value.qty,
-          estimatedAmount: value.amount,
-          finalSoldAmount: value.amount,
-        }),
-      );
-
+      const batchItems = Array.from(aggregate.entries()).map(([productId, val]) => manager.create(DispatchBatchItem, {
+        batchId: savedBatch.id,
+        productId,
+        totalDispatchedQty: val.qty,
+        totalDeliveredQty: val.qty,
+        estimatedAmount: val.amount,
+        finalSoldAmount: val.amount,
+      }));
       await manager.save(batchItems);
 
-      await Promise.all(
-        orders.map((order) =>
-          manager.update(Order, order.id, {
-            status: OrderStatus.ASSIGNED,
-            deliveryPersonId: dto.deliveryPersonId,
-            marketArea: dto.marketArea,
-          }),
-        ),
-      );
+      // Update Order Status
+      await manager.update(Order, { id: In(dto.orderIds) }, {
+        status: OrderStatus.ASSIGNED,
+        deliveryPersonId: dto.deliveryPersonId,
+        assignedDeliveryManId: dto.assignedDeliveryManId,
+      });
 
       return savedBatch.id;
     });
 
-    return this.getDispatchBatch(batchId);
+    return this.getDispatchBatch(savedBatchId);
   }
 
-  async getDispatchBatch(id: number) {
+  async getDispatchBatch(id: number, user?: any) {
     const batch = await this.batchRepository.findOne({
       where: { id },
       relations: [
-        'company',
-        'route',
-        'deliveryPerson',
-        'items',
-        'items.product',
-        'orders',
-        'orders.order',
-        'orders.order.shop',
-        'orders.order.company',
-        'orders.order.route',
-        'orders.order.deliveryPerson',
-        'orders.order.items',
-        'orders.order.items.product',
-        'orders.returns',
-        'orders.returns.items',
-        'orders.collections',
+        'company', 'route', 'deliveryPerson', 'assignedDeliveryMan', 'items', 'items.product',
+        'orders', 'orders.returns', 'orders.returns.items', 'orders.collections',
+        'orders.order', 'orders.order.company', 'orders.order.route', 'orders.order.shop',
+        'orders.order.assignedDeliveryMan', 'orders.order.items', 'orders.order.items.product'
       ],
     });
+    if (!batch) throw new NotFoundException('Batch not found');
+    this.ensureDeliveryManOwnsBatch(batch, user);
+    return { ...batch, metrics: this.calculateBatchSettlement(batch) };
+  }
 
-    if (!batch) {
-      throw new NotFoundException('Dispatch batch not found');
-    }
+  private formatBatchForReport(batch: any) {
+    const itemWiseTotals = (batch.items || []).map((bi: any) => ({
+      productName: bi.product?.name || 'Unknown',
+      quantity: bi.totalDispatchedQty,
+      estimatedAmount: bi.estimatedAmount,
+    }));
 
-    const settlement = this.calculateBatchSettlement(batch);
+    const selectedOrders = (batch.orders || []).map((bo: any) => ({
+      orderId: bo.orderId,
+      shopName: bo.order?.shop?.name || 'Unknown',
+      shopOwnerName: bo.order?.shop?.ownerName || '',
+      shopPhone: bo.order?.shop?.phone || '',
+      shopAddress: bo.order?.shop?.address || '',
+      estimatedAmount: bo.estimatedAmount,
+      items: (bo.order?.items || []).map((oi: any) => ({
+        productName: oi.product?.name || 'Unknown',
+        dispatchedQuantity: Number(oi.quantity) + Number(oi.freeQuantity || 0),
+        orderedQuantity: Number(oi.quantity || 0),
+        freeQuantity: Number(oi.freeQuantity || 0),
+      })),
+    }));
+
+    const productSummary = (batch.items || []).map((bi: any) => ({
+      productName: bi.product?.name || 'Unknown',
+      dispatched: bi.totalDispatchedQty,
+      returned: bi.totalReturnedQty || 0,
+      damaged: bi.totalDamagedQty || 0,
+      delivered: bi.totalDeliveredQty,
+      finalSoldAmount: bi.finalSoldAmount,
+    }));
+
+    const summary = {
+      totalDispatchedQty: (batch.items || []).reduce((sum: number, bi: any) => sum + Number(bi.totalDispatchedQty), 0),
+      grossDispatchedValue: batch.grossDispatchedValue,
+      returnAdjustedValue: batch.returnAdjustedValue || (batch.items || []).reduce((sum: number, bi: any) => sum + Number(bi.finalSoldAmount), 0),
+      finalSoldValue: batch.finalSoldValue || (batch.items || []).reduce((sum: number, bi: any) => sum + Number(bi.finalSoldAmount), 0),
+      totalCollectedAmount: batch.totalCollectedAmount,
+      totalDueAmount: batch.totalDueAmount,
+      totalReturnAmount: Number(batch.grossDispatchedValue || 0) - Number(batch.finalSoldValue || 0),
+      totalCashExpected: (batch.orders || []).reduce((sum: number, bo: any) => {
+        return sum + Math.max(0, Number(bo.finalSoldAmount || 0) - Number(bo.order?.advancePaid || 0));
+      }, 0),
+    };
+
+    const orders = (batch.orders || []).map((bo: any) => ({
+      orderId: bo.orderId,
+      shopName: bo.order?.shop?.name || 'Unknown',
+      shopOwnerName: bo.order?.shop?.ownerName || '',
+      shopPhone: bo.order?.shop?.phone || '',
+      shopAddress: bo.order?.shop?.address || '',
+      deliveryStatus: bo.deliveryStatus,
+      calculations: {
+        finalSoldAmount: bo.finalSoldAmount,
+      },
+      advancePaid: bo.order?.advancePaid || 0,
+      collectedAmount: bo.collectedAmount,
+      dueAmount: bo.dueAmount,
+      cashExpected: Math.max(0, Number(bo.finalSoldAmount || 0) - Number(bo.order?.advancePaid || 0)),
+      note: bo.deliveryNote || bo.order?.deliveryNote || '',
+      items: (bo.order?.items || []).map((oi: any) => ({
+        productName: oi.product?.name || 'Unknown',
+        dispatchedQuantity: Number(oi.quantity || 0) + Number(oi.freeQuantity || 0),
+        deliveredQuantity: Number(oi.deliveredQuantity || 0),
+        returnedQuantity: Number(oi.returnedQuantity || 0),
+        damagedQuantity: Number(oi.damagedQuantity || 0),
+      })),
+    }));
+
     return {
       ...batch,
-      metrics: settlement,
+      itemWiseTotals,
+      selectedOrders,
+      estimatedTotalAmount: (batch.items || []).reduce((sum: number, bi: any) => sum + Number(bi.estimatedAmount), 0),
+      productSummary,
+      summary,
+      orders,
     };
   }
 
-  async markMorningPrinted(id: number) {
+  async dispatchBatch(id: number) {
     const batch = await this.getDispatchBatch(id);
-    if (batch.status === DispatchBatchStatus.CANCELLED) {
-      throw new BadRequestException('Cancelled batches cannot be printed');
+    if (![DispatchBatchStatus.DRAFT, DispatchBatchStatus.PRINTED].includes(batch.status)) {
+      throw new BadRequestException('Invalid batch status for dispatch');
     }
 
-    await this.batchRepository.update(id, {
-      status: DispatchBatchStatus.PRINTED,
-      isMorningPrinted: true,
-      morningPrintedAt: new Date(),
+    return this.dataSource.transaction(async (manager) => {
+      // Stock is already deducted during Order Confirmation.
+      // We just move statuses.
+      await manager.update(DispatchBatch, id, { status: DispatchBatchStatus.DISPATCHED, dispatchedAt: new Date() });
+      await manager.update(Order, { id: In(batch.orders.map((o: any) => o.orderId)) }, {
+        status: OrderStatus.OUT_FOR_DELIVERY,
+        dispatchedAt: new Date(),
+        isLocked: true,
+      });
+      return this.getDispatchBatch(id);
+    });
+  }
+
+  async recordReturns(id: number, dto: RecordBatchReturnsDto) {
+    const batch = await this.getDispatchBatch(id) as any;
+    this.assertBatchEditableByDelivery(batch);
+
+    return this.dataSource.transaction(async (manager) => {
+      for (const orderDto of dto.orders || []) {
+        const batchOrder = batch.orders.find((bo: DispatchBatchOrder) => bo.orderId === orderDto.orderId);
+        if (!batchOrder) {
+          throw new BadRequestException(`Order #${orderDto.orderId} is not part of this batch`);
+        }
+
+        const order = batchOrder.order;
+        let finalSoldAmount = 0;
+
+        for (const itemDto of orderDto.items || []) {
+          const orderItem = order.items.find((item: OrderItem) => item.productId === itemDto.productId);
+          if (!orderItem) continue;
+
+          const orderedPaidQty = Number(orderItem.quantity || 0);
+          const orderedFreeQty = Number(orderItem.freeQuantity || 0);
+          
+          const returnedPaidQty = Number(itemDto.returnedPaidQuantity || 0);
+          const returnedFreeQty = Number(itemDto.returnedFreeQuantity || 0);
+          const damagedPaidQty = Number(itemDto.damagedPaidQuantity || 0);
+
+          const finalPaidDelivered = Math.max(0, orderedPaidQty - returnedPaidQty - damagedPaidQty);
+          const finalDeliveredFree = Math.max(0, orderedFreeQty - returnedFreeQty); 
+
+          finalSoldAmount += this.calculateItemSoldAmount(orderItem, finalPaidDelivered);
+
+          await manager.update(OrderItem, orderItem.id, {
+            deliveredPaidQuantity: finalPaidDelivered,
+            deliveredFreeQuantity: finalDeliveredFree,
+            returnedPaidQuantity: returnedPaidQty,
+            returnedFreeQuantity: returnedFreeQty,
+            damagedPaidQuantity: damagedPaidQty,
+            damagedFreeQuantity: 0,
+          });
+        }
+
+        finalSoldAmount = this.applyOrderDiscount(order, finalSoldAmount);
+        const advancePaid = Number(order.advancePaid || 0);
+        const existingCollectedAmount = Number(batchOrder.collectedAmount || 0);
+        const newDueAmount = Math.max(0, finalSoldAmount - advancePaid - existingCollectedAmount);
+
+        await manager.update(DispatchBatchOrder, batchOrder.id, {
+          finalSoldAmount,
+          dueAmount: newDueAmount,
+          deliveryStatus: batchOrder.deliveryStatus,
+          deliveryNote: orderDto.note || dto.note,
+        });
+
+        await manager.update(Order, order.id, {
+          actualSoldAmount: finalSoldAmount,
+          dueAmount: newDueAmount,
+          deliveryNote: orderDto.note || dto.note,
+          status: OrderStatus.PARTIALLY_DELIVERED,
+        });
+      }
+
+      await manager.update(DispatchBatch, id, {
+        status: DispatchBatchStatus.RETURN_PENDING,
+        returnsRecordedAt: new Date(),
+        note: dto.note || batch.note,
+      });
+
+      await this.recalculateBatchTotals(manager, id);
     });
 
     return this.getDispatchBatch(id);
   }
 
-  async dispatchBatch(id: number) {
-    const batch = await this.getDispatchBatch(id);
-    if (
-      ![DispatchBatchStatus.DRAFT, DispatchBatchStatus.PRINTED].includes(
-        batch.status,
-      )
-    ) {
-      throw new BadRequestException('Batch cannot be dispatched in its current state');
+  async createShopForOrder(orderId: number, dto: CreateShopForOrderDto, user?: any) {
+    const batchOrder = await this.batchOrderRepository.findOne({
+      where: { orderId },
+      relations: ['batch', 'order'],
+    });
+
+    if (!batchOrder) {
+      throw new NotFoundException('Assigned delivery order not found');
+    }
+
+    this.ensureDeliveryManOwnsBatch(batchOrder.batch, user);
+    this.assertBatchEditableByDelivery(batchOrder.batch);
+
+    if (batchOrder.order.shopId) {
+      throw new BadRequestException('This order already has a shop linked');
     }
 
     return this.dataSource.transaction(async (manager) => {
-      for (const item of batch.items) {
-        await this.stockService.create(
-          {
-            productId: item.productId,
-            companyId: item.product.companyId,
-            type: StockMovementType.STOCK_OUT,
-            quantity: -Number(item.totalDispatchedQty),
-            reference: batch.batchNo,
-            note: `Dispatch batch ${batch.batchNo} issued to market`,
-          },
-          'Dispatch',
-          manager,
-        );
-      }
+      const shop = new Shop();
+      shop.name = dto.name;
+      shop.ownerName = dto.ownerName || null;
+      shop.phone = dto.phone || null;
+      shop.address = dto.address || null;
+      shop.companyId = batchOrder.order.companyId;
+      shop.routeId = batchOrder.order.routeId;
+      shop.isActive = true;
+      shop.createdById = this.getUserId(user) ?? null;
 
-      await manager.update(DispatchBatch, id, {
-        status: DispatchBatchStatus.DISPATCHED,
-        dispatchedAt: new Date(),
+      const savedShop = await manager.save(shop);
+
+      await manager.update(Order, orderId, {
+        shopId: savedShop.id,
       });
 
-      await Promise.all(
-        batch.orders.map((batchOrder) =>
-          manager.update(Order, batchOrder.orderId, {
-            status: OrderStatus.OUT_FOR_DELIVERY,
-            dispatchedAt: new Date(),
-            isLocked: true,
-          }),
-        ),
-      );
-
-      return this.getDispatchBatch(id);
+      return manager.findOne(Order, {
+        where: { id: orderId },
+        relations: ['shop'],
+      });
     });
   }
 
-  private gcd(a: number, b: number): number {
-    a = Math.abs(a);
-    b = Math.abs(b);
-    while (b) {
-      a %= b;
-      [a, b] = [b, a];
-    }
-    return a;
-  }
+  async submitDeliveryResult(orderId: number, dto: DeliveryResultDto, user?: any) {
+    const batchOrder = await this.batchOrderRepository.findOne({
+      where: { orderId },
+      relations: [
+        'batch', 'batch.assignedDeliveryMan', 'batch.route',
+        'order', 'order.items', 'order.items.product', 'order.shop', 'order.route',
+      ],
+    });
 
-  private getBundleSize(paid: number, free: number): number {
-    if (!free || free === 0) return 1;
-    const common = this.gcd(paid, free);
-    return (paid / common) + (free / common);
-  }
-
-  async recordReturns(id: number, dto: RecordBatchReturnsDto) {
-    const batch = await this.getDispatchBatch(id);
-
-    if (batch.status === DispatchBatchStatus.SETTLED) {
-      throw new BadRequestException('Batch already settled. No changes allowed.');
+    if (!batchOrder) {
+      throw new NotFoundException('Assigned delivery order not found');
     }
 
-    if (
-      ![
-        DispatchBatchStatus.DISPATCHED,
-        DispatchBatchStatus.RETURN_PENDING,
-        DispatchBatchStatus.PARTIALLY_SETTLED,
-      ].includes(batch.status)
-    ) {
-      throw new BadRequestException('Returns can only be recorded after dispatch');
-    }
-
-    const batchOrderByOrderId = new Map(
-      batch.orders.map((batchOrder) => [batchOrder.orderId, batchOrder]),
-    );
+    this.ensureDeliveryManOwnsBatch(batchOrder.batch, user);
+    this.assertBatchEditableByDelivery(batchOrder.batch);
 
     return this.dataSource.transaction(async (manager) => {
-      await manager.delete(DeliveryReturnItem, {
-        deliveryReturnId: In(
-          (
-            await manager.find(DeliveryReturn, {
-              where: { batchId: id },
-              select: ['id'],
-            })
-          ).map((item) => item.id),
-        ),
-      });
-      await manager.delete(DeliveryReturn, { batchId: id });
-      await manager.delete(DamageRecord, { batchId: id });
+      const order = batchOrder.order;
+      let finalSoldAmount = 0;
+      let totalReturned = 0;
+      let totalDamaged = 0;
 
-      // Clean up previous stock movements for this batch returns/damages to avoid duplication
-      await manager.delete(StockMovement, {
-        reference: batch.batchNo,
-        type: In([StockMovementType.RETURN_IN, StockMovementType.DAMAGE]),
-      });
-
-      const aggregate = new Map<
-        number,
-        { returned: number; damaged: number; delivered: number; soldAmount: number }
-      >();
-
-      for (const orderEntry of dto.orders) {
-        const batchOrder = batchOrderByOrderId.get(orderEntry.orderId);
-        if (!batchOrder) {
-          throw new BadRequestException(
-            `Order #${orderEntry.orderId} is not part of this batch`,
-          );
+      for (const itemDto of dto.items) {
+        const orderItem = order.items.find((item) => item.productId === itemDto.productId);
+        if (!orderItem) {
+          throw new BadRequestException(`Product ${itemDto.productId} is not part of order #${orderId}`);
         }
 
-        const order = batchOrder.order;
-        const orderItemMap = new Map(order.items.map((item) => [item.productId, item]));
-        const deliveryReturn = await manager.save(
-          manager.create(DeliveryReturn, {
-            batchId: id,
-            batchOrderId: batchOrder.id,
-            note: orderEntry.note,
-            returnReason: orderEntry.returnReason,
-          }),
-        );
+        const orderedPaidQty = Number(orderItem.quantity || 0);
+        const orderedFreeQty = Number(orderItem.freeQuantity || 0);
 
-        let totalReturned = 0;
-        let totalDamaged = 0;
+        const returnedPaidQty = Number(itemDto.returnedPaidQty || 0);
+        const damagedPaidQty = Number(itemDto.damagedPaidQty || 0);
 
-        for (const itemEntry of orderEntry.items) {
-          const orderItem = orderItemMap.get(itemEntry.productId);
-          if (!orderItem) {
-            throw new BadRequestException(
-              `Product #${itemEntry.productId} is not part of order #${order.id}`,
-            );
-          }
+        const finalPaidDelivered = Math.max(0, orderedPaidQty - returnedPaidQty - damagedPaidQty);
+        const finalDeliveredFree = orderedFreeQty;
 
-          const dispatchedQuantity =
-            Number(orderItem.quantity) + Number(orderItem.freeQuantity || 0);
-          if (Number(itemEntry.dispatchedQuantity) !== dispatchedQuantity) {
-            throw new BadRequestException(
-              `Dispatched quantity mismatch for product ${orderItem.product.name}`,
-            );
-          }
+        finalSoldAmount += this.calculateItemSoldAmount(orderItem, finalPaidDelivered);
+        totalReturned += returnedPaidQty;
+        totalDamaged += damagedPaidQty;
 
-          const returnedQuantity = Number(itemEntry.returnedQuantity || 0);
-          const damagedQuantity = Number(itemEntry.damagedQuantity || 0);
-          if (returnedQuantity < 0 || damagedQuantity < 0) {
-            throw new BadRequestException('Return and damage quantities must be zero or more');
-          }
-
-          // Bundle validation
-          const paid = Number(orderItem.quantity);
-          const free = Number(orderItem.freeQuantity || 0);
-          if (free > 0) {
-            const bundleSize = this.getBundleSize(paid, free);
-            if ((returnedQuantity + damagedQuantity) % bundleSize !== 0) {
-              throw new BadRequestException(
-                `Return quantity for ${orderItem.product.name} must include the matching free product for this offer.`,
-              );
-            }
-          }
-
-          if (returnedQuantity + damagedQuantity > dispatchedQuantity) {
-            throw new BadRequestException(
-              `Returned + damaged quantity cannot exceed dispatched quantity for ${orderItem.product.name}`,
-            );
-          }
-
-          const deliveredQuantity = dispatchedQuantity - returnedQuantity - damagedQuantity;
-
-          // Split returns into paid and free components
-          const paidRatio = dispatchedQuantity > 0 ? Number(orderItem.quantity) / dispatchedQuantity : 0;
-          const paidReturnedQuantity = returnedQuantity * paidRatio;
-          const freeReturnedQuantity = returnedQuantity - paidReturnedQuantity;
-
-          await manager.save(
-            manager.create(DeliveryReturnItem, {
-              deliveryReturnId: deliveryReturn.id,
-              productId: itemEntry.productId,
-              dispatchedQuantity,
-              returnedQuantity,
-              paidReturnedQuantity,
-              freeReturnedQuantity,
-              damagedQuantity,
-              deliveredQuantity,
-              note: itemEntry.note,
-              reason: itemEntry.reason,
-            }),
-          );
-
-          totalReturned += returnedQuantity;
-          totalDamaged += damagedQuantity;
-
-          if (returnedQuantity > 0) {
-            await this.stockService.create(
-              {
-                productId: itemEntry.productId,
-                companyId: order.companyId,
-                type: StockMovementType.RETURN_IN,
-                quantity: returnedQuantity,
-                reference: batch.batchNo,
-                note: `Returned from dispatch batch ${batch.batchNo}`,
-              },
-              'Dispatch Return',
-              manager,
-            );
-          }
-
-          if (damagedQuantity > 0) {
-            await manager.save(
-              manager.create(DamageRecord, {
-                batchId: id,
-                orderId: order.id,
-                productId: itemEntry.productId,
-                quantity: damagedQuantity,
-                reason: itemEntry.reason,
-                note: itemEntry.note,
-              }),
-            );
-
-            // Damaged items remain out of sellable stock (already deducted at dispatch).
-            // We record a 0-quantity movement just for the audit trail of the damage event.
-            await this.stockService.create(
-              {
-                productId: itemEntry.productId,
-                companyId: order.companyId,
-                type: StockMovementType.DAMAGE,
-                quantity: 0,
-                reference: batch.batchNo,
-                note: `Damaged ${damagedQuantity} unit(s) in dispatch batch ${batch.batchNo}`,
-              },
-              'Dispatch Damage',
-              manager,
-            );
-          }
-
-          const deliveredChargeableQuantity = Math.max(
-            0,
-            Math.min(
-              Number(orderItem.quantity),
-              deliveredQuantity,
-            ),
-          );
-          const itemNetPerPaidUnit =
-            Number(orderItem.quantity) > 0
-              ? Number(orderItem.lineTotal) / Number(orderItem.quantity)
-              : 0;
-          const soldAmount = deliveredChargeableQuantity * itemNetPerPaidUnit;
-
-          const itemAggregate = aggregate.get(itemEntry.productId) ?? {
-            returned: 0,
-            damaged: 0,
-            delivered: 0,
-            soldAmount: 0,
-          };
-
-          aggregate.set(itemEntry.productId, {
-            returned: itemAggregate.returned + returnedQuantity,
-            damaged: itemAggregate.damaged + damagedQuantity,
-            delivered: itemAggregate.delivered + deliveredQuantity,
-            soldAmount: itemAggregate.soldAmount + soldAmount,
-          });
-
-          await manager.update(OrderItem, orderItem.id, {
-            deliveredQuantity,
-            returnedQuantity,
-            damagedQuantity,
-          });
-        }
-
-        const calculatedSettlement = this.calculateOrderSettlement(order);
-        const nextStatus =
-          totalReturned + totalDamaged === 0
-            ? OrderStatus.DELIVERED
-            : calculatedSettlement.deliveredQuantity > 0
-              ? OrderStatus.PARTIALLY_DELIVERED
-              : OrderStatus.RETURNED_PARTIAL;
-
-        await manager.update(Order, order.id, {
-          status: nextStatus,
-          actualSoldAmount: calculatedSettlement.finalSoldAmount,
-          dueAmount: Math.max(
-            0,
-            calculatedSettlement.finalSoldAmount - Number(order.advancePaid || 0),
-          ),
-          deliveredAt: new Date(),
-        });
-
-        await manager.update(DispatchBatchOrder, batchOrder.id, {
-          finalSoldAmount: calculatedSettlement.finalSoldAmount,
-          dueAmount: Math.max(
-            0,
-            calculatedSettlement.finalSoldAmount - Number(order.advancePaid || 0),
-          ),
+        await manager.update(OrderItem, orderItem.id, {
+          deliveredPaidQuantity: finalPaidDelivered,
+          deliveredFreeQuantity: finalDeliveredFree,
+          returnedPaidQuantity: returnedPaidQty,
+          returnedFreeQuantity: 0,
+          damagedPaidQuantity: damagedPaidQty,
+          damagedFreeQuantity: 0,
         });
       }
 
-      for (const batchItem of batch.items) {
-        const next = aggregate.get(batchItem.productId) ?? {
+      finalSoldAmount = this.applyOrderDiscount(order, finalSoldAmount);
+      const cashExpected = Math.max(0, Number((finalSoldAmount - Number(order.advancePaid || 0)).toFixed(2)));
+
+      // Default to cashExpected if cashCollected is not provided (e.g. legacy or simplified submission)
+      const cashCollected = dto.cashCollected !== undefined ? Number(dto.cashCollected) : cashExpected;
+      const dueAmount = Math.max(0, Number((cashExpected - cashCollected).toFixed(2)));
+
+      console.log(`[DeliveryResult] Order #${orderId}: expected=${cashExpected}, collected=${cashCollected}, due=${dueAmount}`);
+
+      if (dueAmount > 0 && !order.shopId) {
+        throw new BadRequestException('Shop is required when delivery has due/baki.');
+      }
+
+      if (cashCollected > cashExpected + 0.01) {
+        throw new BadRequestException('Cash collected cannot exceed the final payable amount');
+      }
+
+      // Validating that the client's dueAmount matches our calculation if provided
+      if (dto.dueAmount !== undefined && Math.abs(Number(dto.dueAmount || 0) - dueAmount) > 0.01) {
+        throw new BadRequestException(`Due amount mismatch. Expected ${dueAmount}, but received ${dto.dueAmount}`);
+      }
+
+      await manager.delete(CashCollection, { batchOrderId: batchOrder.id });
+      if (cashCollected > 0) {
+        await manager.save(CashCollection, manager.create(CashCollection, {
+          batchId: batchOrder.batchId,
+          batchOrderId: batchOrder.id,
+          amount: cashCollected,
+          paymentMode: 'CASH',
+          note: dto.deliveryNote,
+        }));
+      }
+
+      await manager.delete(DeliveryReturn, { batchOrderId: batchOrder.id });
+      await manager.delete(DamageRecord, { batchId: batchOrder.batchId, orderId });
+
+      const returnItems = dto.items.filter((item) => 
+        Number(item.returnedPaidQty || 0) > 0 || 
+        Number(item.returnedFreeQty || 0) > 0 || 
+        Number(item.damagedPaidQty || 0) > 0 || 
+        Number(item.damagedFreeQty || 0) > 0
+      );
+      if (returnItems.length > 0) {
+        const deliveryReturn = await manager.save(DeliveryReturn, manager.create(DeliveryReturn, {
+          batchId: batchOrder.batchId,
+          batchOrderId: batchOrder.id,
+          note: dto.deliveryNote,
+          returnReason: returnItems.map((item) => item.returnReason).filter(Boolean).join(', ') || undefined,
+        }));
+
+        await manager.save(returnItems.map((item) => {
+          const orderItem = order.items.find((oi) => oi.productId === item.productId);
+          return manager.create(DeliveryReturnItem, {
+            deliveryReturnId: deliveryReturn.id,
+            productId: item.productId,
+            returnedPaidQuantity: Number(item.returnedPaidQty || 0),
+            returnedFreeQuantity: Number(item.returnedFreeQty || 0),
+            damagedPaidQuantity: Number(item.damagedPaidQty || 0),
+            damagedFreeQuantity: Number(item.damagedFreeQty || 0),
+            deliveredPaidQuantity: Number(orderItem?.deliveredPaidQuantity || 0),
+            deliveredFreeQuantity: Number(orderItem?.deliveredFreeQuantity || 0),
+            reason: item.returnReason,
+            note: dto.deliveryNote,
+          });
+        }));
+
+        const damageRows = returnItems
+          .filter((item) => Number(item.damagedPaidQty || 0) > 0 || Number(item.damagedFreeQty || 0) > 0)
+          .map((item) => manager.create(DamageRecord, {
+            batchId: batchOrder.batchId,
+            orderId,
+            productId: item.productId,
+            quantity: Number(item.damagedPaidQty || 0) + Number(item.damagedFreeQty || 0),
+            reason: item.damageReason,
+            note: dto.deliveryNote,
+          }));
+        if (damageRows.length > 0) {
+          await manager.save(damageRows);
+        }
+      }
+
+      const completed = dto.status === DeliveryResultStatus.COMPLETED;
+      const nextOrderStatus = completed
+        ? OrderStatus.DELIVERY_COMPLETED
+        : OrderStatus.OUT_FOR_DELIVERY;
+
+      await manager.update(DispatchBatchOrder, batchOrder.id, {
+        finalSoldAmount,
+        collectedAmount: cashCollected,
+        dueAmount,
+        deliveryStatus: completed ? 'COMPLETED' : 'DRAFT',
+        deliveryNote: dto.deliveryNote,
+        deliveryCompletedAt: completed ? new Date() : undefined,
+      });
+
+      await manager.update(Order, orderId, {
+        actualSoldAmount: finalSoldAmount,
+        collectedAmount: cashCollected,
+        dueAmount,
+        deliveryNote: dto.deliveryNote,
+        deliveredAt: completed ? new Date() : order.deliveredAt,
+        status: nextOrderStatus,
+        isLocked: true,
+      });
+
+      await this.recalculateBatchTotals(manager, batchOrder.batchId);
+
+      return manager.findOne(Order, {
+        where: { id: orderId },
+        relations: ['items', 'items.product', 'company', 'route', 'shop', 'deliveryPerson', 'assignedDeliveryMan'],
+      });
+    });
+  }
+
+  private calculateItemSoldAmount(item: OrderItem, deliveredPaid: number): number {
+    const paidQty = Number(item.quantity || 0);
+    if (paidQty <= 0) return 0;
+    const unitPriceAfterItemDiscount = Number(item.lineTotal || 0) / paidQty;
+    return Number(deliveredPaid) * unitPriceAfterItemDiscount;
+  }
+
+  private applyOrderDiscount(order: Order, itemSoldAmount: number) {
+    const subtotal = Number(order.subtotal || 0);
+    const invoiceDiscountApplied = subtotal > 0
+      ? Number(order.discountAmount || 0) * (itemSoldAmount / subtotal)
+      : 0;
+
+    return Math.max(0, Number((itemSoldAmount - invoiceDiscountApplied).toFixed(2)));
+  }
+
+  private async recalculateBatchTotals(manager: any, batchId: number) {
+    const batch = await manager.findOne(DispatchBatch, {
+      where: { id: batchId },
+      relations: ['orders', 'orders.order', 'orders.order.items', 'items'],
+    });
+    if (!batch) return;
+
+    const productTotals = new Map<number, {
+      returned: number;
+      damaged: number;
+      delivered: number;
+      finalSoldAmount: number;
+    }>();
+
+    let finalSoldValue = 0;
+    let totalCollectedAmount = 0;
+    let totalDueAmount = 0;
+
+    for (const batchOrder of batch.orders) {
+      finalSoldValue += Number(batchOrder.finalSoldAmount || 0);
+      totalCollectedAmount += Number(batchOrder.collectedAmount || 0);
+      totalDueAmount += Number(batchOrder.dueAmount || 0);
+
+      for (const orderItem of batchOrder.order?.items || []) {
+        const existing = productTotals.get(orderItem.productId) || {
           returned: 0,
           damaged: 0,
-          delivered: Number(batchItem.totalDispatchedQty),
-          soldAmount: Number(batchItem.estimatedAmount),
+          delivered: 0,
+          finalSoldAmount: 0,
         };
-
-        await manager.update(DispatchBatchItem, batchItem.id, {
-          totalReturnedQty: next.returned,
-          totalDamagedQty: next.damaged,
-          totalDeliveredQty: next.delivered,
-          finalSoldAmount: next.soldAmount,
-        });
+        const deliveredPaid = Number(orderItem.deliveredPaidQuantity || 0);
+        existing.returned += (Number(orderItem.returnedPaidQuantity || 0) + Number(orderItem.returnedFreeQuantity || 0));
+        existing.damaged += (Number(orderItem.damagedPaidQuantity || 0) + Number(orderItem.damagedFreeQuantity || 0));
+        existing.delivered += (deliveredPaid + Number(orderItem.deliveredFreeQuantity || 0));
+        existing.finalSoldAmount += this.calculateItemSoldAmount(orderItem, deliveredPaid);
+        productTotals.set(orderItem.productId, existing);
       }
+    }
 
-      const refreshed = await this.getDispatchBatch(id);
-      const metrics = refreshed.metrics;
-
-      await manager.update(DispatchBatch, id, {
-        status: DispatchBatchStatus.RETURN_PENDING,
-        returnsRecordedAt: new Date(),
-        returnAdjustedValue:
-          Number(metrics.grossDispatchedValue) - Number(metrics.finalSoldValue),
-        finalSoldValue: metrics.finalSoldValue,
+    for (const item of batch.items || []) {
+      const totals = productTotals.get(item.productId) || {
+        returned: 0,
+        damaged: 0,
+        delivered: Number(item.totalDispatchedQty || 0),
+        finalSoldAmount: Number(item.estimatedAmount || 0),
+      };
+      await manager.update(DispatchBatchItem, item.id, {
+        totalReturnedQty: totals.returned,
+        totalDamagedQty: totals.damaged,
+        totalDeliveredQty: totals.delivered,
+        finalSoldAmount: totals.finalSoldAmount,
       });
+    }
 
-      return this.getDispatchBatch(id);
+    await manager.update(DispatchBatch, batchId, {
+      returnAdjustedValue: finalSoldValue,
+      finalSoldValue,
+      totalCollectedAmount,
+      totalDueAmount,
+      shortageOrExcess: totalCollectedAmount - finalSoldValue,
     });
   }
 
   async settleBatch(id: number, dto: SettleDispatchBatchDto) {
-    const batch = await this.getDispatchBatch(id);
-    if (batch.status === DispatchBatchStatus.SETTLED) {
-      throw new BadRequestException('Batch already settled. No changes allowed.');
-    }
-
-    if (
-      ![
-        DispatchBatchStatus.DISPATCHED,
-        DispatchBatchStatus.RETURN_PENDING,
-        DispatchBatchStatus.PARTIALLY_SETTLED,
-      ].includes(batch.status)
-    ) {
-      throw new BadRequestException('Batch is not ready for settlement');
-    }
-
     return this.dataSource.transaction(async (manager) => {
-      let totalCollected = 0;
-      let totalDue = 0;
-      let shortageOrExcess = 0;
+      // 1. Lock the main batch record first using QueryBuilder to ensure NO joins are generated
+      const lockBatch = await manager.createQueryBuilder(DispatchBatch, 'batch')
+        .setLock('pessimistic_write')
+        .where('batch.id = :id', { id })
+        .getOne();
 
-      for (const collectionInput of dto.collections) {
-        const batchOrder = batch.orders.find(
-          (item) => item.orderId === collectionInput.orderId,
-        );
-        if (!batchOrder) {
-          throw new BadRequestException(
-            `Order #${collectionInput.orderId} is not part of this batch`,
-          );
+      if (!lockBatch) throw new NotFoundException('Batch not found');
+
+      // 2. Now fetch with relations (safe since row is already locked in this transaction)
+      const currentBatch = await manager.findOne(DispatchBatch, {
+        where: { id },
+        relations: ['orders', 'orders.order', 'orders.order.items', 'orders.order.items.product']
+      });
+
+      if (!currentBatch) throw new NotFoundException('Batch not found');
+      if (currentBatch.status === DispatchBatchStatus.SETTLED) throw new BadRequestException('Batch is already settled');
+      if (currentBatch.status === DispatchBatchStatus.CANCELLED) throw new BadRequestException('Cannot settle a cancelled batch');
+
+      // 2. Fail-fast if ANY order is already settled or lacks a shop
+      for (const bo of currentBatch.orders) {
+        if (bo.isSettled || [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE].includes(bo.order?.status)) {
+          throw new BadRequestException(`Order #${bo.orderId} is already settled. Batch settlement rejected.`);
         }
-
-        const order = batchOrder.order;
-        const calculated = this.calculateOrderSettlement(order);
-        const payableAfterAdvance = Math.max(
-          0,
-          calculated.finalSoldAmount - Number(order.advancePaid || 0),
-        );
-        const collectedAmount = Number(collectionInput.collectedAmount || 0);
-        const dueAmount = Math.max(0, payableAfterAdvance - collectedAmount);
-        const orderShortageOrExcess = Number(
-          (collectedAmount - payableAfterAdvance).toFixed(2),
-        );
-
-        await manager.save(
-          manager.create(CashCollection, {
-            batchId: id,
-            batchOrderId: batchOrder.id,
-            amount: collectedAmount,
-            paymentMode: collectionInput.paymentMode || 'CASH',
-            note: collectionInput.note,
-          }),
-        );
-
-        await manager.update(DispatchBatchOrder, batchOrder.id, {
-          collectedAmount,
-          dueAmount,
-          shortageOrExcess: orderShortageOrExcess,
-          isSettled: true,
-        });
-
-        await manager.update(Order, order.id, {
-          actualSoldAmount: calculated.finalSoldAmount,
-          collectedAmount,
-          dueAmount,
-          settlementNote: collectionInput.note,
-          settledAt: dueAmount === 0 ? new Date() : undefined,
-          status:
-            dueAmount === 0
-              ? OrderStatus.SETTLED
-              : calculated.deliveredQuantity ===
-                  calculated.dispatchedQuantity
-                ? OrderStatus.DELIVERED
-                : OrderStatus.PARTIALLY_DELIVERED,
-        });
-
-        // Update Due Record via shared service
-        await this.duesService.upsertDue(order, dueAmount, manager);
-
-        totalCollected += collectedAmount;
-        totalDue += dueAmount;
-        shortageOrExcess += orderShortageOrExcess;
+        if (!bo.order?.shopId && bo.dueAmount > 0) {
+          throw new BadRequestException(`Order #${bo.orderId} has a due amount but no linked shop. Settlement rejected.`);
+        }
       }
 
-      const finalSoldValue = batch.orders.reduce((sum, batchOrder) => {
-        const order = batchOrder.order;
-        return sum + this.calculateOrderSettlement(order).finalSoldAmount;
-      }, 0);
+      let totalReportedCollected = 0;
+      let totalExpectedCash = 0;
+      let totalFinalValue = 0;
 
+      // 3. Process each order with mathematical precision
+      for (const batchOrder of currentBatch.orders) {
+        const order = batchOrder.order;
+        if (!order) continue;
+
+        const settlementItems = order.items.map(item => ({
+          productId: item.productId,
+          returnedQuantity: Number(item.returnedPaidQuantity || 0) + Number(item.returnedFreeQuantity || 0),
+          damagedQuantity: Number(item.damagedPaidQuantity || 0) + Number(item.damagedFreeQuantity || 0),
+        }));
+
+        // Settle individual order (Calculates finalSoldAmount and returns stock)
+        const settledOrder = await this.ordersService.settleOrder(order.id, {
+          items: settlementItems,
+          collectedAmount: Number(batchOrder.collectedAmount || 0),
+          dueAmount: Number(batchOrder.dueAmount || 0),
+          settlementNote: dto.note || batchOrder.deliveryNote,
+        } as any, manager);
+
+        await manager.update(DispatchBatchOrder, batchOrder.id, {
+          isSettled: true,
+          deliveryStatus: 'COMPLETED',
+        });
+
+        totalReportedCollected += Number(batchOrder.collectedAmount || 0);
+        totalFinalValue += Number(settledOrder.actualSoldAmount);
+        totalExpectedCash += Math.max(0, Number(settledOrder.actualSoldAmount) - Number(settledOrder.advancePaid || 0));
+      }
+
+      // 4. Triple-Check Reconciliation
+      const actualCashReceived = Number(dto.actualCashReceived ?? totalReportedCollected);
+      const cashDiscrepancy = actualCashReceived - totalReportedCollected;
+
+      // 5. Update Batch with Audit Metadata
       await manager.update(DispatchBatch, id, {
-        status:
-          totalDue === 0
-            ? DispatchBatchStatus.SETTLED
-            : DispatchBatchStatus.PARTIALLY_SETTLED,
-        finalSoldValue,
-        totalAdvancePaid: batch.orders.reduce(
-          (sum, item) => sum + Number(item.order.advancePaid || 0),
-          0,
-        ),
-        totalCollectedAmount: totalCollected,
-        totalDueAmount: totalDue,
-        shortageOrExcess,
-        settlementNote: dto.note,
+        status: DispatchBatchStatus.SETTLED,
         settledAt: new Date(),
+        totalCollectedAmount: totalReportedCollected,
+        finalSoldValue: totalFinalValue,
+        shortageOrExcess: cashDiscrepancy,
+        settlementNote: `${dto.note || ''} [Triple-Check: ExpectedCash=${totalExpectedCash}, Reported=${totalReportedCollected}, Actual=${actualCashReceived}]`.trim()
       });
 
       return this.getDispatchBatch(id);
     });
   }
 
-  async getMorningReport(id: number) {
-    const batch = await this.getDispatchBatch(id);
+
+
+  async getDashboard(date?: string, user?: any) {
+    const where: any = {};
+    if (user && user.role === Role.DELIVERY_MAN) {
+      const userId = user.id || user.sub;
+      if (userId) {
+        where.assignedDeliveryManId = userId;
+      } else {
+        where.assignedDeliveryManId = '00000000-0000-0000-0000-000000000000';
+      }
+    }
 
     return {
-      batchId: batch.id,
-      batchNo: batch.batchNo,
-      dispatchDate: batch.dispatchDate,
-      deliveryPerson: batch.deliveryPerson,
-      company: batch.company,
-      route: batch.route,
-      marketArea: batch.marketArea,
-      selectedOrders: batch.orders.map((batchOrder) => ({
-        orderId: batchOrder.order.id,
-        shopName: batchOrder.order.shop?.name ?? 'Direct Order',
-        orderDate: batchOrder.order.orderDate,
-        status: batchOrder.order.status,
-        estimatedAmount: batchOrder.estimatedAmount,
-        items: batchOrder.order.items.map((item) => ({
-          productName: item.product.name,
-          quantity: Number(item.quantity),
-          freeQuantity: Number(item.freeQuantity || 0),
-          dispatchedQuantity: Number(item.quantity) + Number(item.freeQuantity || 0),
-          lineTotal: item.lineTotal,
-        })),
-      })),
-      itemWiseTotals: batch.items.map((item) => ({
-        productName: item.product.name,
-        quantity: item.totalDispatchedQty,
-        estimatedAmount: item.estimatedAmount,
-      })),
-      estimatedTotalAmount: batch.grossDispatchedValue,
-    };
-  }
-
-  async getFinalReport(id: number) {
-    const batch = await this.getDispatchBatch(id);
-    const metrics = batch.metrics;
-
-    return {
-      batchId: batch.id,
-      batchNo: batch.batchNo,
-      dispatchDate: batch.dispatchDate,
-      deliveryPerson: batch.deliveryPerson,
-      route: batch.route,
-      company: batch.company,
-      summary: metrics,
-      orders: batch.orders.map((batchOrder) => {
-        const settlement = this.calculateOrderSettlement(batchOrder.order);
-
-        return {
-          orderId: batchOrder.order.id,
-          shopName: batchOrder.order.shop?.name ?? 'Direct Order',
-          status: batchOrder.order.status,
-          advancePaid: batchOrder.order.advancePaid,
-          collectedAmount: batchOrder.collectedAmount,
-          dueAmount: batchOrder.dueAmount,
-          shortageOrExcess: batchOrder.shortageOrExcess,
-          calculations: settlement,
-          items: batchOrder.order.items.map((item) => ({
-            productName: item.product.name,
-            dispatchedQuantity:
-              Number(item.quantity) + Number(item.freeQuantity || 0),
-            returnedQuantity: item.returnedQuantity,
-            damagedQuantity: item.damagedQuantity,
-            deliveredQuantity: item.deliveredQuantity,
-          })),
-        };
+      totalBatches: await this.batchRepository.count({ where }),
+      pendingBatches: await this.batchRepository.count({
+        where: { ...where, status: In([DispatchBatchStatus.DRAFT, DispatchBatchStatus.PRINTED]) }
       }),
-      productSummary: batch.items.map((item) => ({
-        productName: item.product.name,
-        dispatched: item.totalDispatchedQty,
-        returned: item.totalReturnedQty,
-        damaged: item.totalDamagedQty,
-        delivered: item.totalDeliveredQty,
-        finalSoldAmount: item.finalSoldAmount,
-      })),
     };
   }
 
-  async getReports(query: QueryDispatchBatchesDto) {
-    const batches = await this.getDispatchBatches(query);
+  async getReports(query: QueryDispatchBatchesDto, user?: any) {
+    const batches = await this.getDispatchBatches(query, user);
 
-    return {
-      filters: query,
-      rows: batches.map((batch) => ({
-        id: batch.id,
-        batchNo: batch.batchNo,
-        dispatchDate: batch.dispatchDate,
-        status: batch.status,
-        deliveryPerson: batch.deliveryPerson?.name,
-        totalOrders: batch.totalOrders,
-        grossDispatchedValue: batch.grossDispatchedValue,
-        finalSoldValue: batch.finalSoldValue,
-        totalCollectedAmount: batch.totalCollectedAmount,
-        totalDueAmount: batch.totalDueAmount,
-      })),
-      totals: batches.reduce(
-        (acc, batch) => ({
-          grossDispatchedValue:
-            acc.grossDispatchedValue + Number(batch.grossDispatchedValue || 0),
-          finalSoldValue: acc.finalSoldValue + Number(batch.finalSoldValue || 0),
-          totalCollectedAmount:
-            acc.totalCollectedAmount + Number(batch.totalCollectedAmount || 0),
-          totalDueAmount: acc.totalDueAmount + Number(batch.totalDueAmount || 0),
-        }),
-        {
-          grossDispatchedValue: 0,
-          finalSoldValue: 0,
-          totalCollectedAmount: 0,
-          totalDueAmount: 0,
-        },
-      ),
-    };
-  }
+    const rows = batches.map(batch => ({
+      id: batch.id,
+      batchNo: batch.batchNo,
+      dispatchDate: batch.dispatchDate,
+      deliveryPerson: batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name || 'Unassigned',
+      grossDispatchedValue: Number(batch.grossDispatchedValue || 0),
+      finalSoldValue: Number(batch.finalSoldValue || 0),
+      totalCollectedAmount: Number(batch.totalCollectedAmount || 0),
+      totalDueAmount: Number(batch.totalDueAmount || 0),
+    }));
 
-  async getDashboard(date?: string) {
-    const queryDate = date || new Date().toISOString().split('T')[0];
-    
-    // Total batches (all time)
-    const allBatches = await this.getDispatchBatches({});
-    // Today's batches
-    const todayBatches = await this.getDispatchBatches({ dispatchDate: queryDate });
-
-    const calcSum = (arr: any[], key: string) => arr.reduce((sum, item) => sum + Number(item[key] || 0), 0);
-    const filterStatus = (arr: any[], statuses: string[]) => arr.filter(b => statuses.includes(b.status));
-
-    return {
-      totalBatches: allBatches.length,
-      todayBatches: todayBatches.length,
-      draftBatches: filterStatus(allBatches, [DispatchBatchStatus.DRAFT, DispatchBatchStatus.PRINTED]).length,
-      dispatchedBatches: filterStatus(allBatches, [DispatchBatchStatus.DISPATCHED]).length,
-      returnPending: filterStatus(allBatches, [DispatchBatchStatus.RETURN_PENDING]).length,
-      settledBatches: filterStatus(allBatches, [DispatchBatchStatus.SETTLED, DispatchBatchStatus.PARTIALLY_SETTLED]).length,
-      todaySettled: todayBatches.filter(b => b.settledAt && isTodayBD(b.settledAt)).length, // rough estimate if settledAt is present
-      
-      totalDispatchAmount: calcSum(allBatches, 'grossDispatchedValue'),
-      todayDispatchAmount: calcSum(todayBatches, 'grossDispatchedValue'),
-      
-      totalFinalSold: calcSum(allBatches, 'finalSoldValue'),
-      todayFinalSold: calcSum(todayBatches, 'finalSoldValue'),
-      
-      totalReturnedQty: allBatches.reduce((sum, b) => sum + (b.items?.reduce((s: any, i: any) => s + Number(i.totalReturnedQty || 0), 0) || 0), 0),
-      todayReturnedQty: todayBatches.reduce((sum, b) => sum + (b.items?.reduce((s: any, i: any) => s + Number(i.totalReturnedQty || 0), 0) || 0), 0),
-      
-      totalCollected: calcSum(allBatches, 'totalCollectedAmount'),
-      todayCollected: calcSum(todayBatches, 'totalCollectedAmount'),
-      
-      totalDue: calcSum(allBatches, 'totalDueAmount'),
-      todayDue: calcSum(todayBatches, 'totalDueAmount'),
-
-      // Fallback old keys
-      grossDispatchedValue: calcSum(allBatches, 'grossDispatchedValue'),
-      finalSoldValue: calcSum(allBatches, 'finalSoldValue'),
-      totalDueAmount: calcSum(allBatches, 'totalDueAmount'),
-      totalCollections: calcSum(allBatches, 'totalCollectedAmount'),
-    };
-  }
-
-  private async generateBatchNo(manager: DataSource['manager'], date: string) {
-    const count = await manager.count(DispatchBatch, {
-      where: { dispatchDate: new Date(date) },
+    const totals = rows.reduce((acc, row) => ({
+      grossDispatchedValue: acc.grossDispatchedValue + row.grossDispatchedValue,
+      finalSoldValue: acc.finalSoldValue + row.finalSoldValue,
+      totalCollectedAmount: acc.totalCollectedAmount + row.totalCollectedAmount,
+      totalDueAmount: acc.totalDueAmount + row.totalDueAmount,
+    }), {
+      grossDispatchedValue: 0,
+      finalSoldValue: 0,
+      totalCollectedAmount: 0,
+      totalDueAmount: 0,
     });
 
-    const compactDate = date.replaceAll('-', '');
-    return `DB-${compactDate}-${String(count + 1).padStart(3, '0')}`;
+    return { rows, totals };
   }
 
-  private async getActiveBatchOrderIds() {
-    const batchOrders = await this.batchOrderRepository.find({
-      relations: ['batch'],
-    });
+  async getMorningReport(id: number, user?: any) {
+    const batch = await this.getDispatchBatch(id, user) as any;
+    return this.formatBatchForReport(batch);
+  }
 
-    return new Set(
-      batchOrders
-        .filter((batchOrder) =>
-          ![DispatchBatchStatus.SETTLED, DispatchBatchStatus.CANCELLED].includes(
-            batchOrder.batch.status,
-          ),
-        )
-        .map((batchOrder) => batchOrder.orderId),
-    );
+  async getFinalReport(id: number, user?: any) {
+    const batch = await this.getDispatchBatch(id, user) as any;
+    return this.formatBatchForReport(batch);
+  }
+
+  async markMorningPrinted(id: number) {
+    await this.batchRepository.update(id, {
+      status: DispatchBatchStatus.PRINTED,
+      isMorningPrinted: true,
+      morningPrintedAt: new Date(),
+    });
+    return this.getDispatchBatch(id);
+  }
+
+  private generateBatchNo(manager: any, date: string): string {
+    const d = new Date(date);
+    return `BCH-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${Math.floor(Math.random() * 1000)}`;
   }
 
   private calculateBatchSettlement(batch: DispatchBatch) {
-    const orderCalculations = batch.orders.map((batchOrder) =>
-      this.calculateOrderSettlement(batchOrder.order),
-    );
-
-    const grossDispatchedValue = batch.orders.reduce(
-      (sum, batchOrder) => sum + Number(batchOrder.estimatedAmount || 0),
-      0,
-    );
-    const finalSoldValue = orderCalculations.reduce(
-      (sum, calc) => sum + calc.finalSoldAmount,
-      0,
-    );
-    const totalAdvancePaid = batch.orders.reduce(
-      (sum, batchOrder) => sum + Number(batchOrder.order.advancePaid || 0),
-      0,
-    );
-    const totalCollectedAmount = batch.orders.reduce(
-      (sum, batchOrder) => sum + Number(batchOrder.collectedAmount || 0),
-      0,
-    );
-    const totalDueAmount = batch.orders.reduce(
-      (sum, batchOrder) => sum + Number(batchOrder.dueAmount || 0),
-      0,
-    );
+    const orders = batch.orders || [];
+    const items = batch.items || [];
+    const totalReturnedQty = items.reduce((sum, item) => sum + Number(item.totalReturnedQty || 0), 0);
+    const totalDamagedQty = items.reduce((sum, item) => sum + Number(item.totalDamagedQty || 0), 0);
+    const totalDeliveredQty = items.reduce((sum, item) => sum + Number(item.totalDeliveredQty || 0), 0);
+    const completedOrders = orders.filter((order) => order.deliveryStatus === 'COMPLETED' || order.isSettled).length;
 
     return {
-      grossDispatchedValue: Number(grossDispatchedValue.toFixed(2)),
-      returnAdjustedValue: Number((grossDispatchedValue - finalSoldValue).toFixed(2)),
-      finalSoldValue: Number(finalSoldValue.toFixed(2)),
-      totalAdvancePaid: Number(totalAdvancePaid.toFixed(2)),
-      totalCollectedAmount: Number(totalCollectedAmount.toFixed(2)),
-      totalDueAmount: Number(totalDueAmount.toFixed(2)),
-      shortageOrExcess: Number((totalCollectedAmount - Math.max(0, finalSoldValue - totalAdvancePaid)).toFixed(2)),
-      orders: orderCalculations,
-    };
-  }
-
-  private calculateOrderSettlement(order: Order): CalculatedOrderSettlement {
-    let dispatchedQuantity = 0;
-    let returnedQuantity = 0;
-    let damagedQuantity = 0;
-    let deliveredQuantity = 0;
-    let deliveredSubtotal = 0;
-
-    for (const item of order.items) {
-      const dispatched = Number(item.quantity) + Number(item.freeQuantity || 0);
-      const returned = Number(item.returnedQuantity || 0);
-      const damaged = Number(item.damagedQuantity || 0);
-      const delivered = dispatched - returned - damaged;
-      const deliveredChargeableQuantity = dispatched > 0 
-        ? delivered * (Number(item.quantity) / dispatched)
-        : 0;
-      const itemNetPerPaidUnit =
-        Number(item.quantity) > 0
-          ? Number(item.lineTotal) / Number(item.quantity)
-          : 0;
-
-      dispatchedQuantity += dispatched;
-      returnedQuantity += returned;
-      damagedQuantity += damaged;
-      deliveredQuantity += delivered;
-      deliveredSubtotal += deliveredChargeableQuantity * itemNetPerPaidUnit;
-    }
-
-    const invoiceDiscountApplied =
-      Number(order.subtotal) > 0
-        ? Number(order.discountAmount || 0) *
-          (deliveredSubtotal / Number(order.subtotal))
-        : 0;
-
-    const finalSoldAmount = Math.max(
-      0,
-      Number((deliveredSubtotal - invoiceDiscountApplied).toFixed(2)),
-    );
-
-    return {
-      orderId: order.id,
-      dispatchedQuantity: Number(dispatchedQuantity.toFixed(2)),
-      returnedQuantity: Number(returnedQuantity.toFixed(2)),
-      damagedQuantity: Number(damagedQuantity.toFixed(2)),
-      deliveredQuantity: Number(deliveredQuantity.toFixed(2)),
-      deliveredSubtotal: Number(deliveredSubtotal.toFixed(2)),
-      invoiceDiscountApplied: Number(invoiceDiscountApplied.toFixed(2)),
-      finalSoldAmount,
+      completedOrders,
+      pendingOrders: Math.max(0, orders.length - completedOrders),
+      totalReturnedQty,
+      totalDamagedQty,
+      totalDeliveredQty,
+      totalCashExpected: orders.reduce((sum, batchOrder) => {
+        return sum + Math.max(0, Number(batchOrder.finalSoldAmount || 0) - Number(batchOrder.order?.advancePaid || 0));
+      }, 0),
+      totalCashCollected: orders.reduce((sum, batchOrder) => sum + Number(batchOrder.collectedAmount || 0), 0),
+      totalDueCreated: orders.reduce((sum, batchOrder) => sum + Number(batchOrder.dueAmount || 0), 0),
     };
   }
 }

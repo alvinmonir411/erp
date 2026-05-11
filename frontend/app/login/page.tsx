@@ -29,7 +29,13 @@ export default function LoginPage() {
           String(Date.now() + SESSION_DURATION_MS),
         );
       }
-      router.push('/');
+      
+      let target = '/dashboard';
+      if (data.user.role === 'SR') target = '/sr-dashboard';
+      else if (data.user.role === 'MANAGER') target = '/manager-dashboard';
+      else if (data.user.role === 'DELIVERY_MAN') target = '/my-deliveries';
+      
+      router.push(target);
     } catch (err: any) {
       setError(err.message || 'Login failed. Invalid credentials.');
     } finally {

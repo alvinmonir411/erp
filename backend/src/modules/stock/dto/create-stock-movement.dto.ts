@@ -21,4 +21,12 @@ export class CreateStockMovementDto {
   @IsString()
   @IsOptional()
   reference?: string;
+
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string;
+
+  @IsNumber()
+  @IsOptional()
+  balanceAfter?: number;
 }

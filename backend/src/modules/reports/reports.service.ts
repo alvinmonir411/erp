@@ -4,6 +4,7 @@ import { Repository, DataSource, Brackets } from 'typeorm';
 import { Order, OrderItem } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/orders.constants';
 import { getBDDayRange, isTodayBDDate } from '../../common/utils/date.utils';
+import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
 export class ReportsService {
@@ -15,7 +16,7 @@ export class ReportsService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async getFreeQuantityReport(filters: any) {
+  async getFreeQuantityReport(filters: any, user?: any) {
     const qb = this.orderItemsRepository.createQueryBuilder('item')
       .leftJoinAndSelect('item.product', 'product')
       .leftJoinAndSelect('item.order', 'order')
@@ -24,6 +25,10 @@ export class ReportsService {
       .leftJoinAndSelect('order.shop', 'shop')
       .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
       .where('item.freeQuantity > 0');
+
+    if (user && user.role === Role.SR) {
+      qb.andWhere('order.createdById = :userId', { userId: user.id || user.sub });
+    }
 
     // Apply Filters
     if (filters.dateMode === 'Today') {

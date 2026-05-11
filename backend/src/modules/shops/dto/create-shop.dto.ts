@@ -37,4 +37,13 @@ export class CreateShopDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  companyId: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
 }

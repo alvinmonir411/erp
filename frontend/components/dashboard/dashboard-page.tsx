@@ -147,8 +147,10 @@ export function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Total Products" value={formatNumber(stock.totalProducts)} icon={Layers} colorTheme="slate" />
-            {money.stockValue > 0 && <StatCard label="Stock Value" value={formatCurrency(stock.stockValue)} icon={DollarSign} colorTheme="indigo" />}
-            <StatCard label="Low Stock Items" value={formatNumber(stock.lowStock || 0)} icon={AlertCircle} colorTheme="amber" />
+            <StatCard label="In Stock" value={formatNumber(stock.inStockProducts)} icon={CheckCircle} colorTheme="emerald" />
+            <StatCard label="Low Stock" value={formatNumber(stock.lowStockProducts)} icon={AlertCircle} colorTheme="amber" />
+            <StatCard label="Out of Stock" value={formatNumber(stock.outOfStockProducts)} icon={XCircle} colorTheme="rose" />
+            {stock.stockValue > 0 && <StatCard label="Stock Value" value={formatCurrency(stock.stockValue)} icon={DollarSign} colorTheme="indigo" />}
           </div>
         </section>
       )}

@@ -207,7 +207,7 @@ export function DeliveryOpsDashboardPage() {
                         </p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-bold text-foreground">{batch.deliveryPerson?.name}</p>
+                        <p className="text-sm font-bold text-foreground">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</p>
                         <p className="mt-1 text-[10px] font-bold text-muted uppercase tracking-tight flex items-center gap-1">
                           <MapPin className="h-3 w-3" /> {batch.route?.name}
                         </p>
@@ -258,7 +258,7 @@ export function DeliveryOpsDashboardPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <p className="text-sm font-black text-foreground">{batch.deliveryPerson?.name}</p>
+                    <p className="text-sm font-black text-foreground">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</p>
                     <p className="text-[10px] font-bold text-muted flex items-center gap-1 uppercase tracking-tight">
                       <MapPin className="h-3 w-3" /> {batch.route?.name}
                     </p>
