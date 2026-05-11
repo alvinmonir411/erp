@@ -9,8 +9,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import { AppModule } from './app.module.js';
-import * as express from 'express';
+import { AppModule } from './app.module';
+// Use default import so express() is callable on both ESM and CJS runtimes.
+// 'import * as express' produces a namespace object, NOT the function itself.
+import express, { Express, Request, Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -29,7 +31,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (status >= 500) {
       try {
-        // Vercel has a read-only filesystem – wrap in try/catch so it never crashes
+        // Vercel has a read-only filesystem – wrapped in try/catch so it never crashes
         const errStr =
           exception instanceof Error
             ? exception.stack || exception.message
@@ -56,18 +58,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
 }
 
 // ── Shared app initialisation ──────────────────────────────────────────────────
-// We cache the initialised app so the serverless function reuses it across
-// warm invocations (cold-start optimisation).
-let cachedApp: express.Express | null = null;
+// Cached so the serverless function reuses the warm NestJS instance across
+// invocations (avoids full cold-start on every request).
+let cachedApp: Express | null = null;
 
-async function createApp(): Promise<express.Express> {
+async function createApp(): Promise<Express> {
   if (cachedApp) return cachedApp;
 
-  const expressApp = express();
+  // express() is callable only when using the default import, not namespace import
+  const expressInstance: Express = express();
 
   const app = await NestFactory.create(
     AppModule,
-    new ExpressAdapter(expressApp),
+    new ExpressAdapter(expressInstance),
     { logger: ['error', 'warn', 'log'] },
   );
 
@@ -91,29 +94,25 @@ async function createApp(): Promise<express.Express> {
 
   await app.init();
 
-  cachedApp = expressApp;
-  return expressApp;
+  cachedApp = expressInstance;
+  return expressInstance;
 }
 
 // ── Local development bootstrap ────────────────────────────────────────────────
-// Only called when running with `nest start` / `ts-node` locally.
+// Only called locally (nest start / ts-node). Skipped entirely on Vercel.
 if (process.env['VERCEL'] !== '1') {
   void (async () => {
-    const expressApp = await createApp();
+    const expressInstance = await createApp();
     const port = Number(process.env['PORT']) || 3001;
-    expressApp.listen(port, () => {
+    expressInstance.listen(port, () => {
       console.log(`🚀 Server running on http://localhost:${port}/api`);
     });
   })();
 }
 
 // ── Vercel serverless default export ──────────────────────────────────────────
-// Vercel invokes this function for every request. `createApp()` is idempotent
-// and returns immediately on warm invocations due to the cache above.
-export default async function handler(
-  req: express.Request,
-  res: express.Response,
-) {
+// Vercel calls this for every incoming request.
+export default async function handler(req: Request, res: Response) {
   const app = await createApp();
   app(req, res);
 }
