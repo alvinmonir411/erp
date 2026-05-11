@@ -15,7 +15,7 @@ import { DeliveryPerson } from './delivery-person.entity';
 import { DispatchBatchOrder } from './dispatch-batch-order.entity';
 import { DispatchBatchItem } from './dispatch-batch-item.entity';
 import { ColumnNumericTransformer } from '../../orders/orders.constants';
-import { User } from 'src/modules/users/entities/user.entity';
+import { User } from '../../users/entities/user.entity';
 
 
 export enum DispatchBatchStatus {
