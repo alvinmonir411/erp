@@ -20,7 +20,7 @@ export function useCompanies() {
 export function useProducts(companyId: number | null) {
   return useQuery({
     queryKey: ['products', companyId],
-    queryFn: () => (companyId ? getProducts(companyId) : Promise.resolve([])),
+    queryFn: () => (companyId ? getProducts({ companyId }) : Promise.resolve([])),
     enabled: !!companyId,
     staleTime: 2 * 60 * 1000,
   });

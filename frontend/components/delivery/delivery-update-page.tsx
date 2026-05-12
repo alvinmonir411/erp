@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { getOrder } from '@/lib/api/orders';
-import { submitDeliveryResult, createShopForOrder } from '@/lib/api/delivery-ops';
+import { submitDeliveryResult, createShopForOrder, type DeliveryResultPayload } from '@/lib/api/delivery-ops';
 import { useToast } from '@/components/ui/toast-provider';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { LoadingBlock } from '@/components/ui/loading-block';
@@ -32,9 +32,10 @@ type DeliveryItemState = {
   dispatchedQty: number;
   unitPrice: number;
   lineTotal: number;
-  deliveredQty: string;
-  returnQty: string;
-  damageQty: string;
+  returnedPaidQty: string;
+  returnedFreeQty: string;
+  damagedPaidQty: string;
+  damagedFreeQty: string;
   returnReason: string;
   damageReason: string;
 };
@@ -70,13 +71,7 @@ export function DeliveryUpdatePage({ orderId }: { orderId: number }) {
           const orderedQty = toNumber(item.quantity);
           const freeQty = toNumber(item.freeQuantity);
           const dispatchedQty = orderedQty + freeQty;
-          const returned = toNumber(item.returnedQuantity);
-          const damaged = toNumber(item.damagedQuantity);
-          const savedDelivered = toNumber(item.deliveredQuantity);
-          const deliveredQty = savedDelivered > 0 || returned > 0 || damaged > 0
-            ? savedDelivered
-            : dispatchedQty;
-
+          
           return {
             productId: item.productId,
             productName: item.product?.name || 'Unknown product',
@@ -86,9 +81,10 @@ export function DeliveryUpdatePage({ orderId }: { orderId: number }) {
             dispatchedQty,
             unitPrice: toNumber(item.unitPrice),
             lineTotal: toNumber(item.lineTotal),
-            deliveredQty: String(deliveredQty),
-            returnQty: String(returned),
-            damageQty: String(damaged),
+            returnedPaidQty: String(toNumber(item.returnedPaidQuantity || 0)),
+            returnedFreeQty: String(toNumber(item.returnedFreeQuantity || 0)),
+            damagedPaidQty: String(toNumber(item.damagedPaidQuantity || 0)),
+            damagedFreeQty: String(toNumber(item.damagedFreeQuantity || 0)),
             returnReason: '',
             damageReason: '',
           };
@@ -114,11 +110,15 @@ export function DeliveryUpdatePage({ orderId }: { orderId: number }) {
     if (!order) return 0;
 
     const itemSoldAmount = items.reduce((sum, item) => {
-      const deliveredQty = toNumber(item.deliveredQty);
-      if (item.dispatchedQty <= 0 || item.orderedQty <= 0) return sum;
-      const chargeableDelivered = deliveredQty * (item.orderedQty / item.dispatchedQty);
-      const unitPriceAfterItemDiscount = item.lineTotal / item.orderedQty;
-      return sum + chargeableDelivered * unitPriceAfterItemDiscount;
+      const rp = toNumber(item.returnedPaidQty);
+      const dp = toNumber(item.damagedPaidQty);
+      const soldPaid = Math.max(0, item.orderedQty - rp - dp);
+      
+      const unitPriceAfterItemDiscount = item.orderedQty > 0 
+        ? item.lineTotal / item.orderedQty 
+        : 0;
+        
+      return sum + soldPaid * unitPriceAfterItemDiscount;
     }, 0);
 
     const subtotal = toNumber(order.subtotal);
@@ -151,15 +151,7 @@ export function DeliveryUpdatePage({ orderId }: { orderId: number }) {
   const updateItem = (index: number, patch: Partial<DeliveryItemState>) => {
     setItems((current) => current.map((item, idx) => {
       if (idx !== index) return item;
-      const newItem = { ...item, ...patch };
-
-      // Auto-balance: If return or damage changed, update delivered to match dispatched total
-      if ('returnQty' in patch || 'damageQty' in patch) {
-        const remaining = newItem.dispatchedQty - (toNumber(newItem.returnQty) + toNumber(newItem.damageQty));
-        newItem.deliveredQty = String(Math.max(0, remaining));
-      }
-
-      return newItem;
+      return { ...item, ...patch };
     }));
   };
 
@@ -184,14 +176,19 @@ export function DeliveryUpdatePage({ orderId }: { orderId: number }) {
 
   const validateForm = () => {
     for (const item of items) {
-      const delivered = toNumber(item.deliveredQty);
-      const returned = toNumber(item.returnQty);
-      const damaged = toNumber(item.damageQty);
-      if ([delivered, returned, damaged].some((qty) => qty < 0)) {
+      const rp = toNumber(item.returnedPaidQty);
+      const rf = toNumber(item.returnedFreeQty);
+      const dp = toNumber(item.damagedPaidQty);
+      const df = toNumber(item.damagedFreeQty);
+
+      if ([rp, rf, dp, df].some((qty) => qty < 0)) {
         return `${item.productName}: quantities cannot be negative`;
       }
-      if (delivered + returned + damaged > item.dispatchedQty) {
-        return `${item.productName}: delivered + return + damage cannot exceed ordered quantity`;
+      if (rp + dp > item.orderedQty) {
+        return `${item.productName}: Paid return + damage (${rp + dp}) exceeds ordered quantity (${item.orderedQty})`;
+      }
+      if (rf + df > item.freeQty) {
+        return `${item.productName}: Free return + damage (${rf + df}) exceeds free quantity (${item.freeQty})`;
       }
     }
 
@@ -215,13 +212,14 @@ export function DeliveryUpdatePage({ orderId }: { orderId: number }) {
 
     try {
       setIsSaving(true);
-      const payload = {
+      const payload: DeliveryResultPayload = {
         status,
         items: items.map((item) => ({
           productId: item.productId,
-          deliveredQty: toNumber(item.deliveredQty),
-          returnQty: toNumber(item.returnQty),
-          damageQty: toNumber(item.damageQty),
+          returnedPaidQty: toNumber(item.returnedPaidQty),
+          returnedFreeQty: toNumber(item.returnedFreeQty),
+          damagedPaidQty: toNumber(item.damagedPaidQty),
+          damagedFreeQty: toNumber(item.damagedFreeQty),
           returnReason: item.returnReason || undefined,
           damageReason: item.damageReason || undefined,
         })),
@@ -342,31 +340,50 @@ export function DeliveryUpdatePage({ orderId }: { orderId: number }) {
                 <p className="text-xs font-black text-slate-700">{formatCurrency(item.lineTotal)}</p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
                 <QuantityInput
-                  label="Delivered"
-                  value={item.deliveredQty}
-                  icon={<CheckCircle className="h-3 w-3" />}
-                  tone="emerald"
-                  disabled={isLocked}
-                  onChange={(value) => updateItem(index, { deliveredQty: value })}
-                />
-                <QuantityInput
-                  label="Return"
-                  value={item.returnQty}
+                  label="Return (Paid)"
+                  value={item.returnedPaidQty}
                   icon={<Undo2 className="h-3 w-3" />}
                   tone="rose"
                   disabled={isLocked}
-                  onChange={(value) => updateItem(index, { returnQty: value })}
+                  onChange={(value) => updateItem(index, { returnedPaidQty: value })}
                 />
                 <QuantityInput
-                  label="Damage"
-                  value={item.damageQty}
+                  label="Return (Free)"
+                  value={item.returnedFreeQty}
+                  icon={<Undo2 className="h-3 w-3" />}
+                  tone="emerald"
+                  disabled={isLocked || item.freeQty === 0}
+                  onChange={(value) => updateItem(index, { returnedFreeQty: value })}
+                />
+                <QuantityInput
+                  label="Damage (Paid)"
+                  value={item.damagedPaidQty}
                   icon={<AlertTriangle className="h-3 w-3" />}
                   tone="amber"
                   disabled={isLocked}
-                  onChange={(value) => updateItem(index, { damageQty: value })}
+                  onChange={(value) => updateItem(index, { damagedPaidQty: value })}
                 />
+                <QuantityInput
+                  label="Damage (Free)"
+                  value={item.damagedFreeQty}
+                  icon={<AlertTriangle className="h-3 w-3" />}
+                  tone="slate"
+                  disabled={isLocked || item.freeQty === 0}
+                  onChange={(value) => updateItem(index, { damagedFreeQty: value })}
+                />
+              </div>
+
+              <div className="flex items-center gap-4 rounded-xl bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                <span className="flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3 text-emerald-600" />
+                  Delivered Paid: {Math.max(0, item.orderedQty - toNumber(item.returnedPaidQty) - toNumber(item.damagedPaidQty))}
+                </span>
+                <span className="flex items-center gap-1 border-l border-slate-200 pl-4">
+                  <CheckCircle className="h-3 w-3 text-emerald-400" />
+                  Delivered Free: {Math.max(0, item.freeQty - toNumber(item.returnedFreeQty) - toNumber(item.damagedFreeQty))}
+                </span>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -556,7 +573,7 @@ function QuantityInput({
   label: string;
   value: string;
   icon: ReactNode;
-  tone: 'emerald' | 'rose' | 'amber';
+  tone: 'emerald' | 'rose' | 'amber' | 'slate';
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
@@ -564,6 +581,7 @@ function QuantityInput({
     emerald: 'text-emerald-600 focus:ring-emerald-500/10',
     rose: 'text-rose-600 focus:ring-rose-500/10',
     amber: 'text-amber-600 focus:ring-amber-500/10',
+    slate: 'text-slate-600 focus:ring-slate-500/10',
   }[tone];
 
   return (

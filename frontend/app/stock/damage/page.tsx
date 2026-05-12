@@ -38,7 +38,7 @@ export default function DamageEntryPage() {
     }
     
     Promise.all([
-      getProducts(Number(companyId)),
+      getProducts({ companyId: Number(companyId) }),
       getStockSummary(Number(companyId))
     ]).then(([productData, stockData]) => {
       setProducts(productData);

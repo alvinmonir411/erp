@@ -313,7 +313,7 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
 
       try {
         const [productData, stockData] = await Promise.all([
-          getProducts(Number(companyId)),
+          getProducts({ companyId: Number(companyId) }),
           getStockSummary(Number(companyId))
         ]);
 
@@ -666,6 +666,7 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
 
       const payload: CreateShopPayload = {
         routeId: Number(routeId),
+        companyId: Number(companyId),
         name: shopForm.name.trim(),
         ownerName: shopForm.ownerName.trim() || undefined,
         phone: shopForm.phone.trim() || undefined,

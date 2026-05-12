@@ -31,6 +31,7 @@ interface DueModalProps {
   batchOrders: any[]; // DispatchBatchOrder with order relation
   draftDues: Record<number, number>;
   route: Route;
+  companyId: number;
   onAddDraftDue: (orderId: number, amount: number) => void;
   onSuccess: () => void;
 }
@@ -43,6 +44,7 @@ export function DueModal({
   batchOrders,
   draftDues,
   route,
+  companyId,
   onAddDraftDue,
   onSuccess
 }: DueModalProps) {
@@ -208,7 +210,8 @@ export function DueModal({
       setIsSaving(true);
       const shop = await createShop({
         ...newShop,
-        routeId: route.id
+        routeId: route.id,
+        companyId: companyId
       });
       await updateOrderShop(selectedOrderId, shop.id);
       showSuccessToast('Shop created and linked to order');

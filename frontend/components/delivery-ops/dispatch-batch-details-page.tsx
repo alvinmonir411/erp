@@ -975,6 +975,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         batchOrders={batch.orders}
         draftDues={draftDues}
         route={batch.route}
+        companyId={batch.companyId || batch.orders[0]?.order.companyId || 0}
         onAddDraftDue={(orderId, amount) => {
           setDraftDues(prev => ({ ...prev, [orderId]: amount }));
         }}
