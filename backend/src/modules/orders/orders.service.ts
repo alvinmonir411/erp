@@ -345,55 +345,57 @@ export class OrdersService {
         const orderItem = order.items.find((i: { productId: number; }) => i.productId === itemDto.productId);
         if (!orderItem) continue;
 
-        const dispatchedQty = Number(orderItem.quantity) + Number(orderItem.freeQuantity || 0);
-        const returnedQty = Number(itemDto.returnedQuantity || 0);
-        const damagedQty = Number(itemDto.damagedQuantity || 0);
-        const deliveredQty = Math.max(0, dispatchedQty - returnedQty - damagedQty);
+        const returnedPaid = Number(itemDto.returnedPaidQuantity || 0);
+        const returnedFree = Number(itemDto.returnedFreeQuantity || 0);
+        const damagedPaid = Number(itemDto.damagedPaidQuantity || 0);
+        const damagedFree = Number(itemDto.damagedFreeQuantity || 0);
+
+        const deliveredPaid = Math.max(0, Number(orderItem.quantity) - returnedPaid - damagedPaid);
+        const deliveredFree = Math.max(0, Number(orderItem.freeQuantity) - returnedFree - damagedFree);
 
         // --- Stock Logic ---
         // 1. Returned Stock -> Added back to inventory (idempotent)
-        if (returnedQty > 0) {
+        const totalReturned = returnedPaid + returnedFree;
+        if (totalReturned > 0) {
           await this.stockService.create({
             productId: orderItem.productId,
             companyId: order.companyId,
             type: StockMovementType.RETURN_IN,
-            quantity: returnedQty,
+            quantity: totalReturned,
             reference: `Order #${id}`,
             idempotencyKey: `SETTLE_RET_${id}_${orderItem.productId}`,
-            note: `Returned ${returnedQty} units from order #${id}`,
+            note: `Returned ${totalReturned} units (${returnedPaid} paid, ${returnedFree} free) from order #${id}`,
           }, 'Admin', m);
         }
 
         // 2. Damaged Stock -> Audited but NOT returned to inventory
-        if (damagedQty > 0) {
+        const totalDamaged = damagedPaid + damagedFree;
+        if (totalDamaged > 0) {
           await this.stockService.create({
             productId: orderItem.productId,
             companyId: order.companyId,
             type: StockMovementType.DAMAGE,
-            quantity: -damagedQty, // Deducted from "Potential Stock" or just logged
+            quantity: -totalDamaged,
             reference: `Order #${id}`,
             idempotencyKey: `SETTLE_DAM_${id}_${orderItem.productId}`,
-            note: `Damaged ${damagedQty} units from order #${id}`,
+            note: `Damaged ${totalDamaged} units (${damagedPaid} paid, ${damagedFree} free) from order #${id}`,
           }, 'Admin', m);
         }
 
-        // --- Money Formulas (Triple-Check compliant) ---
-        // Unit price after line-level discount
+        // --- Money Formula ---
         const lineItemPrice = Number(orderItem.quantity) > 0 
           ? Number(orderItem.lineTotal) / Number(orderItem.quantity)
           : 0;
 
-        // Proportional delivered quantity (excluding free units from the "paid" count)
-        const chargeableDelivered = dispatchedQty > 0
-          ? deliveredQty * (Number(orderItem.quantity) / dispatchedQty)
-          : 0;
-
-        totalSoldAmount += chargeableDelivered * lineItemPrice;
+        totalSoldAmount += deliveredPaid * lineItemPrice;
 
         await m.update(OrderItem, orderItem.id, {
-          deliveredPaidQuantity: deliveredQty,
-          returnedPaidQuantity: returnedQty,
-          damagedPaidQuantity: damagedQty,
+          deliveredPaidQuantity: deliveredPaid,
+          deliveredFreeQuantity: deliveredFree,
+          returnedPaidQuantity: returnedPaid,
+          returnedFreeQuantity: returnedFree,
+          damagedPaidQuantity: damagedPaid,
+          damagedFreeQuantity: damagedFree,
         });
       }
 

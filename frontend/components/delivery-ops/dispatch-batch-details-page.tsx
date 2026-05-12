@@ -112,22 +112,29 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         free: string;
       }> = {};
       aggregatedItems.forEach(item => {
-        let returned = 0;
-        let damaged = 0;
-        let returnedFree = 0;
-        batch.orders.forEach(bo => {
-          const boItem = bo.order.items.find(i => i.productId === item.productId);
-          if (boItem) {
-            returned += Number(boItem.returnedPaidQuantity || 0);
-            damaged += Number(boItem.damagedPaidQuantity || 0);
-            returnedFree += Number(boItem.returnedFreeQuantity || 0);
-          }
-        });
-        initialState[item.productId] = {
-          returned: String(returned),
-          damaged: String(damaged),
-          free: String(returnedFree)
-        };
+        // Find aggregated batch item for this product
+        const batchItem = (batch.items || []).find(bi => bi.productId === item.productId) as any;
+
+        // Preferred source: Split fields from BatchItem (if already recalculated)
+        if (batchItem && (batchItem.returnedPaidQty !== undefined || batchItem.returnedFreeQty !== undefined)) {
+          initialState[item.productId] = {
+            returned: String(batchItem.returnedPaidQty || 0),
+            damaged: String(batchItem.damagedPaidQty || 0),
+            free: String(batchItem.returnedFreeQty || 0)
+          };
+        } else {
+          // Fallback: Aggregate split quantities from individual order items
+          const productItems = batch.orders.flatMap(bo => bo.order.items).filter(i => i.productId === item.productId);
+          const totalReturnedPaid = productItems.reduce((sum, i) => sum + Number(i.returnedPaidQuantity || 0), 0);
+          const totalReturnedFree = productItems.reduce((sum, i) => sum + Number(i.returnedFreeQuantity || 0), 0);
+          const totalDamagedPaid = productItems.reduce((sum, i) => sum + Number(i.damagedPaidQuantity || 0), 0);
+
+          initialState[item.productId] = {
+            returned: String(totalReturnedPaid),
+            damaged: String(totalDamagedPaid),
+            free: String(totalReturnedFree)
+          };
+        }
       });
       setBatchReturnState(initialState);
     }
@@ -223,9 +230,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     window.open(`/delivery-ops/batches/${batchId}/print-field-sheet`, "_blank");
   };
 
-  const handlePrintFinalSettlement = async () => {
-    const draftQuery = encodeURIComponent(JSON.stringify(draftDues));
-    window.open(`/delivery-ops/batches/${batchId}/print-final-settlement?draftDues=${draftQuery}`, "_blank");
+  const handlePrintFinalSettlement = () => {
+    window.print();
   };
 
   const handleDispatch = async () => {
@@ -331,11 +337,11 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         // sets status to COMPLETED but collectedAmount might still be 0, which would falsely
         // trigger a full due amount during settlement.
         const explicitCollected = Number(batchOrder.collectedAmount || 0);
-        
+
         return {
           orderId: batchOrder.orderId,
-          collectedAmount: explicitCollected > 0 
-            ? explicitCollected 
+          collectedAmount: explicitCollected > 0
+            ? explicitCollected
             : Math.max(0, finalAmount - advance - draftDue),
           paymentMode: 'CASH',
           note: batchOrder.deliveryNote || undefined,
@@ -390,6 +396,30 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           .no-print {
             display: none !important;
           }
+          
+          body * {
+            visibility: hidden;
+          }
+
+          .final-settlement-print,
+          .final-settlement-print * {
+            visibility: visible;
+          }
+
+          .final-settlement-print {
+            display: block !important;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 40px;
+            background: white;
+            color: black;
+          }
+        }
+
+        .final-settlement-print {
+          display: none;
         }
       `}} />
       {/* Mobile Header */}
@@ -625,9 +655,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   return (
                     <tr
                       key={item.productId}
-                      className={`hover:bg-slate-50/30 transition-colors ${
-                        item.totalFreeQty > 0 ? 'bg-emerald-50/40 border-l-2 border-emerald-400' : ''
-                      }`}
+                      className={`hover:bg-slate-50/30 transition-colors ${item.totalFreeQty > 0 ? 'bg-emerald-50/40 border-l-2 border-emerald-400' : ''
+                        }`}
                     >
                       <td className="px-6 py-4 text-center font-bold text-slate-400">{index + 1}</td>
                       <td className="px-6 py-4 font-bold text-slate-900">
@@ -678,11 +707,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                             ...prev,
                             [item.productId]: { ...state, free: e.target.value }
                           }))}
-                          className={`w-20 rounded-xl border px-2 py-2 text-center font-black outline-none ${
-                            item.totalFreeQty > 0
+                          className={`w-20 rounded-xl border px-2 py-2 text-center font-black outline-none ${item.totalFreeQty > 0
                               ? 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:bg-white focus:ring-2 focus:ring-emerald-500/10'
                               : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
-                          }`}
+                            }`}
                           placeholder={item.totalFreeQty > 0 ? '0' : '—'}
                         />
                       </td>
@@ -981,6 +1009,165 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         }}
         onSuccess={fetchBatch}
       />
+
+      {/* PRINT SECTION (HIDDEN ON SCREEN) */}
+      <div className="final-settlement-print text-black bg-white min-h-screen">
+        <div className="text-center mb-8 border-b-2 border-black pb-4">
+          <h1 className="text-3xl font-black uppercase tracking-tight mb-1">KORIM TRADERS ERP</h1>
+          <h2 className="text-xl font-bold uppercase tracking-widest text-slate-600">Final Batch Settlement</h2>
+          <p className="text-[10px] font-bold mt-2 uppercase">Printed on {new Date().toLocaleString()}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-8 mb-10 text-sm">
+          <div className="space-y-2 border-l-4 border-black pl-4">
+            <div className="flex justify-between border-b border-slate-100 pb-1">
+              <span className="font-bold text-slate-500">Batch ID:</span>
+              <span className="font-black">#BT-{batch.id}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-100 pb-1">
+              <span className="font-bold text-slate-500">Dispatch Date:</span>
+              <span className="font-black">{formatDate(batch.dispatchedAt || batch.createdAt)}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-100 pb-1">
+              <span className="font-bold text-slate-500">Route:</span>
+              <span className="font-black uppercase">{batch.route?.name}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-100 pb-1">
+              <span className="font-bold text-slate-500">Delivery Man:</span>
+              <span className="font-black uppercase">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</span>
+            </div>
+          </div>
+          <div className="space-y-2 border-l-4 border-emerald-500 pl-4">
+            <div className="flex justify-between border-b border-slate-100 pb-1">
+              <span className="font-bold text-slate-500">Settlement Status:</span>
+              <span className="font-black text-emerald-600">FULLY SETTLED</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-100 pb-1">
+              <span className="font-bold text-slate-500">Settled At:</span>
+              <span className="font-black">{formatDate(new Date())}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-100 pb-1">
+              <span className="font-bold text-slate-500">Market Area:</span>
+              <span className="font-black uppercase">{batch.route?.area || 'N/A'}</span>
+            </div>
+          </div>
+        </div>
+
+        <table className="w-full border-2 border-black text-xs mb-10">
+          <thead>
+            <tr className="bg-slate-100 border-b-2 border-black font-black uppercase">
+              <th className="border-r border-black px-2 py-3 text-center">SL</th>
+              <th className="border-r border-black px-2 py-3 text-left">Product Name</th>
+              <th className="border-r border-black px-2 py-3 text-center">Paid Qty</th>
+              <th className="border-r border-black px-2 py-3 text-center">Free Sent</th>
+              <th className="border-r border-black px-2 py-3 text-center">Ret (Paid)</th>
+              <th className="border-r border-black px-2 py-3 text-center">Ret (Free)</th>
+              <th className="border-r border-black px-2 py-3 text-center">Dam (Paid)</th>
+              <th className="border-r border-black px-2 py-3 text-center">Final Sold</th>
+              <th className="border-r border-black px-2 py-3 text-center">Delivered Free</th>
+              <th className="border-r border-black px-2 py-3 text-center">Unit Price</th>
+              <th className="px-2 py-3 text-right">Final Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-black/10">
+            {aggregatedItems.map((item, idx) => {
+              const state = batchReturnState[item.productId] || { returned: '0', damaged: '0', free: '0' };
+              const rPaid = Number(state.returned || 0);
+              const rFree = Number(state.free || 0);
+              const dPaid = Number(state.damaged || 0);
+              const finalSold = Math.max(0, item.totalPaidQty - rPaid - dPaid);
+              const deliveredFree = Math.max(0, item.totalFreeQty - rFree);
+              const lineTotal = finalSold * item.price;
+
+              return (
+                <tr key={item.productId} className="font-bold">
+                  <td className="border-r border-black px-2 py-2 text-center">{idx + 1}</td>
+                  <td className="border-r border-black px-2 py-2">{item.name}</td>
+                  <td className="border-r border-black px-2 py-2 text-center">{formatNumber(item.totalPaidQty)}</td>
+                  <td className="border-r border-black px-2 py-2 text-center">{formatNumber(item.totalFreeQty)}</td>
+                  <td className="border-r border-black px-2 py-2 text-center text-rose-600">{rPaid > 0 ? formatNumber(rPaid) : '—'}</td>
+                  <td className="border-r border-black px-2 py-2 text-center text-rose-500">{rFree > 0 ? formatNumber(rFree) : '—'}</td>
+                  <td className="border-r border-black px-2 py-2 text-center text-amber-600">{dPaid > 0 ? formatNumber(dPaid) : '—'}</td>
+                  <td className="border-r border-black px-2 py-2 text-center text-blue-600">{formatNumber(finalSold)}</td>
+                  <td className="border-r border-black px-2 py-2 text-center text-emerald-600">{formatNumber(deliveredFree)}</td>
+                  <td className="border-r border-black px-2 py-2 text-center font-black text-slate-500">{formatCurrency(item.price)}</td>
+                  <td className="px-2 py-2 text-right font-black">{formatCurrency(lineTotal)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot className="border-t-2 border-black bg-slate-50 font-black uppercase text-sm">
+            <tr>
+              <td colSpan={7} className="border-r border-black px-4 py-3 text-right">Batch Grand Totals:</td>
+              <td className="border-r border-black px-2 py-3 text-center text-blue-700">{formatNumber(finalMetrics?.finalSold || 0)}</td>
+              <td className="border-r border-black px-2 py-3 text-center text-emerald-700">{formatNumber(finalMetrics?.totalFree || 0)}</td>
+              <td className="border-r border-black px-2 py-3 text-center text-slate-400">—</td>
+              <td className="px-2 py-3 text-right text-slate-900">{formatCurrency(finalMetrics?.finalAmount || 0)}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div className="grid grid-cols-2 gap-12 mt-12">
+          <div className="space-y-4">
+            <h3 className="text-sm font-black uppercase tracking-widest border-b border-black pb-1">Settlement Summary</h3>
+            <div className="space-y-1 text-sm font-bold">
+              <div className="flex justify-between">
+                <span>Total Dispatched (Paid):</span>
+                <span>{formatNumber(finalMetrics?.totalQty || 0)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Delivered Free:</span>
+                <span>{formatNumber(finalMetrics?.totalFree || 0)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Returned (Paid):</span>
+                <span>{formatNumber(finalMetrics?.returned || 0)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Damaged (Paid):</span>
+                <span>{formatNumber(finalMetrics?.damaged || 0)}</span>
+              </div>
+              <div className="flex justify-between text-blue-600 font-black border-t border-slate-100 pt-1 mt-1">
+                <span>Final Sold (Paid):</span>
+                <span>{formatNumber(finalMetrics?.finalSold || 0)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-black uppercase tracking-widest border-b border-black pb-1">Financial reconciliation</h3>
+            <div className="space-y-2 text-sm font-bold">
+              <div className="flex justify-between text-lg font-black border-2 border-black p-3 bg-slate-50">
+                <span>Grand Total Amount:</span>
+                <span>{formatCurrency(finalMetrics?.finalAmount || 0)}</span>
+              </div>
+              <div className="flex justify-between text-rose-600 px-3">
+                <span>Total Customer Due/Baki:</span>
+                <span>-{formatCurrency(finalMetrics?.totalDueDraft || 0)}</span>
+              </div>
+              <div className="flex justify-between text-emerald-700 px-3 font-black border-t border-slate-100 pt-2">
+                <span>Net Cash Collectable:</span>
+                <span>{formatCurrency(finalMetrics?.cashCollectable || 0)}</span>
+              </div>
+              <div className="flex justify-between bg-slate-900 text-white p-3 rounded-none mt-4 font-black">
+                <span>Actual Cash Received:</span>
+                <span>{formatCurrency(Number(actualCashReceived || finalMetrics?.cashCollectable || 0))}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-20 mt-32">
+          <div className="text-center">
+            <div className="border-t-2 border-black pt-2 font-black uppercase tracking-widest text-sm">Delivery Man Signature</div>
+            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</p>
+          </div>
+          <div className="text-center">
+            <div className="border-t-2 border-black pt-2 font-black uppercase tracking-widest text-sm">Authorized Admin Signature</div>
+            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase">Korim Traders Warehouse</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

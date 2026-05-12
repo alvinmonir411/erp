@@ -15,7 +15,7 @@ const createTypeOrmOptions = (
     type: 'postgres',
     url: databaseUrl,
     autoLoadEntities: true,
-    synchronize,
+    synchronize: false,
     dropSchema,
     migrationsRun: false,
     ssl: { rejectUnauthorized: false },

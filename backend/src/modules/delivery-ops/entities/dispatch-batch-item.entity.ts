@@ -47,6 +47,24 @@ export class DispatchBatchItem {
     default: 0,
     transformer: new ColumnNumericTransformer(),
   })
+  returnedPaidQty: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  returnedFreeQty: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   totalDamagedQty: number;
 
   @Column({
@@ -56,7 +74,43 @@ export class DispatchBatchItem {
     default: 0,
     transformer: new ColumnNumericTransformer(),
   })
+  damagedPaidQty: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  damagedFreeQty: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   totalDeliveredQty: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  deliveredPaidQty: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  deliveredFreeQty: number;
 
   @Column({
     type: 'decimal',

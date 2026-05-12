@@ -361,6 +361,7 @@ export type DispatchBatchOrder = {
 };
 
 export type DispatchBatch = {
+  items: any[];
   id: number;
   batchNo: string;
   dispatchDate: string;

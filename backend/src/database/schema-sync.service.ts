@@ -327,8 +327,14 @@ export class SchemaSyncService implements OnApplicationBootstrap {
         ALTER TABLE "dispatch_batch_orders" ADD COLUMN IF NOT EXISTS "deliveryNote" TEXT;
         ALTER TABLE "dispatch_batch_orders" ADD COLUMN IF NOT EXISTS "deliveryCompletedAt" TIMESTAMP;
         ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "totalReturnedQty" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "returnedPaidQty" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "returnedFreeQty" DECIMAL(12,2) DEFAULT 0;
         ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "totalDamagedQty" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "damagedPaidQty" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "damagedFreeQty" DECIMAL(12,2) DEFAULT 0;
         ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "totalDeliveredQty" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "deliveredPaidQty" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "deliveredFreeQty" DECIMAL(12,2) DEFAULT 0;
         ALTER TABLE "dispatch_batch_items" ADD COLUMN IF NOT EXISTS "finalSoldAmount" DECIMAL(12,2) DEFAULT 0;
         ALTER TABLE "dispatch_batches" ALTER COLUMN "deliveryPersonId" DROP NOT NULL;
         ALTER TABLE "orders" ALTER COLUMN "deliveryPersonId" DROP NOT NULL;

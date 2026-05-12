@@ -498,9 +498,10 @@ export class DeliveryOpsService {
           const returnedPaidQty = Number(itemDto.returnedPaidQuantity || 0);
           const returnedFreeQty = Number(itemDto.returnedFreeQuantity || 0);
           const damagedPaidQty = Number(itemDto.damagedPaidQuantity || 0);
+          const damagedFreeQty = Number(itemDto.damagedFreeQuantity || 0);
 
           const finalPaidDelivered = Math.max(0, orderedPaidQty - returnedPaidQty - damagedPaidQty);
-          const finalDeliveredFree = Math.max(0, orderedFreeQty - returnedFreeQty);
+          const finalDeliveredFree = Math.max(0, orderedFreeQty - returnedFreeQty - damagedFreeQty);
 
           finalSoldAmount += this.calculateItemSoldAmount(orderItem, finalPaidDelivered);
 
@@ -510,7 +511,7 @@ export class DeliveryOpsService {
             returnedPaidQuantity: returnedPaidQty,
             returnedFreeQuantity: returnedFreeQty,
             damagedPaidQuantity: damagedPaidQty,
-            damagedFreeQuantity: 0,
+            damagedFreeQuantity: damagedFreeQty,
           });
         }
 
@@ -619,22 +620,24 @@ export class DeliveryOpsService {
         const orderedFreeQty = Number(orderItem.freeQuantity || 0);
 
         const returnedPaidQty = Number(itemDto.returnedPaidQty || 0);
+        const returnedFreeQty = Number(itemDto.returnedFreeQty || 0);
         const damagedPaidQty = Number(itemDto.damagedPaidQty || 0);
+        const damagedFreeQty = Number(itemDto.damagedFreeQty || 0);
 
         const finalPaidDelivered = Math.max(0, orderedPaidQty - returnedPaidQty - damagedPaidQty);
-        const finalDeliveredFree = orderedFreeQty;
+        const finalDeliveredFree = Math.max(0, orderedFreeQty - returnedFreeQty - damagedFreeQty);
 
         finalSoldAmount += this.calculateItemSoldAmount(orderItem, finalPaidDelivered);
-        totalReturned += returnedPaidQty;
-        totalDamaged += damagedPaidQty;
+        totalReturned += (returnedPaidQty + returnedFreeQty);
+        totalDamaged += (damagedPaidQty + damagedFreeQty);
 
         await manager.update(OrderItem, orderItem.id, {
           deliveredPaidQuantity: finalPaidDelivered,
           deliveredFreeQuantity: finalDeliveredFree,
           returnedPaidQuantity: returnedPaidQty,
-          returnedFreeQuantity: 0,
+          returnedFreeQuantity: returnedFreeQty,
           damagedPaidQuantity: damagedPaidQty,
-          damagedFreeQuantity: 0,
+          damagedFreeQuantity: damagedFreeQty,
         });
       }
 
@@ -777,8 +780,14 @@ export class DeliveryOpsService {
 
     const productTotals = new Map<number, {
       returned: number;
+      returnedPaid: number;
+      returnedFree: number;
       damaged: number;
+      damagedPaid: number;
+      damagedFree: number;
       delivered: number;
+      deliveredPaid: number;
+      deliveredFree: number;
       finalSoldAmount: number;
     }>();
 
@@ -794,14 +803,32 @@ export class DeliveryOpsService {
       for (const orderItem of batchOrder.order?.items || []) {
         const existing = productTotals.get(orderItem.productId) || {
           returned: 0,
+          returnedPaid: 0,
+          returnedFree: 0,
           damaged: 0,
+          damagedPaid: 0,
+          damagedFree: 0,
           delivered: 0,
+          deliveredPaid: 0,
+          deliveredFree: 0,
           finalSoldAmount: 0,
         };
         const deliveredPaid = Number(orderItem.deliveredPaidQuantity || 0);
-        existing.returned += (Number(orderItem.returnedPaidQuantity || 0) + Number(orderItem.returnedFreeQuantity || 0));
-        existing.damaged += (Number(orderItem.damagedPaidQuantity || 0) + Number(orderItem.damagedFreeQuantity || 0));
-        existing.delivered += (deliveredPaid + Number(orderItem.deliveredFreeQuantity || 0));
+        const deliveredFree = Number(orderItem.deliveredFreeQuantity || 0);
+        const returnedPaid = Number(orderItem.returnedPaidQuantity || 0);
+        const returnedFree = Number(orderItem.returnedFreeQuantity || 0);
+        const damagedPaid = Number(orderItem.damagedPaidQuantity || 0);
+        const damagedFree = Number(orderItem.damagedFreeQuantity || 0);
+
+        existing.returned += (returnedPaid + returnedFree);
+        existing.returnedPaid += returnedPaid;
+        existing.returnedFree += returnedFree;
+        existing.damaged += (damagedPaid + damagedFree);
+        existing.damagedPaid += damagedPaid;
+        existing.damagedFree += damagedFree;
+        existing.delivered += (deliveredPaid + deliveredFree);
+        existing.deliveredPaid += deliveredPaid;
+        existing.deliveredFree += deliveredFree;
         existing.finalSoldAmount += this.calculateItemSoldAmount(orderItem, deliveredPaid);
         productTotals.set(orderItem.productId, existing);
       }
@@ -810,14 +837,26 @@ export class DeliveryOpsService {
     for (const item of batch.items || []) {
       const totals = productTotals.get(item.productId) || {
         returned: 0,
+        returnedPaid: 0,
+        returnedFree: 0,
         damaged: 0,
+        damagedPaid: 0,
+        damagedFree: 0,
         delivered: Number(item.totalDispatchedQty || 0),
+        deliveredPaid: 0,
+        deliveredFree: 0,
         finalSoldAmount: Number(item.estimatedAmount || 0),
       };
       await manager.update(DispatchBatchItem, item.id, {
         totalReturnedQty: totals.returned,
+        returnedPaidQty: totals.returnedPaid,
+        returnedFreeQty: totals.returnedFree,
         totalDamagedQty: totals.damaged,
+        damagedPaidQty: totals.damagedPaid,
+        damagedFreeQty: totals.damagedFree,
         totalDeliveredQty: totals.delivered,
+        deliveredPaidQty: totals.deliveredPaid,
+        deliveredFreeQty: totals.deliveredFree,
         finalSoldAmount: totals.finalSoldAmount,
       });
     }
@@ -881,8 +920,10 @@ export class DeliveryOpsService {
 
         const settlementItems = order.items.map(item => ({
           productId: item.productId,
-          returnedQuantity: Number(item.returnedPaidQuantity || 0) + Number(item.returnedFreeQuantity || 0),
-          damagedQuantity: Number(item.damagedPaidQuantity || 0) + Number(item.damagedFreeQuantity || 0),
+          returnedPaidQuantity: Number(item.returnedPaidQuantity || 0),
+          returnedFreeQuantity: Number(item.returnedFreeQuantity || 0),
+          damagedPaidQuantity: Number(item.damagedPaidQuantity || 0),
+          damagedFreeQuantity: Number(item.damagedFreeQuantity || 0),
         }));
 
         // Use collectedAmount from dto.collections if provided by frontend;

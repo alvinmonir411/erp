@@ -6,10 +6,16 @@ class SettleOrderItemDto {
   productId: number;
 
   @IsNumber()
-  returnedQuantity: number;
+  returnedPaidQuantity: number;
 
   @IsNumber()
-  damagedQuantity: number;
+  returnedFreeQuantity: number;
+
+  @IsNumber()
+  damagedPaidQuantity: number;
+
+  @IsNumber()
+  damagedFreeQuantity: number;
 }
 
 export class SettleOrderDto {
