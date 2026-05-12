@@ -389,6 +389,8 @@ export type DispatchBatch = {
   settledAt?: string;
   note?: string;
   settlementNote?: string;
+  createdAt: string;
+  updatedAt: string;
   orders: DispatchBatchOrder[];
   assignedDeliveryManId?: string | null;
   assignedDeliveryMan?: User | null;
