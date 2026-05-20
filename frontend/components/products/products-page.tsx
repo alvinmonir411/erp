@@ -71,12 +71,8 @@ export function ProductsPage() {
       try {
         setIsLoading(true);
         setError(null);
-        const [companyData, summaryData] = await Promise.all([
-          getCompanies(),
-          getProductsSummary()
-        ]);
+        const companyData = await getCompanies();
         setCompanies(companyData);
-        setSummary(summaryData);
         setSelectedCompanyId(null); // Default to "All Companies" for better overview
       } catch (loadError) {
         setError(
@@ -98,14 +94,17 @@ export function ProductsPage() {
         setIsLoading(true);
         setError(null);
         
-        const response = await getProducts({
-          companyId: selectedCompanyId || undefined,
-          search: searchTerm || undefined,
-          stockLevel: stockLevelFilter !== 'all' ? (stockLevelFilter as any) : undefined,
-          isActive: activeFilter === 'active' ? true : activeFilter === 'inactive' ? false : undefined,
-          page: currentPage,
-          limit: productsPageSize,
-        });
+        const [response, summaryData] = await Promise.all([
+          getProducts({
+            companyId: selectedCompanyId || undefined,
+            search: searchTerm || undefined,
+            stockLevel: stockLevelFilter !== 'all' ? (stockLevelFilter as any) : undefined,
+            isActive: activeFilter === 'active' ? true : activeFilter === 'inactive' ? false : undefined,
+            page: currentPage,
+            limit: productsPageSize,
+          }),
+          getProductsSummary(selectedCompanyId || undefined)
+        ]);
 
         if (Array.isArray(response)) {
           setProducts(response);
@@ -114,6 +113,8 @@ export function ProductsPage() {
           setProducts(response.items || []);
           setTotalProducts(response.total || 0);
         }
+        
+        setSummary(summaryData);
       } catch (loadError) {
         setError(
           loadError instanceof Error
@@ -168,7 +169,7 @@ export function ProductsPage() {
       setTotalProducts(response.total || 0);
     }
 
-    const summaryData = await getProductsSummary();
+    const summaryData = await getProductsSummary(selectedCompanyId || undefined);
     setSummary(summaryData);
   }
 
@@ -279,7 +280,7 @@ export function ProductsPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
         <PageCard
-          title="Products"
+          title={selectedCompanyId ? `${companies.find(c => c.id === selectedCompanyId)?.name || ''} Product Catalog`.trim() : "Products"}
           description="View products by company and verify pricing, unit, and active status from the backend."
           action={
             <div className="flex flex-col gap-3">
