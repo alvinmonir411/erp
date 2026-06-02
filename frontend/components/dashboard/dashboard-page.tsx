@@ -59,6 +59,9 @@ export function DashboardPage() {
   }
 
   const { orders, delivery, money, stock } = d.uiMetrics;
+  const deliveryRate = delivery.totalDispatch > 0 
+    ? `${Math.round((delivery.delivered / delivery.totalDispatch) * 100)}%` 
+    : '0%';
 
   return (
     <div className="space-y-8 pb-20">
@@ -70,13 +73,13 @@ export function DashboardPage() {
             {user?.role === Role.SR ? 'My Orders' : 'Orders Overview'}
           </h2>
         </div>
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard label="Total Orders" value={formatNumber(orders.totalOrders)} icon={ShoppingCart} colorTheme="primary" />
           <StatCard label="Today Orders" value={formatNumber(orders.todayOrdersCount)} icon={ShoppingCart} colorTheme="emerald" />
-          <StatCard label="Total Order Value" value={formatCurrency(orders.totalOrderValue)} icon={DollarSign} colorTheme="primary" />
-          <StatCard label="Today Order Value" value={formatCurrency(orders.todayOrderValue)} icon={TrendingUp} colorTheme="emerald" />
+          <StatCard label="Total Order Value" value={formatCurrency(orders.totalOrderValue)} icon={DollarSign} colorTheme="indigo" />
+          <StatCard label="Today Order Value" value={formatCurrency(orders.todayOrderValue)} icon={TrendingUp} colorTheme="cyan" />
           <StatCard label="Cancelled Orders" value={formatNumber(orders.cancelledOrders)} icon={XCircle} colorTheme="rose" />
-          <StatCard label="Today Cancelled" value={formatNumber(orders.todayCancelled)} icon={XCircle} colorTheme="rose" />
+          <StatCard label="Today Cancelled" value={formatNumber(orders.todayCancelled)} icon={XCircle} colorTheme="violet" />
         </div>
       </section>
 
@@ -88,11 +91,12 @@ export function DashboardPage() {
             {user?.role === Role.SR ? 'My Deliveries' : 'Delivery Operations'}
           </h2>
         </div>
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard label="Total Dispatch" value={formatNumber(delivery.totalDispatch)} icon={Truck} colorTheme="indigo" />
           <StatCard label="Today Dispatch" value={formatNumber(delivery.todayDispatch)} icon={Truck} colorTheme="emerald" />
           <StatCard label="Pending Dispatch" value={formatNumber(delivery.pendingDispatch)} icon={Clock} colorTheme="amber" />
           <StatCard label="Delivered" value={formatNumber(delivery.delivered)} icon={CheckCircle} colorTheme="primary" />
+          <StatCard label="Delivery Completion" value={deliveryRate} icon={TrendingUp} colorTheme="cyan" />
         </div>
       </section>
 
@@ -109,17 +113,20 @@ export function DashboardPage() {
           <StatCard label="Today Final Sold" value={formatCurrency(money.todayFinalSold)} icon={TrendingUp} colorTheme="emerald" />
           <StatCard label="Remaining Due" value={formatCurrency(money.totalDue)} icon={AlertCircle} colorTheme="rose" />
           
-          {user?.role === Role.SR && (
+          {user?.role === Role.SR ? (
             <>
               <StatCard label="Pending Approval" value={formatCurrency(money.pendingCollected)} icon={Clock} colorTheme="amber" />
               <StatCard label="Approved Collection" value={formatCurrency(money.approvedCollected)} icon={CheckCircle} colorTheme="emerald" />
               <StatCard label="Rejected Collection" value={formatCurrency(money.rejectedCollected)} icon={XCircle} colorTheme="rose" />
             </>
-          )}
-
-          {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) && (
+          ) : (
             <>
-              <StatCard label="Total Profit" value={formatCurrency(money.totalProfit)} icon={TrendingUp} colorTheme="emerald" />
+              <StatCard label="Pending Collections" value={formatCurrency(money.pendingCollected)} icon={Clock} colorTheme="amber" />
+              <StatCard label="Approved Collections" value={formatCurrency(money.approvedCollected)} icon={CheckCircle} colorTheme="emerald" />
+              <StatCard label="Rejected Collections" value={formatCurrency(money.rejectedCollected)} icon={XCircle} colorTheme="rose" />
+              {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) && (
+                <StatCard label="Total Profit" value={formatCurrency(money.totalProfit)} icon={TrendingUp} colorTheme="violet" />
+              )}
             </>
           )}
         </div>
@@ -145,12 +152,18 @@ export function DashboardPage() {
             <Package className="h-5 w-5 text-cyan-500" />
             <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Inventory</h2>
           </div>
-          <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Total Products" value={formatNumber(stock.totalProducts)} icon={Layers} colorTheme="slate" />
+          <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+            <StatCard label="Total Products" value={formatNumber(stock.totalProducts)} icon={Layers} colorTheme="indigo" />
+            <StatCard label="Active Products" value={formatNumber(stock.activeProducts)} icon={Activity} colorTheme="cyan" />
+            <StatCard label="Inactive Products" value={formatNumber(stock.inactiveProducts)} icon={Layers} colorTheme="slate" />
             <StatCard label="In Stock" value={formatNumber(stock.inStockProducts)} icon={CheckCircle} colorTheme="emerald" />
             <StatCard label="Low Stock" value={formatNumber(stock.lowStockProducts)} icon={AlertCircle} colorTheme="amber" />
             <StatCard label="Out of Stock" value={formatNumber(stock.outOfStockProducts)} icon={XCircle} colorTheme="rose" />
-            {stock.stockValue > 0 && <StatCard label="Stock Value" value={formatCurrency(stock.stockValue)} icon={DollarSign} colorTheme="indigo" />}
+            {stock.stockValue > 0 ? (
+              <StatCard label="Stock Value" value={formatCurrency(stock.stockValue)} icon={DollarSign} colorTheme="violet" />
+            ) : (
+              <div className="hidden xl:block" />
+            )}
           </div>
         </section>
       )}
@@ -175,14 +188,16 @@ export function DashboardPage() {
             const max = Math.max(...d.charts.last7Days.map((x: any) => x.amount), 1);
             const height = (day.amount / max) * 100;
             return (
-              <div key={day.date} className="group relative flex flex-1 flex-col items-center gap-2 sm:gap-3 min-w-[30px]">
+              <div key={day.date} className="group relative flex flex-1 h-full flex-col items-center min-w-[30px]">
                 <div className="invisible absolute -top-12 z-10 rounded-lg bg-primary px-2 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-bold text-white shadow-xl transition-all group-hover:visible whitespace-nowrap">
                   {formatCurrency(day.amount)}
                 </div>
-                <div
-                  className="w-full rounded-t-lg bg-accent/20 transition-all duration-300 group-hover:bg-accent"
-                  style={{ height: `${Math.max(8, height)}%` }}
-                />
+                <div className="flex-1 w-full flex items-end justify-center mb-2 sm:mb-3">
+                  <div
+                    className="w-full rounded-t-lg bg-accent/20 transition-all duration-300 group-hover:bg-accent"
+                    style={{ height: `${Math.max(8, height)}%` }}
+                  />
+                </div>
                 <span className="text-[8px] sm:text-[10px] font-bold text-muted uppercase tracking-tight whitespace-nowrap">{day.date.split(' ')[0]}</span>
               </div>
             );

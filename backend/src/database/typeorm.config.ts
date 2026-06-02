@@ -3,6 +3,14 @@ import {
   TypeOrmModuleAsyncOptions,
   TypeOrmModuleOptions,
 } from '@nestjs/typeorm';
+import { types } from 'pg';
+
+// Override pg driver parsing for OID 1114 (timestamp without time zone) to parse as UTC.
+// This prevents timezone-offset shifts on local development machines running in non-UTC.
+types.setTypeParser(1114, (stringValue) => {
+  return new Date(stringValue.replace(' ', 'T') + 'Z');
+});
+
 
 const createTypeOrmOptions = (
   configService: ConfigService,

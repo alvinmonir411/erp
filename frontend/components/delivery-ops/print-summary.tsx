@@ -49,6 +49,19 @@ export function PrintSummary({ report, mode, draftDues = {} }: PrintSummaryProps
             padding: 0 !important; 
             max-width: none !important; 
             font-size: 11px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 262mm !important;
+          }
+          .printable-report > div,
+          .printable-report > div > div {
+            display: flex !important;
+            flex-direction: column !important;
+            flex-grow: 1 !important;
+          }
+          .printable-report .signature-grid {
+            margin-top: auto !important;
+            padding-top: 20px !important;
           }
           
           /* Table spacing overrides */

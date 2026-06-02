@@ -513,7 +513,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           }
 
           .final-settlement-print {
-            display: block !important;
+            display: flex !important;
+            flex-direction: column !important;
             position: absolute;
             left: 0;
             top: 0;
@@ -524,7 +525,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             color: black;
             overflow: hidden;
             height: auto !important;
-            min-height: 0 !important;
+            min-height: 262mm !important;
             max-height: none !important;
             page-break-inside: avoid;
           }
@@ -551,8 +552,11 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           .final-settlement-print .mb-10 { margin-bottom: 10px !important; }
           .final-settlement-print .gap-8 { gap: 8px !important; }
           .final-settlement-print .mt-12 { margin-top: 10px !important; }
-          .final-settlement-print .mt-16 { margin-top: 12px !important; }
           .final-settlement-print .gap-12 { gap: 12px !important; }
+          .final-settlement-print .signature-grid {
+            margin-top: auto !important;
+            padding-top: 20px !important;
+          }
           
           .pb-24 { padding-bottom: 0 !important; }
           .min-h-screen { min-height: 0 !important; }
@@ -1327,7 +1331,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-10 mt-16 print:mt-8">
+        <div className="grid grid-cols-2 gap-10 mt-16 print:mt-8 signature-grid">
           <div className="text-center">
             <div className="border-t-2 border-black pt-2 font-black uppercase tracking-widest text-sm">Delivery Man Signature</div>
             <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</p>

@@ -11,25 +11,25 @@ interface StatCardProps {
 }
 
 const themeClasses = {
-  primary: 'bg-gradient-to-br from-blue-50 to-indigo-100/80 text-blue-950 border-white/60',
-  emerald: 'bg-gradient-to-br from-emerald-50 to-teal-100/80 text-emerald-950 border-white/60',
-  amber: 'bg-gradient-to-br from-amber-50 to-orange-100/80 text-amber-950 border-white/60',
-  rose: 'bg-gradient-to-br from-rose-50 to-pink-100/80 text-rose-950 border-white/60',
-  cyan: 'bg-gradient-to-br from-cyan-50 to-sky-100/80 text-cyan-950 border-white/60',
-  indigo: 'bg-gradient-to-br from-indigo-50 to-violet-100/80 text-indigo-950 border-white/60',
-  violet: 'bg-gradient-to-br from-violet-50 to-fuchsia-100/80 text-violet-950 border-white/60',
-  slate: 'bg-gradient-to-br from-slate-50 to-gray-100/80 text-slate-900 border-white/60',
+  primary: 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-blue-500/20 shadow-md shadow-blue-500/10',
+  emerald: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white border-emerald-500/20 shadow-md shadow-emerald-500/10',
+  amber: 'bg-gradient-to-br from-amber-500 to-orange-600 text-white border-amber-500/20 shadow-md shadow-amber-500/10',
+  rose: 'bg-gradient-to-br from-rose-500 to-pink-600 text-white border-rose-500/20 shadow-md shadow-rose-500/10',
+  cyan: 'bg-gradient-to-br from-cyan-500 to-blue-500 text-white border-cyan-500/20 shadow-md shadow-cyan-500/10',
+  indigo: 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white border-indigo-500/20 shadow-md shadow-indigo-500/10',
+  violet: 'bg-gradient-to-br from-purple-600 to-indigo-800 text-white border-purple-500/20 shadow-md shadow-purple-500/10',
+  slate: 'bg-gradient-to-br from-slate-700 to-slate-900 text-white border-slate-600/20 shadow-md shadow-slate-700/10',
 };
 
 const iconThemeClasses = {
-  primary: 'bg-blue-600/10 text-blue-600',
-  emerald: 'bg-emerald-600/10 text-emerald-600',
-  amber: 'bg-amber-600/10 text-amber-600',
-  rose: 'bg-rose-600/10 text-rose-600',
-  cyan: 'bg-cyan-600/10 text-cyan-600',
-  indigo: 'bg-indigo-600/10 text-indigo-600',
-  violet: 'bg-violet-600/10 text-violet-600',
-  slate: 'bg-slate-600/10 text-slate-600',
+  primary: 'bg-white/20 text-white shadow-inner',
+  emerald: 'bg-white/20 text-white shadow-inner',
+  amber: 'bg-white/20 text-white shadow-inner',
+  rose: 'bg-white/20 text-white shadow-inner',
+  cyan: 'bg-white/20 text-white shadow-inner',
+  indigo: 'bg-white/20 text-white shadow-inner',
+  violet: 'bg-white/20 text-white shadow-inner',
+  slate: 'bg-white/20 text-white shadow-inner',
 };
 
 export function StatCard({
