@@ -101,7 +101,7 @@ export function DuesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between no-print">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Finance Hub</h2>
           <p className="text-sm text-muted">Manage dues, collections and approvals in one place.</p>
@@ -142,7 +142,7 @@ export function DuesPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 no-print">
         <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
@@ -197,7 +197,7 @@ export function DuesPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden no-print">
         <div className="p-4 border-b border-border bg-zinc-50/50 flex flex-col sm:flex-row gap-4 justify-between">
           <div className="relative max-w-sm w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
