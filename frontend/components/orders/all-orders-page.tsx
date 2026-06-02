@@ -173,7 +173,7 @@ export function AllOrdersPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-border shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-border shadow-sm no-print">
         <div className="flex items-center gap-4">
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <ShoppingCart className="h-5 w-5 text-primary" />
@@ -195,7 +195,7 @@ export function AllOrdersPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="modern-card overflow-hidden">
+      <div className="modern-card overflow-hidden no-print">
         {/* Header & Tabs */}
         <div className="border-b border-border bg-white px-6">
           <div className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">

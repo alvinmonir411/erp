@@ -30,7 +30,33 @@ export function OrderModal({ order, onClose }: OrderModalProps) {
 
   return (
     <div className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-3xl bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in duration-200">
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #print-order-modal, #print-order-modal * {
+            visibility: visible;
+          }
+          #print-order-modal {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            max-height: none !important;
+            height: auto !important;
+            overflow: visible !important;
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .no-print, button {
+            display: none !important;
+          }
+        }
+      `}</style>
+      <div id="print-order-modal" className="relative w-full max-w-3xl bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in duration-200">
         
         {/* Header */}
         <div className="bg-slate-900 px-6 py-4 text-white flex items-center justify-between">
@@ -58,10 +84,14 @@ export function OrderModal({ order, onClose }: OrderModalProps) {
               <div>
                 <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider">Shop Details</p>
                 <p className="text-sm font-bold text-slate-900 mt-0.5">{order.shop?.name || 'Direct Sale'}</p>
-                <p className="text-[10px] text-slate-500 font-medium leading-normal mt-0.5">
-                  {order.shop?.ownerName ? `${order.shop.ownerName} · ` : ''}
-                  {order.shop?.phone || ''}
-                </p>
+                {order.shop ? (
+                  <div className="text-[10px] text-slate-500 font-medium leading-normal mt-0.5 space-y-0.5">
+                    {order.shop.ownerName && <p>Owner: <span className="font-bold text-slate-700">{order.shop.ownerName}</span></p>}
+                    {order.shop.phone && <p>Phone: <span className="font-bold text-slate-700">{order.shop.phone}</span></p>}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">No Shop Linked</p>
+                )}
                 {order.shop?.address && (
                   <p className="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">
                     <MapPin className="inline h-2.5 w-2.5 mr-0.5 -mt-0.5" />
@@ -102,6 +132,20 @@ export function OrderModal({ order, onClose }: OrderModalProps) {
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Sales Rep:</span>
                     <span className="text-[10px] font-bold text-slate-800">{order.createdBy}</span>
                   </div>
+                  {['OUT_FOR_DELIVERY', 'DELIVERED', 'PARTIAL_DUE', 'SETTLED'].includes(order.status) && (
+                    <div className="pt-1.5 border-t border-slate-200/60 mt-1">
+                      {order.assignedDeliveryMan?.name && (
+                        <p className="text-[10px] text-slate-500 font-medium">
+                          Delivery Man: <span className="font-bold text-slate-700">{order.assignedDeliveryMan.name}</span>
+                        </p>
+                      )}
+                      {order.deliveryPerson?.name && (
+                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                          Personnel/Staff: <span className="font-bold text-slate-700">{order.deliveryPerson.name}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -297,7 +341,7 @@ export function OrderModal({ order, onClose }: OrderModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 no-print">
           <button 
             onClick={() => window.print()} 
             className="flex-1 rounded-xl border border-slate-200 bg-white py-3 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
