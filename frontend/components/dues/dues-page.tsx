@@ -17,7 +17,8 @@ import {
   Store,
   FileText,
   Loader2,
-  History
+  History,
+  Plus
 } from 'lucide-react';
 import { getDues, collectDue, getDueStats } from '@/lib/api/dues';
 import { apiRequest } from '@/lib/api/client';
@@ -27,6 +28,10 @@ import { useToast } from '@/components/ui/toast-provider';
 import { Role } from '@/types/api';
 
 import Link from 'next/link';
+import { getOrder } from '@/lib/api/orders';
+import { OrderModal } from '@/components/orders/order-modal';
+import { addManualDue } from '@/lib/api/sales';
+import { getShops } from '@/lib/api/shops';
 
 export function DuesPage() {
   const queryClient = useQueryClient();
@@ -35,6 +40,13 @@ export function DuesPage() {
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedDue, setSelectedDue] = useState<any>(null);
+
+  // Order Details Modal State
+  const [viewingOrder, setViewingOrder] = useState<any>(null);
+  const [isViewingOrderLoading, setIsViewingOrderLoading] = useState(false);
+
+  // Manual Due Modal State
+  const [isManualDueModalOpen, setIsManualDueModalOpen] = useState(false);
 
   const { data: dues = [], isLoading } = useQuery({
     queryKey: ['dues'],
@@ -60,6 +72,18 @@ export function DuesPage() {
       showErrorToast(error.response?.data?.message || 'Failed to submit collection');
     }
   });
+
+  const handleViewOrder = async (orderId: number) => {
+    try {
+      setIsViewingOrderLoading(true);
+      const orderData = await getOrder(orderId);
+      setViewingOrder(orderData);
+    } catch (err: any) {
+      showErrorToast(err.message || 'Failed to fetch order details');
+    } finally {
+      setIsViewingOrderLoading(false);
+    }
+  };
 
   const filteredDues = dues.filter((due: any) => 
     due.shop?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -98,13 +122,22 @@ export function DuesPage() {
             Collections
           </Link>
           {user?.role === Role.SUPER_ADMIN && (
-            <Link
-              href="/dues/approvals"
-              className="inline-flex items-center gap-2 rounded-lg bg-white border border-border px-4 py-2 text-sm font-bold text-foreground hover:bg-zinc-50 transition-colors"
-            >
-              <CheckCircle className="w-4 h-4 text-emerald-500" />
-              Approve Payments
-            </Link>
+            <>
+              <Link
+                href="/dues/approvals"
+                className="inline-flex items-center gap-2 rounded-lg bg-white border border-border px-4 py-2 text-sm font-bold text-foreground hover:bg-zinc-50 transition-colors"
+              >
+                <CheckCircle className="w-4 h-4 text-emerald-500" />
+                Approve Payments
+              </Link>
+              <button
+                onClick={() => setIsManualDueModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 text-white px-4 py-2 text-sm font-bold hover:bg-zinc-800 transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Add Manual Due
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -215,7 +248,12 @@ export function DuesPage() {
                         </div>
                         <div>
                           <p className="font-bold text-foreground">{due.shop?.name || 'Direct Sale'}</p>
-                          <p className="text-[10px] font-bold text-muted uppercase tracking-tight">Order #{due.orderId}</p>
+                          <button
+                            onClick={() => handleViewOrder(due.orderId)}
+                            className="text-[10px] font-black text-primary hover:underline uppercase tracking-tight block text-left"
+                          >
+                            Order #{due.orderId}
+                          </button>
                         </div>
                       </div>
                     </td>
@@ -292,7 +330,13 @@ export function DuesPage() {
                     </div>
                     <div>
                       <p className="font-bold text-foreground text-sm">{due.shop?.name || 'Direct Sale'}</p>
-                      <p className="text-[10px] font-bold text-muted uppercase tracking-tight">Order #{due.orderId} • SR: {due.srName}</p>
+                      <button
+                        onClick={() => handleViewOrder(due.orderId)}
+                        className="text-[10px] font-black text-primary hover:underline uppercase tracking-tight block text-left mb-0.5"
+                      >
+                        Order #{due.orderId}
+                      </button>
+                      <p className="text-[10px] font-medium text-muted uppercase tracking-tight">SR: {due.srName}</p>
                     </div>
                   </div>
                   <span className={`px-2 py-1 rounded-md text-[10px] font-black border ${getStatusColor(due.status)}`}>
@@ -364,6 +408,177 @@ export function DuesPage() {
           onClose={() => setIsHistoryModalOpen(false)} 
         />
       )}
+
+      {isViewingOrderLoading && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/30 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white p-6 rounded-2xl shadow-xl flex items-center gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="text-sm font-bold text-zinc-700">Loading order details...</span>
+          </div>
+        </div>
+      )}
+
+      {viewingOrder && (
+        <OrderModal
+          order={viewingOrder}
+          onClose={() => setViewingOrder(null)}
+        />
+      )}
+
+      {isManualDueModalOpen && (
+        <ManualDueModal
+          onClose={() => setIsManualDueModalOpen(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['dues'] });
+            queryClient.invalidateQueries({ queryKey: ['due-stats'] });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
+  const { user } = useAuth();
+  const { success: showSuccessToast, error: showErrorToast } = useToast();
+  const [shopId, setShopId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [note, setNote] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (user?.role !== Role.SUPER_ADMIN) {
+    return null;
+  }
+
+  const { data: shops = [], isLoading } = useQuery({
+    queryKey: ['all-shops-for-due'],
+    queryFn: () => getShops(),
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsedAmount = Number(amount);
+
+    if (!shopId) {
+      showErrorToast('Please select a shop.');
+      return;
+    }
+
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      showErrorToast('Amount must be greater than 0.');
+      return;
+    }
+
+    if (reason.trim().length < 3) {
+      showErrorToast('Reason must be at least 3 characters.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await addManualDue({
+        shopId,
+        amount: parsedAmount,
+        reason: reason.trim(),
+        note: note.trim() || undefined,
+      });
+      showSuccessToast('Manual due recorded successfully.');
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      showErrorToast(err.message || 'Failed to add manual due');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden border border-border animate-in slide-in-from-bottom sm:zoom-in duration-200 mb-0 pb-safe pb-4 sm:pb-0">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-zinc-50/50">
+          <h3 className="text-lg font-bold text-foreground">Add Manual Due</h3>
+          <button onClick={onClose} className="p-1 hover:bg-zinc-200 rounded-lg transition-colors">
+            <XCircle className="w-5 h-5 text-muted" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted">Select Shop</label>
+            <select
+              value={shopId}
+              onChange={(e) => setShopId(e.target.value)}
+              required
+              disabled={isLoading}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+            >
+              <option value="">-- Choose Shop --</option>
+              {shops.map((shop: any) => (
+                <option key={shop.id} value={shop.id}>
+                  {shop.name} {shop.route ? `· ${shop.route.name}` : ''}
+                </option>
+              ))}
+            </select>
+            {isLoading && <p className="text-[10px] text-muted">Loading shops list...</p>}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted">Due Amount (BDT)</label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted">Reason / Reference</label>
+            <input
+              type="text"
+              required
+              minLength={3}
+              maxLength={200}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              placeholder="e.g., Unpaid balance from invoice #1234"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted">Note (Optional)</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              placeholder="Additional comments or context..."
+            />
+          </div>
+
+          <div className="pt-4 flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm font-semibold border border-border rounded-lg hover:bg-zinc-50 transition-colors">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || isLoading}
+              className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50"
+            >
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Due Record'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -2,8 +2,10 @@ import { apiRequest } from './client';
 import type {
   CompanyWiseDueSummary,
   CompanyWiseSalesSummary,
+  CreateManualDuePayload,
   CreateSalePayload,
   DueOverviewSummary,
+  ManualDueResponse,
   MonthlySalesSummary,
   PaginatedResponse,
   ReceiveSalePaymentPayload,
@@ -36,6 +38,13 @@ export function createSale(payload: CreateSalePayload) {
 
 export function receiveSalePayment(id: number, payload: ReceiveSalePaymentPayload) {
   return apiRequest<Sale>(`sales/${id}/payments`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function addManualDue(payload: CreateManualDuePayload) {
+  return apiRequest<ManualDueResponse>('sales/manual-due', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

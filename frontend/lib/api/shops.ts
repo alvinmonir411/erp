@@ -5,6 +5,10 @@ export function getShops(routeId?: number, search?: string) {
   return apiRequest<Shop[]>('shops', { query: { routeId, search } });
 }
 
+export function getShop(id: number) {
+  return apiRequest<Shop>(`shops/${id}`);
+}
+
 export function createShop(payload: CreateShopPayload) {
   return apiRequest<Shop>('shops', { method: 'POST', body: JSON.stringify(payload) });
 }

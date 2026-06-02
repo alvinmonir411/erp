@@ -144,6 +144,7 @@ export type OrderStatus =
   | 'DELIVERED'
   | 'RETURNED_PARTIAL'
   | 'CANCELLED'
+  | 'MANUAL_DUE'
   | 'PARTIAL_DUE'
   | 'SETTLED';
 
@@ -237,17 +238,21 @@ export type DueCollection = {
   id: number;
   dueId: number;
   orderId: number;
+  shopId?: number | null;
   routeId?: number | null;
+  srId?: string | null;
+  srName?: string | null;
   collectedAmount: number | string;
   amount: number | string;
   status: string;
   note?: string | null;
-  collectedBy: string;
+  collectedBy?: string;
   collectionDate: string;
   approvedAt?: string | null;
   rejectedAt?: string | null;
   rejectionReason?: string | null;
   due?: Due;
+  shop?: Shop;
 };
 
 export type DeliveryPerson = {
@@ -702,6 +707,24 @@ export type ReceiveSalePaymentPayload = {
   amount: number;
   paymentDate?: string;
   note?: string;
+};
+
+export type CreateManualDuePayload = {
+  shopId: string;
+  amount: number;
+  reason: string;
+  note?: string;
+};
+
+export type ManualDueResponse = {
+  order: Order;
+  due: Due;
+  shop: Shop;
+  shopTotalDue: number | string;
+  totalAmount: number | string;
+  paidAmount: number | string;
+  dueAmount: number | string;
+  status: 'MANUAL_DUE';
 };
 
 export type TodaySalesSummary = {

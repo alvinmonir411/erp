@@ -17,6 +17,7 @@ import { DeliveryOpsModule } from './modules/delivery-ops/delivery-ops.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { DuesModule } from './modules/dues/dues.module';
+import { SalesModule } from './modules/sales/sales.module';
 
 // Triggering backend reload for new PATCH route 5
 @Module({
@@ -43,6 +44,7 @@ import { DuesModule } from './modules/dues/dues.module';
     DashboardModule,
     ReportsModule,
     DuesModule,
+    SalesModule,
   ],
 })
 export class AppModule {}

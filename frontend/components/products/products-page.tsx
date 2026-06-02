@@ -242,7 +242,7 @@ export function ProductsPage() {
     <div className="flex flex-col gap-6">
       {/* 1. Summary Cards */}
       {summary && (
-        <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-7">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-8">
           <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
             <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Products</div>
             <div className="mt-1 text-2xl font-bold text-slate-900">{formatNumber(summary.totalProducts)}</div>
@@ -271,7 +271,7 @@ export function ProductsPage() {
             <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Stock Qty</div>
             <div className="mt-1 text-xl font-bold text-slate-900">{formatNumber(summary.totalStockQuantity)}</div>
           </div>
-          <div className="rounded-3xl border border-indigo-100 bg-indigo-50 p-4 shadow-sm">
+          <div className="rounded-3xl border border-indigo-100 bg-indigo-50 p-4 shadow-sm col-span-2 md:col-span-4 xl:col-span-2">
             <div className="text-xs font-medium text-indigo-700 uppercase tracking-wider">Stock Value</div>
             <div className="mt-1 text-xl font-bold text-indigo-900">{formatCurrency(summary.totalStockValue)}</div>
           </div>
@@ -342,7 +342,8 @@ export function ProductsPage() {
         >
         {isLoading ? <LoadingBlock label="Loading products..." /> : null}
         {!isLoading && !error ? (
-          <div className="overflow-x-auto">
+          <>
+          <div className="hidden lg:block overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead>
                 <tr className="text-left text-slate-500">
@@ -407,6 +408,72 @@ export function ProductsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          
+          {/* Mobile View */}
+          <div className="lg:hidden divide-y divide-slate-100">
+            {paginatedProducts.map((product) => (
+              <div key={product.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-bold text-slate-900">{product.name}</div>
+                    <div className="text-xs text-slate-500 font-mono mt-0.5">{product.sku}</div>
+                    {!selectedCompanyId && product.company && (
+                      <div className="text-xs text-slate-500 mt-1">{product.company.name}</div>
+                    )}
+                  </div>
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                      product.isActive
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-rose-100 text-rose-700'
+                    }`}
+                  >
+                    {product.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-2 bg-slate-50 rounded-xl p-3">
+                  <div>
+                    <div className="text-[10px] font-black uppercase text-slate-400">Stock</div>
+                    <div className="font-bold">
+                      <span className={Number(product.currentStock || 0) <= 0 ? 'text-rose-600' : Number(product.currentStock || 0) <= 10 ? 'text-amber-600' : 'text-slate-900'}>
+                        {formatNumber(product.currentStock)}
+                      </span>
+                      <span className="text-[10px] ml-1 text-slate-500">{product.unit}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black uppercase text-slate-400">Buy</div>
+                    <div className="font-bold text-slate-700">{formatCurrency(product.buyPrice)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black uppercase text-slate-400">Sale</div>
+                    <div className="font-bold text-slate-900">{formatCurrency(product.salePrice)}</div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingProduct(product)}
+                    className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingId === product.id}
+                    onClick={() => handleDelete(product.id, product.name)}
+                    className="flex-1 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    {isDeletingId === product.id ? '...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
             {products.length === 0 ? (
               <div className="pt-4">
                 <StateMessage
@@ -421,7 +488,7 @@ export function ProductsPage() {
               pageSize={productsPageSize}
               onPageChange={setCurrentPage}
             />
-          </div>
+          </>
         ) : null}
       </PageCard>
 
@@ -586,7 +653,7 @@ export function ProductsPage() {
           description="Detailed breakdown of product counts, stock levels, and asset value per company."
           className="xl:col-span-2"
         >
-          <div className="overflow-x-auto">
+          <div className="hidden lg:block overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead>
                 <tr className="text-left text-slate-500">
@@ -617,6 +684,55 @@ export function ProductsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="lg:hidden divide-y divide-slate-100">
+            {summary.companyWiseProducts.map((c: any) => (
+              <div key={c.companyId} className="p-4 space-y-3">
+                <div className="font-bold text-slate-900 text-lg border-b border-slate-100 pb-2">{c.companyName}</div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 rounded-xl p-3">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Products</div>
+                    <div className="text-xl font-black text-slate-900">{formatNumber(c.totalProducts)}</div>
+                  </div>
+                  <div className="bg-emerald-50 rounded-xl p-3">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600">In Stock</div>
+                    <div className="text-xl font-black text-emerald-700">{formatNumber(c.inStockProducts)}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 text-center text-xs border-y border-slate-100 py-3">
+                  <div>
+                    <div className="font-bold text-slate-400 mb-1">Active</div>
+                    <div className="font-black text-emerald-600">{formatNumber(c.activeProducts)}</div>
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-400 mb-1">Inactive</div>
+                    <div className="font-black text-slate-400">{formatNumber(c.inactiveProducts)}</div>
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-400 mb-1">Low</div>
+                    <div className="font-black text-amber-600">{formatNumber(c.lowStockProducts)}</div>
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-400 mb-1">Out</div>
+                    <div className="font-black text-rose-600">{formatNumber(c.outOfStockProducts)}</div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center bg-indigo-50 rounded-xl p-3">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Stock Qty</div>
+                    <div className="font-black text-indigo-700">{formatNumber(c.totalStockQuantity)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Value</div>
+                    <div className="font-black text-indigo-900">{formatCurrency(c.totalStockValue)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </PageCard>
       )}

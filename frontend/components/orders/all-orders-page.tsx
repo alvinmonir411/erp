@@ -24,6 +24,7 @@ import {
 import { useCompanies, useRoutes, useShops } from '@/hooks/use-common-queries';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { OrderModal } from './order-modal';
 
 const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
   DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-600', icon: Clock },
@@ -62,7 +63,10 @@ export function AllOrdersPage() {
 
   // Selection & Details
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [settlingOrder, setSettlingOrder] = useState<any>(null);
   const [isActionLoading, setIsActionLoading] = useState<number | null>(null);
+
+  const paginatedOrders = orders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Queries
   const { data: companies = [] } = useCompanies();
@@ -308,7 +312,7 @@ export function AllOrdersPage() {
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
+                  <td colSpan={7} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                       <p className="text-sm font-bold text-muted">Retrieving Orders...</p>
@@ -317,12 +321,12 @@ export function AllOrdersPage() {
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
+                  <td colSpan={7} className="px-6 py-20 text-center">
                     <StateMessage title="No orders found" description="Adjust your filters or create a new order." />
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => (
+                paginatedOrders.map((order) => (
                   <tr key={order.id} className="group hover:bg-secondary/30 transition-colors">
                     <td className="px-6 py-4">
                       <button
@@ -370,13 +374,22 @@ export function AllOrdersPage() {
                           <Eye className="h-4 w-4" />
                         </button>
                         {user?.role !== 'SR' && !['SETTLED', 'PARTIAL_DUE'].includes(order.status) && (
-                          <Link
-                            href={`/orders/${order.id}/edit`}
-                            className="p-2 text-muted hover:text-primary transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Link>
+                          <>
+                            <Link
+                              href={`/orders/${order.id}/edit`}
+                              className="p-2 text-muted hover:text-primary transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                            <button
+                              onClick={() => setSettlingOrder(order)}
+                              className="p-2 text-muted hover:text-emerald-600 transition-colors"
+                              title="Settle Order"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          </>
                         )}
                         {user?.role === 'SUPER_ADMIN' && (
                           <button
@@ -408,8 +421,8 @@ export function AllOrdersPage() {
               <p className="text-sm text-muted">No orders found</p>
             </div>
           ) : (
-            orders.map((order) => (
-              <div key={order.id} className="p-4 space-y-3" onClick={() => setSelectedOrder(order)}>
+            paginatedOrders.map((order) => (
+              <div key={order.id} className="p-4 space-y-3 hover:bg-secondary/10 transition-colors" onClick={() => setSelectedOrder(order)}>
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
                     <span className="text-xs font-black text-primary">#{order.id.toString().padStart(6, '0')}</span>
@@ -439,16 +452,24 @@ export function AllOrdersPage() {
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">
-                  <button className="text-[10px] font-bold uppercase text-primary px-3 py-1.5 bg-primary/5 rounded-lg">View Details</button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedOrder(order);
+                    }}
+                    className="text-[10px] font-bold uppercase text-primary px-3 py-1.5 bg-primary/5 rounded-lg"
+                  >
+                    View Details
+                  </button>
                   {user?.role !== 'SR' && !['SETTLED', 'PARTIAL_DUE'].includes(order.status) && (
-                    <Link href={`/orders/${order.id}/edit`} className="text-[10px] font-bold uppercase text-amber-600 px-3 py-1.5 bg-amber-50 rounded-lg">Edit</Link>
-                  )}
-                  {user?.role === 'SUPER_ADMIN' && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDelete(order.id); }}
-                      className="text-[10px] font-bold uppercase text-rose-600 px-3 py-1.5 bg-rose-50 rounded-lg"
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSettlingOrder(order);
+                      }}
+                      className="text-[10px] font-bold uppercase text-emerald-600 px-3 py-1.5 bg-emerald-50 rounded-lg flex items-center gap-1"
                     >
-                      Delete
+                      <CheckCircle className="h-3.5 w-3.5" /> Settle
                     </button>
                   )}
                 </div>
@@ -458,137 +479,47 @@ export function AllOrdersPage() {
         </div>
 
         {/* Pagination */}
-        <div className="border-t border-border px-6 py-4 bg-secondary/10">
+        <div className="border-t border-border bg-white px-6 py-4">
           <Pagination
             currentPage={page}
-            totalItems={stats?.totalOrders || orders.length}
+            totalItems={orders.length}
             pageSize={PAGE_SIZE}
             onPageChange={setPage}
           />
         </div>
       </div>
 
-      {/* Modal - Same logic as before but cleaner UI */}
       {selectedOrder && (
-        <OrderModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+        <OrderModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+        />
+      )}
+
+      {settlingOrder && (
+        <SettlementModal
+          order={settlingOrder}
+          onClose={() => setSettlingOrder(null)}
+          onSettled={() => {
+            setSettlingOrder(null);
+            fetchOrders();
+            fetchStats();
+          }}
+        />
       )}
     </div>
   );
 }
 
-
-function OrderModal({ order, onClose }: { order: any, onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 mb-0 pb-safe pb-4 sm:pb-0">
-        <div className="bg-primary p-6 text-white flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-black">Order #{order.id.toString().padStart(6, '0')}</h2>
-            <p className="text-xs font-bold opacity-60 uppercase tracking-widest">{formatDate(order.createdAt)}</p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-            <XCircle className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="p-8 max-h-[70vh] overflow-y-auto">
-          <div className="grid gap-8 md:grid-cols-2 mb-8">
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Shop Details</p>
-              <p className="text-sm font-bold text-foreground">{order.shop?.name || 'Direct Customer'}</p>
-              <p className="text-xs font-medium text-muted">{order.shop?.address || 'No address provided'}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Route / Network</p>
-              <p className="text-sm font-bold text-foreground">{order.route?.name}</p>
-              <p className="text-xs font-medium text-muted">{order.company?.name}</p>
-            </div>
-          </div>
-
-          {order.note && (
-            <div className="mb-8 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3">
-              <Info className="h-5 w-5 text-amber-600 shrink-0" />
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Order Note</p>
-                <p className="text-sm font-medium text-amber-900 mt-0.5">{order.note}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-6 md:grid-cols-3 mb-8">
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Status</p>
-              <p className="text-sm font-black text-slate-900 mt-1">{['SETTLED', 'PARTIAL_DUE'].includes(order.status) ? 'PAID / RECORDED' : 'DUE / PENDING'}</p>
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Delivery Status</p>
-              <p className="text-sm font-black text-slate-900 mt-1">{order.status.replace(/_/g, ' ')}</p>
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Delivery Man</p>
-              <p className="text-sm font-black text-slate-900 mt-1">{order.deliveryPerson?.name || 'NOT ASSIGNED'}</p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto mb-8 rounded-xl border border-border">
-            <table className="w-full text-left min-w-[400px]">
-              <thead className="bg-secondary/30 text-[10px] font-bold uppercase tracking-wider text-muted">
-                <tr>
-                  <th className="px-4 py-3">Product</th>
-                  <th className="px-4 py-3 text-center">Qty</th>
-                  <th className="px-4 py-3 text-right">Price</th>
-                  <th className="px-4 py-3 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {order.items?.map((item: any, idx: number) => (
-                  <tr key={idx} className="text-sm">
-                    <td className="px-4 py-3 font-bold text-foreground">{item.product?.name}</td>
-                    <td className="px-4 py-3 text-center font-bold">{item.quantity}</td>
-                    <td className="px-4 py-3 text-right font-medium text-muted">{formatCurrency(Number(item.unitPrice))}</td>
-                    <td className="px-4 py-3 text-right font-bold text-foreground">{formatCurrency(Number(item.lineTotal))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="bg-primary/5 rounded-2xl p-6 space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted font-bold">Subtotal</span>
-              <span className="text-foreground font-bold">{formatCurrency(Number(order.subtotal))}</span>
-            </div>
-            {Number(order.discountAmount) > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-rose-500 font-bold">Discount</span>
-                <span className="text-rose-500 font-bold">-{formatCurrency(Number(order.discountAmount))}</span>
-              </div>
-            )}
-            <div className="pt-3 border-t border-border flex justify-between items-end">
-              <span className="text-xs font-black uppercase text-muted">Grand Total</span>
-              <span className="text-2xl font-black text-primary">{formatCurrency(Number(order.grandTotal))}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 bg-secondary/30 border-t border-border flex gap-3">
-          <button onClick={() => window.print()} className="flex-1 rounded-xl border border-border bg-white py-3 text-sm font-bold text-foreground hover:bg-secondary transition-colors flex items-center justify-center gap-2">
-            <Printer className="h-4 w-4" /> Print Invoice
-          </button>
-          <button onClick={onClose} className="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary/90 transition-colors">
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+interface SettlementModalProps {
+  order: any;
+  onClose: () => void;
+  onSettled: () => void;
 }
 
-
-function SettlementModal({ order, onClose, onSettled }: { order: any, onClose: () => void, onSettled: () => void }) {
-  const { error: showErrorToast, success: showSuccessToast } = useToast();
+function SettlementModal({ order, onClose, onSettled }: SettlementModalProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [returnState, setReturnState] = useState<Record<number, { returned: string, damaged: string }>>(
     Object.fromEntries(order.items.map((i: any) => [i.productId, { returned: '0', damaged: '0' }]))
   );

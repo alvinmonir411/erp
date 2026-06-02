@@ -19,6 +19,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import Link from 'next/link';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
+import { useToast } from '@/components/ui/toast-provider';
 
 export function ApprovalsPage() {
   const queryClient = useQueryClient();
@@ -27,6 +28,8 @@ export function ApprovalsPage() {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  const { success: showSuccessToast, error: showErrorToast } = useToast();
 
   const { data: pending = [], isLoading } = useQuery({
     queryKey: ['pending-approvals'],
@@ -38,8 +41,11 @@ export function ApprovalsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      alert('Payment approved and due balance updated.');
+      showSuccessToast('Payment approved and due balance updated.');
     },
+    onError: (err: any) => {
+      showErrorToast(err.message || 'Failed to approve payment.');
+    }
   });
 
   const rejectMutation = useMutation({
@@ -48,14 +54,27 @@ export function ApprovalsPage() {
       queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
       setIsRejectModalOpen(false);
       setRejectReason('');
-      alert('Payment collection rejected.');
+      showSuccessToast('Payment collection rejected.');
     },
+    onError: (err: any) => {
+      showErrorToast(err.message || 'Failed to reject payment.');
+    }
   });
 
   const filteredPending = pending.filter((c: any) => 
     c.shop?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.srName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (user?.role !== Role.SUPER_ADMIN) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4 bg-white rounded-2xl border border-border p-8 shadow-sm">
+        <AlertCircle className="w-12 h-12 text-rose-500" />
+        <h2 className="text-xl font-bold text-foreground">Access Denied</h2>
+        <p className="text-sm text-muted max-w-md">Only Super Admin users are allowed to approve payment collections.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

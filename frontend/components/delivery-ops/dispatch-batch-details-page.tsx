@@ -140,8 +140,90 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     }
   }, [batch, aggregatedItems]);
 
+  // Compute dynamic orders in real-time based on current return state inputs
+  const dynamicOrders = useMemo(() => {
+    if (!batch) return [];
+
+    const remRet: Record<number, number> = {};
+    const remDam: Record<number, number> = {};
+    const remFree: Record<number, number> = {};
+
+    Object.entries(batchReturnState).forEach(([pid, s]) => {
+      const id = Number(pid);
+      remRet[id] = Number(s.returned || 0);
+      remDam[id] = Number(s.damaged || 0);
+      remFree[id] = Number(s.free || 0);
+    });
+
+    return batch.orders.map((bo) => {
+      let itemSoldAmount = 0;
+
+      const dynamicItems = bo.order.items.map((item) => {
+        const productId = item.productId;
+        const orderPaid = Number(item.quantity || 0);
+        const orderFree = Number(item.freeQuantity || 0);
+
+        const takeRet = Math.min(orderPaid, remRet[productId] || 0);
+        remRet[productId] -= takeRet;
+
+        const takeDam = Math.min(orderPaid - takeRet, remDam[productId] || 0);
+        remDam[productId] -= takeDam;
+
+        const takeFreeRet = Math.min(orderFree, remFree[productId] || 0);
+        remFree[productId] -= takeFreeRet;
+
+        const finalPaidDelivered = Math.max(0, orderPaid - takeRet - takeDam);
+        const finalDeliveredFree = Math.max(0, orderFree - takeFreeRet);
+
+        const unitPriceAfterItemDiscount = orderPaid > 0 ? Number(item.lineTotal || 0) / orderPaid : 0;
+        itemSoldAmount += finalPaidDelivered * unitPriceAfterItemDiscount;
+
+        return {
+          ...item,
+          deliveredPaidQuantity: finalPaidDelivered,
+          deliveredFreeQuantity: finalDeliveredFree,
+          returnedPaidQuantity: takeRet,
+          returnedFreeQuantity: takeFreeRet,
+          damagedPaidQuantity: takeDam,
+        };
+      });
+
+      const subtotal = Number(bo.order.subtotal || 0);
+      const invoiceDiscountApplied = subtotal > 0
+        ? Number(bo.order.discountAmount || 0) * (itemSoldAmount / subtotal)
+        : 0;
+
+      const finalSoldAmount = Math.max(0, Number((itemSoldAmount - invoiceDiscountApplied).toFixed(2)));
+
+      return {
+        ...bo,
+        finalSoldAmount,
+        order: {
+          ...bo.order,
+          items: dynamicItems,
+        },
+      };
+    });
+  }, [batch, batchReturnState]);
+
+  const isReturnDirty = useMemo(() => {
+    if (!batch) return false;
+    return aggregatedItems.some(item => {
+      const state = batchReturnState[item.productId] || { returned: '0', damaged: '0', free: '0' };
+      const batchItem = (batch.items || []).find(bi => bi.productId === item.productId) as any;
+      const dbReturned = batchItem?.returnedPaidQty || 0;
+      const dbDamaged = batchItem?.damagedPaidQty || 0;
+      const dbFree = batchItem?.returnedFreeQty || 0;
+      return (
+        Number(state.returned || 0) !== dbReturned ||
+        Number(state.damaged || 0) !== dbDamaged ||
+        Number(state.free || 0) !== dbFree
+      );
+    });
+  }, [batch, aggregatedItems, batchReturnState]);
+
   const finalMetrics = useMemo(() => {
-    if (!batch || aggregatedItems.length === 0) return null;
+    if (!batch || dynamicOrders.length === 0) return null;
     let totalQty = 0;
     let totalFree = 0;
     let returned = 0;
@@ -149,25 +231,18 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     let finalSold = 0;
     let finalAmount = 0;
 
-    aggregatedItems.forEach(item => {
-      const state = batchReturnState[item.productId] || { returned: '0', damaged: '0', free: '0' };
-      const q = item.totalPaidQty;
-      const f = Number(state.free || 0);
-      const r = Number(state.returned || 0);
-      const d = Number(state.damaged || 0);
-
-      const sold = Math.max(0, q - r - d);
-      const deliveredFree = Math.max(0, item.totalFreeQty - f);
-
-      totalQty += q;
-      totalFree += deliveredFree;
-      returned += r;
-      damaged += d;
-      finalSold += sold;
-      finalAmount += sold * item.price;
+    dynamicOrders.forEach(bo => {
+      finalAmount += bo.finalSoldAmount;
+      bo.order.items.forEach(item => {
+        totalQty += Number(item.quantity || 0);
+        totalFree += Number(item.deliveredFreeQuantity || 0);
+        returned += Number(item.returnedPaidQuantity || 0);
+        damaged += Number(item.damagedPaidQuantity || 0);
+        finalSold += Number(item.deliveredPaidQuantity || 0);
+      });
     });
 
-    const totalDueDraft = Object.values(draftDues).reduce((a, b) => a + b, 0);
+    const totalDueDraft = Object.values(draftDues).reduce((a, b) => Number(a) + Number(b), 0);
     const cashCollectable = Math.max(0, finalAmount - totalDueDraft);
 
     return {
@@ -180,7 +255,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       totalDueDraft,
       cashCollectable,
     };
-  }, [batch, aggregatedItems, batchReturnState, draftDues]);
+  }, [dynamicOrders, draftDues]);
 
   // Reset states when batch ID changes to prevent stale data from previous batches
   useEffect(() => {
@@ -215,6 +290,32 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
   const batchStatus = batch ? batchStatusConfig[batch.status] : null;
   const isBatchSettled = batch ? ['SETTLED', 'PARTIALLY_SETTLED'].includes(batch.status) : false;
+
+  const settledDuesTotal = useMemo(() => {
+    if (!batch) return 0;
+    return batch.orders.reduce((sum, bo) => sum + Number(bo.dueAmount || 0), 0);
+  }, [batch]);
+
+  const currentFinalAmount = useMemo(() => {
+    if (isBatchSettled && batch) {
+      return Number(batch.finalSoldValue || 0);
+    }
+    return Number(finalMetrics?.finalAmount || 0);
+  }, [isBatchSettled, batch, finalMetrics]);
+
+  const currentCustomerDue = useMemo(() => {
+    if (isBatchSettled && batch) {
+      return Number(batch.totalDueAmount || 0);
+    }
+    return Number(finalMetrics?.totalDueDraft || 0);
+  }, [isBatchSettled, batch, finalMetrics]);
+
+  const currentCashCollectable = useMemo(() => {
+    if (isBatchSettled && batch) {
+      return Number(batch.totalCollectedAmount || 0);
+    }
+    return Math.max(0, currentFinalAmount - currentCustomerDue);
+  }, [isBatchSettled, batch, currentFinalAmount, currentCustomerDue]);
 
   const handlePrintMorning = async () => {
     try {
@@ -327,8 +428,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     try {
       setIsSettling(true);
 
-      const collections = batch.orders.map((batchOrder) => {
-        const draftDue = draftDues[batchOrder.orderId] || 0;
+      const collections = dynamicOrders.map((batchOrder) => {
+        const draftDue = Number(draftDues[batchOrder.orderId] || 0);
         const finalAmount = Number(batchOrder.finalSoldAmount || 0);
         const advance = Number(batchOrder.order?.advancePaid || 0);
         // If cash was explicitly collected per-order, use it.
@@ -339,20 +440,20 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         const explicitCollected = Number(batchOrder.collectedAmount || 0);
 
         return {
-          orderId: batchOrder.orderId,
+          orderId: Number(batchOrder.orderId),
           collectedAmount: explicitCollected > 0
-            ? explicitCollected
-            : Math.max(0, finalAmount - advance - draftDue),
+            ? Number(explicitCollected)
+            : Number(Math.max(0, finalAmount - advance - draftDue)),
           paymentMode: 'CASH',
           note: batchOrder.deliveryNote || undefined,
         };
       });
 
       const dueEntries = Object.entries(draftDues)
-        .filter(([_, amount]) => amount > 0)
+        .filter(([_, amount]) => Number(amount) > 0)
         .map(([orderId, amount]) => ({
           orderId: Number(orderId),
-          amount: amount,
+          amount: Number(amount),
           note: 'Added during batch settlement'
         }));
 
@@ -393,6 +494,11 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       <style dangerouslySetInnerHTML={{
         __html: `
         @media print {
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+
           .no-print {
             display: none !important;
           }
@@ -412,10 +518,22 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             left: 0;
             top: 0;
             width: 100%;
-            padding: 40px;
+            padding: 0;
             background: white;
             color: black;
+            overflow: hidden;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            page-break-inside: avoid;
           }
+          
+          table { page-break-inside: auto; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
+          
+          .pb-24 { padding-bottom: 0 !important; }
+          .min-h-screen { min-height: 0 !important; }
+          .mt-32 { margin-top: 40px !important; }
         }
 
         .final-settlement-print {
@@ -648,9 +766,13 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
                   const sold = Math.max(0, item.totalPaidQty - r - d);
                   const itemCashValue = sold * item.price;
-                  const itemDraftDue = batch.orders
-                    .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                    .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0);
+                  const itemDraftDue = isBatchSettled
+                    ? batch.orders
+                      .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                      .reduce((sum, bo) => sum + Number(bo.dueAmount || 0), 0)
+                    : batch.orders
+                      .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                      .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0);
 
                   return (
                     <tr
@@ -770,9 +892,13 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
               const sold = Math.max(0, q - r - d);
               const itemCashValue = sold * item.price;
-              const itemDraftDue = batch.orders
-                .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0);
+              const itemDraftDue = isBatchSettled
+                ? batch.orders
+                    .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                    .reduce((sum, bo) => sum + Number(bo.dueAmount || 0), 0)
+                : batch.orders
+                    .filter(bo => bo.order.items.some(i => i.productId === item.productId))
+                    .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0);
 
               return (
                 <div key={item.productId} className="p-4 space-y-4">
@@ -890,15 +1016,19 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
           <div className="flex-1 p-4 lg:p-6 bg-slate-900 text-white flex justify-between lg:block items-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 lg:mb-1">Final Amount</p>
-            <p className="text-xl lg:text-2xl font-black truncate">{formatCurrency(finalMetrics?.finalAmount || 0)}</p>
+            <p className="text-xl lg:text-2xl font-black truncate">{formatCurrency(currentFinalAmount)}</p>
           </div>
           <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 lg:mb-1">Due/Baki</p>
-            <p className="text-xl lg:text-2xl font-black text-amber-700">{formatCurrency(finalMetrics?.totalDueDraft || 0)}</p>
+            <p className="text-xl lg:text-2xl font-black text-amber-700">
+              {formatCurrency(currentCustomerDue)}
+            </p>
           </div>
           <div className="flex-1 p-4 lg:p-6 bg-emerald-950 text-white border-l-0 lg:border-l-4 border-emerald-500 flex justify-between lg:block items-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 lg:mb-1">Cash Collectable</p>
-            <p className="text-xl lg:text-2xl font-black truncate text-emerald-400">{formatCurrency(finalMetrics?.cashCollectable || 0)}</p>
+            <p className="text-xl lg:text-2xl font-black truncate text-emerald-400">
+              {formatCurrency(currentCashCollectable)}
+            </p>
           </div>
         </div>
 
@@ -914,12 +1044,12 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center text-sm font-bold text-slate-500">
                     <span>Final Amount (Sold):</span>
-                    <span className="text-slate-900">{formatCurrency(finalMetrics?.finalAmount || 0)}</span>
+                    <span className="text-slate-900">{formatCurrency(currentFinalAmount)}</span>
                   </div>
 
                   <div className="flex justify-between items-center text-sm font-bold text-slate-500 border-b border-slate-100 pb-2">
                     <span>Reported by Delivery Man:</span>
-                    <span className="text-blue-600">{formatCurrency(finalMetrics?.cashCollectable || 0)}</span>
+                    <span className="text-blue-600">{formatCurrency(currentCashCollectable)}</span>
                   </div>
 
                   <div className="space-y-2">
@@ -942,7 +1072,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                     <div className="flex justify-between items-center">
                       <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Remaining Due/Baki</p>
                       <p className="text-xl font-black text-amber-700">
-                        {formatCurrency(Math.max(0, (finalMetrics?.finalAmount || 0) - Number(actualCashReceived || 0)))}
+                        {formatCurrency(Math.max(0, currentFinalAmount - Number(actualCashReceived || 0)))}
                       </p>
                     </div>
                     <p className="mt-1 text-[8px] font-bold text-amber-500 uppercase leading-relaxed">
@@ -951,14 +1081,14 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   </div>
 
                   {/* Mismatch Warning: Only if admin input differs from delivery man report */}
-                  {actualCashReceived && Math.abs(Number(actualCashReceived) - (finalMetrics?.cashCollectable || 0)) > 0.01 && (
+                  {actualCashReceived && Math.abs(Number(actualCashReceived) - currentCashCollectable) > 0.01 && (
                     <div className="rounded-2xl bg-rose-50 p-4 border border-rose-100 animate-pulse">
                       <div className="flex items-center gap-2 text-rose-600">
                         <ShieldAlert className="h-4 w-4" />
                         <p className="text-xs font-black uppercase tracking-tight">Cash Mismatch Warning</p>
                       </div>
                       <p className="mt-1 text-[10px] font-bold text-rose-500 uppercase leading-relaxed">
-                        Delivery man reported {formatCurrency(finalMetrics?.cashCollectable || 0)}, but you are settling with {formatCurrency(Number(actualCashReceived))}.
+                        Delivery man reported {formatCurrency(currentCashCollectable)}, but you are settling with {formatCurrency(Number(actualCashReceived))}.
                       </p>
                     </div>
                   )}
@@ -966,10 +1096,19 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               </div>
             </div>
 
+            {isReturnDirty && (
+              <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100 w-full sm:max-w-md text-center">
+                <p className="text-xs font-bold text-amber-800 uppercase">Unsaved Return changes</p>
+                <p className="text-[10px] text-amber-600 mt-1 uppercase leading-relaxed">
+                  You have modified return quantities. Please click "Save Returns" in the Return Entry tab before settling.
+                </p>
+              </div>
+            )}
+
             <button
               onClick={handleSettle}
-              disabled={isSettling}
-              className="w-full sm:max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-slate-900 px-6 sm:px-12 py-4 text-base sm:text-lg font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900 disabled:opacity-50"
+              disabled={isSettling || isReturnDirty}
+              className="w-full sm:max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-slate-900 px-6 sm:px-12 py-4 text-base sm:text-lg font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900 disabled:opacity-50 disabled:bg-slate-400 disabled:border-slate-400"
             >
               {isSettling ? <RefreshCw className="h-5 w-5 animate-spin" /> : <HandCoins className="h-5 w-5" />}
               {isSettling ? 'Processing...' : 'Confirm & Settle Batch'}
@@ -1000,12 +1139,12 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         onClose={() => setDueModalProduct(null)}
         productName={dueModalProduct?.name || ''}
         productId={dueModalProduct?.id || 0}
-        batchOrders={batch.orders}
+        batchOrders={dynamicOrders}
         draftDues={draftDues}
         route={batch.route}
         companyId={batch.companyId || batch.orders[0]?.order.companyId || 0}
         onAddDraftDue={(orderId, amount) => {
-          setDraftDues(prev => ({ ...prev, [orderId]: amount }));
+          setDraftDues(prev => ({ ...prev, [orderId]: Number(amount) }));
         }}
         onSuccess={fetchBatch}
       />
@@ -1136,22 +1275,29 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
           <div className="space-y-4">
             <h3 className="text-sm font-black uppercase tracking-widest border-b border-black pb-1">Financial reconciliation</h3>
+            <div className="flex items-center gap-2 mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <span>Original Amount</span>
+              <span>→</span>
+              <span>Adjustments</span>
+              <span>→</span>
+              <span className="text-emerald-600">Final Collectable</span>
+            </div>
             <div className="space-y-2 text-sm font-bold">
               <div className="flex justify-between text-lg font-black border-2 border-black p-3 bg-slate-50">
-                <span>Grand Total Amount:</span>
-                <span>{formatCurrency(finalMetrics?.finalAmount || 0)}</span>
+                <span>Original Order Amount:</span>
+                <span>{formatCurrency(currentFinalAmount)}</span>
               </div>
               <div className="flex justify-between text-rose-600 px-3">
-                <span>Total Customer Due/Baki:</span>
-                <span>-{formatCurrency(finalMetrics?.totalDueDraft || 0)}</span>
+                <span>Adjustments (Customer Due/Baki):</span>
+                <span>-{formatCurrency(currentCustomerDue)}</span>
               </div>
               <div className="flex justify-between text-emerald-700 px-3 font-black border-t border-slate-100 pt-2">
-                <span>Net Cash Collectable:</span>
-                <span>{formatCurrency(finalMetrics?.cashCollectable || 0)}</span>
+                <span>Final Cash Collectable:</span>
+                <span>{formatCurrency(currentCashCollectable)}</span>
               </div>
               <div className="flex justify-between bg-slate-900 text-white p-3 rounded-none mt-4 font-black">
-                <span>Actual Cash Received:</span>
-                <span>{formatCurrency(Number(actualCashReceived || finalMetrics?.cashCollectable || 0))}</span>
+                <span>Actual Cash Settled:</span>
+                <span>{formatCurrency(isBatchSettled ? (batch.totalCollectedAmount || 0) : Number(actualCashReceived || currentCashCollectable))}</span>
               </div>
             </div>
           </div>

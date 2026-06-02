@@ -106,6 +106,15 @@ export class SchemaSyncService implements OnApplicationBootstrap {
                SELECT 1
                FROM pg_enum e
                JOIN pg_type t ON t.oid = e.enumtypid
+               WHERE t.typname = 'orders_status_enum' AND e.enumlabel = 'MANUAL_DUE'
+             ) THEN
+               ALTER TYPE "orders_status_enum" ADD VALUE 'MANUAL_DUE';
+             END IF;
+
+             IF NOT EXISTS (
+               SELECT 1
+               FROM pg_enum e
+               JOIN pg_type t ON t.oid = e.enumtypid
                WHERE t.typname = 'orders_status_enum' AND e.enumlabel = 'DELIVERY_COMPLETED'
              ) THEN
                ALTER TYPE "orders_status_enum" ADD VALUE 'DELIVERY_COMPLETED';

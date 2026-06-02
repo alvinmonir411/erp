@@ -53,7 +53,6 @@ const navigation = [
     roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
       { href: '/delivery-ops', label: 'Delivery Report', icon: FileText },
-      { href: '/delivery-ops/personnel', label: 'Delivery Person', icon: Users },
     ]
   },
   {
@@ -120,7 +119,7 @@ export function Sidebar({ isOpen, onToggle, onClose }: { isOpen: boolean, onTogg
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
               <Package className="h-5 w-5" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-primary">Dealer ERP</span>
+            <span className="text-xl font-bold tracking-tight text-primary">MS Karim traders</span>
           </div>
         </div>
 

@@ -895,8 +895,8 @@ export class DeliveryOpsService {
         if (bo.isSettled || [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE].includes(bo.order?.status)) {
           throw new BadRequestException(`Order #${bo.orderId} is already settled. Batch settlement rejected.`);
         }
-        const requestedDue = dto.dueEntries?.find(d => d.orderId === bo.orderId)?.amount || 0;
-        if (!bo.order?.shopId && requestedDue > 0) {
+        const requestedDue = dto.dueEntries?.find(d => Number(d.orderId) === Number(bo.orderId))?.amount || 0;
+        if (!bo.order?.shopId && Number(requestedDue) > 0) {
           throw new BadRequestException(`Order #${bo.orderId} is a direct order (no shop) and cannot have a due. Settlement rejected.`);
         }
       }
@@ -904,12 +904,13 @@ export class DeliveryOpsService {
       let totalReportedCollected = 0;
       let totalExpectedCash = 0;
       let totalFinalValue = 0;
+      let totalDueAmount = 0;
 
       // Build a lookup map from dto.collections (what the frontend calculated per order)
       const collectionMap = new Map<number, number>();
       if (dto.collections && dto.collections.length > 0) {
         for (const col of dto.collections) {
-          collectionMap.set(col.orderId, Number(col.collectedAmount || 0));
+          collectionMap.set(Number(col.orderId), Number(col.collectedAmount || 0));
         }
       }
 
@@ -928,41 +929,57 @@ export class DeliveryOpsService {
 
         // Use collectedAmount from dto.collections if provided by frontend;
         // fall back to batchOrder.collectedAmount (set during per-order delivery result submission)
-        const collectedFromDto = collectionMap.get(batchOrder.orderId);
-        const collectedAmount = collectedFromDto !== undefined
+        const collectedFromDto = collectionMap.get(Number(batchOrder.orderId));
+        const collectedAmount = Number(collectedFromDto !== undefined
           ? collectedFromDto
-          : Number(batchOrder.collectedAmount || 0);
+          : Number(batchOrder.collectedAmount || 0));
 
-        const requestedDue = dto.dueEntries?.find(d => d.orderId === batchOrder.orderId)?.amount || 0;
+        const requestedDue = dto.dueEntries?.find(d => Number(d.orderId) === Number(batchOrder.orderId))?.amount || 0;
 
         // Settle individual order (Calculates finalSoldAmount and returns stock)
         const settledOrder = await this.ordersService.settleOrder(order.id, {
           items: settlementItems,
-          collectedAmount,
-          dueAmount: requestedDue,
+          collectedAmount: Number(collectedAmount),
+          dueAmount: Number(requestedDue),
           settlementNote: dto.note || batchOrder.deliveryNote,
         } as any, manager);
 
         await manager.update(DispatchBatchOrder, batchOrder.id, {
           isSettled: true,
           deliveryStatus: 'COMPLETED',
+          collectedAmount: Number(collectedAmount),
+          dueAmount: Number(settledOrder.dueAmount || 0),
+          finalSoldAmount: Number(settledOrder.actualSoldAmount || 0),
         });
 
-        totalReportedCollected += collectedAmount;
-        totalFinalValue += Number(settledOrder.actualSoldAmount);
-        totalExpectedCash += Math.max(0, Number(settledOrder.actualSoldAmount) - Number(settledOrder.advancePaid || 0));
+        totalReportedCollected += Number(collectedAmount);
+        totalFinalValue += Number(settledOrder.actualSoldAmount || 0);
+        totalDueAmount += Number(settledOrder.dueAmount || 0);
+        totalExpectedCash += Math.max(0, Number(settledOrder.actualSoldAmount || 0) - Number(settledOrder.advancePaid || 0));
       }
 
-      // 4. Triple-Check Reconciliation
+      // 4. Triple-Check Reconciliation with Explicit Numeric Casting
+      const totalAmount = Number(totalFinalValue || 0);
       const actualCashReceived = Number(dto.actualCashReceived ?? totalReportedCollected);
-      const cashDiscrepancy = actualCashReceived - totalReportedCollected;
+      
+      const finalDueBaki = Number((totalAmount - actualCashReceived).toFixed(2));
+      const finalCashCollectable = Number(actualCashReceived);
+
+      console.log('=== PERSISTING SETTLEMENT VALUES ===');
+      console.log('totalAmountSold (Total Amount Sold):', totalAmount);
+      console.log('actualCashReceived (Actual Cash Received):', actualCashReceived);
+      console.log('cashCollectable:', finalCashCollectable);
+      console.log('dueBaki:', finalDueBaki);
+
+      const cashDiscrepancy = Number(actualCashReceived - totalReportedCollected);
 
       // 5. Update Batch with Audit Metadata
       await manager.update(DispatchBatch, id, {
         status: DispatchBatchStatus.SETTLED,
         settledAt: new Date(),
-        totalCollectedAmount: totalReportedCollected,
-        finalSoldValue: totalFinalValue,
+        totalCollectedAmount: finalCashCollectable,
+        finalSoldValue: totalAmount,
+        totalDueAmount: finalDueBaki,
         shortageOrExcess: cashDiscrepancy,
         settlementNote: `${dto.note || ''} [Triple-Check: ExpectedCash=${totalExpectedCash}, Reported=${totalReportedCollected}, Actual=${actualCashReceived}]`.trim()
       });

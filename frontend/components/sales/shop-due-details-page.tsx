@@ -1,60 +1,91 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { DollarSign, History, Loader2, XCircle } from 'lucide-react';
+import type { FormEvent } from 'react';
+import { useMemo, useState } from 'react';
+import { History, Loader2, PlusCircle, XCircle } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getShopDues } from '@/lib/api/dues';
+import { addManualDue } from '@/lib/api/sales';
+import { getShop } from '@/lib/api/shops';
+import { apiRequest } from '@/lib/api/client';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { PageCard } from '@/components/ui/page-card';
 import { StateMessage } from '@/components/ui/state-message';
-import { useToastNotification } from '@/components/ui/toast-provider';
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/format';
-import { useQuery } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/api/client';
+import {
+  useToast,
+  useToastNotification,
+} from '@/components/ui/toast-provider';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
+import type {
+  CreateManualDuePayload,
+  Due,
+  DueCollection,
+} from '@/types/api';
 
 export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
-  const [shop, setShop] = useState<any>(null);
-  const [dues, setDues] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedDue, setSelectedDue] = useState<any>(null);
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [selectedDue, setSelectedDue] = useState<Due | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isManualDueModalOpen, setIsManualDueModalOpen] = useState(false);
 
-  const refreshDetails = useCallback(
-    async (showLoader: boolean) => {
-      try {
-        if (showLoader) {
-          setIsLoading(true);
-        }
+  const shopQuery = useQuery({
+    queryKey: ['shops', 'detail', shopId],
+    queryFn: () => getShop(shopId),
+    staleTime: 60 * 1000,
+  });
 
-        setError(null);
-        const duesData = await getShopDues(shopId);
-        setDues(duesData);
-        // Derive shop info from the first due's shop relation if available
-        if (duesData.length > 0 && duesData[0].shop) {
-          setShop(duesData[0].shop);
-        }
-      } catch (loadError) {
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : 'Failed to load shop due details.',
-        );
-      } finally {
-        if (showLoader) {
-          setIsLoading(false);
-        }
-      }
-    },
-    [shopId],
+  const duesQuery = useQuery({
+    queryKey: ['shop-due', shopId],
+    queryFn: () => getShopDues(shopId),
+    staleTime: 30 * 1000,
+  });
+
+  const dues = duesQuery.data ?? [];
+  const shop = useMemo(
+    () => dues.find((due) => due.shop)?.shop ?? shopQuery.data ?? null,
+    [dues, shopQuery.data],
   );
+  const loadError = duesQuery.error ?? (dues.length === 0 ? shopQuery.error : null);
+  const loadErrorMessage = getErrorMessage(loadError);
+  const isLoading = duesQuery.isLoading || (shopQuery.isLoading && dues.length === 0);
 
-  useEffect(() => {
-    void refreshDetails(true);
-  }, [refreshDetails]);
+  useToastNotification({
+    message: loadErrorMessage,
+    title: 'Could not load shop ledger',
+    tone: 'error',
+  });
 
-  const totalDueAmount = dues.reduce((sum, d) => sum + Number(d.remainingDue), 0);
-  const totalPaidAmount = dues.reduce((sum, d) => sum + Number(d.paidAmount), 0);
+  const manualDueMutation = useMutation({
+    mutationFn: addManualDue,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['shop-due', shopId] }),
+        queryClient.invalidateQueries({ queryKey: ['shops', 'detail', shopId] }),
+        queryClient.invalidateQueries({ queryKey: ['shops'] }),
+        queryClient.invalidateQueries({ queryKey: ['dues'] }),
+        queryClient.invalidateQueries({ queryKey: ['due-stats'] }),
+        queryClient.invalidateQueries({ queryKey: ['sales', 'summary', 'due'] }),
+        queryClient.invalidateQueries({ queryKey: ['sales', 'summary', 'due-shop'] }),
+      ]);
+
+      setIsManualDueModalOpen(false);
+      toast.success('Manual due added', 'The shop ledger has been updated.');
+    },
+    onError: (error) => {
+      toast.error('Manual due was not added', getErrorMessage(error));
+    },
+  });
+
+  const totalDueAmount = dues.reduce(
+    (sum, due) => sum + Number(due.remainingDue || 0),
+    0,
+  );
+  const totalPaidAmount = dues.reduce(
+    (sum, due) => sum + Number(due.paidAmount || 0),
+    0,
+  );
 
   return (
     <div className="space-y-6">
@@ -63,9 +94,20 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
         description="Review outstanding due for this shop, including order details and SR information."
         action={
           <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                manualDueMutation.reset();
+                setIsManualDueModalOpen(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2"
+            >
+              <PlusCircle className="h-4 w-4" />
+              Add Manual Due
+            </button>
             <Link
               href="/shops"
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
+              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               Back to shops
             </Link>
@@ -74,7 +116,14 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
       >
         {isLoading ? <LoadingBlock label="Loading shop ledger..." /> : null}
 
-        {!isLoading && !error && shop ? (
+        {!isLoading && loadErrorMessage ? (
+          <StateMessage
+            title="Could not load shop ledger"
+            description={loadErrorMessage}
+          />
+        ) : null}
+
+        {!isLoading && !loadErrorMessage && shop ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <InfoCard label="Shop" value={shop.name} />
             <InfoCard
@@ -98,53 +147,19 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
         description="List of orders with remaining due balance."
       >
         {isLoading ? <LoadingBlock label="Loading dues..." /> : null}
-        {!isLoading && !error && dues ? (
+
+        {!isLoading && !loadErrorMessage ? (
           dues.length > 0 ? (
             <div className="space-y-4">
               {dues.map((due) => (
-                <div
+                <DueLedgerCard
                   key={due.id}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
-                >
-                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                    <div>
-                      <p className="text-lg font-black text-slate-900 uppercase">
-                        Order #{due.orderId}
-                      </p>
-                      <p className="mt-1 text-sm font-bold text-slate-500 uppercase">
-                        SR: {due.srName} • {formatDate(due.order?.orderDate || due.createdAt)}
-                      </p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-black uppercase ${due.status === 'DUE' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
-                            }`}
-                        >
-                          {due.status}
-                        </span>
-                        <span className="text-xs font-bold text-slate-500 uppercase">
-                          {Number(due.remainingDue) > 0 ? `${formatCurrency(due.remainingDue)} still due` : 'Paid'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-4">
-                      <SummaryPill label="Total Due" value={formatCurrency(due.dueAmount)} />
-                      <SummaryPill label="Paid" value={formatCurrency(due.paidAmount)} />
-                      <SummaryPill label="Remaining" value={formatCurrency(due.remainingDue)} tone="amber" />
-                      <div className="flex items-center justify-center">
-                        <button
-                          onClick={() => {
-                            setSelectedDue(due);
-                            setIsHistoryModalOpen(true);
-                          }}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
-                        >
-                          <History className="w-4 h-4" />
-                          History
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  due={due}
+                  onHistoryClick={() => {
+                    setSelectedDue(due);
+                    setIsHistoryModalOpen(true);
+                  }}
+                />
               ))}
             </div>
           ) : (
@@ -156,48 +171,297 @@ export function ShopDueDetailsPage({ shopId }: { shopId: number }) {
         ) : null}
       </PageCard>
 
-      {isHistoryModalOpen && selectedDue && (
+      {isHistoryModalOpen && selectedDue ? (
         <HistoryModal
           due={selectedDue}
           onClose={() => setIsHistoryModalOpen(false)}
         />
-      )}
+      ) : null}
+
+      {isManualDueModalOpen ? (
+        <ManualDueModal
+          shopId={shopId}
+          shopName={shop?.name}
+          isSubmitting={manualDueMutation.isPending}
+          errorMessage={getErrorMessage(manualDueMutation.error)}
+          onClose={() => {
+            if (!manualDueMutation.isPending) {
+              manualDueMutation.reset();
+              setIsManualDueModalOpen(false);
+            }
+          }}
+          onSubmit={(payload) => manualDueMutation.mutate(payload)}
+        />
+      ) : null}
     </div>
   );
 }
 
-function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
-  const { data: collections = [], isLoading } = useQuery({
-    queryKey: ['order-collections', due.orderId],
-    queryFn: () => apiRequest<any[]>(`/dues/order/${due.orderId}/collections`, { method: 'GET' }),
-  });
+function DueLedgerCard({
+  due,
+  onHistoryClick,
+}: {
+  due: Due;
+  onHistoryClick: () => void;
+}) {
+  const isManualDue = due.order?.status === 'MANUAL_DUE';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm">
-      <div className="w-full sm:max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden border border-border animate-in slide-in-from-bottom sm:zoom-in duration-200 text-left">
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-zinc-50/50">
-          <div>
-            <h3 className="text-lg font-bold text-foreground leading-none">Collection History</h3>
-            <p className="text-xs font-bold text-muted uppercase mt-1">Shop: {due.shop?.name} · Order #{due.orderId}</p>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <p className="text-lg font-black uppercase text-slate-900">
+            {isManualDue ? 'Manual Due' : 'Order'} #{due.orderId}
+          </p>
+          <p className="mt-1 text-sm font-bold uppercase text-slate-500">
+            SR: {due.srName || 'Unknown'} -{' '}
+            {formatDate(due.order?.orderDate || due.createdAt)}
+          </p>
+          {due.note ? (
+            <p className="mt-2 max-w-2xl whitespace-pre-line text-sm leading-6 text-slate-600">
+              {due.note}
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex rounded-full px-3 py-1 text-xs font-black uppercase ${getDueStatusClass(due.status)}`}
+            >
+              {due.status}
+            </span>
+            <span className="text-xs font-bold uppercase text-slate-500">
+              {Number(due.remainingDue) > 0
+                ? `${formatCurrency(due.remainingDue)} still due`
+                : 'Paid'}
+            </span>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-zinc-200 rounded-lg transition-colors">
-            <XCircle className="w-5 h-5 text-muted" />
+        </div>
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryPill label="Total Due" value={formatCurrency(due.dueAmount)} />
+          <SummaryPill label="Paid" value={formatCurrency(due.paidAmount)} />
+          <SummaryPill
+            label="Remaining"
+            value={formatCurrency(due.remainingDue)}
+            tone="amber"
+          />
+          <div className="flex items-center justify-center">
+            <button
+              type="button"
+              onClick={onHistoryClick}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+            >
+              <History className="h-4 w-4" />
+              History
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ManualDueModal({
+  shopId,
+  shopName,
+  isSubmitting,
+  errorMessage,
+  onClose,
+  onSubmit,
+}: {
+  shopId: number;
+  shopName?: string;
+  isSubmitting: boolean;
+  errorMessage: string | null;
+  onClose: () => void;
+  onSubmit: (payload: CreateManualDuePayload) => void;
+}) {
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [note, setNote] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const parsedAmount = Number(amount);
+    const cleanReason = reason.trim();
+    const cleanNote = note.trim();
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setFormError('Due amount must be greater than 0.');
+      return;
+    }
+
+    if (cleanReason.length < 3) {
+      setFormError('Reason must be at least 3 characters.');
+      return;
+    }
+
+    setFormError(null);
+    onSubmit({
+      shopId: String(shopId),
+      amount: Number(parsedAmount.toFixed(2)),
+      reason: cleanReason,
+      note: cleanNote || undefined,
+    });
+  }
+
+  const displayedError = formError || errorMessage;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-lg rounded-t-3xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50/70 px-6 py-5">
+          <div>
+            <h3 className="text-lg font-black text-slate-900">
+              Add Manual Due
+            </h3>
+            <p className="mt-1 text-xs font-bold uppercase text-slate-500">
+              {shopName ?? `Shop #${shopId}`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-xl p-1 text-slate-500 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Close manual due form"
+          >
+            <XCircle className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className="rounded-xl bg-zinc-50 p-3 border border-zinc-100">
-              <p className="text-[10px] font-black uppercase text-muted">Original Due</p>
-              <p className="text-lg font-bold text-zinc-900">{formatCurrency(due.dueAmount)}</p>
+        <div className="space-y-4 px-6 py-5">
+          <label className="block">
+            <span className="text-xs font-black uppercase text-slate-500">
+              Due Amount
+            </span>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              disabled={isSubmitting}
+              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-black uppercase text-slate-500">
+              Reason
+            </span>
+            <input
+              type="text"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              maxLength={200}
+              disabled={isSubmitting}
+              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-black uppercase text-slate-500">
+              Notes
+            </span>
+            <textarea
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              rows={4}
+              maxLength={2000}
+              disabled={isSubmitting}
+              className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium leading-6 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+            />
+          </label>
+
+          {displayedError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+              {displayedError}
             </div>
-            <div className="rounded-xl bg-emerald-50 p-3 border border-emerald-100">
-              <p className="text-[10px] font-black uppercase text-emerald-600">Total Paid</p>
-              <p className="text-lg font-bold text-emerald-700">{formatCurrency(due.paidAmount)}</p>
+          ) : null}
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Add Due
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function HistoryModal({ due, onClose }: { due: Due; onClose: () => void }) {
+  const { data: collections = [], isLoading } = useQuery({
+    queryKey: ['order-collections', due.orderId],
+    queryFn: () =>
+      apiRequest<DueCollection[]>(`/dues/order/${due.orderId}/collections`, {
+        method: 'GET',
+      }),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl border border-border bg-white text-left shadow-2xl sm:max-w-2xl sm:rounded-2xl">
+        <div className="flex items-center justify-between border-b border-border bg-zinc-50/50 px-6 py-4">
+          <div>
+            <h3 className="text-lg font-bold leading-none text-foreground">
+              Collection History
+            </h3>
+            <p className="mt-1 text-xs font-bold uppercase text-muted">
+              Shop: {due.shop?.name || 'Shop'} - Order #{due.orderId}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 transition-colors hover:bg-zinc-200"
+          >
+            <XCircle className="h-5 w-5 text-muted" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto p-6">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
+              <p className="text-[10px] font-black uppercase text-muted">
+                Original Due
+              </p>
+              <p className="text-lg font-bold text-zinc-900">
+                {formatCurrency(due.dueAmount)}
+              </p>
             </div>
-            <div className="rounded-xl bg-rose-50 p-3 border border-rose-100">
-              <p className="text-[10px] font-black uppercase text-rose-600">Remaining</p>
-              <p className="text-lg font-bold text-rose-700">{formatCurrency(due.remainingDue)}</p>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+              <p className="text-[10px] font-black uppercase text-emerald-600">
+                Total Paid
+              </p>
+              <p className="text-lg font-bold text-emerald-700">
+                {formatCurrency(due.paidAmount)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-rose-100 bg-rose-50 p-3">
+              <p className="text-[10px] font-black uppercase text-rose-600">
+                Remaining
+              </p>
+              <p className="text-lg font-bold text-rose-700">
+                {formatCurrency(due.remainingDue)}
+              </p>
             </div>
           </div>
 
@@ -215,25 +479,35 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
                 {isLoading ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-8 text-center">
-                      <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
+                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
                     </td>
                   </tr>
                 ) : collections.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-muted">No history found.</td>
+                    <td
+                      colSpan={4}
+                      className="px-4 py-8 text-center text-muted"
+                    >
+                      No history found.
+                    </td>
                   </tr>
                 ) : (
-                  collections.map((c: any) => (
-                    <tr key={c.id} className="hover:bg-zinc-50/30">
-                      <td className="px-4 py-3 text-xs font-bold text-zinc-600">{new Date(c.collectionDate).toLocaleDateString()}</td>
-                      <td className="px-4 py-3 text-xs font-medium text-zinc-700">{c.srName}</td>
-                      <td className="px-4 py-3 text-right font-black text-primary">{formatCurrency(c.collectedAmount)}</td>
+                  collections.map((collection) => (
+                    <tr key={collection.id} className="hover:bg-zinc-50/30">
+                      <td className="px-4 py-3 text-xs font-bold text-zinc-600">
+                        {new Date(collection.collectionDate).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-medium text-zinc-700">
+                        {collection.srName || collection.collectedBy || 'Unknown'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-black text-primary">
+                        {formatCurrency(collection.collectedAmount)}
+                      </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-black border ${c.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                          c.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                            'bg-rose-50 text-rose-700 border-rose-100'
-                          }`}>
-                          {c.status}
+                        <span
+                          className={`rounded border px-2 py-0.5 text-[8px] font-black ${getCollectionStatusClass(collection.status)}`}
+                        >
+                          {collection.status}
                         </span>
                       </td>
                     </tr>
@@ -244,8 +518,12 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
           </div>
         </div>
 
-        <div className="px-6 py-4 bg-zinc-50/50 border-t border-border flex justify-end">
-          <button onClick={onClose} className="px-6 py-2 bg-zinc-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest">
+        <div className="flex justify-end border-t border-border bg-zinc-50/50 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-zinc-900 px-6 py-2 text-xs font-bold uppercase tracking-widest text-white"
+          >
             Close
           </button>
         </div>
@@ -253,7 +531,6 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
     </div>
   );
 }
-
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
@@ -284,4 +561,40 @@ function SummaryPill({
       <p className="mt-1 font-medium">{value}</p>
     </div>
   );
+}
+
+function getDueStatusClass(status: string) {
+  if (status === 'DUE') {
+    return 'bg-rose-100 text-rose-700';
+  }
+
+  if (status === 'PARTIAL') {
+    return 'bg-amber-100 text-amber-700';
+  }
+
+  return 'bg-emerald-100 text-emerald-700';
+}
+
+function getCollectionStatusClass(status: string) {
+  if (status === 'APPROVED') {
+    return 'border-emerald-100 bg-emerald-50 text-emerald-700';
+  }
+
+  if (status === 'PENDING') {
+    return 'border-amber-100 bg-amber-50 text-amber-700';
+  }
+
+  return 'border-rose-100 bg-rose-50 text-rose-700';
+}
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) {
+    return null;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Something went wrong.';
 }
