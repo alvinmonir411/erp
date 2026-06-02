@@ -495,8 +495,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         __html: `
         @media print {
           @page {
-            size: A4;
-            margin: 10mm;
+            size: A4 portrait;
+            margin: 6mm 8mm !important;
           }
 
           .no-print {
@@ -518,7 +518,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             left: 0;
             top: 0;
             width: 100%;
-            padding: 0;
+            padding: 0 !important;
+            margin: 0 !important;
             background: white;
             color: black;
             overflow: hidden;
@@ -528,19 +529,41 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             page-break-inside: avoid;
           }
           
-          table { page-break-inside: auto; }
-          tr { page-break-inside: avoid; page-break-after: auto; }
+          table { 
+            page-break-inside: auto; 
+          }
+          tr { 
+            page-break-inside: avoid; 
+            page-break-after: auto; 
+          }
+          
+          /* Table spacing overrides */
+          .final-settlement-print table th, 
+          .final-settlement-print table td { 
+            padding: 4px 6px !important; 
+            font-size: 10px !important;
+            line-height: 1.15 !important;
+          }
+          
+          /* Spacing cleanups for print */
+          .final-settlement-print .mb-8 { margin-bottom: 8px !important; }
+          .final-settlement-print .pb-4 { padding-bottom: 4px !important; }
+          .final-settlement-print .mb-10 { margin-bottom: 10px !important; }
+          .final-settlement-print .gap-8 { gap: 8px !important; }
+          .final-settlement-print .mt-12 { margin-top: 10px !important; }
+          .final-settlement-print .mt-16 { margin-top: 12px !important; }
+          .final-settlement-print .gap-12 { gap: 12px !important; }
           
           .pb-24 { padding-bottom: 0 !important; }
           .min-h-screen { min-height: 0 !important; }
-          .mt-32 { margin-top: 40px !important; }
         }
 
         .final-settlement-print {
           display: none;
         }
       `}} />
-      {/* Mobile Header */}
+      <div className="no-print space-y-6">
+        {/* Mobile Header */}
       <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between bg-white px-4 py-3 border-b border-slate-100 lg:hidden">
         <button
           onClick={() => router.push('/delivery-ops')}
@@ -1148,9 +1171,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         }}
         onSuccess={fetchBatch}
       />
+      </div>
 
       {/* PRINT SECTION (HIDDEN ON SCREEN) */}
-      <div className="final-settlement-print text-black bg-white min-h-screen">
+      <div className="final-settlement-print text-black bg-white">
         <div className="text-center mb-8 border-b-2 border-black pb-4">
           <h1 className="text-3xl font-black uppercase tracking-tight mb-1">KORIM TRADERS ERP</h1>
           <h2 className="text-xl font-bold uppercase tracking-widest text-slate-600">Final Batch Settlement</h2>
@@ -1303,7 +1327,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-20 mt-32">
+        <div className="grid grid-cols-2 gap-10 mt-16 print:mt-8">
           <div className="text-center">
             <div className="border-t-2 border-black pt-2 font-black uppercase tracking-widest text-sm">Delivery Man Signature</div>
             <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</p>

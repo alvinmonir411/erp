@@ -24,13 +24,74 @@ export function PrintSummary({ report, mode, draftDues = {} }: PrintSummaryProps
     <div className="mx-auto bg-white p-2 sm:p-4 text-[13px] text-black printable-report max-w-full md:max-w-[210mm]">
       <style dangerouslySetInnerHTML={{
         __html: `
+        .printable-report table { border-collapse: collapse; width: 100%; }
+        .printable-report th, .printable-report td { border: 1px solid #000; padding: 5px 7px; }
+        
         @media print {
-          @page { size: A4; margin: 12mm; }
-          body { -webkit-print-color-adjust: exact; }
-          .printable-report { p-0 !important; max-width: none !important; }
+          @page { 
+            size: A4 portrait; 
+            margin: 6mm 8mm 6mm 8mm !important; 
+          }
+          body { 
+            -webkit-print-color-adjust: exact !important; 
+            background: white !important;
+            color: black !important;
+            font-size: 11px !important;
+          }
+          html, body {
+            height: auto !important;
+            min-height: 0 !important;
+          }
+          .min-h-screen {
+            min-height: 0 !important;
+          }
+          .printable-report { 
+            padding: 0 !important; 
+            max-width: none !important; 
+            font-size: 11px !important;
+          }
+          
+          /* Table spacing overrides */
+          .printable-report table th, 
+          .printable-report table td { 
+            padding: 3px 5px !important; 
+            font-size: 9px !important;
+            line-height: 1.15 !important;
+            border: 1px solid #000000 !important;
+          }
+          
+          /* Spacing cleanups */
+          .mb-6 { margin-bottom: 8px !important; }
+          .mb-4 { margin-bottom: 6px !important; }
+          .mt-8 { margin-top: 10px !important; }
+          .mt-12 { margin-top: 12px !important; }
+          .mt-20 { margin-top: 24px !important; }
+          
+          /* Morning summary breakdown grid */
+          .order-breakdown-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 6px !important;
+          }
+          .order-breakdown-card {
+            padding: 6px !important;
+            border-width: 1px !important;
+            font-size: 9px !important;
+          }
+          
+          /* Field Summary Sheet Table height adjustments */
+          .field-sheet-table tr {
+            height: auto !important;
+          }
+          .field-sheet-table td {
+            padding: 4px 6px !important;
+          }
+          .empty-row {
+            height: 22px !important; /* Make empty rows much smaller in print */
+          }
+          .empty-row td {
+            padding: 2px 4px !important;
+          }
         }
-        .printable-report table { border-collapse: collapse; width: 100%; min-width: 600px; }
-        .printable-report th, .printable-report td { border: 1px solid #000; padding: 6px 8px; }
       `}} />
 
       {/* Header Section */}
@@ -100,12 +161,10 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
         </thead>
         <tbody>
           {sortedProducts.map((item, index) => {
-            // deliveredPaid = paid-only sold qty (excludes free items from revenue)
             const soldQty = Number(item.deliveredPaid ?? item.delivered ?? 0);
             const totalAmount = Number(item.finalSoldAmount || 0);
             const unitPrice = soldQty > 0 ? totalAmount / soldQty : 0;
 
-            // Calculate due for this product row
             const productDue = report.orders
               .filter((order: any) => order.items.some((i: any) => i.productName === item.productName))
               .reduce((sum: number, order: any) => {
@@ -151,7 +210,6 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
         </tbody>
       </table>
 
-      {/* Summary Aligned Rows */}
       <div className="mt-8 flex justify-end">
         <div className="w-64 space-y-2 border-t border-black pt-4">
           <div className="flex justify-between text-xs font-medium">
@@ -168,7 +226,6 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
           </div>
           <div className="flex justify-between text-xs font-bold border-b border-black pb-2">
             <span>Sold (Paid):</span>
-            {/* paid-only delivered — excludes free items from sold count */}
             <span>{formatNumber(products.reduce((s, i: any) => s + Number(i.deliveredPaid ?? i.delivered ?? 0), 0))}</span>
           </div>
           <div className="flex justify-between text-base font-bold pt-1">
@@ -191,78 +248,31 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
                   <span>Total Due/Baki:</span>
                   <span>{formatCurrency(totalDue)}</span>
                 </div>
-          <div className="flex justify-between text-lg font-black pt-2 border-t-2 border-black text-emerald-700">
-            <span>CASH COLLECTABLE:</span>
-            <span>{formatCurrency(cashCollectable)}</span>
-          </div>
-          <div className="flex justify-between text-sm font-bold pt-1">
-            <span>Cash Received:</span>
-            <span>{formatCurrency(report.summary.totalCollectedAmount || 0)}</span>
-          </div>
-          <div className="flex justify-between text-sm font-bold pt-1">
-            <span>Cash Expected:</span>
-            <span>{formatCurrency(report.summary.totalCashExpected || cashCollectable)}</span>
-          </div>
-        </>
-      );
+                <div className="flex justify-between text-lg font-black pt-2 border-t-2 border-black text-emerald-700">
+                  <span>CASH COLLECTABLE:</span>
+                  <span>{formatCurrency(cashCollectable)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold pt-1">
+                  <span>Cash Received:</span>
+                  <span>{formatCurrency(report.summary.totalCollectedAmount || 0)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold pt-1">
+                  <span>Cash Expected:</span>
+                  <span>{formatCurrency(report.summary.totalCashExpected || cashCollectable)}</span>
+                </div>
+              </>
+            );
           })()}
         </div>
       </div>
 
-      {(() => {
-        const ordersWithDue = report.orders.filter((order: any) => {
-          const due = draftDues[order.orderId] !== undefined ? draftDues[order.orderId] : Number(order.dueAmount || 0);
-          return due > 0;
-        });
-
-        if (ordersWithDue.length === 0) return null;
-
-        return (
-          <div className="mt-12 break-inside-avoid">
-            <h2 className="text-sm font-black uppercase tracking-widest border-b border-black mb-4 inline-block">Due / Baki Details</h2>
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 uppercase font-bold text-[10px]">
-                  <th className="w-8 text-center border border-black p-2">SL</th>
-                  <th className="text-left border border-black p-2">Shop</th>
-                  <th className="text-left border border-black p-2">Order</th>
-                  <th className="text-left border border-black p-2">SR</th>
-                  <th className="text-left border border-black p-2">Product</th>
-                  <th className="text-right border border-black p-2">Due Amount</th>
-                  <th className="text-left border border-black p-2">Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ordersWithDue.map((order: any, idx: number) => {
-                  const due = draftDues[order.orderId] !== undefined ? draftDues[order.orderId] : Number(order.dueAmount || 0);
-                  const productNames = order.items.map((i: any) => i.productName).join(', ');
-                  return (
-                    <tr key={order.orderId}>
-                      <td className="text-center border border-black p-2">{idx + 1}</td>
-                      <td className="border border-black p-2 font-bold">{order.shopName}</td>
-                      <td className="border border-black p-2">#{order.orderId}</td>
-                      <td className="border border-black p-2">{report.assignedDeliveryMan?.name || report.deliveryPerson?.name}</td>
-                      <td className="border border-black p-2 text-slate-600">{productNames}</td>
-                      <td className="border border-black p-2 text-right font-bold text-amber-600">{formatCurrency(due)}</td>
-                      <td className="border border-black p-2"></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        );
-      })()}
-
-      <div className="mt-20 grid grid-cols-3 gap-10">
-        <div className="border-t border-black pt-2 text-center text-[10px] font-bold uppercase tracking-widest">
-          Delivery Man Signature
+      {/* Signature block for Final Settlement Sheet */}
+      <div className="mt-12 signature-grid grid grid-cols-2 gap-10">
+        <div className="border-t-2 border-slate-900 pt-3 text-center">
+          <p className="text-xs font-black uppercase tracking-widest">Delivery Man Signature</p>
         </div>
-        <div className="border-t border-black pt-2 text-center text-[10px] font-bold uppercase tracking-widest">
-          Authorized Signature
-        </div>
-        <div className="border-t border-black pt-2 text-center text-[10px] font-bold uppercase tracking-widest">
-          Cash Received By
+        <div className="border-t-2 border-slate-900 pt-3 text-center">
+          <p className="text-xs font-black uppercase tracking-widest">Authorized Signature</p>
         </div>
       </div>
     </div>
@@ -270,15 +280,12 @@ function FinalSettlementLayout({ report, draftDues }: { report: any, draftDues: 
 }
 
 function FieldLayout({ report }: { report: any }) {
-  // Aggregate items across all orders (though morning report usually already has itemWiseTotals)
   const items = report.itemWiseTotals || [];
-
-  // Sort alphabetically
   const sortedItems = [...items].sort((a, b) => a.productName.localeCompare(b.productName));
 
   return (
-    <div className="mt-8 min-w-[700px]">
-      <table className="w-full border-2 border-slate-900 border-collapse">
+    <div className="mt-4 min-w-[700px]">
+      <table className="w-full border-2 border-slate-900 border-collapse field-sheet-table">
         <thead>
           <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest">
             <th className="border-2 border-slate-900 px-2 py-3 text-center w-10">SL</th>
@@ -317,23 +324,21 @@ function FieldLayout({ report }: { report: any }) {
               </tr>
             );
           })}
-          {/* Empty rows for manual entry if needed */}
-          {sortedItems.length < 15 && Array.from({ length: Math.max(0, 15 - sortedItems.length) }).map((_, i) => (
-            <tr key={`empty-${i}`} className="h-10">
-              <td className="border-2 border-slate-900 px-2 py-3"></td>
-              <td className="border-2 border-slate-900 px-3 py-3"></td>
-              <td className="border-2 border-slate-900 px-2 py-3"></td>
-              <td className="border-2 border-slate-900 px-2 py-3"></td>
-              <td className="border-2 border-slate-900 px-2 py-3"></td>
-              <td className="border-2 border-slate-900 px-2 py-3"></td>
-              <td className="border-2 border-slate-900 px-2 py-3"></td>
-              <td className="border-2 border-slate-900 px-3 py-3"></td>
+          {sortedItems.length < 12 && Array.from({ length: Math.max(0, 12 - sortedItems.length) }).map((_, i) => (
+            <tr key={`empty-${i}`} className="h-8 empty-row">
+              <td className="border-2 border-slate-900 px-2 py-1.5"></td>
+              <td className="border-2 border-slate-900 px-3 py-1.5"></td>
+              <td className="border-2 border-slate-900 px-2 py-1.5"></td>
+              <td className="border-2 border-slate-900 px-2 py-1.5"></td>
+              <td className="border-2 border-slate-900 px-2 py-1.5"></td>
+              <td className="border-2 border-slate-900 px-2 py-1.5"></td>
+              <td className="border-2 border-slate-900 px-2 py-1.5"></td>
+              <td className="border-2 border-slate-900 px-3 py-1.5"></td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      {/* Bottom Summary */}
       <div className="mt-6 flex justify-end">
         <div className="border-2 border-slate-900 px-6 py-3 bg-slate-50">
           <p className="text-lg font-black">
@@ -342,7 +347,7 @@ function FieldLayout({ report }: { report: any }) {
         </div>
       </div>
 
-      <div className="mt-12 grid grid-cols-2 gap-20">
+      <div className="mt-8 signature-grid grid grid-cols-2 gap-10">
         <div className="border-t-2 border-slate-900 pt-3 text-center">
           <p className="text-xs font-black uppercase tracking-widest">Delivery Man Signature</p>
         </div>
@@ -357,7 +362,6 @@ function FieldLayout({ report }: { report: any }) {
 function MorningLayout({ report }: { report: any }) {
   return (
     <div className="mt-8 space-y-10 min-w-[600px]">
-      {/* Item Summary Table */}
       <div>
         <h2 className="text-sm font-black uppercase tracking-widest border-l-4 border-slate-900 pl-3 mb-4">
           Item-wise Loading Sheet
@@ -394,14 +398,13 @@ function MorningLayout({ report }: { report: any }) {
         </table>
       </div>
 
-      {/* Order Breakdown */}
       <div>
         <h2 className="text-sm font-black uppercase tracking-widest border-l-4 border-slate-900 pl-3 mb-4">
           Order Breakdown
         </h2>
-        <div className="grid gap-4 grid-cols-2">
+        <div className="grid gap-4 grid-cols-2 order-breakdown-grid">
           {report.selectedOrders.map((order: any) => (
-            <div key={order.orderId} className="rounded-xl border-2 border-slate-100 p-4 break-inside-avoid">
+            <div key={order.orderId} className="rounded-xl border-2 border-slate-100 p-4 break-inside-avoid order-breakdown-card">
               <div className="flex justify-between items-start mb-3 border-b border-slate-50 pb-2">
                 <div>
                   <p className="font-black">Order #{String(order.orderId).padStart(6, '0')}</p>
@@ -424,5 +427,3 @@ function MorningLayout({ report }: { report: any }) {
     </div>
   );
 }
-
-

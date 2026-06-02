@@ -29,12 +29,12 @@ export default function LoginPage() {
           String(Date.now() + SESSION_DURATION_MS),
         );
       }
-      
+
       let target = '/dashboard';
       if (data.user.role === 'SR') target = '/sr-dashboard';
       else if (data.user.role === 'MANAGER') target = '/manager-dashboard';
       else if (data.user.role === 'DELIVERY_MAN') target = '/my-deliveries';
-      
+
       router.push(target);
     } catch (err: any) {
       setError(err.message || 'Login failed. Invalid credentials.');
@@ -48,7 +48,7 @@ export default function LoginPage() {
       {/* Background decorations */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/30 blur-[120px] rounded-full" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/30 blur-[120px] rounded-full" />
-      
+
       <div className="w-full max-w-md p-8 relative z-10 backdrop-blur-3xl bg-zinc-900/50 border border-zinc-800 rounded-3xl shadow-2xl">
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20">
@@ -108,10 +108,7 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-        
-        <div className="mt-8 text-center border-t border-zinc-800 pt-6">
-          <p className="text-zinc-500 text-xs">Default Admin: <strong>admin@erp.com</strong> / <strong>admin123</strong></p>
-        </div>
+
       </div>
     </div>
   );
