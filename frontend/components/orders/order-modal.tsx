@@ -1,18 +1,47 @@
 'use client';
 
+import { useState } from 'react';
 import { 
   X, Printer, Info, Clock, CheckCircle, 
   MapPin, Store, Building2, DollarSign, 
-  ShieldAlert, Package, Calendar
+  ShieldAlert, Package, Calendar, Trash2,
+  AlertCircle, RefreshCw
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { useAuth } from '../auth/auth-provider';
+import { useToast } from '@/components/ui/toast-provider';
+import { deleteOrder } from '@/lib/api/orders';
 
 interface OrderModalProps {
   order: any;
   onClose: () => void;
+  onDeleteSuccess?: () => void;
 }
 
-export function OrderModal({ order, onClose }: OrderModalProps) {
+export function OrderModal({ order, onClose, onDeleteSuccess }: OrderModalProps) {
+  const { user } = useAuth();
+  const { success: showSuccessToast, error: showErrorToast } = useToast();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deleteOrder(order.id);
+      showSuccessToast('Order deleted successfully');
+      setShowDeleteConfirm(false);
+      onDeleteSuccess?.();
+    } catch (e: any) {
+      showErrorToast(e.message || 'Failed to delete order');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const isSettled = ['SETTLED', 'PARTIAL_DUE'].includes(order.status);
   
   // Calculate total units dispatched vs delivered
@@ -406,6 +435,20 @@ export function OrderModal({ order, onClose }: OrderModalProps) {
 
           {/* Footer */}
           <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+            {user?.role === 'SUPER_ADMIN' && (
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 rounded-xl bg-rose-600 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-rose-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Delete Order
+              </button>
+            )}
             <button 
               onClick={() => window.print()} 
               className="flex-1 rounded-xl border border-slate-200 bg-white py-3 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
@@ -656,8 +699,46 @@ export function OrderModal({ order, onClose }: OrderModalProps) {
             </div>
           </div>
         </div>
-
       </div>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(false)} />
+          <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="h-12 w-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">Delete Order #{order.id.toString().padStart(6, '0')}</h3>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed font-bold">
+                  Are you sure you want to delete this order? This will reverse stock changes, delete associated dues/payments, and cannot be undone.
+                </p>
+              </div>
+              <div className="flex w-full gap-3 pt-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                  className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="flex-1 rounded-xl bg-rose-600 py-3 text-xs font-black text-white hover:bg-rose-700 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isDeleting ? (
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    'Yes, Delete'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

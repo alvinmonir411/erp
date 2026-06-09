@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   ClipboardList,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { PageCard } from '@/components/ui/page-card';
 import { useToast } from '@/components/ui/toast-provider';
@@ -24,12 +25,14 @@ import {
   markMorningPrinted,
   recordBatchReturns,
   settleDispatchBatch,
+  deleteDispatchBatch,
 } from '@/lib/api/delivery-ops';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils/format';
 import type { DispatchBatch } from '@/types/api';
 import { batchStatusConfig, orderStatusConfig, StatusBadge } from './delivery-ops-ui';
 import { PrintSummary } from './print-summary';
 import { DueModal } from './due-modal';
+import { DeleteBatchConfirmModal } from './delivery-ops-dashboard-page';
 
 const gcd = (a: number, b: number): number => {
   a = Math.abs(a);
@@ -68,6 +71,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const [draftDues, setDraftDues] = useState<Record<number, number>>({});
   const [dueModalProduct, setDueModalProduct] = useState<{ id: number; name: string } | null>(null);
   const [actualCashReceived, setActualCashReceived] = useState<string>('');
+  const [batchToDelete, setBatchToDelete] = useState<{ id: number; batchNo: string; isSettled: boolean } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   // Track whether admin has manually edited the cash field — if yes, never auto-overwrite it
   const cashManuallyEdited = useRef(false);
 
@@ -345,6 +350,27 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     }
   };
 
+  const handleDeleteClick = () => {
+    if (!batch) return;
+    const isSettled = batch.status === 'SETTLED' || batch.status === 'PARTIALLY_SETTLED';
+    setBatchToDelete({ id: batchId, batchNo: batch.batchNo, isSettled });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!batchToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      await deleteDispatchBatch(batchToDelete.id);
+      router.push('/delivery-ops');
+      showSuccessToast('Batch deleted successfully');
+    } catch (err: any) {
+      showErrorToast(err.message || 'Failed to delete batch');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleSaveReturns = async () => {
     if (!batch) return;
 
@@ -607,6 +633,25 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
         </div>
 
+        {['DISPATCHED', 'RETURN_PENDING', 'PARTIALLY_SETTLED', 'SETTLED'].includes(batch.status) && (
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={handlePrintFinalSettlement}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl border-2 border-slate-900 bg-white px-5 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
+            >
+              <Printer className="h-4 w-4" />
+              Print Final Settlement
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 text-red-600 px-5 py-3 text-sm font-bold shadow-sm transition hover:bg-red-100"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Batch
+            </button>
+          </div>
+        )}
+
         {batch.status === 'DRAFT' && (
           <div className="flex flex-col sm:flex-row gap-3">
             <button
@@ -623,17 +668,12 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               <Send className="h-4 w-4" />
               Dispatch to Field
             </button>
-          </div>
-        )}
-
-        {['DISPATCHED', 'RETURN_PENDING', 'PARTIALLY_SETTLED', 'SETTLED'].includes(batch.status) && (
-          <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={handlePrintFinalSettlement}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl border-2 border-slate-900 bg-white px-5 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
+              onClick={handleDeleteClick}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 text-red-600 px-5 py-3 text-sm font-bold shadow-sm transition hover:bg-red-100"
             >
-              <Printer className="h-4 w-4" />
-              Print Final Settlement
+              <Trash2 className="h-4 w-4" />
+              Delete Batch
             </button>
           </div>
         )}
@@ -1342,6 +1382,16 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
         </div>
       </div>
+      {batchToDelete && (
+        <DeleteBatchConfirmModal
+          isOpen={!!batchToDelete}
+          onClose={() => setBatchToDelete(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isDeleting}
+          batchNo={batchToDelete.batchNo}
+          isSettled={batchToDelete.isSettled}
+        />
+      )}
     </div>
   );
 }

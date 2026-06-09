@@ -198,3 +198,9 @@ export function getDispatchReports(query: DispatchBatchQuery = {}) {
     query,
   });
 }
+
+export function deleteDispatchBatch(id: number) {
+  return apiRequest<{ success: boolean; message: string }>(`delivery-ops/batches/${id}`, {
+    method: 'DELETE',
+  });
+}

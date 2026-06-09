@@ -7,16 +7,16 @@ import { StatCard } from '@/components/ui/stat-card';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToast } from '@/components/ui/toast-provider';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
-import { getDeliveryDashboard, getDispatchBatches } from '@/lib/api/delivery-ops';
+import { getDeliveryDashboard, getDispatchBatches, deleteDispatchBatch } from '@/lib/api/delivery-ops';
 import { useCompanies, useRoutes } from '@/hooks/use-common-queries';
 import { batchStatusConfig, StatusBadge } from './delivery-ops-ui';
 import type { DispatchBatch } from '@/types/api';
-import { AlertCircle, ArrowUpRight, BarChart3, CheckCircle, CheckCircle2, CheckCircle2Icon, ClipboardList, DollarSign, Filter, HandCoins, History, MapPin, Package, Plus, Search, TrendingUp, Truck, Undo2, Wallet, ArrowLeft, LogOut, User } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, BarChart3, CheckCircle, CheckCircle2, CheckCircle2Icon, ClipboardList, DollarSign, Filter, HandCoins, History, MapPin, Package, Plus, Search, TrendingUp, Truck, Undo2, Wallet, ArrowLeft, LogOut, User, Trash2 } from 'lucide-react';
 
 
 
 export function DeliveryOpsDashboardPage() {
-  const { error: showErrorToast } = useToast();
+  const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [companyId, setCompanyId] = useState('');
   const [routeId, setRouteId] = useState('');
@@ -25,6 +25,8 @@ export function DeliveryOpsDashboardPage() {
   const [batches, setBatches] = useState<DispatchBatch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [batchToDelete, setBatchToDelete] = useState<{ id: number; batchNo: string; isSettled: boolean } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data: companies = [] } = useCompanies();
   const { data: routes = [] } = useRoutes();
@@ -61,6 +63,26 @@ export function DeliveryOpsDashboardPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  const handleDeleteClick = (id: number, batchNo: string, isSettled: boolean) => {
+    setBatchToDelete({ id, batchNo, isSettled });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!batchToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      await deleteDispatchBatch(batchToDelete.id);
+      showSuccessToast('Batch deleted successfully');
+      setBatchToDelete(null);
+      fetchData();
+    } catch (err: any) {
+      showErrorToast(err.message || 'Failed to delete batch');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -222,9 +244,21 @@ export function DeliveryOpsDashboardPage() {
                         <StatusBadge {...config} />
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Link href={`/delivery-ops/batches/${batch.id}`} className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-muted hover:text-primary transition-colors">
-                          Manage <ArrowUpRight className="h-3 w-3" />
-                        </Link>
+                        <div className="flex items-center justify-end gap-3">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(batch.id, batch.batchNo, batch.status === 'SETTLED' || batch.status === 'PARTIALLY_SETTLED');
+                            }}
+                            className="text-red-500 hover:text-red-600 transition-colors"
+                            title="Delete Batch"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          <Link href={`/delivery-ops/batches/${batch.id}`} className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-muted hover:text-primary transition-colors">
+                            Manage <ArrowUpRight className="h-3 w-3" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -277,14 +311,97 @@ export function DeliveryOpsDashboardPage() {
 
                   <div className="flex justify-between items-center pt-2">
                     <span className="text-[10px] font-bold text-muted uppercase">{batch.totalOrders} Order(s) · {formatDate(batch.dispatchDate)}</span>
-                    <Link href={`/delivery-ops/batches/${batch.id}`} className="text-[10px] font-black uppercase tracking-widest text-primary px-3 py-1.5 bg-primary/5 rounded-lg">
-                      Manage
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(batch.id, batch.batchNo, batch.status === 'SETTLED' || batch.status === 'PARTIALLY_SETTLED');
+                        }}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <Link href={`/delivery-ops/batches/${batch.id}`} className="text-[10px] font-black uppercase tracking-widest text-primary px-3 py-1.5 bg-primary/5 rounded-lg">
+                        Manage
+                      </Link>
+                    </div>
                   </div>
                 </div>
               );
             })
           )}
+        </div>
+      </div>
+      {batchToDelete && (
+        <DeleteBatchConfirmModal
+          isOpen={!!batchToDelete}
+          onClose={() => setBatchToDelete(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isDeleting}
+          batchNo={batchToDelete.batchNo}
+          isSettled={batchToDelete.isSettled}
+        />
+      )}
+    </div>
+  );
+}
+
+interface DeleteBatchConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isDeleting: boolean;
+  batchNo: string;
+  isSettled: boolean;
+}
+
+export function DeleteBatchConfirmModal({ isOpen, onClose, onConfirm, isDeleting, batchNo, isSettled }: DeleteBatchConfirmModalProps) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[10002] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150">
+        <div className="flex flex-col items-center text-center space-y-4">
+          <div className="h-12 w-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-black text-slate-900">Delete Batch {batchNo}</h3>
+            {isSettled ? (
+              <div className="mt-2 bg-rose-50 border border-rose-100 p-3 rounded-xl">
+                <p className="text-[11px] text-rose-600 font-bold leading-relaxed text-left uppercase tracking-wide">
+                  Warning: This batch is Settled.
+                </p>
+                <p className="text-[11px] text-rose-600/80 font-semibold leading-relaxed text-left mt-1">
+                  Deleting it will reverse all stock adjustments, delete associated dues/collections, and revert orders to CONFIRMED.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed font-bold">
+                Are you sure you want to delete this batch? This action cannot be undone.
+              </p>
+            )}
+          </div>
+          <div className="flex w-full gap-3 pt-2">
+            <button
+              onClick={onClose}
+              disabled={isDeleting}
+              className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isDeleting}
+              className="flex-1 rounded-xl bg-rose-600 py-3 text-xs font-black text-white hover:bg-rose-700 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              {isDeleting ? (
+                <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                'Yes, Delete'
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

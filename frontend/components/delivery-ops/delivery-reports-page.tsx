@@ -12,11 +12,13 @@ import type { User } from '@/types/api';
 import { Role } from '@/types/api';
 import { getUsersByRole } from '@/lib/api/users';
 import { StateMessage } from '../ui/state-message';
-import { getDispatchReports } from '@/lib/api/delivery-ops';
+import { getDispatchReports, deleteDispatchBatch } from '@/lib/api/delivery-ops';
+import { Trash2 } from 'lucide-react';
+import { DeleteBatchConfirmModal } from './delivery-ops-dashboard-page';
 
 export function DeliveryReportsPage() {
   const router = useRouter();
-  const { error: showErrorToast } = useToast();
+  const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [dispatchDate, setDispatchDate] = useState(new Date().toISOString().split('T')[0]);
   const [companyId, setCompanyId] = useState('');
   const [routeId, setRouteId] = useState('');
@@ -24,6 +26,8 @@ export function DeliveryReportsPage() {
   const [report, setReport] = useState<any>(null);
   const [deliveryMen, setDeliveryMen] = useState<User[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [batchToDelete, setBatchToDelete] = useState<{ id: number; batchNo: string; isSettled: boolean } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data: companies = [] } = useCompanies();
   const { data: routes = [] } = useRoutes();
@@ -57,6 +61,27 @@ export function DeliveryReportsPage() {
   useEffect(() => {
     fetchReport();
   }, [dispatchDate, companyId, routeId, deliveryPersonId]);
+
+  const handleDeleteClick = (id: number, batchNo: string, status: string) => {
+    const isSettled = status === 'SETTLED' || status === 'PARTIALLY_SETTLED';
+    setBatchToDelete({ id, batchNo, isSettled });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!batchToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      await deleteDispatchBatch(batchToDelete.id);
+      showSuccessToast('Batch deleted successfully');
+      setBatchToDelete(null);
+      fetchReport();
+    } catch (err: any) {
+      showErrorToast(err.message || 'Failed to delete batch');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -199,6 +224,7 @@ export function DeliveryReportsPage() {
                 <th className="px-6 py-4 text-right">Final</th>
                 <th className="px-6 py-4 text-right">Collected</th>
                 <th className="px-6 py-4 text-right">Due</th>
+                <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -215,6 +241,18 @@ export function DeliveryReportsPage() {
                   <td className="px-6 py-4 text-right text-sm font-black text-emerald-700">{formatCurrency(row.finalSoldValue)}</td>
                   <td className="px-6 py-4 text-right text-sm font-black text-cyan-700">{formatCurrency(row.totalCollectedAmount)}</td>
                   <td className="px-6 py-4 text-right text-sm font-black text-amber-700">{formatCurrency(row.totalDueAmount)}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(row.id, row.batchNo, row.status);
+                      }}
+                      className="text-red-500 hover:text-red-600 transition-colors"
+                      title="Delete Batch"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -260,6 +298,18 @@ export function DeliveryReportsPage() {
                 <p className="text-sm font-black text-rose-600">{formatCurrency(row.totalDueAmount)}</p>
               </div>
             </div>
+            
+            <div className="flex justify-end pt-4 border-t border-slate-50">
+               <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(row.id, row.batchNo, row.status);
+                  }}
+                  className="flex items-center gap-1.5 text-xs font-black text-red-500 hover:text-red-600 uppercase tracking-widest"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+               </button>
+            </div>
           </div>
         ))}
         {!report?.rows?.length && (
@@ -272,6 +322,16 @@ export function DeliveryReportsPage() {
           </div>
         )}
       </div>
+      {batchToDelete && (
+        <DeleteBatchConfirmModal
+          isOpen={!!batchToDelete}
+          onClose={() => setBatchToDelete(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isDeleting}
+          batchNo={batchToDelete.batchNo}
+          isSettled={batchToDelete.isSettled}
+        />
+      )}
     </div>
   );
 }

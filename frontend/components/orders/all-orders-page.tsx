@@ -65,6 +65,7 @@ export function AllOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [settlingOrder, setSettlingOrder] = useState<any>(null);
   const [isActionLoading, setIsActionLoading] = useState<number | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<any | null>(null);
 
   const paginatedOrders = orders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -139,16 +140,24 @@ export function AllOrdersPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this order?')) return;
+  const handleDelete = (id: number) => {
+    const ord = orders.find(o => o.id === id);
+    if (ord) {
+      setOrderToDelete(ord);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!orderToDelete) return;
     try {
-      setIsActionLoading(id);
-      await deleteOrder(id);
+      setIsActionLoading(orderToDelete.id);
+      await deleteOrder(orderToDelete.id);
       showSuccessToast('Order deleted successfully');
+      setOrderToDelete(null);
       fetchOrders();
       fetchStats();
-    } catch (e) {
-      showErrorToast('Failed to delete order');
+    } catch (e: any) {
+      showErrorToast(e.message || 'Failed to delete order');
     } finally {
       setIsActionLoading(null);
     }
@@ -457,7 +466,7 @@ export function AllOrdersPage() {
                       e.stopPropagation();
                       setSelectedOrder(order);
                     }}
-                    className="text-[10px] font-bold uppercase text-primary px-3 py-1.5 bg-primary/5 rounded-lg"
+                    className="text-[10px] font-bold uppercase text-primary px-3 py-1.5 bg-primary/5 rounded-lg font-black"
                   >
                     View Details
                   </button>
@@ -467,9 +476,21 @@ export function AllOrdersPage() {
                         e.stopPropagation();
                         setSettlingOrder(order);
                       }}
-                      className="text-[10px] font-bold uppercase text-emerald-600 px-3 py-1.5 bg-emerald-50 rounded-lg flex items-center gap-1"
+                      className="text-[10px] font-bold uppercase text-emerald-600 px-3 py-1.5 bg-emerald-50 rounded-lg flex items-center gap-1 font-black"
                     >
                       <CheckCircle className="h-3.5 w-3.5" /> Settle
+                    </button>
+                  )}
+                  {user?.role === 'SUPER_ADMIN' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(order.id);
+                      }}
+                      disabled={isActionLoading === order.id}
+                      className="text-[10px] font-bold uppercase text-rose-600 px-3 py-1.5 bg-rose-50 rounded-lg flex items-center gap-1 hover:bg-rose-100 transition-all disabled:opacity-50 font-black"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
                     </button>
                   )}
                 </div>
@@ -493,6 +514,11 @@ export function AllOrdersPage() {
         <OrderModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
+          onDeleteSuccess={() => {
+            setSelectedOrder(null);
+            fetchOrders();
+            fetchStats();
+          }}
         />
       )}
 
@@ -505,6 +531,16 @@ export function AllOrdersPage() {
             fetchOrders();
             fetchStats();
           }}
+        />
+      )}
+
+      {orderToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!orderToDelete}
+          onClose={() => setOrderToDelete(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isActionLoading === orderToDelete.id}
+          orderId={orderToDelete.id}
         />
       )}
     </div>
@@ -698,6 +734,56 @@ function SettlementModal({ order, onClose, onSettled }: SettlementModalProps) {
             {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Confirm Settlement
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface DeleteConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isDeleting: boolean;
+  orderId: number;
+}
+
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, isDeleting, orderId }: DeleteConfirmModalProps) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[10002] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150 animate-out fade-out zoom-out-95">
+        <div className="flex flex-col items-center text-center space-y-4">
+          <div className="h-12 w-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-black text-slate-900">Delete Order #{orderId.toString().padStart(6, '0')}</h3>
+            <p className="text-xs text-slate-500 mt-2 leading-relaxed font-bold">
+              Are you sure you want to delete this order? This will reverse stock changes, delete associated dues/payments, and cannot be undone.
+            </p>
+          </div>
+          <div className="flex w-full gap-3 pt-2">
+            <button
+              onClick={onClose}
+              disabled={isDeleting}
+              className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isDeleting}
+              className="flex-1 rounded-xl bg-rose-600 py-3 text-xs font-black text-white hover:bg-rose-700 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              {isDeleting ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                'Yes, Delete'
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
