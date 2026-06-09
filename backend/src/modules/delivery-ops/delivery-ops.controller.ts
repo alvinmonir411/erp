@@ -162,4 +162,10 @@ export class DeliveryOpsController {
   ) {
     return this.deliveryOpsService.settleBatch(id, dto);
   }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Delete('batches/:id')
+  deleteDispatchBatch(@Param('id', ParseIntPipe) id: number) {
+    return this.deliveryOpsService.deleteDispatchBatch(id);
+  }
 }

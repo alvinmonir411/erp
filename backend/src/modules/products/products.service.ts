@@ -199,8 +199,17 @@ export class ProductsService {
 
   async remove(id: number) {
     const product = await this.findOne(id);
-    await this.productsRepository.remove(product);
-    return { success: true };
+    try {
+      await this.productsRepository.remove(product);
+      return { success: true };
+    } catch (error: any) {
+      if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
+        throw new ConflictException(
+          'Cannot delete this product because it has been used in sales orders or stock history. Please Edit the product and mark it as Inactive instead.'
+        );
+      }
+      throw error;
+    }
   }
 
   private async ensureCompanyExists(companyId: number) {

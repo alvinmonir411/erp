@@ -1021,6 +1021,7 @@ export class DeliveryOpsService {
       finalSoldValue: Number(batch.finalSoldValue || 0),
       totalCollectedAmount: Number(batch.totalCollectedAmount || 0),
       totalDueAmount: Number(batch.totalDueAmount || 0),
+      status: batch.status,
     }));
 
     const totals = rows.reduce((acc, row) => ({
@@ -1055,6 +1056,108 @@ export class DeliveryOpsService {
       morningPrintedAt: new Date(),
     });
     return this.getDispatchBatch(id);
+  }
+
+  async deleteDispatchBatch(id: number) {
+    return this.dataSource.transaction(async (manager) => {
+      // 1. Lock the batch to prevent concurrent modifications
+      const batch = await manager.createQueryBuilder(DispatchBatch, 'batch')
+        .setLock('pessimistic_write')
+        .where('batch.id = :id', { id })
+        .getOne();
+
+      if (!batch) {
+        throw new NotFoundException(`Dispatch batch #${id} not found`);
+      }
+
+      // Fetch with relations
+      const fullBatch = await manager.findOne(DispatchBatch, {
+        where: { id },
+        relations: ['orders', 'orders.order', 'orders.order.items', 'items'],
+      });
+
+      if (!fullBatch) {
+        throw new NotFoundException(`Dispatch batch #${id} not found`);
+      }
+
+      const isSettled = [DispatchBatchStatus.SETTLED, DispatchBatchStatus.PARTIALLY_SETTLED].includes(batch.status);
+
+      // 2. Process each order in the batch
+      for (const batchOrder of fullBatch.orders) {
+        const order = batchOrder.order;
+        if (!order) continue;
+
+        // If batch was settled, we need to rollback stock adjustments and financial dues
+        if (isSettled) {
+          for (const orderItem of order.items) {
+            const returnedQty = Number(orderItem.returnedPaidQuantity || 0) + Number(orderItem.returnedFreeQuantity || 0);
+            const damagedQty = Number(orderItem.damagedPaidQuantity || 0) + Number(orderItem.damagedFreeQuantity || 0);
+
+            // Revert RETURN_IN (stock was added to inventory, we need to remove it)
+            if (returnedQty > 0) {
+              await this.stockService.create({
+                productId: orderItem.productId,
+                companyId: order.companyId,
+                type: StockMovementType.ADJUSTMENT,
+                quantity: -returnedQty,
+                reference: `Revert Batch #${id}`,
+                note: `Reverted ${returnedQty} units returned from cancelled settlement of order #${order.id}`,
+              }, 'Admin', manager);
+            }
+
+            // Revert DAMAGE (stock was removed from inventory, we need to add it back)
+            if (damagedQty > 0) {
+              await this.stockService.create({
+                productId: orderItem.productId,
+                companyId: order.companyId,
+                type: StockMovementType.ADJUSTMENT,
+                quantity: damagedQty,
+                reference: `Revert Batch #${id}`,
+                note: `Reverted ${damagedQty} units damaged from cancelled settlement of order #${order.id}`,
+              }, 'Admin', manager);
+            }
+          }
+
+          // Delete dues and due_collections associated with the order
+          await manager.query('DELETE FROM due_collections WHERE "orderId" = $1', [order.id]);
+          await manager.query('DELETE FROM dues WHERE "orderId" = $1', [order.id]);
+          await manager.query('DELETE FROM damage_records WHERE "orderId" = $1', [order.id]);
+        }
+
+        // 3. Revert Order fields to CONFIRMED state
+        await manager.update(Order, order.id, {
+          status: OrderStatus.CONFIRMED,
+          deliveryPersonId: null as any,
+          assignedDeliveryManId: null as any,
+          dispatchedAt: null as any,
+          deliveredAt: null as any,
+          settledAt: null as any,
+          actualSoldAmount: order.grandTotal,
+          collectedAmount: 0,
+          dueAmount: Math.max(0, Number(order.grandTotal) - Number(order.advancePaid || 0)),
+          deliveryNote: null as any,
+          settlementNote: null as any,
+          isLocked: false,
+        });
+
+        // 4. Revert OrderItem fields
+        for (const orderItem of order.items) {
+          await manager.update(OrderItem, orderItem.id, {
+            deliveredPaidQuantity: 0,
+            deliveredFreeQuantity: 0,
+            returnedPaidQuantity: 0,
+            returnedFreeQuantity: 0,
+            damagedPaidQuantity: 0,
+            damagedFreeQuantity: 0,
+          });
+        }
+      }
+
+      // 5. Delete the batch
+      await manager.remove(DispatchBatch, fullBatch);
+
+      return { success: true, message: `Batch #${id} deleted and related orders reverted to CONFIRMED.` };
+    });
   }
 
   private generateBatchNo(manager: any, date: string): string {

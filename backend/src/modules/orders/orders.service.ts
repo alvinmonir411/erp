@@ -12,7 +12,9 @@ import { StockService } from '../stock/stock.service';
 import { DuesService } from '../dues/dues.service';
 import { Role } from '../../common/enums/role.enum';
 import { Due } from '../dues/entities/due.entity';
+import { DueCollection } from '../dues/entities/due-collection.entity';
 import { DispatchBatchOrder } from '../delivery-ops/entities/dispatch-batch-order.entity';
+import { DamageRecord } from '../delivery-ops/entities/damage-record.entity';
 import { DeliveryPerson } from '../delivery-ops/entities/delivery-person.entity';
 import { Shop } from '../shops/entities/shop.entity';
 
@@ -238,15 +240,37 @@ export class OrdersService {
   }
 
   async delete(id: number) {
+    console.log(`[OrdersService.delete] Called with id: ${id} (${typeof id})`);
     const order = await this.findOne(id);
     await this.validateBatchLock(id);
 
     return this.dataSource.transaction(async (manager) => {
       if (order.status !== OrderStatus.CANCELLED) {
+        console.log(`[OrdersService.delete] Handling stock return for order #${id}`);
         await this.handleStockChange(order, order.items, StockMovementType.RETURN_IN, manager);
       }
-      await manager.delete(OrderItem, { orderId: id });
-      return manager.delete(Order, id);
+      
+      console.log(`[OrdersService.delete] Starting raw deletions for order #${id}`);
+      
+      const res1 = await manager.query('DELETE FROM due_collections WHERE "orderId" = $1', [id]);
+      console.log(`[OrdersService.delete] Deleted due_collections:`, res1);
+
+      const res2 = await manager.query('DELETE FROM dues WHERE "orderId" = $1', [id]);
+      console.log(`[OrdersService.delete] Deleted dues:`, res2);
+
+      const res3 = await manager.query('DELETE FROM damage_records WHERE "orderId" = $1', [id]);
+      console.log(`[OrdersService.delete] Deleted damage_records:`, res3);
+
+      const res4 = await manager.query('DELETE FROM dispatch_batch_orders WHERE "orderId" = $1', [id]);
+      console.log(`[OrdersService.delete] Deleted dispatch_batch_orders:`, res4);
+
+      const res5 = await manager.query('DELETE FROM order_items WHERE "orderId" = $1', [id]);
+      console.log(`[OrdersService.delete] Deleted order_items:`, res5);
+
+      console.log(`[OrdersService.delete] Executing manager.delete for Order #${id}`);
+      const deleteResult = await manager.delete(Order, id);
+      console.log(`[OrdersService.delete] manager.delete result:`, deleteResult);
+      return deleteResult;
     });
   }
 
