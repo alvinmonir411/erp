@@ -52,7 +52,7 @@ const navigation = [
     title: 'Delivery',
     roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
-      { href: '/delivery-ops', label: 'Delivery Report', icon: FileText },
+      { href: '/delivery-ops', label: 'Delivery Summary', icon: FileText },
     ]
   },
   {
@@ -77,7 +77,7 @@ const navigation = [
     roles: [Role.SUPER_ADMIN, Role.ADMIN],
     items: [
       { href: '/users', label: 'User Management', icon: Users },
-      { href: '/settings', label: 'Settings', icon: Settings, roles: [Role.SUPER_ADMIN] },
+
     ]
   },
   {

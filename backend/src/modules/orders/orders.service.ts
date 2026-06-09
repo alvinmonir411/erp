@@ -14,6 +14,7 @@ import { Role } from '../../common/enums/role.enum';
 import { Due } from '../dues/entities/due.entity';
 import { DueCollection } from '../dues/entities/due-collection.entity';
 import { DispatchBatchOrder } from '../delivery-ops/entities/dispatch-batch-order.entity';
+import { DispatchBatchStatus } from '../delivery-ops/entities/dispatch-batch.entity';
 import { DamageRecord } from '../delivery-ops/entities/damage-record.entity';
 import { DeliveryPerson } from '../delivery-ops/entities/delivery-person.entity';
 import { Shop } from '../shops/entities/shop.entity';
@@ -45,9 +46,16 @@ export class OrdersService {
       relations: ['batch'],
     });
 
-    if (batchOrder && !batchOrder.isSettled) {
+    if (
+      batchOrder && 
+      [
+        DispatchBatchStatus.RETURN_PENDING,
+        DispatchBatchStatus.PARTIALLY_SETTLED,
+        DispatchBatchStatus.SETTLED
+      ].includes(batchOrder.batch.status as DispatchBatchStatus)
+    ) {
       throw new BadRequestException(
-        `Order #${orderId} is locked because it is part of active batch ${batchOrder.batch.batchNo}. Please manage it via Delivery Operations.`,
+        `Order #${orderId} is locked because its delivery batch (${batchOrder.batch.batchNo}) is currently in the settlement phase.`,
       );
     }
   }

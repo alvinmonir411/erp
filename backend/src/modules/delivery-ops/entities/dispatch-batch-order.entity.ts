@@ -20,7 +20,7 @@ export class DispatchBatchOrder {
   @Column()
   orderId: number;
 
-  @ManyToOne(() => Order)
+  @ManyToOne(() => Order, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'orderId' })
   order: Order;
 
