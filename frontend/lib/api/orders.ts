@@ -30,7 +30,7 @@ export function createOrder(payload: CreateOrderPayload) {
 }
 
 export function getOrders(query?: Record<string, any>) {
-  return apiRequest<Order[]>('orders', { query });
+  return apiRequest<{ items: Order[]; total: number } | Order[]>('orders', { query });
 }
 
 export function getOrder(id: number) {

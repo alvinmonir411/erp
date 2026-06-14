@@ -44,7 +44,7 @@ export class DuesService {
       }
     }
 
-    return query.getMany();
+    return query.take(200).getMany();
   }
 
   async findPendingCollections(user: any) {
@@ -72,7 +72,7 @@ export class DuesService {
       }
     }
 
-    return query.getMany();
+    return query.take(200).getMany();
   }
 
   async findCollections(user: any) {
@@ -99,7 +99,7 @@ export class DuesService {
       }
     }
 
-    return query.getMany();
+    return query.take(200).getMany();
   }
 
   async findCollectionsByOrderId(orderId: number) {
@@ -391,6 +391,6 @@ export class DuesService {
       query.andWhere('due.srId = :userId', { userId: user.id || user.sub });
     }
 
-    return query.orderBy('due.createdAt', 'DESC').getMany();
+    return query.orderBy('due.createdAt', 'DESC').take(200).getMany();
   }
 }

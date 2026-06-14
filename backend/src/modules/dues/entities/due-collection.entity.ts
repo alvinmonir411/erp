@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { Due } from './due.entity';
 import { Order } from '../../orders/entities/order.entity';
 import { Shop } from '../../shops/entities/shop.entity';
@@ -16,6 +16,7 @@ export class DueCollection {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Index()
   @Column()
   dueId: number;
 
@@ -23,6 +24,7 @@ export class DueCollection {
   @JoinColumn({ name: 'dueId' })
   due: Due;
 
+  @Index()
   @Column()
   orderId: number;
 
@@ -30,6 +32,7 @@ export class DueCollection {
   @JoinColumn({ name: 'orderId' })
   order: Order;
 
+  @Index()
   @Column()
   shopId: number;
 
@@ -37,6 +40,7 @@ export class DueCollection {
   @JoinColumn({ name: 'shopId' })
   shop: Shop;
 
+  @Index()
   @Column({ nullable: true })
   routeId: number;
 
@@ -44,6 +48,7 @@ export class DueCollection {
   @JoinColumn({ name: 'routeId' })
   route: Route;
 
+  @Index()
   @Column()
   srId: string;
 
@@ -59,6 +64,7 @@ export class DueCollection {
   @Column({ type: 'text', nullable: true })
   note: string;
 
+  @Index()
   @Column({ type: 'enum', enum: CollectionStatus, default: CollectionStatus.PENDING })
   status: CollectionStatus;
 

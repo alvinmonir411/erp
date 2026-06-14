@@ -25,9 +25,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 @Controller('delivery-ops')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ThrottlerGuard)
 export class DeliveryOpsController {
   constructor(private readonly deliveryOpsService: DeliveryOpsService) { }
 

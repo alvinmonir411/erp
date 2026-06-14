@@ -4,6 +4,7 @@ import { Repository, DataSource, Between } from 'typeorm';
 import { DeliverySummary, DeliverySummaryStatus } from './entities/delivery-summary.entity';
 import { DeliverySummaryItem } from './entities/delivery-summary-item.entity';
 import { OrdersService } from '../orders/orders.service';
+import { Order } from '../orders/entities/order.entity';
 import { StockService } from '../stock/stock.service';
 import { StockMovementType } from '../stock/stock.constants';
 
@@ -56,12 +57,12 @@ export class DeliverySummariesService {
 
   async syncOrders(date: string, companyId: number, routeId: number) {
     // 1. Find all confirmed/delivered orders for this date+company+route
-    const orders = await this.ordersService.findAll({
+    const orders = (await this.ordersService.findAll({
       startDate: date,
       endDate: date,
       companyId,
       routeId,
-    });
+    })) as Order[];
 
     if (orders.length === 0) {
       throw new BadRequestException('No orders found for the selected date, company, and route');
@@ -166,7 +167,7 @@ export class DeliverySummariesService {
               quantity: diff, // Positive means stock coming back
               note: `Return from Delivery Summary #${summary.id}`,
               reference: `DS #${summary.id}`,
-            }, 'Admin');
+            }, 'Admin', manager);
           }
         }
       }
@@ -209,12 +210,12 @@ export class DeliverySummariesService {
   }
 
   async getDailyReport(date: string, companyId?: number, routeId?: number) {
-    const orders = await this.ordersService.findAll({
+    const orders = (await this.ordersService.findAll({
       startDate: date,
       endDate: date,
       companyId,
       routeId,
-    });
+    })) as Order[];
 
     const companyMap = new Map<number, { name: string, items: Map<number, { name: string, qty: number, price: number }> }>();
 

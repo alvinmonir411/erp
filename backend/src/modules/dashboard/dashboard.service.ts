@@ -49,71 +49,100 @@ export class DashboardService {
       where.createdById = userId;
     }
 
-    // 1. Fetch orders
-    const allOrders = await this.ordersRepository.find({
-      where,
-      relations: ['items', 'items.product'],
-    });
+    // 1. Conditional SQL Aggregations (Single Query for all Order Metrics)
+    const baseQb = this.ordersRepository.createQueryBuilder('order');
+    if (companyId) {
+      baseQb.andWhere('order.companyId = :companyId', { companyId });
+    }
+    if (isSR) {
+      baseQb.andWhere('order.createdById = :userId', { userId });
+    }
 
-    const nonCancelled = allOrders.filter(o => o.status !== OrderStatus.CANCELLED);
-    const settledOrders = allOrders.filter(o => o.status === OrderStatus.SETTLED);
+    const aggResult = await baseQb
+      .select('COUNT(order.id)', 'totalOrdersCount')
+      .addSelect(`SUM(CASE WHEN order.status <> 'CANCELLED' THEN COALESCE(order.grandTotal, 0) ELSE 0 END)`, 'totalOrderValue')
+      .addSelect(`SUM(CASE WHEN order.status = 'CANCELLED' THEN 1 ELSE 0 END)`, 'cancelledOrdersCount')
+      .addSelect(`SUM(CASE WHEN order.status = 'SETTLED' THEN COALESCE(order.actualSoldAmount, 0) ELSE 0 END)`, 'netSales')
+      
+      // Daily (today) metrics
+      .addSelect(`COUNT(CASE WHEN order.createdAt >= :todayStartUTC AND order.createdAt <= :todayEndUTC AND order.status <> 'CANCELLED' THEN 1 END)`, 'todayOrdersCount')
+      .addSelect(`SUM(CASE WHEN order.createdAt >= :todayStartUTC AND order.createdAt <= :todayEndUTC AND order.status <> 'CANCELLED' THEN COALESCE(order.grandTotal, 0) ELSE 0 END)`, 'todayOrderValue')
+      
+      .addSelect(`COUNT(CASE WHEN order.dispatchedAt >= :todayStartUTC AND order.dispatchedAt <= :todayEndUTC THEN 1 END)`, 'todayDispatchCount')
+      .addSelect(`SUM(CASE WHEN order.status = 'SETTLED' AND order.settledAt >= :todayStartUTC AND order.settledAt <= :todayEndUTC THEN COALESCE(order.actualSoldAmount, 0) ELSE 0 END)`, 'todaySettledValue')
+      .addSelect(`COUNT(CASE WHEN order.status = 'CANCELLED' AND order.updatedAt >= :todayStartUTC AND order.updatedAt <= :todayEndUTC THEN 1 END)`, 'todayCancelledCount')
+      
+      // Delivery status totals
+      .addSelect(`COUNT(CASE WHEN order.dispatchedAt IS NOT NULL THEN 1 END)`, 'totalDispatchCount')
+      .addSelect(`COUNT(CASE WHEN order.status IN ('CONFIRMED', 'ASSIGNED') THEN 1 END)`, 'pendingDispatchCount')
+      .addSelect(`COUNT(CASE WHEN order.status IN ('DELIVERED', 'SETTLED') THEN 1 END)`, 'deliveredCount')
+      .setParameters({ todayStartUTC, todayEndUTC })
+      .getRawOne();
 
-    const totalOrderValue = nonCancelled.reduce((sum, o) => sum + safeNum(o.grandTotal), 0);
-    const netSales = settledOrders.reduce((sum, o) => sum + safeNum(o.actualSoldAmount), 0);
-
-    // Total Profit (Only for Admin/Manager usually, but let's calculate)
-    const itemsQuery = this.orderItemsRepository.createQueryBuilder('item')
-      .leftJoinAndSelect('item.product', 'product')
+    // 2. Profit calculation via direct query
+    const profitResult = await this.orderItemsRepository.createQueryBuilder('item')
+      .leftJoin('item.product', 'product')
       .leftJoin('item.order', 'order')
-      .where('order.status = :status', { status: OrderStatus.SETTLED });
-    if (companyId) itemsQuery.andWhere('order.companyId = :companyId', { companyId });
-    if (isSR) itemsQuery.andWhere('order.createdById = :userId', { userId });
+      .select(`SUM(
+        COALESCE(item.deliveredPaidQuantity, 0) * (
+          CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+          ELSE COALESCE(item.unitPrice, 0) END - COALESCE(product.buyPrice, 0)
+        )
+      )`, 'profit')
+      .where('order.status = :status', { status: OrderStatus.SETTLED })
+      .andWhere(companyId ? 'order.companyId = :companyId' : '1=1', { companyId })
+      .andWhere(isSR ? 'order.createdById = :userId' : '1=1', { userId })
+      .getRawOne();
     
-    const settledItems = await itemsQuery.getMany();
+    const totalProfit = safeNum(profitResult?.profit);
 
-    const totalProfit = settledItems.reduce((sum: number, item: OrderItem) => {
-      const delivered = safeNum(item.deliveredPaidQuantity);
-      const buyPrice = safeNum(item.product?.buyPrice);
-      const itemPrice = item.quantity > 0 ? item.lineTotal / item.quantity : item.unitPrice;
-      return sum + (delivered * (itemPrice - buyPrice));
-    }, 0);
-
-    // Dues and Collections metrics
+    // 3. Dues and Collections metrics via database aggregations
     let totalDueAmount = 0;
-    let collections: any[] = [];
     let pendingCollected = 0;
     let approvedCollected = 0;
     let rejectedCollected = 0;
-    try {
-      const duesRecords = await this.duesRepository.find({
-        where: isSR ? { srId: userId } : (companyId ? { order: { companyId } } : {}),
-        relations: ['order']
-      });
-      totalDueAmount = duesRecords.reduce((sum, d) => sum + safeNum(d.remainingDue), 0);
 
-      collections = await this.collectionsRepository.find({
-        where: isSR ? { srId: userId } : (companyId ? { order: { companyId } } : {}),
-        relations: ['order']
-      });
-      pendingCollected = collections.filter(c => c.status === CollectionStatus.PENDING).reduce((sum, c) => sum + safeNum(c.collectedAmount), 0);
-      approvedCollected = collections.filter(c => c.status === CollectionStatus.APPROVED).reduce((sum, c) => sum + safeNum(c.collectedAmount), 0);
-      rejectedCollected = collections.filter(c => c.status === CollectionStatus.REJECTED).reduce((sum, c) => sum + safeNum(c.collectedAmount), 0);
+    try {
+      const duesQb = this.duesRepository.createQueryBuilder('due')
+        .leftJoin('due.order', 'order');
+      if (companyId) duesQb.andWhere('order.companyId = :companyId', { companyId });
+      if (isSR) duesQb.andWhere('due.srId = :userId', { userId });
+      
+      const dueRes = await duesQb.select('SUM(COALESCE(due.remainingDue, 0))', 'totalDue').getRawOne();
+      totalDueAmount = safeNum(dueRes?.totalDue);
+
+      const collQb = this.collectionsRepository.createQueryBuilder('coll')
+        .leftJoin('coll.order', 'order');
+      if (companyId) collQb.andWhere('order.companyId = :companyId', { companyId });
+      if (isSR) collQb.andWhere('coll.srId = :userId', { userId });
+
+      const collRes = await collQb
+        .select(`SUM(CASE WHEN coll.status = :pending THEN COALESCE(coll.collectedAmount, 0) ELSE 0 END)`, 'pending')
+        .addSelect(`SUM(CASE WHEN coll.status = :approved THEN COALESCE(coll.collectedAmount, 0) ELSE 0 END)`, 'approved')
+        .addSelect(`SUM(CASE WHEN coll.status = :rejected THEN COALESCE(coll.collectedAmount, 0) ELSE 0 END)`, 'rejected')
+        .setParameters({
+          pending: CollectionStatus.PENDING,
+          approved: CollectionStatus.APPROVED,
+          rejected: CollectionStatus.REJECTED,
+        })
+        .getRawOne();
+
+      pendingCollected = safeNum(collRes?.pending);
+      approvedCollected = safeNum(collRes?.approved);
+      rejectedCollected = safeNum(collRes?.rejected);
     } catch (err) {
       this.logger.error('Error fetching dues/collections for dashboard:', err.message);
     }
 
-    // Daily Operations
-    const todayOrdersList = allOrders.filter(o => isTodayBD(o.createdAt) && o.status !== OrderStatus.CANCELLED);
+    // 4. Daily Operations
     const todayOrders = {
-      amount: todayOrdersList.reduce((sum, o) => sum + safeNum(o.grandTotal), 0),
-      count: todayOrdersList.length
+      amount: safeNum(aggResult?.todayOrderValue),
+      count: safeNum(aggResult?.todayOrdersCount)
     };
 
-    const todayDispatch = allOrders.filter(o => isTodayBD(o.dispatchedAt)).length;
-    const todaySettledValue = allOrders.filter(o => o.status === OrderStatus.SETTLED && isTodayBD(o.settledAt))
-      .reduce((sum, o) => sum + safeNum(o.actualSoldAmount), 0);
-
-    const todayCancelled = allOrders.filter(o => o.status === OrderStatus.CANCELLED && isTodayBD(o.updatedAt)).length;
+    const todayDispatch = safeNum(aggResult?.todayDispatchCount);
+    const todaySettledValue = safeNum(aggResult?.todaySettledValue);
+    const todayCancelled = safeNum(aggResult?.todayCancelledCount);
 
     // 5. Stock metrics from ProductsService (Unified Source)
     let productMetrics: any = { totalProducts: 0, stockValue: 0, activeProducts: 0, inactiveProducts: 0, lowStockProducts: 0, outOfStockProducts: 0 };
@@ -123,49 +152,152 @@ export class DashboardService {
       this.logger.error('Error fetching stock for dashboard:', err.message);
     }
 
-    // Recent Orders (Newest 10)
-    const recentOrders = allOrders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 10);
+    // 6. Recent Orders (Newest 10)
+    const recentOrders = await this.ordersRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+      take: 10,
+    });
 
-    // Main Chart: Last 7 Days Sales
+    // 7. Main Chart: Last 7 Days Sales (Single Grouped Query)
     const last7Days = [];
     const BD_OFFSET_MS = 6 * 60 * 60 * 1000;
     const startOfTodayBD = new Date(new Date().getTime() + BD_OFFSET_MS);
     startOfTodayBD.setUTCHours(0,0,0,0);
 
+    const startRangeUtc = new Date(startOfTodayBD.getTime() - 6 * 24 * 60 * 60 * 1000 - BD_OFFSET_MS);
+    
+    const chartQb = this.ordersRepository.createQueryBuilder('order')
+      .select(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`, 'dayDate')
+      .addSelect('SUM(COALESCE(order.actualSoldAmount, 0))', 'daySales')
+      .where('order.status = :status', { status: OrderStatus.SETTLED })
+      .andWhere('order.settledAt >= :startRangeUtc', { startRangeUtc });
+      
+    if (companyId) chartQb.andWhere('order.companyId = :companyId', { companyId });
+    if (isSR) chartQb.andWhere('order.createdById = :userId', { userId });
+    
+    const chartData = await chartQb
+      .groupBy(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`)
+      .getRawMany();
+
+    const chartMap = new Map<string, number>();
+    for (const row of chartData) {
+      if (row.dayDate) {
+        const dStr = new Date(row.dayDate).toISOString().split('T')[0];
+        chartMap.set(dStr, safeNum(row.daySales));
+      }
+    }
+
     for (let i = 6; i >= 0; i--) {
       const d = new Date(startOfTodayBD.getTime() - i * 24 * 60 * 60 * 1000);
-      const dStart = new Date(d.getTime() - BD_OFFSET_MS);
-      const dEnd = new Date(dStart.getTime() + 24 * 60 * 60 * 1000);
-
-      const daySales = allOrders.filter(o => o.status === OrderStatus.SETTLED && o.settledAt && o.settledAt >= dStart && o.settledAt < dEnd)
-        .reduce((sum, o) => sum + safeNum(o.actualSoldAmount), 0);
+      const dKey = d.toISOString().split('T')[0];
+      const salesAmount = chartMap.get(dKey) || 0;
 
       last7Days.push({
         date: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'Asia/Dhaka' }),
-        amount: daySales
+        amount: salesAmount
       });
     }
+
+    // 8. Company-wise Sales and Profit
+    const salesQb = this.ordersRepository.createQueryBuilder('order')
+      .leftJoin('order.company', 'company')
+      .select('order.companyId', 'companyId')
+      .addSelect('company.name', 'companyName')
+      .addSelect('SUM(COALESCE(order.actualSoldAmount, 0))', 'sales')
+      .where('order.status = :status', { status: OrderStatus.SETTLED });
+
+    if (companyId) {
+      salesQb.andWhere('order.companyId = :companyId', { companyId });
+    }
+    if (isSR) {
+      salesQb.andWhere('order.createdById = :userId', { userId });
+    }
+
+    const salesData = await salesQb
+      .groupBy('order.companyId')
+      .addGroupBy('company.name')
+      .getRawMany();
+
+    const companyMap = new Map<number, { companyId: number, companyName: string, sales: number, profit: number }>();
+
+    for (const s of salesData) {
+      const cId = Number(s.companyId);
+      companyMap.set(cId, {
+        companyId: cId,
+        companyName: s.companyName || `Company #${cId}`,
+        sales: safeNum(s.sales),
+        profit: 0
+      });
+    }
+
+    const canViewProfit = user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER;
+    if (canViewProfit) {
+      try {
+        const profitQb = this.orderItemsRepository.createQueryBuilder('item')
+          .leftJoin('item.order', 'order')
+          .leftJoin('item.product', 'product')
+          .select('order.companyId', 'companyId')
+          .addSelect(`SUM(
+            COALESCE(item.deliveredPaidQuantity, 0) * (
+              CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+              ELSE COALESCE(item.unitPrice, 0) END - COALESCE(product.buyPrice, 0)
+            )
+          )`, 'profit')
+          .where('order.status = :status', { status: OrderStatus.SETTLED });
+
+        if (companyId) {
+          profitQb.andWhere('order.companyId = :companyId', { companyId });
+        }
+        if (isSR) {
+          profitQb.andWhere('order.createdById = :userId', { userId });
+        }
+
+        const profitData = await profitQb
+          .groupBy('order.companyId')
+          .getRawMany();
+
+        for (const p of profitData) {
+          const cId = Number(p.companyId);
+          const existing = companyMap.get(cId);
+          if (existing) {
+            existing.profit = safeNum(p.profit);
+          } else {
+            companyMap.set(cId, {
+              companyId: cId,
+              companyName: `Company #${cId}`,
+              sales: 0,
+              profit: safeNum(p.profit)
+            });
+          }
+        }
+      } catch (err) {
+        this.logger.error('Error fetching company-wise profit for dashboard:', err.message);
+      }
+    }
+
+    const companySummary = Array.from(companyMap.values());
 
     return {
       uiMetrics: {
         orders: {
-          totalOrders: allOrders.length,
+          totalOrders: safeNum(aggResult?.totalOrdersCount),
           todayOrdersCount: todayOrders.count,
-          totalOrderValue,
+          totalOrderValue: safeNum(aggResult?.totalOrderValue),
           todayOrderValue: todayOrders.amount,
-          cancelledOrders: allOrders.filter(o => o.status === OrderStatus.CANCELLED).length,
+          cancelledOrders: safeNum(aggResult?.cancelledOrdersCount),
           todayCancelled
         },
         delivery: {
-          totalDispatch: allOrders.filter(o => o.dispatchedAt).length,
+          totalDispatch: safeNum(aggResult?.totalDispatchCount),
           todayDispatch,
-          pendingDispatch: allOrders.filter(o => [OrderStatus.CONFIRMED, OrderStatus.ASSIGNED].includes(o.status)).length,
-          delivered: allOrders.filter(o => o.status === OrderStatus.DELIVERED || o.status === OrderStatus.SETTLED).length,
+          pendingDispatch: safeNum(aggResult?.pendingDispatchCount),
+          delivered: safeNum(aggResult?.deliveredCount),
         },
         money: {
-          totalGrossAmount: totalOrderValue,
+          totalGrossAmount: safeNum(aggResult?.totalOrderValue),
           todayGrossAmount: todayOrders.amount,
-          totalFinalSold: netSales,
+          totalFinalSold: safeNum(aggResult?.netSales),
           todayFinalSold: todaySettledValue,
           totalDue: totalDueAmount,
           pendingCollected,
@@ -184,6 +316,7 @@ export class DashboardService {
         }
       },
       charts: { last7Days },
+      companySummary,
       recentOrders: recentOrders.map(o => ({
         id: o.id,
         grandTotal: o.grandTotal,

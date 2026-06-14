@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Unique } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Unique, Index } from 'typeorm';
 import { Order } from '../../orders/entities/order.entity';
 import { Shop } from '../../shops/entities/shop.entity';
 import { Route } from '../../routes/entities/route.entity';
@@ -12,6 +12,8 @@ export enum DueStatus {
 
 @Entity('dues')
 @Unique(['orderId'])
+@Index(['srId', 'status'])
+@Index(['routeId', 'status'])
 export class Due {
   @PrimaryGeneratedColumn()
   id: number;
@@ -23,6 +25,7 @@ export class Due {
   @JoinColumn({ name: 'orderId' })
   order: Order;
 
+  @Index()
   @Column()
   shopId: number;
 
@@ -30,6 +33,7 @@ export class Due {
   @JoinColumn({ name: 'shopId' })
   shop: Shop;
 
+  @Index()
   @Column({ nullable: true })
   routeId: number;
 
@@ -37,6 +41,7 @@ export class Due {
   @JoinColumn({ name: 'routeId' })
   route: Route;
 
+  @Index()
   @Column()
   srId: string;
 
@@ -52,6 +57,7 @@ export class Due {
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
   remainingDue: number;
 
+  @Index()
   @Column({ type: 'enum', enum: DueStatus, default: DueStatus.DUE })
   status: DueStatus;
   

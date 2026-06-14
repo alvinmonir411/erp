@@ -290,6 +290,28 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     fetchBatch();
   }, [batchId]);
 
+  useEffect(() => {
+    const handleRefresh = (e: any) => {
+      const detail = e.detail;
+      if (detail && detail.data) {
+        const matchesBatch = detail.data.id === batchId || 
+                             detail.data.batchId === batchId ||
+                             (detail.data.orders && detail.data.orders.some((o: any) => o.batchId === batchId));
+        if (matchesBatch) {
+          fetchBatch();
+        }
+      } else {
+        fetchBatch();
+      }
+    };
+    window.addEventListener('batch-refresh', handleRefresh);
+    window.addEventListener('order-refresh', handleRefresh);
+    return () => {
+      window.removeEventListener('batch-refresh', handleRefresh);
+      window.removeEventListener('order-refresh', handleRefresh);
+    };
+  }, [batchId]);
+
   // Auto-fill actual cash received ONCE when the batch first loads — never overwrites user-typed value
   useEffect(() => {
     if (finalMetrics && finalMetrics.cashCollectable > 0 && !cashManuallyEdited.current && actualCashReceived === '') {

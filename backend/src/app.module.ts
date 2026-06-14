@@ -18,8 +18,10 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { DuesModule } from './modules/dues/dues.module';
 import { SalesModule } from './modules/sales/sales.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { CacheModule } from '@nestjs/cache-manager';
 
-// Triggering backend reload for new PATCH route 5
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -28,6 +30,15 @@ import { SalesModule } from './modules/sales/sales.module';
       envFilePath: ['.env.local', '.env'],
       load: [configuration],
       validationSchema: envValidationSchema,
+    }),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100, // Safe default rate limit: 100 requests per minute
+    }]),
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 600, // 10 minutes cache TTL by default
+      max: 200, // Max items in cache
     }),
     DatabaseModule,
     HealthModule,
@@ -45,6 +56,7 @@ import { SalesModule } from './modules/sales/sales.module';
     ReportsModule,
     DuesModule,
     SalesModule,
+    RealtimeModule,
   ],
 })
 export class AppModule {}

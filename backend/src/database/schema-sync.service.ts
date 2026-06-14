@@ -372,6 +372,22 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       }
     }
 
+    // 13. Create Database Indexes for Performance Optimization
+    try {
+      this.logger.log('Ensuring database indexes exist for high performance...');
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS "idx_orders_status" ON "orders" ("status");
+        CREATE INDEX IF NOT EXISTS "idx_orders_company_route" ON "orders" ("companyId", "routeId");
+        CREATE INDEX IF NOT EXISTS "idx_orders_created_at" ON "orders" ("createdAt");
+        CREATE INDEX IF NOT EXISTS "idx_dues_sr_id" ON "dues" ("srId");
+        CREATE INDEX IF NOT EXISTS "idx_dues_remaining" ON "dues" ("remainingDue");
+        CREATE INDEX IF NOT EXISTS "idx_due_collections_status" ON "due_collections" ("status");
+        CREATE INDEX IF NOT EXISTS "idx_stock_movements_prod_created" ON "stock_movements" ("productId", "createdAt" DESC);
+      `);
+    } catch (e) {
+      this.logger.error('Failed to create performance indexes:', e.message);
+    }
+
     this.logger.log('--- DEFENSIVE SCHEMA SYNC COMPLETED ---');
   }
 }

@@ -27,6 +27,11 @@ const createTypeOrmOptions = (
     dropSchema,
     migrationsRun: false,
     ssl: { rejectUnauthorized: false },
+    extra: {
+      max: 30,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 15000, // Increased to 15s to accommodate Neon DB wake-up/cold-starts and latency
+    },
   };
 };
 

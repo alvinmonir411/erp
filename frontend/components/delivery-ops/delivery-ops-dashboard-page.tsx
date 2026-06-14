@@ -64,6 +64,18 @@ export function DeliveryOpsDashboardPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchData();
+    };
+    window.addEventListener('batch-refresh', handleRefresh);
+    window.addEventListener('order-refresh', handleRefresh);
+    return () => {
+      window.removeEventListener('batch-refresh', handleRefresh);
+      window.removeEventListener('order-refresh', handleRefresh);
+    };
+  }, [date, companyId, routeId, search]);
+
   const handleDeleteClick = (id: number, batchNo: string, isSettled: boolean) => {
     setBatchToDelete({ id, batchNo, isSettled });
   };

@@ -19,6 +19,7 @@ import { DispatchBatchStatus } from '../delivery-ops/entities/dispatch-batch.ent
 import { DamageRecord } from '../delivery-ops/entities/damage-record.entity';
 import { DeliveryPerson } from '../delivery-ops/entities/delivery-person.entity';
 import { Shop } from '../shops/entities/shop.entity';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class OrdersService {
@@ -34,6 +35,7 @@ export class OrdersService {
     private readonly stockService: StockService,
     private readonly duesService: DuesService,
     private readonly dataSource: DataSource,
+    private readonly realtimeGateway: RealtimeGateway,
   ) { }
 
   private readonly logger = new Logger(OrdersService.name);
@@ -94,7 +96,7 @@ export class OrdersService {
       throw new BadRequestException('Order must have at least one item');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const order = manager.create(Order, {
         orderDate: new Date(dto.orderDate),
         companyId: dto.companyId,
@@ -147,6 +149,9 @@ export class OrdersService {
       if (!finalOrder) throw new NotFoundException(`Order #${savedOrder.id} not found after creation`);
       return finalOrder;
     });
+
+    this.realtimeGateway.emitPayload('orderCreated', result);
+    return result;
   }
 
   async update(id: number, dto: CreateOrderDto) {
@@ -157,7 +162,7 @@ export class OrdersService {
       throw new BadRequestException('Cannot edit a cancelled or settled order');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       // 1. Return old stock
       await this.handleStockChange(existingOrder, existingOrder.items, StockMovementType.RETURN_IN, manager);
 
@@ -213,6 +218,9 @@ export class OrdersService {
 
       return this.findOne(id);
     });
+
+    this.realtimeGateway.emitPayload('orderUpdated', result);
+    return result;
   }
 
   async updateStatus(id: number, status: OrderStatus) {
@@ -222,7 +230,7 @@ export class OrdersService {
     // Prevent unsafe manual changes if part of a batch
     await this.validateBatchLock(id);
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
         // Return stock if cancelled
         await this.handleStockChange(order, order.items, StockMovementType.RETURN_IN, manager);
@@ -243,6 +251,9 @@ export class OrdersService {
       await manager.update(Order, id, patch);
       return this.findOne(id);
     });
+
+    this.realtimeGateway.emitPayload('orderUpdated', result);
+    return result;
   }
 
   async delete(id: number) {
@@ -380,6 +391,8 @@ export class OrdersService {
       
       // Commit transaction
       await queryRunner.commitTransaction();
+
+      this.realtimeGateway.emitPayload('orderDeleted', { id: numericId });
 
       return deleteResult;
     } catch (error) {
@@ -579,7 +592,9 @@ export class OrdersService {
     };
 
     if (manager) return exec(manager);
-    return this.dataSource.transaction(exec);
+    const result = await this.dataSource.transaction(exec);
+    this.realtimeGateway.emitPayload('orderUpdated', result);
+    return result;
   }
 
   // --- Helper Methods ---
@@ -654,9 +669,38 @@ export class OrdersService {
     if (query.status) qb.andWhere('order.status = :status', { status: query.status });
     if (query.companyId) qb.andWhere('order.companyId = :companyId', { companyId: query.companyId });
     if (query.routeId) qb.andWhere('order.routeId = :routeId', { routeId: query.routeId });
+    if (query.shopId) qb.andWhere('order.shopId = :shopId', { shopId: query.shopId });
+
+    if (query.search) {
+      qb.andWhere(
+        '(CAST(order.id AS VARCHAR) ILIKE :search OR shop.name ILIKE :search OR route.name ILIKE :search)',
+        { search: `%${query.search}%` },
+      );
+    }
+
+    if (query.startDate && query.endDate) {
+      qb.andWhere('order.orderDate BETWEEN :startDate AND :endDate', {
+        startDate: new Date(query.startDate),
+        endDate: new Date(query.endDate),
+      });
+    } else if (query.startDate) {
+      qb.andWhere('order.orderDate >= :startDate', { startDate: new Date(query.startDate) });
+    } else if (query.endDate) {
+      qb.andWhere('order.orderDate <= :endDate', { endDate: new Date(query.endDate) });
+    }
 
     qb.orderBy('order.orderDate', 'DESC').addOrderBy('order.createdAt', 'DESC');
-    return qb.getMany();
+
+    if (query.page === undefined && query.limit === undefined) {
+      // Cap at 200 to protect database and server memory from cartesian product blowout
+      return qb.take(200).getMany();
+    } else {
+      const page = Number(query.page || 1);
+      const limit = Number(query.limit || 15);
+      qb.skip((page - 1) * limit).take(limit);
+      const [items, total] = await qb.getManyAndCount();
+      return { items, total };
+    }
   }
 
   private buildOrderItems(itemsDto: any[], manager: any) {

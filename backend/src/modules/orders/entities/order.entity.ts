@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn, VersionColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn, VersionColumn, Index } from 'typeorm';
 import { Company } from '../../companies/entities/company.entity';
 import { Route } from '../../routes/entities/route.entity';
 import { Shop } from '../../shops/entities/shop.entity';
@@ -8,13 +8,18 @@ import { DeliveryPerson } from '../../delivery-ops/entities/delivery-person.enti
 import { User } from '../../users/entities/user.entity';
 
 @Entity('orders')
+@Index(['companyId', 'orderDate'])
+@Index(['routeId', 'orderDate'])
+@Index(['assignedDeliveryManId', 'status'])
 export class Order {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Index()
   @Column({ type: 'date' })
   orderDate: Date;
 
+  @Index()
   @Column()
   companyId: number;
 
@@ -22,6 +27,7 @@ export class Order {
   @JoinColumn({ name: 'companyId' })
   company: Company;
 
+  @Index()
   @Column()
   routeId: number;
 
@@ -29,6 +35,7 @@ export class Order {
   @JoinColumn({ name: 'routeId' })
   route: Route;
 
+  @Index()
   @Column({ nullable: true })
   deliveryPersonId?: number;
 
@@ -36,6 +43,7 @@ export class Order {
   @JoinColumn({ name: 'deliveryPersonId' })
   deliveryPerson?: DeliveryPerson;
 
+  @Index()
   @Column({ type: 'uuid', nullable: true })
   assignedDeliveryManId: string;
 
@@ -46,6 +54,7 @@ export class Order {
   @Column({ type: 'varchar', length: 120, nullable: true })
   marketArea?: string;
 
+  @Index()
   @Column({ nullable: true })
   shopId?: number;
 
@@ -92,6 +101,7 @@ export class Order {
   @Column({ default: false })
   isLocked: boolean;
 
+  @Index()
   @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.CONFIRMED })
   status: OrderStatus;
 
@@ -101,6 +111,7 @@ export class Order {
   @Column({ default: 'Admin' })
   createdBy: string;
 
+  @Index()
   @Column({ type: 'uuid', nullable: true })
   createdById: string | null;
 

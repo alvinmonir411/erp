@@ -168,6 +168,56 @@ export function DashboardPage() {
         </section>
       )}
 
+      {/* Company Wise Sales & Profit Section */}
+      {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER || user?.role === Role.ADMIN) && d.companySummary && d.companySummary.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Building2 className="h-5 w-5 text-indigo-500" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Company-wise Sales & Profit</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {d.companySummary.map((c: any) => (
+              <div
+                key={c.companyId}
+                className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-500/5"
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                        <Building2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 line-clamp-1">{c.companyName}</h4>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Company Wise Summary</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-3">
+                    <div>
+                      <p className="text-[8px] font-black uppercase text-slate-400">Total Sales</p>
+                      <p className="text-sm font-black text-emerald-600">{formatCurrency(c.sales)}</p>
+                    </div>
+                    {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? (
+                      <div>
+                        <p className="text-[8px] font-black uppercase text-slate-400">Total Profit</p>
+                        <p className="text-sm font-black text-violet-600">{formatCurrency(c.profit)}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-[8px] font-black uppercase text-slate-400">Company ID</p>
+                        <p className="text-sm font-black text-slate-500">#{c.companyId}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Main Chart */}
       <section className="modern-card p-4 sm:p-8">
         <div className="mb-8 flex items-center justify-between">

@@ -46,6 +46,7 @@ export function AllOrdersPage() {
 
   // Data States
   const [orders, setOrders] = useState<any[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
@@ -67,8 +68,6 @@ export function AllOrdersPage() {
   const [isActionLoading, setIsActionLoading] = useState<number | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<any | null>(null);
 
-  const paginatedOrders = orders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
   // Queries
   const { data: companies = [] } = useCompanies();
   const { data: routes = [] } = useRoutes();
@@ -89,7 +88,13 @@ export function AllOrdersPage() {
         endDate: endDate || undefined,
       };
       const data = await getOrders(query);
-      setOrders(data);
+      if (data && typeof data === 'object' && 'items' in data) {
+        setOrders(data.items || []);
+        setTotalItems(data.total || 0);
+      } else {
+        setOrders(Array.isArray(data) ? data : []);
+        setTotalItems(Array.isArray(data) ? data.length : 0);
+      }
     } catch (e) {
       showErrorToast('Failed to fetch orders');
     } finally {
@@ -125,6 +130,17 @@ export function AllOrdersPage() {
   useEffect(() => {
     fetchStats();
   }, []);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchOrders();
+      fetchStats();
+    };
+    window.addEventListener('order-refresh', handleRefresh);
+    return () => {
+      window.removeEventListener('order-refresh', handleRefresh);
+    };
+  }, [page, companyId, routeId, shopId, activeTab, startDate, endDate, search]);
 
   const handleStatusUpdate = async (id: number, newStatus: string) => {
     try {
@@ -335,7 +351,7 @@ export function AllOrdersPage() {
                   </td>
                 </tr>
               ) : (
-                paginatedOrders.map((order) => (
+                orders.map((order) => (
                   <tr key={order.id} className="group hover:bg-secondary/30 transition-colors">
                     <td className="px-6 py-4">
                       <button
@@ -430,7 +446,7 @@ export function AllOrdersPage() {
               <p className="text-sm text-muted">No orders found</p>
             </div>
           ) : (
-            paginatedOrders.map((order) => (
+            orders.map((order) => (
               <div key={order.id} className="p-4 space-y-3 hover:bg-secondary/10 transition-colors" onClick={() => setSelectedOrder(order)}>
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
@@ -503,7 +519,7 @@ export function AllOrdersPage() {
         <div className="border-t border-border bg-white px-6 py-4">
           <Pagination
             currentPage={page}
-            totalItems={orders.length}
+            totalItems={totalItems}
             pageSize={PAGE_SIZE}
             onPageChange={setPage}
           />

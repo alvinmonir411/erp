@@ -38,6 +38,7 @@ import { Role } from '../../common/enums/role.enum';
 import { User } from '../users/entities/user.entity';
 import { UserStatus } from '../../common/enums/user-status.enum';
 import { Shop } from '../shops/entities/shop.entity';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const gcd = (a: number, b: number): number => {
   a = Math.abs(a);
@@ -87,6 +88,7 @@ export class DeliveryOpsService {
     @Inject(forwardRef(() => OrdersService))
     private readonly ordersService: OrdersService,
     private readonly dataSource: DataSource,
+    private readonly realtimeGateway: RealtimeGateway,
   ) { }
 
   private readonly editableBatchStatuses = [
@@ -348,7 +350,9 @@ export class DeliveryOpsService {
       return savedBatch.id;
     });
 
-    return this.getDispatchBatch(savedBatchId);
+    const result = await this.getDispatchBatch(savedBatchId);
+    this.realtimeGateway.emitPayload('batchCreated', result);
+    return result;
   }
 
   async getDispatchBatch(id: number, user?: any) {
@@ -356,13 +360,22 @@ export class DeliveryOpsService {
       where: { id },
       relations: [
         'company', 'route', 'deliveryPerson', 'assignedDeliveryMan', 'items', 'items.product',
-        'orders', 'orders.returns', 'orders.returns.items', 'orders.collections',
-        'orders.order', 'orders.order.company', 'orders.order.route', 'orders.order.shop',
-        'orders.order.assignedDeliveryMan', 'orders.order.items', 'orders.order.items.product'
       ],
     });
     if (!batch) throw new NotFoundException('Batch not found');
     this.ensureDeliveryManOwnsBatch(batch, user);
+
+    // Split query: fetch batch orders with nested relations separately to avoid massive cartesian join
+    const batchOrders = await this.batchOrderRepository.find({
+      where: { batchId: id },
+      relations: [
+        'returns', 'returns.items', 'collections',
+        'order', 'order.company', 'order.route', 'order.shop',
+        'order.assignedDeliveryMan', 'order.items', 'order.items.product'
+      ],
+    });
+    batch.orders = batchOrders;
+
     return { ...batch, metrics: this.calculateBatchSettlement(batch) };
   }
 
@@ -461,7 +474,7 @@ export class DeliveryOpsService {
       throw new BadRequestException('Invalid batch status for dispatch');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       // Stock is already deducted during Order Confirmation.
       // We just move statuses.
       await manager.update(DispatchBatch, id, { status: DispatchBatchStatus.DISPATCHED, dispatchedAt: new Date() });
@@ -472,6 +485,9 @@ export class DeliveryOpsService {
       });
       return this.getDispatchBatch(id);
     });
+
+    this.realtimeGateway.emitPayload('batchUpdated', result);
+    return result;
   }
 
   async recordReturns(id: number, dto: RecordBatchReturnsDto) {
@@ -544,7 +560,9 @@ export class DeliveryOpsService {
       await this.recalculateBatchTotals(manager, id);
     });
 
-    return this.getDispatchBatch(id);
+    const result = await this.getDispatchBatch(id);
+    this.realtimeGateway.emitPayload('batchUpdated', result);
+    return result;
   }
 
   async createShopForOrder(orderId: number, dto: CreateShopForOrderDto, user?: any) {
@@ -604,7 +622,7 @@ export class DeliveryOpsService {
     this.ensureDeliveryManOwnsBatch(batchOrder.batch, user);
     this.assertBatchEditableByDelivery(batchOrder.batch);
 
-    return this.dataSource.transaction(async (manager) => {
+    const updatedOrder = await this.dataSource.transaction(async (manager) => {
       const order = batchOrder.order;
       let finalSoldAmount = 0;
       let totalReturned = 0;
@@ -753,6 +771,18 @@ export class DeliveryOpsService {
         relations: ['items', 'items.product', 'company', 'route', 'shop', 'deliveryPerson', 'assignedDeliveryMan'],
       });
     });
+
+    if (updatedOrder) {
+      this.realtimeGateway.emitPayload('orderUpdated', updatedOrder);
+      try {
+        const updatedBatch = await this.getDispatchBatch(batchOrder.batchId);
+        this.realtimeGateway.emitPayload('batchUpdated', updatedBatch);
+      } catch (e) {
+        console.error('Failed to emit batchUpdated for batchId', batchOrder.batchId, e);
+      }
+    }
+
+    return updatedOrder;
   }
 
   private calculateItemSoldAmount(item: OrderItem, deliveredPaid: number): number {
@@ -871,7 +901,7 @@ export class DeliveryOpsService {
   }
 
   async settleBatch(id: number, dto: SettleDispatchBatchDto) {
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       // 1. Lock the main batch record first using QueryBuilder to ensure NO joins are generated
       const lockBatch = await manager.createQueryBuilder(DispatchBatch, 'batch')
         .setLock('pessimistic_write')
@@ -986,6 +1016,16 @@ export class DeliveryOpsService {
 
       return this.getDispatchBatch(id);
     });
+
+    this.realtimeGateway.emitPayload('batchUpdated', result);
+    if (result && result.orders) {
+      for (const bo of result.orders) {
+        if (bo.order) {
+          this.realtimeGateway.emitPayload('orderUpdated', bo.order);
+        }
+      }
+    }
+    return result;
   }
 
 
@@ -1059,7 +1099,7 @@ export class DeliveryOpsService {
   }
 
   async deleteDispatchBatch(id: number) {
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       // 1. Lock the batch to prevent concurrent modifications
       const batch = await manager.createQueryBuilder(DispatchBatch, 'batch')
         .setLock('pessimistic_write')
@@ -1081,6 +1121,7 @@ export class DeliveryOpsService {
       }
 
       const isSettled = [DispatchBatchStatus.SETTLED, DispatchBatchStatus.PARTIALLY_SETTLED].includes(batch.status);
+      const orderIds = fullBatch.orders.map(bo => bo.orderId);
 
       // 2. Process each order in the batch
       for (const batchOrder of fullBatch.orders) {
@@ -1152,8 +1193,31 @@ export class DeliveryOpsService {
       // 5. Delete the batch
       await manager.remove(DispatchBatch, fullBatch);
 
-      return { success: true, message: `Batch #${id} deleted and related orders reverted to CONFIRMED.` };
+      return {
+        success: true,
+        message: `Batch #${id} deleted and related orders reverted to CONFIRMED.`,
+        orderIds,
+      };
     });
+
+    this.realtimeGateway.emitPayload('batchDeleted', { id });
+    if (result && result.orderIds) {
+      for (const orderId of result.orderIds) {
+        try {
+          const updatedOrder = await this.orderRepository.findOne({
+            where: { id: orderId },
+            relations: ['items', 'items.product', 'company', 'route', 'shop', 'deliveryPerson', 'assignedDeliveryMan'],
+          });
+          if (updatedOrder) {
+            this.realtimeGateway.emitPayload('orderUpdated', updatedOrder);
+          }
+        } catch (e) {
+          console.error(`Failed to fetch and emit orderUpdated for order #${orderId}`, e);
+        }
+      }
+    }
+
+    return { success: result.success, message: result.message };
   }
 
   private generateBatchNo(manager: any, date: string): string {
