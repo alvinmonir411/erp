@@ -8,7 +8,9 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
 
-@WebSocketGateway(5002, {
+const isVercel = process.env.VERCEL === '1';
+
+@WebSocketGateway(isVercel ? undefined : 5002, {
   cors: {
     origin: '*',
   },
