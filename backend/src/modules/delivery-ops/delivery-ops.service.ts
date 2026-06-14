@@ -1087,41 +1087,37 @@ export class DeliveryOpsService {
         const order = batchOrder.order;
         if (!order) continue;
 
-        // If batch was settled, we need to rollback stock adjustments and financial dues
-        if (isSettled) {
-          for (const orderItem of order.items) {
-            const returnedQty = Number(orderItem.returnedPaidQuantity || 0) + Number(orderItem.returnedFreeQuantity || 0);
-            const damagedQty = Number(orderItem.damagedPaidQuantity || 0) + Number(orderItem.damagedFreeQuantity || 0);
+        for (const orderItem of order.items) {
+          const dispatchedQty = Number(orderItem.quantity || 0) + Number(orderItem.freeQuantity || 0);
+          const returnedQty = Number(orderItem.returnedPaidQuantity || 0) + Number(orderItem.returnedFreeQuantity || 0);
 
-            // Revert RETURN_IN (stock was added to inventory, we need to remove it)
-            if (returnedQty > 0) {
-              await this.stockService.create({
-                productId: orderItem.productId,
-                companyId: order.companyId,
-                type: StockMovementType.ADJUSTMENT,
-                quantity: -returnedQty,
-                reference: `Revert Batch #${id}`,
-                note: `Reverted ${returnedQty} units returned from cancelled settlement of order #${order.id}`,
-              }, 'Admin', manager);
-            }
+          // ── SINGLE RETURN_IN: avoid double-write TypeORM cache bug ──
+          // For SETTLED batches: settleOrder() already did RETURN_IN for returnedQty.
+          //   So only restore the undelivered portion: dispatchedQty - returnedQty.
+          //   Net: current(S₀ - dispatched + returned) + (dispatched - returned) = S₀ ✓
+          // For ACTIVE batches: no RETURN_IN has happened yet (settlement never ran).
+          //   Restore the full dispatched qty.
+          //   Net: current(S₀ - dispatched) + dispatched = S₀ ✓
+          const qtyToRestore = isSettled
+            ? Math.max(0, dispatchedQty - returnedQty)
+            : Math.max(0, dispatchedQty);
 
-            // Revert DAMAGE (stock was removed from inventory, we need to add it back)
-            if (damagedQty > 0) {
-              await this.stockService.create({
-                productId: orderItem.productId,
-                companyId: order.companyId,
-                type: StockMovementType.ADJUSTMENT,
-                quantity: damagedQty,
-                reference: `Revert Batch #${id}`,
-                note: `Reverted ${damagedQty} units damaged from cancelled settlement of order #${order.id}`,
-              }, 'Admin', manager);
-            }
+          if (qtyToRestore > 0) {
+            await this.stockService.create({
+              productId: orderItem.productId,
+              companyId: order.companyId,
+              type: StockMovementType.RETURN_IN,
+              quantity: qtyToRestore,
+              reference: `Delete Batch #${id}`,
+              note: `Restored ${qtyToRestore} units — batch #${id} (${isSettled ? 'settled' : 'active'}) deleted, order #${order.id} reverted`,
+            }, 'System', manager);
           }
 
-          // Delete dues and due_collections associated with the order
-          await manager.query('DELETE FROM due_collections WHERE "orderId" = $1', [order.id]);
-          await manager.query('DELETE FROM dues WHERE "orderId" = $1', [order.id]);
-          await manager.query('DELETE FROM damage_records WHERE "orderId" = $1', [order.id]);
+          if (isSettled) {
+            await manager.query('DELETE FROM due_collections WHERE "orderId" = $1', [order.id]);
+            await manager.query('DELETE FROM dues WHERE "orderId" = $1', [order.id]);
+            await manager.query('DELETE FROM damage_records WHERE "orderId" = $1', [order.id]);
+          }
         }
 
         // 3. Revert Order fields to CONFIRMED state

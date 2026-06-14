@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import { getBDDayRange, isTodayBD, isTodayBDDate } from '../../common/utils/date.utils';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -7,6 +7,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { DiscountType, OrderStatus } from './orders.constants';
 import { SettleOrderDto } from './dto/settle-order.dto';
 import { StockMovementType } from '../stock/stock.constants';
+import { StockMovement } from '../stock/entities/stock-movement.entity';
 import { Product } from '../products/entities/product.entity';
 import { StockService } from '../stock/stock.service';
 import { DuesService } from '../dues/dues.service';
@@ -37,9 +38,6 @@ export class OrdersService {
 
   private readonly logger = new Logger(OrdersService.name);
 
-  /**
-   * Prevents changes to orders that are part of an active dispatch batch.
-   */
   private async validateBatchLock(orderId: number) {
     const batchOrder = await this.batchOrderRepository.findOne({
       where: { orderId },
@@ -47,7 +45,7 @@ export class OrdersService {
     });
 
     if (
-      batchOrder && 
+      batchOrder &&
       [
         DispatchBatchStatus.RETURN_PENDING,
         DispatchBatchStatus.PARTIALLY_SETTLED,
@@ -248,47 +246,168 @@ export class OrdersService {
   }
 
   async delete(id: number) {
-    console.log(`[OrdersService.delete] Called with id: ${id} (${typeof id})`);
-    const order = await this.findOne(id);
-    await this.validateBatchLock(id);
+    return this.deleteOrder(String(id));
+  }
 
-    return this.dataSource.transaction(async (manager) => {
-      if (order.status !== OrderStatus.CANCELLED) {
-        console.log(`[OrdersService.delete] Handling stock return for order #${id}`);
-        await this.handleStockChange(order, order.items, StockMovementType.RETURN_IN, manager);
+  /**
+   * Highly scalable, concurrent-safe, and high-performance order deletion and stock reversion.
+   * Reverts both ordered quantity and free quantity to product stock atomically.
+   */
+  async deleteOrder(orderId: string): Promise<any> {
+    const numericId = parseInt(orderId, 10);
+    if (isNaN(numericId)) {
+      throw new BadRequestException(`Invalid order ID: ${orderId}`);
+    }
+
+    this.logger.log(`[OrdersService.deleteOrder] Initiating deletion for Order #${numericId}`);
+
+    // Create a new QueryRunner to execute a strict ACID transaction
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Fetch order with pessimistic write lock to prevent concurrent modifications
+      const order = await queryRunner.manager.findOne(Order, {
+        where: { id: numericId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Order #${numericId} not found`);
       }
+
+      // 2. Validate batch locks (order cannot be deleted if in certain delivery stages)
+      const batchOrder = await queryRunner.manager.findOne(DispatchBatchOrder, {
+        where: { orderId: numericId },
+        relations: ['batch'],
+      });
+
+      if (
+        batchOrder && 
+        [
+          DispatchBatchStatus.RETURN_PENDING,
+          DispatchBatchStatus.PARTIALLY_SETTLED,
+          DispatchBatchStatus.SETTLED
+        ].includes(batchOrder.batch.status as DispatchBatchStatus)
+      ) {
+        throw new BadRequestException(
+          `Order #${numericId} is locked because its delivery batch (${batchOrder.batch.batchNo}) is currently in the settlement phase.`,
+        );
+      }
+
+      // 3. Revert stock based on the order's status and item returned quantities
+      // Fetch order items (fetching entire entity to prevent TypeORM select mapping bugs)
+      const orderItems = await queryRunner.manager.find(OrderItem, {
+        where: { orderId: numericId },
+      });
+
+      const movementsToInsert: StockMovement[] = [];
+
+      for (const item of orderItems) {
+        let qtyToRevert = 0;
+
+        if (order.status === OrderStatus.CANCELLED) {
+          // If order was cancelled, stock has already been fully reverted.
+          qtyToRevert = 0;
+        } else if ([
+          OrderStatus.CONFIRMED,
+          OrderStatus.ASSIGNED,
+          OrderStatus.OUT_FOR_DELIVERY,
+          OrderStatus.DRAFT
+        ].includes(order.status)) {
+          // Active orders: Revert the full dispatched quantity (paid + free)
+          qtyToRevert = Number(item.quantity) + Number(item.freeQuantity || 0);
+        } else {
+          // Delivered or Settled orders: Revert only the net quantities that were not already returned
+          const totalDispatched = Number(item.quantity) + Number(item.freeQuantity || 0);
+          const alreadyReturned = Number(item.returnedPaidQuantity || 0) + Number(item.returnedFreeQuantity || 0);
+          qtyToRevert = Math.max(0, totalDispatched - alreadyReturned);
+        }
+
+        this.logger.log(`[OrdersService.deleteOrder] Product #${item.productId}: Order Status = ${order.status}, Dispatched = ${Number(item.quantity) + Number(item.freeQuantity || 0)}, Already Returned = ${Number(item.returnedPaidQuantity || 0) + Number(item.returnedFreeQuantity || 0)}, Reverting = ${qtyToRevert}`);
+
+        if (qtyToRevert <= 0) {
+          continue;
+        }
+
+        // Perform concurrent-safe atomic update on product stock and retrieve the new stock balance
+        const updateResult = await queryRunner.manager.query(
+          `UPDATE products SET "currentStock" = "currentStock" + $1, "version" = "version" + 1 WHERE id = $2 RETURNING "currentStock"`,
+          [qtyToRevert, item.productId]
+        );
+
+        if (!updateResult || updateResult.length === 0) {
+          throw new NotFoundException(`Product #${item.productId} not found during stock reversion`);
+        }
+
+        const balanceAfter = Number(updateResult[0].currentStock);
+
+        // Prepare StockMovement audit record
+        movementsToInsert.push(
+          queryRunner.manager.create(StockMovement, {
+            productId: item.productId,
+            companyId: order.companyId,
+            type: StockMovementType.RETURN_IN,
+            quantity: qtyToRevert,
+            reference: `Order #${numericId}`,
+            note: `Returned ${qtyToRevert} units (net adjustment) from deleted order #${numericId}`,
+            user: 'System',
+            balanceAfter: balanceAfter,
+            idempotencyKey: `DEL_ORDER_RET_${numericId}_${item.productId}`,
+          })
+        );
+      }
+
+      // Bulk insert stock movements
+      if (movementsToInsert.length > 0) {
+        await queryRunner.manager.save(movementsToInsert);
+      }
+
+      this.logger.log(`[OrdersService.deleteOrder] Deleting relational constraints for Order #${numericId}`);
+
+      // 4. Handle relational constraints (deleting related records to avoid foreign key violations)
+      await queryRunner.manager.query('DELETE FROM due_collections WHERE "orderId" = $1', [numericId]);
+      await queryRunner.manager.query('DELETE FROM dues WHERE "orderId" = $1', [numericId]);
+      await queryRunner.manager.query('DELETE FROM damage_records WHERE "orderId" = $1', [numericId]);
+      await queryRunner.manager.query('DELETE FROM dispatch_batch_orders WHERE "orderId" = $1', [numericId]);
+      await queryRunner.manager.query('DELETE FROM order_items WHERE "orderId" = $1', [numericId]);
+
+      // 5. Delete the order itself
+      const deleteResult = await queryRunner.manager.delete(Order, numericId);
+
+      this.logger.log(`[OrdersService.deleteOrder] Order #${numericId} and dependencies successfully deleted`);
       
-      console.log(`[OrdersService.delete] Starting raw deletions for order #${id}`);
-      
-      const res1 = await manager.query('DELETE FROM due_collections WHERE "orderId" = $1', [id]);
-      console.log(`[OrdersService.delete] Deleted due_collections:`, res1);
+      // Commit transaction
+      await queryRunner.commitTransaction();
 
-      const res2 = await manager.query('DELETE FROM dues WHERE "orderId" = $1', [id]);
-      console.log(`[OrdersService.delete] Deleted dues:`, res2);
-
-      const res3 = await manager.query('DELETE FROM damage_records WHERE "orderId" = $1', [id]);
-      console.log(`[OrdersService.delete] Deleted damage_records:`, res3);
-
-      const res4 = await manager.query('DELETE FROM dispatch_batch_orders WHERE "orderId" = $1', [id]);
-      console.log(`[OrdersService.delete] Deleted dispatch_batch_orders:`, res4);
-
-      const res5 = await manager.query('DELETE FROM order_items WHERE "orderId" = $1', [id]);
-      console.log(`[OrdersService.delete] Deleted order_items:`, res5);
-
-      console.log(`[OrdersService.delete] Executing manager.delete for Order #${id}`);
-      const deleteResult = await manager.delete(Order, id);
-      console.log(`[OrdersService.delete] manager.delete result:`, deleteResult);
       return deleteResult;
-    });
+    } catch (error) {
+      // Rollback transaction in case of any failure
+      this.logger.error(`[OrdersService.deleteOrder] Transaction failed for Order #${numericId}. Rolling back. Error: ${error.message}`, error.stack);
+      await queryRunner.rollbackTransaction();
+      
+      if (
+        error instanceof NotFoundException || 
+        error instanceof BadRequestException || 
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException(`Failed to delete order: ${error.message}`);
+    } finally {
+      // Release query runner
+      await queryRunner.release();
+    }
   }
 
   async updateShop(id: number, shopId: number) {
     const order = await this.findOne(id);
-    
+
     // Intentionally bypassing validateBatchLock(id) here.
     // This breaks the deadlock where an order without a shop gets locked in an active batch,
     // and settlement fails because due creation requires a shop, but shop cannot be linked due to the batch lock.
-    
+
     const shop = await this.dataSource.getRepository(Shop).findOne({ where: { id: shopId } });
     if (!shop) {
       throw new NotFoundException(`Shop #${shopId} not found`);
@@ -400,22 +519,12 @@ export class OrdersService {
           }, 'Admin', m);
         }
 
-        // 2. Damaged Stock -> Audited but NOT returned to inventory
+        // 2. Damaged Stock -> Audited via damage_records, but NOT returned to inventory
+        // (Stock was already deducted during STOCK_OUT, so we do nothing here)
         const totalDamaged = damagedPaid + damagedFree;
-        if (totalDamaged > 0) {
-          await this.stockService.create({
-            productId: orderItem.productId,
-            companyId: order.companyId,
-            type: StockMovementType.DAMAGE,
-            quantity: -totalDamaged,
-            reference: `Order #${id}`,
-            idempotencyKey: `SETTLE_DAM_${id}_${orderItem.productId}`,
-            note: `Damaged ${totalDamaged} units (${damagedPaid} paid, ${damagedFree} free) from order #${id}`,
-          }, 'Admin', m);
-        }
 
         // --- Money Formula ---
-        const lineItemPrice = Number(orderItem.quantity) > 0 
+        const lineItemPrice = Number(orderItem.quantity) > 0
           ? Number(orderItem.lineTotal) / Number(orderItem.quantity)
           : 0;
 
@@ -432,17 +541,17 @@ export class OrdersService {
       }
 
       // Calculate final invoice discount proportionally
-      const invoiceDiscountRatio = Number(order.subtotal) > 0 
+      const invoiceDiscountRatio = Number(order.subtotal) > 0
         ? totalSoldAmount / Number(order.subtotal)
         : 0;
       const finalInvoiceDiscount = Number(order.discountAmount || 0) * invoiceDiscountRatio;
 
       const grandTotal = Math.max(0, Number((totalSoldAmount - finalInvoiceDiscount).toFixed(2)));
       const collectedAmount = Number(dto.collectedAmount || 0);
-      
+
       // Triple-Check Rule: Expected Cash = Sold Amount - Advance Paid
       const expectedCash = Math.max(0, grandTotal - Number(order.advancePaid || 0));
-      
+
       // Expected Due = Expected Cash - Reported Collected
       const dueAmount = Math.max(0, Number((expectedCash - collectedAmount).toFixed(2)));
 

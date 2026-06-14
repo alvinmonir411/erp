@@ -41,4 +41,30 @@ export class ReportsController {
       orderStatus,
     }, user);
   }
+
+  @Get('damage')
+  async getDamageReport(
+    @CurrentUser() user: any,
+    @Query('dateMode') dateMode?: string,
+    @Query('date') date?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('companyId') companyId?: string,
+    @Query('routeId') routeId?: string,
+    @Query('shopId') shopId?: string,
+    @Query('deliveryManId') deliveryManId?: string,
+    @Query('productId') productId?: string,
+  ) {
+    return this.reportsService.getDamageReport({
+      dateMode: dateMode || 'Today',
+      date,
+      fromDate,
+      toDate,
+      companyId: companyId ? Number(companyId) : undefined,
+      routeId: routeId ? Number(routeId) : undefined,
+      shopId: shopId ? Number(shopId) : undefined,
+      deliveryManId: deliveryManId ? Number(deliveryManId) : undefined,
+      productId: productId ? Number(productId) : undefined,
+    }, user);
+  }
 }

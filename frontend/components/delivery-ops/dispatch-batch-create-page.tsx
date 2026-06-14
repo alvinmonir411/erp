@@ -7,6 +7,7 @@ import { PageCard } from '@/components/ui/page-card';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToast } from '@/components/ui/toast-provider';
 import { useCompanies, useRoutes } from '@/hooks/use-common-queries';
+import { useWithLoading } from '@/lib/loading-context';
 import {
   createDispatchBatch,
   getDeliveryPeople,
@@ -19,6 +20,7 @@ import { getDeliveryMen } from '@/lib/api/users';
 export function DispatchBatchCreatePage() {
   const router = useRouter();
   const { error: showErrorToast, success: showSuccessToast } = useToast();
+  const { withLoading } = useWithLoading();
 
   const [dispatchDate, setDispatchDate] = useState(getTodayBDDate());
   const [companyId, setCompanyId] = useState('');
@@ -110,7 +112,7 @@ export function DispatchBatchCreatePage() {
 
     try {
       setIsSaving(true);
-      const batch = await createDispatchBatch({
+      const batch = await withLoading(() => createDispatchBatch({
         dispatchDate,
         companyId: companyId ? Number(companyId) : undefined,
         routeId: Number(routeId),
@@ -118,7 +120,7 @@ export function DispatchBatchCreatePage() {
         marketArea: marketArea || undefined,
         note: note || undefined,
         orderIds: selectedOrderIds,
-      });
+      }), 'Creating dispatch batch...');
       showSuccessToast('Dispatch batch created successfully');
       router.push(`/delivery-ops/batches/${batch.id}`);
     } catch (error: any) {

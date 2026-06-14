@@ -18,7 +18,9 @@ import {
   X,
   FileText,
   DollarSign,
-  Truck
+  Truck,
+  Gift,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
@@ -42,13 +44,6 @@ const navigation = [
     ]
   },
   {
-    title: 'Finance',
-    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR],
-    items: [
-      { href: '/dues', label: 'Due', icon: DollarSign },
-    ]
-  },
-  {
     title: 'Delivery',
     roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
@@ -56,11 +51,27 @@ const navigation = [
     ]
   },
   {
+    title: 'Finance',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR],
+    items: [
+      { href: '/dues', label: 'Due', icon: DollarSign },
+    ]
+  },
+
+  {
     title: 'Inventory',
     roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
       { href: '/products', label: 'Products', icon: Box },
       { href: '/stock', label: 'Stock', icon: BarChart3 },
+    ]
+  },
+  {
+    title: 'Reports',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
+    items: [
+      { href: '/reports/free-quantity', label: 'Free Qty Report', icon: Gift },
+      { href: '/reports/damage', label: 'Damage Report', icon: AlertCircle },
     ]
   },
   {

@@ -17,7 +17,7 @@ export class DeliverySummariesService {
     private readonly ordersService: OrdersService,
     private readonly stockService: StockService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   async findAll(query: any = {}) {
     const qb = this.summaryRepository.createQueryBuilder('s')
@@ -70,10 +70,10 @@ export class DeliverySummariesService {
     return await this.dataSource.transaction(async (manager) => {
       // 2. Check if summary already exists
       let summary = await manager.findOne(DeliverySummary, {
-        where: { 
-          deliveryDate: new Date(date), 
-          companyId, 
-          routeId 
+        where: {
+          deliveryDate: new Date(date),
+          companyId,
+          routeId
         },
         relations: ['items'],
       });
@@ -90,7 +90,7 @@ export class DeliverySummariesService {
 
       // 3. Aggregate product quantities
       const productMap = new Map<number, { ordered: number, price: number }>();
-      
+
       for (const order of orders) {
         for (const item of order.items) {
           const existing = productMap.get(item.productId) || { ordered: 0, price: item.unitPrice };
@@ -107,7 +107,7 @@ export class DeliverySummariesService {
 
       for (const [productId, data] of productMap.entries()) {
         let item = summary.items?.find(i => i.productId === productId);
-        
+
         if (!item) {
           item = manager.create(DeliverySummaryItem, {
             summaryId: summary.id,
@@ -124,7 +124,7 @@ export class DeliverySummariesService {
           item.unitPrice = data.price;
           item.lineTotal = item.soldQuantity * item.unitPrice;
         }
-        
+
         totalAmount += item.lineTotal;
         summaryItems.push(item);
       }
@@ -139,20 +139,20 @@ export class DeliverySummariesService {
 
   async updateReturns(id: number, items: { productId: number, returnedQuantity: number }[]) {
     const summary = await this.findOne(id);
-    
+
     return await this.dataSource.transaction(async (manager) => {
       let totalAmount = 0;
-      
+
       for (const update of items) {
         const item = summary.items.find(i => i.productId === update.productId);
         if (item) {
           const oldReturned = Number(item.returnedQuantity);
           const newReturned = Number(update.returnedQuantity);
-          
+
           item.returnedQuantity = newReturned;
           item.soldQuantity = item.orderedQuantity - item.returnedQuantity;
           item.lineTotal = item.soldQuantity * item.unitPrice;
-          
+
           totalAmount += item.lineTotal;
           await manager.save(item);
 
@@ -174,7 +174,7 @@ export class DeliverySummariesService {
       summary.totalAmount = totalAmount;
       summary.status = DeliverySummaryStatus.COMPLETED;
       await manager.save(summary);
-      
+
       return this.findOne(id);
     });
   }
@@ -188,7 +188,24 @@ export class DeliverySummariesService {
 
   async delete(id: number) {
     const summary = await this.findOne(id);
-    return this.summaryRepository.remove(summary);
+
+    return await this.dataSource.transaction(async (manager) => {
+      // Rollback returned stock to prevent stock leaks upon summary deletion
+      for (const item of summary.items) {
+        const returned = Number(item.returnedQuantity || 0);
+        if (returned > 0) {
+          await this.stockService.create({
+            productId: item.productId,
+            companyId: summary.companyId,
+            type: StockMovementType.ADJUSTMENT,
+            quantity: -returned,
+            note: `Reverted returned stock due to deletion of Delivery Summary #${summary.id}`,
+            reference: `DS #${summary.id}`,
+          }, 'Admin', manager);
+        }
+      }
+      return manager.remove(DeliverySummary, summary);
+    });
   }
 
   async getDailyReport(date: string, companyId?: number, routeId?: number) {
@@ -205,8 +222,8 @@ export class DeliverySummariesService {
       if (!companyMap.has(order.companyId)) {
         companyMap.set(order.companyId, { name: order.company.name, items: new Map() });
       }
-      
-      const co = companyMap.get(order.companyId)!;
+
+      const co = companyMap.get(order.companyId)!
       for (const item of order.items) {
         if (!co.items.has(item.productId)) {
           co.items.set(item.productId, { name: item.product.name, qty: 0, price: item.unitPrice });

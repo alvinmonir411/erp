@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useWithLoading } from '@/lib/loading-context';
 import {
   ArrowLeft,
   HandCoins,
@@ -14,6 +15,7 @@ import {
   ClipboardList,
   RefreshCw,
   Trash2,
+  CheckCircle2,
 } from 'lucide-react';
 import { PageCard } from '@/components/ui/page-card';
 import { useToast } from '@/components/ui/toast-provider';
@@ -73,6 +75,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const [actualCashReceived, setActualCashReceived] = useState<string>('');
   const [batchToDelete, setBatchToDelete] = useState<{ id: number; batchNo: string; isSettled: boolean } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDispatching, setIsDispatching] = useState(false);
+  const { withLoading } = useWithLoading();
   // Track whether admin has manually edited the cash field — if yes, never auto-overwrite it
   const cashManuallyEdited = useRef(false);
 
@@ -341,12 +345,15 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   };
 
   const handleDispatch = async () => {
+    setIsDispatching(true);
     try {
-      await markBatchDispatched(batchId);
+      await withLoading(() => markBatchDispatched(batchId), 'Dispatching to field...');
       showSuccessToast('Batch dispatched successfully');
       fetchBatch();
     } catch (error: any) {
       showErrorToast(error.message || 'Failed to dispatch batch');
+    } finally {
+      setIsDispatching(false);
     }
   };
 
@@ -358,10 +365,9 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
   const handleConfirmDelete = async () => {
     if (!batchToDelete) return;
-    
     try {
       setIsDeleting(true);
-      await deleteDispatchBatch(batchToDelete.id);
+      await withLoading(() => deleteDispatchBatch(batchToDelete.id), 'Deleting batch & restoring stock...');
       router.push('/delivery-ops');
       showSuccessToast('Batch deleted successfully');
     } catch (err: any) {
@@ -437,7 +443,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
     try {
       setIsSavingReturns(true);
-      await recordBatchReturns(batchId, { orders: ordersToUpdate });
+      await withLoading(() => recordBatchReturns(batchId, { orders: ordersToUpdate }), 'Saving returns...');
       showSuccessToast('Returns recorded successfully');
       fetchBatch();
       // Keep on entry tab to allow further edits until final settlement
@@ -484,11 +490,11 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         }));
 
       // Complete Settlement
-      await settleDispatchBatch(batchId, {
+      await withLoading(() => settleDispatchBatch(batchId, {
         collections,
         dueEntries: dueEntries.length > 0 ? dueEntries : undefined,
         actualCashReceived: actualCashReceived ? Number(actualCashReceived) : undefined
-      });
+      }), 'Settling batch...');
 
       showSuccessToast('Batch marked as settled and dues recorded');
       setDraftDues({});
@@ -663,10 +669,20 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             </button>
             <button
               onClick={handleDispatch}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600"
+              disabled={isDispatching}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-amber-200 transition hover:bg-amber-600 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Send className="h-4 w-4" />
-              Dispatch to Field
+              {isDispatching ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Dispatching...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Dispatch to Field
+                </>
+              )}
             </button>
             <button
               onClick={handleDeleteClick}

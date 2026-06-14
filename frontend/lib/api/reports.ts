@@ -5,3 +5,9 @@ export async function getFreeQuantityReport(filters: any) {
     query: filters,
   });
 }
+
+export async function getDamageReport(filters: any) {
+  return apiRequest<any>('reports/damage', {
+    query: filters,
+  });
+}
