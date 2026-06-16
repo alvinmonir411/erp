@@ -28,4 +28,14 @@ export class QueryDispatchBatchesDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (value ? Number(value) : undefined))
+  @IsNumber()
+  page?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value ? Number(value) : undefined))
+  @IsNumber()
+  limit?: number;
 }

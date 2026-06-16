@@ -204,17 +204,30 @@ export class DeliveryOpsService {
   }
 
   async getDispatchBatches(query: QueryDispatchBatchesDto, user?: any) {
+    const isPaginated = query.page !== undefined || query.limit !== undefined;
+
     const qb = this.batchRepository.createQueryBuilder('batch')
       .leftJoinAndSelect('batch.company', 'company')
       .leftJoinAndSelect('batch.route', 'route')
       .leftJoinAndSelect('batch.deliveryPerson', 'deliveryPerson')
-      .leftJoinAndSelect('batch.assignedDeliveryMan', 'assignedDeliveryMan')
-      .leftJoinAndSelect('batch.orders', 'batchOrders')
-      .leftJoinAndSelect('batchOrders.order', 'order')
-      .leftJoinAndSelect('order.shop', 'shop')
-      .leftJoinAndSelect('order.route', 'orderRoute')
-      .leftJoinAndSelect('batch.items', 'items')
-      .orderBy('batch.dispatchDate', 'DESC')
+      .leftJoinAndSelect('batch.assignedDeliveryMan', 'assignedDeliveryMan');
+
+    if (isPaginated) {
+      // For filtering/searching, we use leftJoin (no select) to avoid select bloat
+      qb.leftJoin('batch.orders', 'batchOrders')
+        .leftJoin('batchOrders.order', 'order')
+        .leftJoin('order.shop', 'shop')
+        .leftJoin('order.route', 'orderRoute');
+    } else {
+      // Maintain full backward compatibility
+      qb.leftJoinAndSelect('batch.orders', 'batchOrders')
+        .leftJoinAndSelect('batchOrders.order', 'order')
+        .leftJoinAndSelect('order.shop', 'shop')
+        .leftJoinAndSelect('order.route', 'orderRoute')
+        .leftJoinAndSelect('batch.items', 'items');
+    }
+
+    qb.orderBy('batch.dispatchDate', 'DESC')
       .addOrderBy('batch.createdAt', 'DESC');
 
     if (user && user.role === Role.SR) {
@@ -240,6 +253,9 @@ export class DeliveryOpsService {
         .andWhere('(batch.companyId = :companyId OR batchProductFilter.companyId = :companyId)', { companyId: query.companyId });
     }
     if (query.routeId) qb.andWhere('batch.routeId = :routeId', { routeId: query.routeId });
+    if (query.dispatchDate) {
+      qb.andWhere('batch.dispatchDate = :dispatchDate', { dispatchDate: query.dispatchDate });
+    }
     if (query.search) {
       qb.andWhere(
         '(batch.batchNo ILIKE :search OR CAST(order.id AS TEXT) ILIKE :search OR shop.name ILIKE :search OR shop.ownerName ILIKE :search OR shop.phone ILIKE :search)',
@@ -266,7 +282,24 @@ export class DeliveryOpsService {
       }
     }
 
-    return qb.getMany();
+    if (!isPaginated) {
+      return qb.getMany();
+    } else {
+      const page = Number(query.page || 1);
+      const limit = Number(query.limit || 10);
+      const skip = (page - 1) * limit;
+
+      qb.skip(skip).take(limit);
+
+      const [items, total] = await qb.getManyAndCount();
+      return {
+        items,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
   }
 
   async createDispatchBatch(dto: CreateDispatchBatchDto) {
@@ -1058,7 +1091,11 @@ export class DeliveryOpsService {
   }
 
   async getReports(query: QueryDispatchBatchesDto, user?: any) {
-    const batches = await this.getDispatchBatches(query, user);
+    const reportQuery = { ...query };
+    delete reportQuery.page;
+    delete reportQuery.limit;
+
+    const batches = (await this.getDispatchBatches(reportQuery, user)) as DispatchBatch[];
 
     const rows = batches.map(batch => ({
       id: batch.id,
@@ -1072,7 +1109,7 @@ export class DeliveryOpsService {
       status: batch.status,
     }));
 
-    const totals = rows.reduce((acc, row) => ({
+    const totals = rows.reduce((acc: any, row: any) => ({
       grossDispatchedValue: acc.grossDispatchedValue + row.grossDispatchedValue,
       finalSoldValue: acc.finalSoldValue + row.finalSoldValue,
       totalCollectedAmount: acc.totalCollectedAmount + row.totalCollectedAmount,

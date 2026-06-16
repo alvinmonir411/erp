@@ -26,7 +26,7 @@ export function DeliverySummariesListPage() {
   const [totalItems, setTotalItems] = useState(0);
 
   // Filter States
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [routeId, setRouteId] = useState('');
 
@@ -37,8 +37,8 @@ export function DeliverySummariesListPage() {
     try {
       setIsLoading(true);
       const data = await getDeliverySummaries({
-        startDate: date,
-        endDate: date,
+        startDate: date || undefined,
+        endDate: date || undefined,
         companyId: companyId || undefined,
         routeId: routeId || undefined,
         page,
@@ -58,6 +58,10 @@ export function DeliverySummariesListPage() {
   }, [date, companyId, routeId, page]);
 
   const handleSync = async () => {
+    if (!date) {
+      showErrorToast('Please select a delivery date to sync orders');
+      return;
+    }
     if (!companyId || !routeId) {
       showErrorToast('Please select company and route to sync orders');
       return;
@@ -83,6 +87,13 @@ export function DeliverySummariesListPage() {
     } catch (e) {
       showErrorToast('Failed to delete');
     }
+  };
+
+  const clearFilters = () => {
+    setDate('');
+    setCompanyId('');
+    setRouteId('');
+    setPage(1);
   };
 
   return (
@@ -111,7 +122,7 @@ export function DeliverySummariesListPage() {
       </div>
 
       <PageCard>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Delivery Date</label>
             <input
@@ -142,6 +153,14 @@ export function DeliverySummariesListPage() {
               <option value="">Select Route</option>
               {routes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={clearFilters}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+            >
+              Clear Filters
+            </button>
           </div>
         </div>
       </PageCard>

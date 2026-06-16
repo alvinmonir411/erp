@@ -24,14 +24,14 @@ export class StockService implements OnModuleInit {
     @InjectRepository(DispatchBatch)
     private readonly batchRepository: Repository<DispatchBatch>,
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     this.logger.log('Ensuring database schema: products.currentStock and enum values');
     try {
       // 1. Ensure currentStock column
       await this.dataSource.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS "currentStock" DECIMAL(12,2) DEFAULT 0');
-
+      
       // 2. Ensure enum values for stock movements
       // Postgres doesn't support IF NOT EXISTS for ADD VALUE directly in older versions, 
       // but we can check if it exists first.
@@ -129,7 +129,7 @@ export class StockService implements OnModuleInit {
       user: username,
       balanceAfter: newBalance,
     });
-
+    
     return await movementRepo.save(movement);
   }
 
@@ -141,9 +141,9 @@ export class StockService implements OnModuleInit {
     return Number(product?.currentStock || 0);
   }
 
-  async getHistory(query: {
-    companyId?: number;
-    productId?: number;
+  async getHistory(query: { 
+    companyId?: number; 
+    productId?: number; 
     type?: StockMovementType;
     startDate?: string;
     endDate?: string;
@@ -160,11 +160,11 @@ export class StockService implements OnModuleInit {
     if (query.companyId) qb.andWhere('m.companyId = :companyId', { companyId: query.companyId });
     if (query.productId) qb.andWhere('m.productId = :productId', { productId: query.productId });
     if (query.type) qb.andWhere('m.type = :type', { type: query.type });
-
+    
     if (query.startDate && query.endDate) {
-      qb.andWhere('m.createdAt BETWEEN :start AND :end', {
-        start: new Date(query.startDate),
-        end: new Date(query.endDate)
+      qb.andWhere('m.createdAt BETWEEN :start AND :end', { 
+        start: new Date(query.startDate), 
+        end: new Date(query.endDate) 
       });
     }
 
@@ -192,7 +192,7 @@ export class StockService implements OnModuleInit {
 
   async getSummary(companyId?: number, search?: string, page?: number, limit?: number) {
     const { startUtc: todayStartUTC, endUtc: todayEndUTC } = getBDDayRange();
-
+    
     // Helper for safe numeric conversion
     const safeNum = (val: any) => {
       const n = Number(val);
@@ -246,7 +246,7 @@ export class StockService implements OnModuleInit {
     if (search) {
       totalCountQuery.andWhere('(p.name ILIKE :s OR p.sku ILIKE :s)', { s: `%${search}%` });
     }
-
+    
     const totalsMetrics = await totalCountQuery
       .select('COUNT(p.id)', 'totalProducts')
       .addSelect('SUM(p.currentStock)', 'totalStockQty')
@@ -273,11 +273,11 @@ export class StockService implements OnModuleInit {
     const qb = this.productRepository.createQueryBuilder('p')
       .leftJoinAndSelect('p.company', 'company')
       .orderBy('p.name', 'ASC');
-
+      
     if (companyId) {
       qb.andWhere('p.companyId = :companyId', { companyId });
     }
-
+    
     if (search) {
       qb.andWhere('(p.name ILIKE :s OR p.sku ILIKE :s)', { s: `%${search}%` });
     }
@@ -305,13 +305,12 @@ export class StockService implements OnModuleInit {
         limit: limitNum,
         totalPages: Math.ceil(total / limitNum),
       };
-      return { summary, currentStockList };
     }
   }
 
   async backfillStock() {
     this.logger.log('Starting stock backfill...');
-
+    
     // Ensure column exists in case synchronize:false
     try {
       await this.dataSource.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS "currentStock" DECIMAL(12,2) DEFAULT 0');
@@ -329,7 +328,7 @@ export class StockService implements OnModuleInit {
         .select('SUM(m.quantity)', 'sum')
         .where('m.productId = :productId', { productId: product.id })
         .getRawOne();
-
+      
       const actualStock = Number(result?.sum || 0);
       product.currentStock = actualStock;
       await this.productRepository.save(product);
@@ -340,4 +339,3 @@ export class StockService implements OnModuleInit {
     return { updatedCount };
   }
 }
-

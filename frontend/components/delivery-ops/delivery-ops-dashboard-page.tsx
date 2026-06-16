@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { StatCard } from '@/components/ui/stat-card';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToast } from '@/components/ui/toast-provider';
+import { Pagination } from '@/components/ui/pagination';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { getDeliveryDashboard, getDispatchBatches, deleteDispatchBatch } from '@/lib/api/delivery-ops';
 import { useCompanies, useRoutes } from '@/hooks/use-common-queries';
@@ -14,6 +15,8 @@ import type { DispatchBatch } from '@/types/api';
 import { AlertCircle, ArrowUpRight, BarChart3, CheckCircle, CheckCircle2, CheckCircle2Icon, ClipboardList, DollarSign, Filter, HandCoins, History, MapPin, Package, Plus, Search, TrendingUp, Truck, Undo2, Wallet, ArrowLeft, LogOut, User, Trash2 } from 'lucide-react';
 
 
+
+const PAGE_SIZE = 10;
 
 export function DeliveryOpsDashboardPage() {
   const { error: showErrorToast, success: showSuccessToast } = useToast();
@@ -28,6 +31,10 @@ export function DeliveryOpsDashboardPage() {
   const [batchToDelete, setBatchToDelete] = useState<{ id: number; batchNo: string; isSettled: boolean } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   const { data: companies = [] } = useCompanies();
   const { data: routes = [] } = useRoutes();
 
@@ -41,11 +48,19 @@ export function DeliveryOpsDashboardPage() {
           companyId: companyId ? Number(companyId) : undefined,
           routeId: routeId ? Number(routeId) : undefined,
           search: search || undefined,
+          page,
+          limit: PAGE_SIZE,
         }),
       ]);
 
       setDashboard(dashboardData);
-      setBatches(batchData);
+      if (batchData && typeof batchData === 'object' && 'items' in batchData) {
+        setBatches(batchData.items || []);
+        setTotalItems(batchData.total || 0);
+      } else {
+        setBatches(Array.isArray(batchData) ? batchData : []);
+        setTotalItems(Array.isArray(batchData) ? batchData.length : 0);
+      }
     } catch (error) {
       showErrorToast('Failed to load delivery operations dashboard');
     } finally {
@@ -55,10 +70,11 @@ export function DeliveryOpsDashboardPage() {
 
   useEffect(() => {
     fetchData();
-  }, [date, companyId, routeId]);
+  }, [date, companyId, routeId, page]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      setPage(1);
       fetchData();
     }, 300);
     return () => clearTimeout(timer);
@@ -74,7 +90,7 @@ export function DeliveryOpsDashboardPage() {
       window.removeEventListener('batch-refresh', handleRefresh);
       window.removeEventListener('order-refresh', handleRefresh);
     };
-  }, [date, companyId, routeId, search]);
+  }, [date, companyId, routeId, search, page]);
 
   const handleDeleteClick = (id: number, batchNo: string, isSettled: boolean) => {
     setBatchToDelete({ id, batchNo, isSettled });
@@ -156,7 +172,7 @@ export function DeliveryOpsDashboardPage() {
                 <input
                   type="date"
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => { setDate(e.target.value); setPage(1); }}
                   className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm focus:bg-white outline-none transition"
                 />
               </div>
@@ -164,7 +180,7 @@ export function DeliveryOpsDashboardPage() {
                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Company</label>
                 <select
                   value={companyId}
-                  onChange={(e) => setCompanyId(e.target.value)}
+                  onChange={(e) => { setCompanyId(e.target.value); setPage(1); }}
                   className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm focus:bg-white outline-none"
                 >
                   <option value="">All Companies</option>
@@ -175,7 +191,7 @@ export function DeliveryOpsDashboardPage() {
                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Route</label>
                 <select
                   value={routeId}
-                  onChange={(e) => setRouteId(e.target.value)}
+                  onChange={(e) => { setRouteId(e.target.value); setPage(1); }}
                   className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm focus:bg-white outline-none"
                 >
                   <option value="">All Routes</option>
@@ -342,6 +358,16 @@ export function DeliveryOpsDashboardPage() {
               );
             })
           )}
+        </div>
+
+        {/* Pagination */}
+        <div className="border-t border-border bg-white px-6 py-4">
+          <Pagination
+            currentPage={page}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </div>
       </div>
       {batchToDelete && (

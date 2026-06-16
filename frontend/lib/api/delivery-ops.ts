@@ -8,6 +8,8 @@ export type DispatchBatchQuery = {
   dispatchDate?: string;
   status?: string;
   search?: string;
+  page?: number;
+  limit?: number;
 };
 
 export type DashboardSummary = {
@@ -129,7 +131,7 @@ export function getEligibleDispatchOrders(query: DispatchBatchQuery = {}) {
 }
 
 export function getDispatchBatches(query: DispatchBatchQuery = {}) {
-  return apiRequest<DispatchBatch[]>('delivery-ops/batches', {
+  return apiRequest<any>('delivery-ops/batches', {
     query,
   });
 }
