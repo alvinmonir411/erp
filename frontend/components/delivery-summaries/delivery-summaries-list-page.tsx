@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { PageCard } from '@/components/ui/page-card';
 import { useToast } from '@/components/ui/toast-provider';
+import { Pagination } from '@/components/ui/pagination';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { getDeliverySummaries, deleteDeliverySummary, syncDeliverySummary } from '@/lib/api/delivery-summaries';
 import { useCompanies, useRoutes } from '@/hooks/use-common-queries';
@@ -19,6 +20,10 @@ export function DeliverySummariesListPage() {
   const [summaries, setSummaries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Filter States
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -36,8 +41,11 @@ export function DeliverySummariesListPage() {
         endDate: date,
         companyId: companyId || undefined,
         routeId: routeId || undefined,
+        page,
+        limit: 15,
       });
-      setSummaries(data.items);
+      setSummaries(data.items || []);
+      setTotalItems(data.totalItems || 0);
     } catch (e) {
       showErrorToast('Failed to fetch delivery summaries');
     } finally {
@@ -47,7 +55,7 @@ export function DeliverySummariesListPage() {
 
   useEffect(() => {
     fetchSummaries();
-  }, [date, companyId, routeId]);
+  }, [date, companyId, routeId, page]);
 
   const handleSync = async () => {
     if (!companyId || !routeId) {
@@ -109,7 +117,7 @@ export function DeliverySummariesListPage() {
             <input
               type="date"
               value={date}
-              onChange={e => setDate(e.target.value)}
+              onChange={e => { setDate(e.target.value); setPage(1); }}
               className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
@@ -117,7 +125,7 @@ export function DeliverySummariesListPage() {
             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Company</label>
             <select
               value={companyId}
-              onChange={e => setCompanyId(e.target.value)}
+              onChange={e => { setCompanyId(e.target.value); setPage(1); }}
               className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="">Select Company</option>
@@ -128,7 +136,7 @@ export function DeliverySummariesListPage() {
             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Route</label>
             <select
               value={routeId}
-              onChange={e => setRouteId(e.target.value)}
+              onChange={e => { setRouteId(e.target.value); setPage(1); }}
               className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="">Select Route</option>
@@ -213,6 +221,14 @@ export function DeliverySummariesListPage() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-slate-100 bg-white px-6 py-4">
+          <Pagination
+            currentPage={page}
+            totalItems={totalItems}
+            pageSize={15}
+            onPageChange={setPage}
+          />
         </div>
       </PageCard>
     </div>

@@ -17,7 +17,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('stats')
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
   getStats(@CurrentUser() user: any) {

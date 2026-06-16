@@ -22,6 +22,7 @@ export class ReportsService {
   async getFreeQuantityReport(filters: any, user?: any) {
     const qb = this.orderItemsRepository.createQueryBuilder('item')
       .leftJoinAndSelect('item.product', 'product')
+      .leftJoinAndSelect('product.company', 'productCompany')
       .leftJoinAndSelect('item.order', 'order')
       .leftJoinAndSelect('order.company', 'company')
       .leftJoinAndSelect('order.route', 'route')
@@ -47,7 +48,7 @@ export class ReportsService {
     }
 
     if (filters.companyId) {
-      qb.andWhere('order.companyId = :companyId', { companyId: filters.companyId });
+      qb.andWhere('product.companyId = :companyId', { companyId: filters.companyId });
     }
     if (filters.routeId) {
       qb.andWhere('order.routeId = :routeId', { routeId: filters.routeId });
@@ -95,11 +96,11 @@ export class ReportsService {
         id: key,
         label: labelGetter(groupItems),
         totalQty: groupItems.reduce((sum, i) => sum + safeNum(i.freeQuantity), 0),
-        totalValue: groupItems.reduce((sum, i) => sum + (safeNum(i.freeQuantity) * safeNum(i.product?.salePrice)), 0),
+        totalValue: groupItems.reduce((sum, i) => sum + (safeNum(i.freeQuantity) * safeNum(i.product?.salePrice || 0)), 0),
       })).sort((a, b) => b.totalQty - a.totalQty);
     };
 
-    const companySummary = mapToSummary(groupBy(items, i => i.order?.companyId), items => items[0]?.order?.company?.name || 'Unknown');
+    const companySummary = mapToSummary(groupBy(items, i => i.product?.companyId), items => items[0]?.product?.company?.name || 'Unknown');
     const routeSummary = mapToSummary(groupBy(items, i => i.order?.routeId), items => items[0]?.order?.route?.name || 'Unknown');
     const productSummary = mapToSummary(groupBy(items, i => i.productId), items => items[0]?.product?.name || 'Unknown');
     const shopSummary = mapToSummary(groupBy(items, i => i.order?.shopId), items => items[0]?.order?.shop?.name || 'Direct Order');
@@ -120,7 +121,7 @@ export class ReportsService {
         id: i.id,
         date: i.order?.orderDate,
         orderId: i.orderId,
-        company: i.order?.company?.name,
+        company: i.product?.company?.name || i.order?.company?.name || 'Unknown',
         route: i.order?.route?.name,
         shop: i.order?.shop?.name || 'Direct Order',
         deliveryMan: i.order?.deliveryPerson?.name || 'Unassigned',
@@ -143,6 +144,7 @@ export class ReportsService {
   async getDamageReport(filters: any, user?: any) {
     const qb = this.damageRecordRepository.createQueryBuilder('damage')
       .leftJoinAndSelect('damage.product', 'product')
+      .leftJoinAndSelect('product.company', 'productCompany')
       .leftJoinAndSelect('damage.order', 'order')
       .leftJoinAndSelect('order.company', 'company')
       .leftJoinAndSelect('order.route', 'route')
@@ -168,7 +170,7 @@ export class ReportsService {
     }
 
     if (filters.companyId) {
-      qb.andWhere('order.companyId = :companyId', { companyId: filters.companyId });
+      qb.andWhere('product.companyId = :companyId', { companyId: filters.companyId });
     }
     if (filters.routeId) {
       qb.andWhere('order.routeId = :routeId', { routeId: filters.routeId });
@@ -217,7 +219,7 @@ export class ReportsService {
       })).sort((a, b) => b.totalQty - a.totalQty);
     };
 
-    const companySummary = mapToSummary(groupBy(items, i => i.order?.companyId), items => items[0]?.order?.company?.name || 'Unknown');
+    const companySummary = mapToSummary(groupBy(items, i => i.product?.companyId), items => items[0]?.product?.company?.name || 'Unknown');
     const routeSummary = mapToSummary(groupBy(items, i => i.order?.routeId), items => items[0]?.order?.route?.name || 'Unknown');
     const productSummary = mapToSummary(groupBy(items, i => i.productId), items => items[0]?.product?.name || 'Unknown');
     const shopSummary = mapToSummary(groupBy(items, i => i.order?.shopId), items => items[0]?.order?.shop?.name || 'Direct Order');
@@ -238,7 +240,7 @@ export class ReportsService {
         id: i.id,
         date: i.createdAt,
         orderId: i.orderId,
-        company: i.order?.company?.name,
+        company: i.product?.company?.name || i.order?.company?.name || 'Unknown',
         route: i.order?.route?.name,
         shop: i.order?.shop?.name || 'Direct Order',
         deliveryMan: i.order?.deliveryPerson?.name || 'Unassigned',

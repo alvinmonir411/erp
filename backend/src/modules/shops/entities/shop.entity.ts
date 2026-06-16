@@ -50,8 +50,8 @@ export class Shop {
   })
   @JoinColumn({ name: 'routeId' })
   route: Route;
-  @Column()
-  companyId: number;
+  @Column({ type: 'int', nullable: true })
+  companyId?: number | null;
 
   @VersionColumn()
   version: number;

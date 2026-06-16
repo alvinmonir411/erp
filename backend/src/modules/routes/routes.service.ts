@@ -35,6 +35,10 @@ export class RoutesService {
   async findAll(query: QueryRoutesDto) {
     const queryBuilder = this.routesRepository
       .createQueryBuilder('route')
+      .loadRelationCountAndMap('route.shopCount', 'route.shops')
+      .loadRelationCountAndMap('route.activeShopCount', 'route.shops', 'shop', (qb) =>
+        qb.where('shop.isActive = :isActive', { isActive: true }),
+      )
       .orderBy('route.name', 'ASC');
 
     if (query.search) {
@@ -50,7 +54,42 @@ export class RoutesService {
       });
     }
 
-    return queryBuilder.getMany();
+    if (query.page === undefined && query.limit === undefined) {
+      return queryBuilder.getMany();
+    } else {
+      const page = Number(query.page || 1);
+      const limit = Number(query.limit || 10);
+      const skip = (page - 1) * limit;
+
+      queryBuilder.skip(skip).take(limit);
+
+      const [items, total] = await queryBuilder.getManyAndCount();
+      const [totalRoutes, activeRoutes, totalShops, activeShops, uniqueAreasResult] = await Promise.all([
+        this.routesRepository.count(),
+        this.routesRepository.count({ where: { isActive: true } }),
+        this.shopsRepository.count(),
+        this.shopsRepository.count({ where: { isActive: true } }),
+        this.routesRepository.createQueryBuilder('route')
+          .select('COUNT(DISTINCT(route.area))', 'count')
+          .where('route.area IS NOT NULL AND route.area != :empty', { empty: '' })
+          .getRawOne(),
+      ]);
+
+      return {
+        items,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        summary: {
+          totalRoutes,
+          activeRoutes,
+          totalShops,
+          activeShops,
+          uniqueAreas: Number(uniqueAreasResult?.count || 0),
+        },
+      };
+    }
   }
 
   async findOne(id: number) {

@@ -249,9 +249,19 @@ export function DueModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
-      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={isSaving ? undefined : onClose} />
       
       <div className="relative z-10 flex h-[95vh] sm:h-[90vh] w-full sm:max-w-2xl flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl">
+
+        {/* Global Loading Overlay */}
+        {isSaving && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm rounded-t-3xl sm:rounded-3xl">
+            <div className="flex flex-col items-center gap-4">
+              <div className="h-14 w-14 rounded-full border-4 border-slate-200 border-t-cyan-600 animate-spin" />
+              <p className="text-sm font-black uppercase tracking-widest text-slate-700">Saving...</p>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
           <div>
@@ -293,8 +303,14 @@ export function DueModal({
                              <Store className="h-5 w-5" />
                           </div>
                           <div>
-                             <p className="text-sm font-black text-slate-900 leading-tight mb-0.5">{ro.order.shop?.name || 'Missing Shop'}</p>
-                             <p className="text-[10px] font-bold text-slate-500 uppercase">Order #{ro.orderId} · {ro.order.createdBy}</p>
+                             <p className="text-sm font-black text-slate-900 leading-tight mb-0.5">
+                               {ro.order.shop?.name || (
+                                 <span className="text-amber-500">⚠ No Shop — Link Below</span>
+                               )}
+                             </p>
+                             <p className="text-[10px] font-bold text-slate-500 uppercase">
+                               Order #{ro.orderId} · SR: {ro.order.createdBy || '—'}
+                             </p>
                           </div>
                        </div>
                        <div className="text-left sm:text-right pl-13 sm:pl-0">
@@ -364,32 +380,38 @@ export function DueModal({
                </div>
 
                {!selectedOrder.order.shopId ? (
-                 <div className="rounded-2xl bg-amber-50 p-4 flex items-center justify-between border border-amber-100">
-                    <div className="flex items-center gap-3">
-                       <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-amber-100 text-amber-600">
-                          <AlertCircle className="h-5 w-5" />
-                       </div>
-                       <div>
-                          <p className="text-sm font-bold text-amber-900">Shop missing for this order</p>
-                          <p className="text-xs text-amber-700">A shop must be linked before saving due.</p>
-                       </div>
+                 <div className="rounded-2xl bg-amber-50 p-4 flex items-start gap-3 border border-amber-100">
+                    <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-xl bg-amber-100 text-amber-600 mt-0.5">
+                       <AlertCircle className="h-5 w-5" />
                     </div>
-                    <button 
-                      onClick={() => setShowShopSelector(true)}
-                      className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-black uppercase text-white hover:bg-amber-700 transition-colors"
-                    >
-                      Fix Now
-                    </button>
+                    <div className="flex-1">
+                       <p className="text-sm font-bold text-amber-900">Shop missing for this order</p>
+                       <p className="text-xs text-amber-700 mt-0.5">একটি Order একটি Shop এর সাথে linked। Due দেওয়ার আগে Shop link করুন।</p>
+                       <button 
+                         onClick={() => setShowShopSelector(true)}
+                         className="mt-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-black uppercase text-white hover:bg-amber-700 transition-colors"
+                       >
+                         Shop Link করুন
+                       </button>
+                    </div>
                  </div>
                ) : validation.isValid ? (
-                 <div className="rounded-2xl bg-emerald-50 p-4 flex items-center gap-3 border border-emerald-100">
-                    <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                       <CheckCircle2 className="h-5 w-5" />
+                 <div className="rounded-2xl bg-emerald-50 p-4 flex items-center justify-between gap-3 border border-emerald-100">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                         <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                      <div>
+                         <p className="text-sm font-bold text-emerald-900">Ready to save</p>
+                         <p className="text-xs text-emerald-700">Shop: <span className="font-bold">{selectedOrder.order.shop?.name || 'Linked Shop'}</span></p>
+                      </div>
                     </div>
-                    <div>
-                       <p className="text-sm font-bold text-emerald-900">Ready to save</p>
-                       <p className="text-xs text-emerald-700">Due will be linked to <span className="font-bold">{selectedOrder.order.shop?.name || 'Linked Shop'}</span></p>
-                    </div>
+                    <button
+                      onClick={() => setShowShopSelector(true)}
+                      className="flex-shrink-0 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      Change
+                    </button>
                  </div>
                ) : dueAmount ? (
                  <div className="rounded-2xl bg-rose-50 p-4 flex items-center gap-3 border border-rose-100">
@@ -434,7 +456,8 @@ export function DueModal({
                     <button
                       key={shop.id}
                       onClick={() => handleLinkShop(shop.id)}
-                      className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-cyan-200 hover:bg-cyan-50/20 transition-all text-left group"
+                      disabled={isSaving}
+                      className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-cyan-200 hover:bg-cyan-50/20 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                        <div className="flex items-center gap-3">
                           <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 group-hover:bg-cyan-100 group-hover:text-cyan-600">
@@ -533,23 +556,31 @@ export function DueModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:px-6 sm:py-6 flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pb-8 sm:pb-6">
-           <button 
-            onClick={onClose}
-            className="w-full sm:w-auto px-6 py-3.5 sm:py-3 rounded-xl text-sm font-black uppercase text-slate-500 bg-slate-200/50 hover:bg-slate-200 sm:bg-transparent sm:hover:bg-transparent hover:text-slate-700 transition-colors"
-           >
-             Cancel
-           </button>
-           {!showShopSelector && !showCreateShop && (
-            <button 
-              onClick={handleSaveDue}
-              disabled={isSaving || !selectedOrderId || !dueAmount || !validation.isValid || maxAllowed === 0}
-              className="w-full sm:w-auto px-10 py-3.5 sm:py-3 rounded-xl bg-slate-900 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:bg-slate-400 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+        <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:px-6 sm:py-5 flex flex-col gap-3 pb-8 sm:pb-5">
+           {/* Architectural note */}
+           <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-2.5">
+             <p className="text-[10px] font-bold text-blue-700 uppercase leading-relaxed">
+               ℹ️ একটি Order = একটি Shop। আলাদা দোকানের জন্য Fast Track Dispatch থেকে আলাদা Order বানান।
+             </p>
+           </div>
+           <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3">
+             <button 
+              onClick={onClose}
+              className="w-full sm:w-auto px-6 py-3.5 sm:py-3 rounded-xl text-sm font-black uppercase text-slate-500 bg-slate-200/50 hover:bg-slate-200 sm:bg-transparent sm:hover:bg-transparent hover:text-slate-700 transition-colors"
              >
+               Cancel
+             </button>
+             {!showShopSelector && !showCreateShop && (
+              <button 
+                onClick={handleSaveDue}
+                disabled={isSaving || !selectedOrderId || !dueAmount || !validation.isValid || maxAllowed === 0}
+                className="w-full sm:w-auto px-10 py-3.5 sm:py-3 rounded-xl bg-slate-900 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:bg-slate-400 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+               >
                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                Add Due to Settlement
              </button>
-           )}
+            )}
+           </div>
         </div>
       </div>
       

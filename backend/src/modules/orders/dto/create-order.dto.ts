@@ -30,7 +30,8 @@ export class CreateOrderDto {
   orderDate: string;
 
   @IsNumber()
-  companyId: number;
+  @IsOptional()
+  companyId?: number;
 
   @IsNumber()
   routeId: number;

@@ -50,6 +50,12 @@ export class ShopsService {
       });
     }
 
+    if (query.companyId) {
+      queryBuilder.andWhere('shop.companyId = :companyId', {
+        companyId: query.companyId,
+      });
+    }
+
     if (query.search) {
       queryBuilder.andWhere(
         '(shop.name ILIKE :search OR shop.ownerName ILIKE :search OR route.name ILIKE :search)',
@@ -63,8 +69,49 @@ export class ShopsService {
       });
     }
 
-    const shops = await queryBuilder.getMany();
+    // 1. Fetch matching info for summary totals
+    const allMatchingShops = await queryBuilder
+      .select(['shop.id', 'shop.isActive'])
+      .getMany();
 
+    const totalMatching = allMatchingShops.length;
+    const activeMatching = allMatchingShops.filter(s => s.isActive).length;
+    const allMatchingIds = allMatchingShops.map(s => s.id);
+
+    let globalTotalDue = 0;
+    if (allMatchingIds.length > 0) {
+      let globalDueQuery = `SELECT SUM("remainingDue") as "totalDue" 
+         FROM dues 
+         WHERE "shopId" IN (${allMatchingIds.join(',')}) 
+         AND status IN ('DUE', 'PARTIAL') 
+         AND "remainingDue" > 0`;
+
+      if (user) {
+        if (user.role === 'SR') {
+          globalDueQuery += ` AND "srId" = '${user.id || user.sub}'`;
+        } else if (user.role === 'MANAGER' && user.allowedRouteIds && user.allowedRouteIds.length > 0) {
+          globalDueQuery += ` AND "routeId" IN (${user.allowedRouteIds.join(',')})`;
+        }
+      }
+
+      const res = await this.shopsRepository.manager.query(globalDueQuery);
+      globalTotalDue = Number(res[0]?.totalDue || 0);
+    }
+
+    // 2. Fetch actual page items
+    let shops: Shop[];
+    let total = totalMatching;
+    const page = Number(query.page || 1);
+    const limit = Number(query.limit || 12);
+
+    if (query.page === undefined && query.limit === undefined) {
+      shops = await queryBuilder.getMany();
+    } else {
+      const skip = (page - 1) * limit;
+      shops = await queryBuilder.skip(skip).take(limit).getMany();
+    }
+
+    // 3. Compute dues for the returned shops only
     let duesSummary: Record<number, number> = {};
     if (shops.length > 0) {
       const shopIds = shops.map(s => s.id);
@@ -91,11 +138,28 @@ export class ShopsService {
       });
     }
 
-    return shops.map(shop => ({
+    const items = shops.map(shop => ({
       ...shop,
       totalOrders: 0,
       totalDue: duesSummary[shop.id] || 0,
     }));
+
+    if (query.page === undefined && query.limit === undefined) {
+      return items;
+    } else {
+      return {
+        items,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        summary: {
+          totalShops: totalMatching,
+          activeShops: activeMatching,
+          totalDue: globalTotalDue,
+        },
+      };
+    }
   }
 
   async findOne(id: number) {

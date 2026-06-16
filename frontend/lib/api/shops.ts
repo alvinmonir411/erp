@@ -1,8 +1,8 @@
 import { apiRequest } from './client';
 import type { CreateShopPayload, Shop, UpdateShopPayload } from '@/types/api';
 
-export function getShops(routeId?: number, search?: string) {
-  return apiRequest<Shop[]>('shops', { query: { routeId, search } });
+export function getShops(query?: { routeId?: number; companyId?: number; search?: string; isActive?: boolean; page?: number; limit?: number }) {
+  return apiRequest<any>('shops', { query });
 }
 
 export function getShop(id: number) {

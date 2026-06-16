@@ -5,6 +5,7 @@ import { Due, DueStatus } from './entities/due.entity';
 import { DueCollection, CollectionStatus } from './entities/due-collection.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Role } from '../../common/enums/role.enum';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class DuesService {
@@ -212,15 +213,35 @@ export class DuesService {
 
     let due = await manager.findOne(Due, { where: { orderId: order.id } });
 
+    let srId = order.createdById;
+    let srName = order.createdBy;
 
+    // Resolve route's SR if order was created by an Admin/Manager
+    if (order.createdByRole !== Role.SR || !srId) {
+      try {
+        const srUsers = await manager.getRepository(User).find({
+          where: { role: Role.SR, status: 'ACTIVE' },
+        });
+        const srForRoute = srUsers.find((u: any) => {
+          if (!u.allowedRouteIds) return false;
+          return u.allowedRouteIds.map(Number).includes(Number(order.routeId));
+        });
+        if (srForRoute) {
+          srId = srForRoute.id;
+          srName = srForRoute.name;
+        }
+      } catch (err) {
+        // Fallback to order details if lookups fail
+      }
+    }
 
     if (!due) {
       due = manager.create(Due, {
         orderId: order.id,
         shopId: order.shopId,
         routeId: order.routeId,
-        srId: order.createdById,
-        srName: order.createdBy,
+        srId: srId,
+        srName: srName,
         dueAmount: dueAmount,
         paidAmount: 0,
         remainingDue: dueAmount,

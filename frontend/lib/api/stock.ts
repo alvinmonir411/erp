@@ -25,17 +25,21 @@ export function getStockHistory(params: {
   startDate?: string;
   endDate?: string;
   search?: string;
+  page?: number;
+  limit?: number;
 }) {
-  return apiRequest<any[]>('stock/history', {
+  return apiRequest<any>('stock/history', {
     query: params as Record<string, any>,
   });
 }
 
-export function getStockSummary(companyId?: number, search?: string) {
+export function getStockSummary(companyId?: number, search?: string, page?: number, limit?: number) {
   return apiRequest<any>('stock/summary', {
     query: {
       companyId,
       search,
+      page,
+      limit,
     },
   });
 }

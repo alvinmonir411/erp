@@ -37,7 +37,7 @@ const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }>
   CANCELLED: { label: 'Cancelled', color: 'bg-rose-100 text-rose-700', icon: XCircle },
 };
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 export function AllOrdersPage() {
   const { user } = useAuth();

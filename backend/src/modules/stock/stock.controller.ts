@@ -27,6 +27,8 @@ export class StockController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.stockService.getHistory({
       companyId: companyId ? Number(companyId) : undefined,
@@ -35,6 +37,8 @@ export class StockController {
       startDate,
       endDate,
       search,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
     });
   }
 
@@ -42,10 +46,14 @@ export class StockController {
   getSummary(
     @Query('companyId') companyId?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.stockService.getSummary(
       companyId ? Number(companyId) : undefined,
       search,
+      page ? Number(page) : undefined,
+      limit ? Number(limit) : undefined,
     );
   }
 

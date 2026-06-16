@@ -894,6 +894,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                           </span>
                         )}
                       </td>
+
                       <td className="px-6 py-4 text-center font-black text-slate-700">
                         {formatNumber(item.totalPaidQty)}
                       </td>
@@ -1098,6 +1099,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       <div className="mt-10 pt-10 border-t-2 border-slate-900 pb-24">
         <h2 className="text-base font-black uppercase tracking-widest text-slate-900 mb-6">Final Batch Summary</h2>
 
+
+
         <div className="flex flex-col lg:flex-row border-2 border-slate-900 divide-y-2 lg:divide-y-0 lg:divide-x-2 divide-slate-900">
           <div className="flex-1 p-4 lg:p-6 bg-white flex justify-between lg:block items-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 lg:mb-1">Total Qty</p>
@@ -1257,14 +1260,14 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
       {/* PRINT SECTION (HIDDEN ON SCREEN) */}
       <div className="final-settlement-print text-black bg-white">
-        <div className="text-center mb-8 border-b-2 border-black pb-4">
+        <div className="text-center mb-6 border-b-2 border-black pb-3">
           <h1 className="text-3xl font-black uppercase tracking-tight mb-1">KORIM TRADERS ERP</h1>
           <h2 className="text-xl font-bold uppercase tracking-widest text-slate-600">Final Batch Settlement</h2>
-          <p className="text-[10px] font-bold mt-2 uppercase">Printed on {new Date().toLocaleString()}</p>
+          <p className="text-[10px] font-bold mt-1 uppercase">Printed on {new Date().toLocaleString()}</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 mb-10 text-sm">
-          <div className="space-y-2 border-l-4 border-black pl-4">
+        <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
+          <div className="space-y-1.5 border-l-4 border-black pl-4">
             <div className="flex justify-between border-b border-slate-100 pb-1">
               <span className="font-bold text-slate-500">Batch ID:</span>
               <span className="font-black">#BT-{batch.id}</span>
@@ -1282,7 +1285,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               <span className="font-black uppercase">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</span>
             </div>
           </div>
-          <div className="space-y-2 border-l-4 border-emerald-500 pl-4">
+          <div className="space-y-1.5 border-l-4 border-emerald-500 pl-4">
             <div className="flex justify-between border-b border-slate-100 pb-1">
               <span className="font-bold text-slate-500">Settlement Status:</span>
               <span className="font-black text-emerald-600">FULLY SETTLED</span>
@@ -1298,7 +1301,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
         </div>
 
-        <table className="w-full border-2 border-black text-xs mb-10">
+        <table className="w-full border-2 border-black text-xs mb-4">
           <thead>
             <tr className="bg-slate-100 border-b-2 border-black font-black uppercase">
               <th className="border-r border-black px-2 py-3 text-center">SL</th>
@@ -1309,9 +1312,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               <th className="border-r border-black px-2 py-3 text-center">Ret (Free)</th>
               <th className="border-r border-black px-2 py-3 text-center">Dam (Paid)</th>
               <th className="border-r border-black px-2 py-3 text-center">Final Sold</th>
-              <th className="border-r border-black px-2 py-3 text-center">Delivered Free</th>
+              <th className="border-r border-black px-2 py-3 text-center">Del. Free</th>
               <th className="border-r border-black px-2 py-3 text-center">Unit Price</th>
-              <th className="px-2 py-3 text-right">Final Amount</th>
+              <th className="border-r border-black px-2 py-3 text-right">Final Amount</th>
+              <th className="px-2 py-3 text-right bg-rose-100 text-rose-800">Due</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-black/10">
@@ -1323,6 +1327,13 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               const finalSold = Math.max(0, item.totalPaidQty - rPaid - dPaid);
               const deliveredFree = Math.max(0, item.totalFreeQty - rFree);
               const lineTotal = finalSold * item.price;
+              // Sum due from all orders containing this product
+              const itemDue = dynamicOrders
+                .filter(bo => bo.order.items.some((i: any) => i.productId === item.productId))
+                .reduce((sum, bo) => {
+                  const d = isBatchSettled ? Number(bo.dueAmount || 0) : (draftDues[bo.orderId] || 0);
+                  return sum + d;
+                }, 0);
 
               return (
                 <tr key={item.productId} className="font-bold">
@@ -1336,7 +1347,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   <td className="border-r border-black px-2 py-2 text-center text-blue-600">{formatNumber(finalSold)}</td>
                   <td className="border-r border-black px-2 py-2 text-center text-emerald-600">{formatNumber(deliveredFree)}</td>
                   <td className="border-r border-black px-2 py-2 text-center font-black text-slate-500">{formatCurrency(item.price)}</td>
-                  <td className="px-2 py-2 text-right font-black">{formatCurrency(lineTotal)}</td>
+                  <td className="border-r border-black px-2 py-2 text-right font-black">{formatCurrency(lineTotal)}</td>
+                  <td className={`px-2 py-2 text-right font-black ${itemDue > 0 ? 'text-rose-700 bg-rose-50' : 'text-slate-300'}`}>
+                    {itemDue > 0 ? formatCurrency(itemDue) : '—'}
+                  </td>
                 </tr>
               );
             })}
@@ -1347,69 +1361,18 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               <td className="border-r border-black px-2 py-3 text-center text-blue-700">{formatNumber(finalMetrics?.finalSold || 0)}</td>
               <td className="border-r border-black px-2 py-3 text-center text-emerald-700">{formatNumber(finalMetrics?.totalFree || 0)}</td>
               <td className="border-r border-black px-2 py-3 text-center text-slate-400">—</td>
-              <td className="px-2 py-3 text-right text-slate-900">{formatCurrency(finalMetrics?.finalAmount || 0)}</td>
+              <td className="border-r border-black px-2 py-3 text-right text-slate-900">{formatCurrency(currentFinalAmount)}</td>
+              <td className="px-2 py-3 text-right text-rose-700 bg-rose-50">{currentCustomerDue > 0 ? formatCurrency(currentCustomerDue) : '—'}</td>
+            </tr>
+            <tr className="border-t-2 border-black bg-white text-black">
+              <td colSpan={11} className="border-r border-black px-4 py-2.5 text-right font-black">Cash Collected:</td>
+              <td className="px-2 py-2.5 text-right font-black text-black">{formatCurrency(isBatchSettled ? (batch.totalCollectedAmount || 0) : Number(actualCashReceived || currentCashCollectable))}</td>
             </tr>
           </tfoot>
         </table>
 
-        <div className="grid grid-cols-2 gap-12 mt-12">
-          <div className="space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-widest border-b border-black pb-1">Settlement Summary</h3>
-            <div className="space-y-1 text-sm font-bold">
-              <div className="flex justify-between">
-                <span>Total Dispatched (Paid):</span>
-                <span>{formatNumber(finalMetrics?.totalQty || 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Delivered Free:</span>
-                <span>{formatNumber(finalMetrics?.totalFree || 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total Returned (Paid):</span>
-                <span>{formatNumber(finalMetrics?.returned || 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total Damaged (Paid):</span>
-                <span>{formatNumber(finalMetrics?.damaged || 0)}</span>
-              </div>
-              <div className="flex justify-between text-blue-600 font-black border-t border-slate-100 pt-1 mt-1">
-                <span>Final Sold (Paid):</span>
-                <span>{formatNumber(finalMetrics?.finalSold || 0)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-widest border-b border-black pb-1">Financial reconciliation</h3>
-            <div className="flex items-center gap-2 mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-              <span>Original Amount</span>
-              <span>→</span>
-              <span>Adjustments</span>
-              <span>→</span>
-              <span className="text-emerald-600">Final Collectable</span>
-            </div>
-            <div className="space-y-2 text-sm font-bold">
-              <div className="flex justify-between text-lg font-black border-2 border-black p-3 bg-slate-50">
-                <span>Original Order Amount:</span>
-                <span>{formatCurrency(currentFinalAmount)}</span>
-              </div>
-              <div className="flex justify-between text-rose-600 px-3">
-                <span>Adjustments (Customer Due/Baki):</span>
-                <span>-{formatCurrency(currentCustomerDue)}</span>
-              </div>
-              <div className="flex justify-between text-emerald-700 px-3 font-black border-t border-slate-100 pt-2">
-                <span>Final Cash Collectable:</span>
-                <span>{formatCurrency(currentCashCollectable)}</span>
-              </div>
-              <div className="flex justify-between bg-slate-900 text-white p-3 rounded-none mt-4 font-black">
-                <span>Actual Cash Settled:</span>
-                <span>{formatCurrency(isBatchSettled ? (batch.totalCollectedAmount || 0) : Number(actualCashReceived || currentCashCollectable))}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-10 mt-16 print:mt-8 signature-grid">
+        {/* Signatures */}
+        <div className="grid grid-cols-2 gap-10 mt-10 signature-grid">
           <div className="text-center">
             <div className="border-t-2 border-black pt-2 font-black uppercase tracking-widest text-sm">Delivery Man Signature</div>
             <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</p>
@@ -1420,6 +1383,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
         </div>
       </div>
+
+
       {batchToDelete && (
         <DeleteBatchConfirmModal
           isOpen={!!batchToDelete}

@@ -20,8 +20,8 @@ export class Order {
   orderDate: Date;
 
   @Index()
-  @Column()
-  companyId: number;
+  @Column({ type: 'int', nullable: true })
+  companyId?: number | null;
 
   @ManyToOne(() => Company)
   @JoinColumn({ name: 'companyId' })

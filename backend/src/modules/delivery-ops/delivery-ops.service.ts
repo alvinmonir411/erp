@@ -180,7 +180,11 @@ export class DeliveryOpsService {
       qb.andWhere('order.assignedDeliveryManId = :userId', { userId: user.id || user.sub });
     }
 
-    if (query.companyId) qb.andWhere('order.companyId = :companyId', { companyId: query.companyId });
+    if (query.companyId) {
+      qb.innerJoin('order.items', 'filterItems')
+        .innerJoin('filterItems.product', 'filterProduct')
+        .andWhere('filterProduct.companyId = :companyId', { companyId: query.companyId });
+    }
     if (query.routeId) qb.andWhere('order.routeId = :routeId', { routeId: query.routeId });
     if (query.deliveryPersonId) qb.andWhere('order.deliveryPersonId = :deliveryPersonId', { deliveryPersonId: query.deliveryPersonId });
     if (query.dispatchDate) qb.andWhere('order.orderDate = :dispatchDate', { dispatchDate: query.dispatchDate });
@@ -230,7 +234,11 @@ export class DeliveryOpsService {
       }
     }
 
-    if (query.companyId) qb.andWhere('batch.companyId = :companyId', { companyId: query.companyId });
+    if (query.companyId) {
+      qb.leftJoin('batch.items', 'batchItemFilter')
+        .leftJoin('batchItemFilter.product', 'batchProductFilter')
+        .andWhere('(batch.companyId = :companyId OR batchProductFilter.companyId = :companyId)', { companyId: query.companyId });
+    }
     if (query.routeId) qb.andWhere('batch.routeId = :routeId', { routeId: query.routeId });
     if (query.search) {
       qb.andWhere(
@@ -1113,7 +1121,7 @@ export class DeliveryOpsService {
       // Fetch with relations
       const fullBatch = await manager.findOne(DispatchBatch, {
         where: { id },
-        relations: ['orders', 'orders.order', 'orders.order.items', 'items'],
+        relations: ['orders', 'orders.order', 'orders.order.items', 'orders.order.items.product', 'items'],
       });
 
       if (!fullBatch) {
@@ -1146,7 +1154,7 @@ export class DeliveryOpsService {
           if (qtyToRestore > 0) {
             await this.stockService.create({
               productId: orderItem.productId,
-              companyId: order.companyId,
+              companyId: orderItem.product?.companyId || order.companyId || 0,
               type: StockMovementType.RETURN_IN,
               quantity: qtyToRestore,
               reference: `Delete Batch #${id}`,

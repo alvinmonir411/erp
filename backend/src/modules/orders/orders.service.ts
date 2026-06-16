@@ -76,10 +76,13 @@ export class OrdersService {
       // For STOCK_OUT, we use negative quantity
       const movementQty = type === StockMovementType.STOCK_OUT ? -qty : qty;
 
+      const product = await manager.findOne(Product, { where: { id: item.productId } });
+      const companyId = product ? product.companyId : order.companyId;
+
       await this.stockService.create(
         {
           productId: item.productId,
-          companyId: order.companyId,
+          companyId: companyId,
           type: type,
           quantity: movementQty,
           reference: `Order #${order.id}`,
@@ -311,6 +314,7 @@ export class OrdersService {
       // Fetch order items (fetching entire entity to prevent TypeORM select mapping bugs)
       const orderItems = await queryRunner.manager.find(OrderItem, {
         where: { orderId: numericId },
+        relations: ['product'],
       });
 
       const movementsToInsert: StockMovement[] = [];
@@ -358,7 +362,7 @@ export class OrdersService {
         movementsToInsert.push(
           queryRunner.manager.create(StockMovement, {
             productId: item.productId,
-            companyId: order.companyId,
+            companyId: item.product?.companyId || order.companyId || 0,
             type: StockMovementType.RETURN_IN,
             quantity: qtyToRevert,
             reference: `Order #${numericId}`,
@@ -426,11 +430,9 @@ export class OrdersService {
       throw new NotFoundException(`Shop #${shopId} not found`);
     }
 
-    if (shop.companyId !== order.companyId) {
-      throw new BadRequestException('Shop belongs to a different company than the order');
-    }
-
-    if (shop.routeId !== order.routeId) {
+    // Shop belongs to a route, not a company — no company check needed.
+    // Route check: only block if both are explicitly set and differ
+    if (shop.routeId && order.routeId && shop.routeId !== order.routeId) {
       throw new BadRequestException('Shop belongs to a different route than the order');
     }
 
@@ -523,7 +525,7 @@ export class OrdersService {
         if (totalReturned > 0) {
           await this.stockService.create({
             productId: orderItem.productId,
-            companyId: order.companyId,
+            companyId: orderItem.product?.companyId || order.companyId || 0,
             type: StockMovementType.RETURN_IN,
             quantity: totalReturned,
             reference: `Order #${id}`,
@@ -651,7 +653,8 @@ export class OrdersService {
       .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
       .leftJoinAndSelect('order.assignedDeliveryMan', 'assignedDeliveryMan')
       .leftJoinAndSelect('order.items', 'items')
-      .leftJoinAndSelect('items.product', 'product');
+      .leftJoinAndSelect('items.product', 'product')
+      .leftJoinAndSelect('product.company', 'productCompany');
 
     if (user && user.role === Role.SR) {
       qb.andWhere('order.createdById = :userId', { userId: user.id || user.sub });
@@ -667,7 +670,11 @@ export class OrdersService {
     }
 
     if (query.status) qb.andWhere('order.status = :status', { status: query.status });
-    if (query.companyId) qb.andWhere('order.companyId = :companyId', { companyId: query.companyId });
+    if (query.companyId) {
+      qb.innerJoin('order.items', 'filterItems')
+        .innerJoin('filterItems.product', 'filterProduct')
+        .andWhere('filterProduct.companyId = :companyId', { companyId: query.companyId });
+    }
     if (query.routeId) qb.andWhere('order.routeId = :routeId', { routeId: query.routeId });
     if (query.shopId) qb.andWhere('order.shopId = :shopId', { shopId: query.shopId });
 
@@ -741,7 +748,34 @@ export class OrdersService {
   }
 
   async getStats(user?: any) {
-    // Basic stats implementation (omitted for brevity, can be refined later)
-    return {};
+    const qb = this.ordersRepository.createQueryBuilder('order');
+    if (user && user.role === Role.SR) {
+      qb.andWhere('order.createdById = :userId', { userId: user.id || user.sub });
+    } else if (user && user.role === Role.DELIVERY_MAN) {
+      qb.andWhere('order.assignedDeliveryManId = :userId', { userId: user.id || user.sub });
+    }
+
+    const counts = await qb
+      .select('order.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('order.status')
+      .getRawMany();
+
+    const stats: Record<string, number> = {
+      total: 0,
+      CONFIRMED: 0,
+      ASSIGNED: 0,
+      OUT_FOR_DELIVERY: 0,
+      DELIVERED: 0,
+      SETTLED: 0,
+      CANCELLED: 0,
+    };
+
+    counts.forEach(c => {
+      stats[c.status] = Number(c.count || 0);
+      stats.total += Number(c.count || 0);
+    });
+
+    return stats;
   }
 }

@@ -60,6 +60,7 @@ export class SchemaSyncService implements OnApplicationBootstrap {
         ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "version" INTEGER DEFAULT 1;
         ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "companyId" INTEGER;
         ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "createdByRole" VARCHAR(50);
+        ALTER TABLE "shops" ALTER COLUMN "companyId" DROP NOT NULL;
       `);
     } catch (e) {
       if (!e.message.includes('does not exist')) {
@@ -87,6 +88,7 @@ export class SchemaSyncService implements OnApplicationBootstrap {
         ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "assignedDeliveryManId" UUID;
         ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "marketArea" VARCHAR(120);
         ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "version" INTEGER DEFAULT 1;
+        ALTER TABLE "orders" ALTER COLUMN "companyId" DROP NOT NULL;
       `);
 
       await this.dataSource.query(`

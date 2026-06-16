@@ -1,43 +1,58 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
+  isPolling: boolean;
 }
 
 const SocketContext = createContext<SocketContextType>({
   socket: null,
   isConnected: false,
+  isPolling: false,
 });
 
 export const useSocket = () => useContext(SocketContext);
 
+const POLLING_INTERVAL_MS = 15000;
+
 const getSocketUrl = () => {
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+    return process.env.NEXT_PUBLIC_SOCKET_URL;
+  }
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api';
   try {
     const url = new URL(apiUrl);
     if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
       return `${url.protocol}//${url.hostname}:5002`;
     }
-    return `${url.protocol}//${url.host}`;
+    // Vercel Serverless does not support persistent WebSockets.
+    return null;
   } catch (e) {
-    return 'http://localhost:5002';
+    return null;
   }
 };
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
   const queryClient = useQueryClient();
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleRefresh = useCallback((eventType: string, data?: any) => {
-    console.log(`[SocketProvider] Refreshing queries for event: ${eventType}`, data);
-    
-    // 1. Invalidate target query caches based on event domain to optimize database load
+  const refreshAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['sales'] });
+    queryClient.invalidateQueries({ queryKey: ['dues'] });
+    queryClient.invalidateQueries({ queryKey: ['delivery'] });
+    queryClient.invalidateQueries({ queryKey: ['stock'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  }, [queryClient]);
+
+  const handleSocketEvent = useCallback((eventType: string, data?: any) => {
     if (eventType.startsWith('order')) {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['dues'] });
@@ -47,7 +62,6 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['stock'] });
     }
 
-    // 2. Dispatch custom events for components using legacy/state-based fetching
     if (typeof window !== 'undefined') {
       if (eventType.startsWith('order')) {
         window.dispatchEvent(new CustomEvent('order-refresh', { detail: { eventType, data } }));
@@ -59,7 +73,29 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const socketUrl = getSocketUrl();
-    console.log('[SocketProvider] Connecting to socket at:', socketUrl);
+
+    if (!socketUrl) {
+      // Production (Vercel): Use silent HTTP polling instead of WebSocket
+      setIsPolling(true);
+
+      // Immediate first refresh on mount
+      refreshAll();
+
+      // Poll every 15 seconds
+      pollIntervalRef.current = setInterval(refreshAll, POLLING_INTERVAL_MS);
+
+      // Refresh when user switches back to this tab
+      const handleFocus = () => refreshAll();
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        window.removeEventListener('focus', handleFocus);
+        setIsPolling(false);
+      };
+    }
+
+    // Development / dedicated socket server: use WebSocket
     const socketInstance = io(socketUrl, {
       transports: ['websocket'],
       autoConnect: true,
@@ -67,25 +103,13 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       reconnectionDelay: 2000,
     });
 
-    socketInstance.on('connect', () => {
-      console.log('[SocketProvider] Connected to WebSocket server');
-      setIsConnected(true);
-    });
+    socketInstance.on('connect', () => setIsConnected(true));
+    socketInstance.on('disconnect', () => setIsConnected(false));
+    socketInstance.on('connect_error', () => setIsConnected(false));
 
-    socketInstance.on('disconnect', () => {
-      console.log('[SocketProvider] Disconnected from WebSocket server');
-      setIsConnected(false);
-    });
-
-    socketInstance.on('connect_error', (err) => {
-      console.error('[SocketProvider] Connection Error:', err.message);
-      setIsConnected(false);
-    });
-
-    // Domain event hooks
     const events = ['orderCreated', 'orderUpdated', 'orderDeleted', 'batchCreated', 'batchUpdated', 'batchDeleted'];
     events.forEach(event => {
-      socketInstance.on(event, (data) => handleRefresh(event, data));
+      socketInstance.on(event, (data) => handleSocketEvent(event, data));
     });
 
     setSocket(socketInstance);
@@ -94,10 +118,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       events.forEach(event => socketInstance.off(event));
       socketInstance.disconnect();
     };
-  }, [handleRefresh]);
+  }, [handleSocketEvent, refreshAll]);
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected }}>
+    <SocketContext.Provider value={{ socket, isConnected, isPolling }}>
       {children}
     </SocketContext.Provider>
   );

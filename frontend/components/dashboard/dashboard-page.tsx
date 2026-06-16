@@ -65,6 +65,56 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-8 pb-20">
+      {/* Today's Summary Section */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="h-5 w-5 text-rose-500" />
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">
+            {user?.role === Role.SR ? "Today's Activity" : "Today's Summary"}
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <StatCard
+            label="Today Orders"
+            value={formatNumber(orders.todayOrdersCount)}
+            description={`Value: ${formatCurrency(orders.todayOrderValue)}`}
+            icon={ShoppingCart}
+            colorTheme="cyan"
+          />
+          <StatCard
+            label="Today Dispatch"
+            value={formatNumber(delivery.todayDispatch)}
+            description={delivery.todayDispatchAmount > 0 ? `Value: ${formatCurrency(delivery.todayDispatchAmount)}` : undefined}
+            icon={Truck}
+            colorTheme="amber"
+          />
+          <StatCard
+            label="Today Dispatch Amount"
+            value={formatCurrency(delivery.todayDispatchAmount || 0)}
+            icon={DollarSign}
+            colorTheme="indigo"
+          />
+          <StatCard
+            label="Today Due"
+            value={formatCurrency(money.todayDue || 0)}
+            icon={AlertCircle}
+            colorTheme="rose"
+          />
+          <StatCard
+            label="Today Due Collection"
+            value={formatCurrency(money.todayDueCollection || 0)}
+            icon={CheckCircle}
+            colorTheme="emerald"
+          />
+          <StatCard
+            label="Total Due"
+            value={formatCurrency(money.totalDue)}
+            icon={Wallet}
+            colorTheme="violet"
+          />
+        </div>
+      </section>
+
       {/* Orders Section */}
       <section>
         <div className="flex items-center gap-2 mb-4">

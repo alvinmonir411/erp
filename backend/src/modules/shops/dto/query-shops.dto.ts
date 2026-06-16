@@ -15,6 +15,12 @@ export class QueryShopsDto {
   routeId?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  companyId?: number;
+
+  @IsOptional()
   @IsString()
   search?: string;
 
@@ -22,4 +28,17 @@ export class QueryShopsDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  limit?: number;
 }
+

@@ -301,8 +301,8 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   const grandTotal = subtotal - invoiceDiscountAmount;
 
   const handleSave = async () => {
-    if (!orderDate || !companyId || !routeId) {
-      setError('Please fill in all required fields (Date, Company, Route)');
+    if (!orderDate || !routeId) {
+      setError('Please fill in all required fields (Date, Route)');
       return;
     }
 
@@ -332,7 +332,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
       setIsSaving(true);
       const payload = {
         orderDate,
-        companyId: Number(companyId),
+        companyId: companyId ? Number(companyId) : undefined,
         routeId: Number(routeId),
         shopId: shopId ? Number(shopId) : undefined,
         deliveryPersonId: deliveryPersonId ? Number(deliveryPersonId) : undefined,
@@ -423,12 +423,12 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
 
                 {/* Company */}
                 <div className="relative space-y-1.5" ref={compRef}>
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Company</label>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Company (Optional)</label>
                   <div className="relative">
                     <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Search company..."
+                      placeholder="Search company (optional)..."
                       className="w-full h-[42px] rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-medium focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
                       value={compSearch}
                       onChange={e => {
@@ -603,9 +603,8 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                           <div className="relative product-row-container">
                             <input
                               type="text"
-                              placeholder={companyId ? "Type to search..." : "Select company first"}
-                              disabled={!companyId}
-                              className={`w-full h-10 rounded-lg border border-slate-200 px-3 text-sm font-medium focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${!companyId ? 'bg-slate-100 cursor-not-allowed opacity-50' : 'bg-white focus:border-blue-500'}`}
+                              placeholder="Type to search..."
+                              className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
                               value={line.productId ? line.productName : line.searchText || ''}
                               onChange={(e) => {
                                 updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
@@ -633,11 +632,6 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                                         onMouseDown={(e) => {
                                           e.preventDefault();
                                           if (isOutOfStock) return;
-                                          if (!companyId) {
-                                            setCompanyId(p.companyId);
-                                            const comp = companies.find(c => c.id === p.companyId);
-                                            if (comp) setCompSearch(comp.name);
-                                          }
                                           updateLine(idx, {
                                             productId: p.id,
                                             productName: p.name,
@@ -732,11 +726,10 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                        <input
+                         <input
                           type="text"
-                          placeholder={companyId ? "Search product..." : "Select company first"}
-                          disabled={!companyId}
-                          className={`w-full h-11 rounded-lg border border-slate-200 px-3 text-sm font-medium focus:ring-4 focus:ring-blue-500/10 outline-none transition-all ${!companyId ? 'bg-slate-50 cursor-not-allowed opacity-50' : 'bg-white focus:border-blue-500'}`}
+                          placeholder="Search product..."
+                          className="w-full h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
                           value={line.productId ? line.productName : line.searchText || ''}
                           onChange={(e) => {
                             updateLine(idx, { searchText: e.target.value, showResults: true, productId: 0 });
@@ -1113,14 +1106,14 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                 Cancel
               </button>
               <button 
-                disabled={isCreatingShop || !newShop.name || !newShop.phone || !companyId}
+                disabled={isCreatingShop || !newShop.name || !newShop.phone}
                 onClick={async () => {
                   try {
                     setIsCreatingShop(true);
                     const shop = await createShop({
                       ...newShop,
                       routeId: Number(routeId),
-                      companyId: Number(companyId),
+                      companyId: companyId ? Number(companyId) : undefined,
                     });
                     setShops(prev => [...prev, shop]);
                     setShopId(shop.id);

@@ -15,13 +15,14 @@ type FilterStatus = 'all' | 'active' | 'inactive';
 
 export function RoutesPage() {
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [shops, setShops] = useState<Shop[]>([]);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [deletingRoute, setDeletingRoute] = useState<Route | null>(null);
   const [form, setForm] = useState(initialForm);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [summary, setSummary] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -36,18 +37,29 @@ export function RoutesPage() {
   useToastNotification({ message: deleteError, title: 'Delete error', tone: 'error' });
   useToastNotification({ message: success, title: 'Done', tone: 'success' });
 
-  async function load() {
+  const fetchRoutes = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const [routeData, shopData] = await Promise.all([getRoutes(), getShops()]);
-      setRoutes(routeData);
-      setShops(shopData);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Failed to load.'); }
-    finally { setIsLoading(false); }
-  }
+      const data = await getRoutes({
+        page,
+        limit: PAGE_SIZE,
+        search: search.trim() || undefined,
+        isActive: filterStatus === 'active' ? true : filterStatus === 'inactive' ? false : undefined,
+      });
+      setRoutes(data.items || []);
+      setTotalItems(data.total || 0);
+      setSummary(data.summary || null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load routes.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    fetchRoutes();
+  }, [page, search, filterStatus]);
 
   useEffect(() => {
     setForm(editingRoute
@@ -55,24 +67,20 @@ export function RoutesPage() {
       : initialForm);
   }, [editingRoute]);
 
-  const shopCountForRoute = (id: number) => shops.filter((s) => s.routeId === id).length;
-  const activeShopsForRoute = (id: number) => shops.filter((s) => s.routeId === id && s.isActive).length;
+  const shopCountForRoute = (id: number) => {
+    const route = routes.find((r) => r.id === id);
+    return route ? Number((route as any).shopCount || 0) : 0;
+  };
+  const activeShopsForRoute = (id: number) => {
+    const route = routes.find((r) => r.id === id);
+    return route ? Number((route as any).activeShopCount || 0) : 0;
+  };
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return routes.filter((r) => {
-      if (q && !r.name.toLowerCase().includes(q) && !(r.area ?? '').toLowerCase().includes(q)) return false;
-      if (filterStatus === 'active' && !r.isActive) return false;
-      if (filterStatus === 'inactive' && r.isActive) return false;
-      return true;
-    });
-  }, [routes, search, filterStatus]);
-
-  const paginated = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
-  const activeCount = routes.filter((r) => r.isActive).length;
-  const totalShops = shops.length;
-  const activeShops = shops.filter((s) => s.isActive).length;
-  const uniqueAreas = [...new Set(routes.map((r) => r.area).filter(Boolean))].length;
+  const paginated = routes;
+  const activeCount = summary ? summary.activeRoutes : 0;
+  const totalShops = summary ? summary.totalShops : 0;
+  const activeShops = summary ? summary.activeShops : 0;
+  const uniqueAreas = summary ? summary.uniqueAreas : 0;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -90,7 +98,8 @@ export function RoutesPage() {
         setSuccess(`"${payload.name}" created.`);
         setForm(initialForm);
       }
-      await load();
+      setPage(1);
+      await fetchRoutes();
     } catch (err) { setFormError(err instanceof Error ? err.message : 'Failed to save.'); }
     finally { setIsSaving(false); }
   }
@@ -100,7 +109,7 @@ export function RoutesPage() {
     try {
       await updateRoute(route.id, { isActive: !route.isActive });
       setSuccess(`"${route.name}" ${!route.isActive ? 'activated' : 'deactivated'}.`);
-      await load();
+      await fetchRoutes();
     } catch (err) { setFormError(err instanceof Error ? err.message : 'Failed to update.'); }
     finally { setIsTogglingId(null); }
   }
@@ -114,7 +123,8 @@ export function RoutesPage() {
       setSuccess(`"${deletingRoute.name}" deleted.`);
       if (editingRoute?.id === deletingRoute.id) setEditingRoute(null);
       setDeletingRoute(null);
-      await load();
+      setPage(1);
+      await fetchRoutes();
     } catch (err) { setDeleteError(err instanceof Error ? err.message : 'Failed to delete.'); setDeletingRoute(null); }
     finally { setIsDeleting(false); }
   }
@@ -132,8 +142,8 @@ export function RoutesPage() {
                 <h3 className="text-base font-semibold text-slate-900">Delete Route</h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Delete <span className="font-semibold text-slate-800">{deletingRoute.name}</span>?
-                  {shopCountForRoute(deletingRoute.id) > 0
-                    ? <span className="mt-1 block font-semibold text-amber-700">⚠️ This route has {shopCountForRoute(deletingRoute.id)} shop(s) — deletion will be blocked.</span>
+                  {Number((deletingRoute as any).shopCount || 0) > 0
+                    ? <span className="mt-1 block font-semibold text-amber-700">⚠️ This route has {Number((deletingRoute as any).shopCount || 0)} shop(s) — deletion will be blocked.</span>
                     : ' This route has no shops and can be safely deleted.'}
                 </p>
               </div>
@@ -169,7 +179,7 @@ export function RoutesPage() {
             <div className="mt-5 grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Total Routes</p>
-                <p className="mt-2 text-2xl font-bold text-white">{routes.length}</p>
+                <p className="mt-2 text-2xl font-bold text-white">{summary?.totalRoutes || 0}</p>
                 <p className="mt-1 text-xs text-slate-500">{activeCount} active</p>
               </div>
               <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
@@ -184,7 +194,7 @@ export function RoutesPage() {
               </div>
               <div className="rounded-2xl border border-violet-500/20 bg-violet-500/10 p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-violet-400">Avg Shops</p>
-                <p className="mt-2 text-2xl font-bold text-white">{routes.length > 0 ? (totalShops / routes.length).toFixed(1) : '0'}</p>
+                <p className="mt-2 text-2xl font-bold text-white">{summary?.totalRoutes > 0 ? (totalShops / summary.totalRoutes).toFixed(1) : '0'}</p>
                 <p className="mt-1 text-xs text-slate-500">Per route</p>
               </div>
             </div>
@@ -201,7 +211,7 @@ export function RoutesPage() {
                   className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-cyan-300 focus:bg-white focus:ring-2 focus:ring-cyan-100" />
                 <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
                   {(['all', 'active', 'inactive'] as FilterStatus[]).map((s) => (
-                    <button key={s} type="button" onClick={() => setFilterStatus(s)}
+                    <button key={s} type="button" onClick={() => { setPage(1); setFilterStatus(s); }}
                       className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${filterStatus === s ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                       {s}
                     </button>
@@ -210,14 +220,14 @@ export function RoutesPage() {
               </div>
               {(search || filterStatus !== 'all') && (
                 <div className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">
-                  Showing {filtered.length} of {routes.length} routes
-                  <button type="button" onClick={() => { setSearch(''); setFilterStatus('all'); }} className="ml-3 font-semibold text-rose-600 hover:underline">Clear</button>
+                  Showing {totalItems} routes
+                  <button type="button" onClick={() => { setSearch(''); setFilterStatus('all'); setPage(1); }} className="ml-3 font-semibold text-rose-600 hover:underline">Clear</button>
                 </div>
               )}
             </div>
 
             {isLoading ? <LoadingBlock label="Loading routes..." /> : null}
-            {!isLoading && filtered.length === 0 ? <StateMessage title="No routes found" description="Adjust your search or add a new route." /> : null}
+            {!isLoading && totalItems === 0 ? <StateMessage title="No routes found" description="Adjust your search or add a new route." /> : null}
 
             <div className="space-y-3">
               {paginated.map((route) => {
@@ -282,7 +292,7 @@ export function RoutesPage() {
               })}
             </div>
 
-            <Pagination currentPage={page} totalItems={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            <Pagination currentPage={page} totalItems={totalItems} pageSize={PAGE_SIZE} onPageChange={setPage} />
           </div>
 
           {/* ── Right: Form ── */}

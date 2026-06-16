@@ -148,11 +148,14 @@ export class StockService implements OnModuleInit {
     startDate?: string;
     endDate?: string;
     search?: string;
+    page?: number;
+    limit?: number;
   }) {
     const qb = this.movementRepository.createQueryBuilder('m')
       .leftJoinAndSelect('m.product', 'product')
       .leftJoinAndSelect('m.company', 'company')
-      .orderBy('m.createdAt', 'DESC');
+      .orderBy('m.createdAt', 'DESC')
+      .addOrderBy('m.id', 'DESC');
 
     if (query.companyId) qb.andWhere('m.companyId = :companyId', { companyId: query.companyId });
     if (query.productId) qb.andWhere('m.productId = :productId', { productId: query.productId });
@@ -169,28 +172,25 @@ export class StockService implements OnModuleInit {
       qb.andWhere('(product.name ILIKE :s OR product.sku ILIKE :s)', { s: `%${query.search}%` });
     }
 
-    return qb.getMany();
+    if (query.page === undefined && query.limit === undefined) {
+      return qb.getMany();
+    } else {
+      const page = Number(query.page || 1);
+      const limit = Number(query.limit || 15);
+      const skip = (page - 1) * limit;
+
+      const [items, total] = await qb.skip(skip).take(limit).getManyAndCount();
+      return {
+        items,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
   }
 
-  async getSummary(companyId?: number, search?: string) {
-    const qb = this.productRepository.createQueryBuilder('p')
-      .leftJoinAndSelect('p.company', 'company');
-      
-    if (companyId) {
-      qb.andWhere('p.companyId = :companyId', { companyId });
-    }
-    
-    if (search) {
-      qb.andWhere('(p.name ILIKE :s OR p.sku ILIKE :s)', { s: `%${search}%` });
-    }
-    
-    const products = await qb.getMany();
-
-    // Check for negative stocks and provide a "fix" flag if requested
-    // (In this system, reading from p.currentStock is now standard)
-
-    // Check for negative stocks and provide a "fix" flag if requested
-    // (In this system, recalculating is already the way it works, 
+  async getSummary(companyId?: number, search?: string, page?: number, limit?: number) {
     const { startUtc: todayStartUTC, endUtc: todayEndUTC } = getBDDayRange();
     
     // Helper for safe numeric conversion
@@ -238,12 +238,29 @@ export class StockService implements OnModuleInit {
 
     const totalDeliveryAmountAllTime = allSettledBatches.reduce((total, batch) => total + safeNum(batch.finalSoldValue), 0);
 
+    // Calculate metrics using efficient DB query
+    const totalCountQuery = this.productRepository.createQueryBuilder('p');
+    if (companyId) {
+      totalCountQuery.andWhere('p.companyId = :companyId', { companyId });
+    }
+    if (search) {
+      totalCountQuery.andWhere('(p.name ILIKE :s OR p.sku ILIKE :s)', { s: `%${search}%` });
+    }
+    
+    const totalsMetrics = await totalCountQuery
+      .select('COUNT(p.id)', 'totalProducts')
+      .addSelect('SUM(p.currentStock)', 'totalStockQty')
+      .addSelect('SUM(p.currentStock * p.buyPrice)', 'totalStockValue')
+      .addSelect('SUM(CASE WHEN p.currentStock > 0 AND p.currentStock <= 10 THEN 1 ELSE 0 END)', 'lowStockCount')
+      .addSelect('SUM(CASE WHEN p.currentStock <= 0 THEN 1 ELSE 0 END)', 'outOfStockCount')
+      .getRawOne();
+
     const summary = {
-      totalProducts: products.length,
-      totalStockQty: products.reduce((sum, p) => sum + Number(p.currentStock || 0), 0),
-      totalStockValue: products.reduce((sum, p) => sum + (Number(p.currentStock || 0) * p.buyPrice), 0),
-      lowStockCount: products.filter(p => Number(p.currentStock || 0) > 0 && Number(p.currentStock || 0) <= 10).length,
-      outOfStockCount: products.filter(p => Number(p.currentStock || 0) <= 0).length,
+      totalProducts: safeNum(totalsMetrics.totalProducts),
+      totalStockQty: safeNum(totalsMetrics.totalStockQty),
+      totalStockValue: safeNum(totalsMetrics.totalStockValue),
+      lowStockCount: safeNum(totalsMetrics.lowStockCount),
+      outOfStockCount: safeNum(totalsMetrics.outOfStockCount),
       todaySoldQty,
       todayReturnQty,
       todayDeliveryAmount,
@@ -252,12 +269,45 @@ export class StockService implements OnModuleInit {
       totalDeliveryAmountAllTime,
     };
 
-    const currentStockList = products.map(p => ({
-      ...p,
-      stockValue: Number(p.currentStock || 0) * p.buyPrice,
-    }));
+    // Query for listing products in currentStockList
+    const qb = this.productRepository.createQueryBuilder('p')
+      .leftJoinAndSelect('p.company', 'company')
+      .orderBy('p.name', 'ASC');
+      
+    if (companyId) {
+      qb.andWhere('p.companyId = :companyId', { companyId });
+    }
+    
+    if (search) {
+      qb.andWhere('(p.name ILIKE :s OR p.sku ILIKE :s)', { s: `%${search}%` });
+    }
 
-    return { summary, currentStockList };
+    if (page === undefined && limit === undefined) {
+      const products = await qb.getMany();
+      const currentStockList = products.map(p => ({
+        ...p,
+        stockValue: Number(p.currentStock || 0) * p.buyPrice,
+      }));
+      return { summary, currentStockList };
+    } else {
+      const pageNum = Number(page || 1);
+      const limitNum = Number(limit || 15);
+      const skip = (pageNum - 1) * limitNum;
+
+      const [products, total] = await qb.skip(skip).take(limitNum).getManyAndCount();
+      const currentStockList = {
+        items: products.map(p => ({
+          ...p,
+          stockValue: Number(p.currentStock || 0) * p.buyPrice,
+        })),
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      };
+      return { summary, currentStockList };
+    }
+  }
   }
 
   async backfillStock() {

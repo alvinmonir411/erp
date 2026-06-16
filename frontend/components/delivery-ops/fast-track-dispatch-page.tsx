@@ -215,49 +215,35 @@ export function FastTrackDispatchPage() {
     try {
       setIsSaving(true);
       
-      // 1. Group lines by company
-      const companyGroups = new Map<number, OrderLine[]>();
-      lines.forEach(l => {
-        const group = companyGroups.get(l.companyId) || [];
-        group.push(l);
-        companyGroups.set(l.companyId, group);
-      });
+      // 1. Create exactly one order for all items
+      const orderPayload: any = {
+        orderDate,
+        routeId: Number(routeId),
+        shopId: shopId ? Number(shopId) : undefined,
+        marketArea: marketArea || undefined,
+        discountType: 'FIXED',
+        discountValue: 0,
+        note: note.trim() || undefined,
+        items: lines.map(l => ({
+          productId: l.productId,
+          quantity: Number(l.quantity),
+          freeQuantity: Number(l.freeQuantity),
+          unitPrice: Number(l.unitPrice),
+          discountType: l.discountType,
+          discountValue: Number(l.discountValue),
+        }))
+      };
+      const order = await createOrder(orderPayload);
 
-      // 2. Create orders for each company
-      const createdOrderIds: number[] = [];
-      for (const [companyId, groupLines] of Array.from(companyGroups.entries())) {
-        const orderPayload: any = {
-          orderDate,
-          companyId,
-          routeId: Number(routeId),
-          shopId: shopId ? Number(shopId) : undefined,
-          marketArea: marketArea || undefined,
-          discountType: 'FIXED',
-          discountValue: 0,
-          note: note.trim() || undefined,
-          items: groupLines.map(l => ({
-            productId: l.productId,
-            quantity: Number(l.quantity),
-            freeQuantity: Number(l.freeQuantity),
-            unitPrice: Number(l.unitPrice),
-            discountType: l.discountType,
-            discountValue: Number(l.discountValue),
-          }))
-        };
-        const order = await createOrder(orderPayload);
-        createdOrderIds.push(order.id);
-      }
-
-      // 3. Create dispatch batch for all these orders
-      // Note: If multiple companies, we pass undefined for companyId in batch
+      // 2. Create dispatch batch for this single order
       const batchPayload = {
         dispatchDate: orderDate,
-        companyId: companyGroups.size === 1 ? Array.from(companyGroups.keys())[0] : undefined,
+        companyId: undefined,
         routeId: Number(routeId),
         assignedDeliveryManId,
         marketArea: marketArea || undefined,
         note: note || undefined,
-        orderIds: createdOrderIds,
+        orderIds: [order.id],
       };
 
       const batch = await createDispatchBatch(batchPayload);

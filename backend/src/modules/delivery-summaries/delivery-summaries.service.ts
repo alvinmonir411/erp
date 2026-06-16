@@ -24,7 +24,8 @@ export class DeliverySummariesService {
     const qb = this.summaryRepository.createQueryBuilder('s')
       .leftJoinAndSelect('s.company', 'company')
       .leftJoinAndSelect('s.route', 'route')
-      .orderBy('s.deliveryDate', 'DESC');
+      .orderBy('s.deliveryDate', 'DESC')
+      .addOrderBy('s.createdAt', 'DESC');
 
     if (query.startDate && query.endDate) {
       qb.andWhere('s.deliveryDate BETWEEN :start AND :end', {
@@ -41,8 +42,17 @@ export class DeliverySummariesService {
       qb.andWhere('s.routeId = :routeId', { routeId: query.routeId });
     }
 
-    const [items, totalItems] = await qb.getManyAndCount();
-    return { items, totalItems };
+    const total = await qb.getCount();
+
+    if (query.page !== undefined || query.limit !== undefined) {
+      const page = Number(query.page || 1);
+      const limit = Number(query.limit || 15);
+      const skip = (page - 1) * limit;
+      qb.skip(skip).take(limit);
+    }
+
+    const items = await qb.getMany();
+    return { items, totalItems: total };
   }
 
   async findOne(id: number) {
@@ -94,6 +104,7 @@ export class DeliverySummariesService {
 
       for (const order of orders) {
         for (const item of order.items) {
+          if (item.product?.companyId !== companyId) continue;
           const existing = productMap.get(item.productId) || { ordered: 0, price: item.unitPrice };
           productMap.set(item.productId, {
             ordered: existing.ordered + Number(item.quantity) + Number(item.freeQuantity || 0),
@@ -220,12 +231,15 @@ export class DeliverySummariesService {
     const companyMap = new Map<number, { name: string, items: Map<number, { name: string, qty: number, price: number }> }>();
 
     for (const order of orders) {
-      if (!companyMap.has(order.companyId)) {
-        companyMap.set(order.companyId, { name: order.company.name, items: new Map() });
-      }
-
-      const co = companyMap.get(order.companyId)!
       for (const item of order.items) {
+        const prodCompanyId = Number(item.product?.companyId || order.companyId || 0);
+        const prodCompanyName = item.product?.company?.name || order.company?.name || 'Unknown';
+
+        if (!companyMap.has(prodCompanyId)) {
+          companyMap.set(prodCompanyId, { name: prodCompanyName, items: new Map() });
+        }
+
+        const co = companyMap.get(prodCompanyId)!;
         if (!co.items.has(item.productId)) {
           co.items.set(item.productId, { name: item.product.name, qty: 0, price: item.unitPrice });
         }

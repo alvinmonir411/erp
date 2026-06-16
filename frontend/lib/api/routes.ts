@@ -1,8 +1,8 @@
 import { apiRequest } from './client';
 import type { CreateRoutePayload, Route, UpdateRoutePayload } from '@/types/api';
 
-export function getRoutes(search?: string) {
-  return apiRequest<Route[]>('routes', { query: { search } });
+export function getRoutes(query?: { page?: number; limit?: number; search?: string; isActive?: boolean }) {
+  return apiRequest<any>('routes', { query });
 }
 
 export function createRoute(payload: CreateRoutePayload) {
