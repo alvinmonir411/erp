@@ -28,18 +28,21 @@ export class ReportsController {
     @Query('productId') productId?: string,
     @Query('orderStatus') orderStatus?: string,
   ) {
-    return this.reportsService.getFreeQuantityReport({
-      dateMode: dateMode || 'Today',
-      date,
-      fromDate,
-      toDate,
-      companyId: companyId ? Number(companyId) : undefined,
-      routeId: routeId ? Number(routeId) : undefined,
-      shopId: shopId ? Number(shopId) : undefined,
-      deliveryManId: deliveryManId ? Number(deliveryManId) : undefined,
-      productId: productId ? Number(productId) : undefined,
-      orderStatus,
-    }, user);
+    return this.reportsService.getFreeQuantityReport(
+      {
+        dateMode: dateMode || 'Today',
+        date,
+        fromDate,
+        toDate,
+        companyId: companyId ? Number(companyId) : undefined,
+        routeId: routeId ? Number(routeId) : undefined,
+        shopId: shopId ? Number(shopId) : undefined,
+        deliveryManId: deliveryManId ? Number(deliveryManId) : undefined,
+        productId: productId ? Number(productId) : undefined,
+        orderStatus,
+      },
+      user,
+    );
   }
 
   @Get('damage')
@@ -55,16 +58,19 @@ export class ReportsController {
     @Query('deliveryManId') deliveryManId?: string,
     @Query('productId') productId?: string,
   ) {
-    return this.reportsService.getDamageReport({
-      dateMode: dateMode || 'Today',
-      date,
-      fromDate,
-      toDate,
-      companyId: companyId ? Number(companyId) : undefined,
-      routeId: routeId ? Number(routeId) : undefined,
-      shopId: shopId ? Number(shopId) : undefined,
-      deliveryManId: deliveryManId ? Number(deliveryManId) : undefined,
-      productId: productId ? Number(productId) : undefined,
-    }, user);
+    return this.reportsService.getDamageReport(
+      {
+        dateMode: dateMode || 'Today',
+        date,
+        fromDate,
+        toDate,
+        companyId: companyId ? Number(companyId) : undefined,
+        routeId: routeId ? Number(routeId) : undefined,
+        shopId: shopId ? Number(shopId) : undefined,
+        deliveryManId: deliveryManId ? Number(deliveryManId) : undefined,
+        productId: productId ? Number(productId) : undefined,
+      },
+      user,
+    );
   }
 }

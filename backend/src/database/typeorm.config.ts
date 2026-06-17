@@ -11,7 +11,6 @@ types.setTypeParser(1114, (stringValue) => {
   return new Date(stringValue.replace(' ', 'T') + 'Z');
 });
 
-
 const createTypeOrmOptions = (
   configService: ConfigService,
 ): TypeOrmModuleOptions => {

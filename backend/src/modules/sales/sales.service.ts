@@ -179,7 +179,9 @@ export class SalesService {
           .filter((routeId) => Number.isInteger(routeId));
 
     if (allowedRouteIds.length > 0 && !allowedRouteIds.includes(shop.routeId)) {
-      throw new ForbiddenException('You do not have access to this shop route.');
+      throw new ForbiddenException(
+        'You do not have access to this shop route.',
+      );
     }
   }
 }

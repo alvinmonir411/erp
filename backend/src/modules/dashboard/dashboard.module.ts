@@ -11,7 +11,14 @@ import { ProductsModule } from '../products/products.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderItem, Product, StockMovement, Due, DueCollection]),
+    TypeOrmModule.forFeature([
+      Order,
+      OrderItem,
+      Product,
+      StockMovement,
+      Due,
+      DueCollection,
+    ]),
     ProductsModule,
   ],
   controllers: [DashboardController],

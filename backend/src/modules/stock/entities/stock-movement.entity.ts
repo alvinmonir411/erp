@@ -1,8 +1,15 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { Product } from '../../products/entities/product.entity';
 import { Company } from '../../companies/entities/company.entity';
 import { StockMovementType } from '../stock.constants';
-
 
 @Entity('stock_movements')
 export class StockMovement {

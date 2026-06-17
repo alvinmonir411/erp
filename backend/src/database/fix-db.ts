@@ -16,22 +16,26 @@ async function run() {
   }
 
   console.log('Connecting to database to fix enum issues...');
-  
+
   const client = new Client({
     connectionString,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: false },
   });
 
   try {
     await client.connect();
-    
+
     console.log('Dropping stock_movements table...');
     await client.query('DROP TABLE IF EXISTS "stock_movements" CASCADE');
-    
+
     console.log('Dropping stock_movements_type_enum...');
-    await client.query('DROP TYPE IF EXISTS "stock_movements_type_enum" CASCADE');
-    
-    console.log('Database cleanup successful. You can now start the server with npm run start:dev');
+    await client.query(
+      'DROP TYPE IF EXISTS "stock_movements_type_enum" CASCADE',
+    );
+
+    console.log(
+      'Database cleanup successful. You can now start the server with npm run start:dev',
+    );
   } catch (err) {
     console.error('Error during cleanup:', err);
   } finally {

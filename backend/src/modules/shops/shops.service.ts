@@ -32,7 +32,7 @@ export class ShopsService {
       phone: createShopDto.phone ?? null,
       address: createShopDto.address ?? null,
       isActive: createShopDto.isActive ?? true,
-      createdById: user ? (user.id || user.sub) : null,
+      createdById: user ? user.id || user.sub : null,
     });
 
     return this.shopsRepository.save(shop);
@@ -75,8 +75,8 @@ export class ShopsService {
       .getMany();
 
     const totalMatching = allMatchingShops.length;
-    const activeMatching = allMatchingShops.filter(s => s.isActive).length;
-    const allMatchingIds = allMatchingShops.map(s => s.id);
+    const activeMatching = allMatchingShops.filter((s) => s.isActive).length;
+    const allMatchingIds = allMatchingShops.map((s) => s.id);
 
     let globalTotalDue = 0;
     if (allMatchingIds.length > 0) {
@@ -89,7 +89,11 @@ export class ShopsService {
       if (user) {
         if (user.role === 'SR') {
           globalDueQuery += ` AND "srId" = '${user.id || user.sub}'`;
-        } else if (user.role === 'MANAGER' && user.allowedRouteIds && user.allowedRouteIds.length > 0) {
+        } else if (
+          user.role === 'MANAGER' &&
+          user.allowedRouteIds &&
+          user.allowedRouteIds.length > 0
+        ) {
           globalDueQuery += ` AND "routeId" IN (${user.allowedRouteIds.join(',')})`;
         }
       }
@@ -100,7 +104,7 @@ export class ShopsService {
 
     // 2. Fetch actual page items
     let shops: Shop[];
-    let total = totalMatching;
+    const total = totalMatching;
     const page = Number(query.page || 1);
     const limit = Number(query.limit || 12);
 
@@ -112,10 +116,10 @@ export class ShopsService {
     }
 
     // 3. Compute dues for the returned shops only
-    let duesSummary: Record<number, number> = {};
+    const duesSummary: Record<number, number> = {};
     if (shops.length > 0) {
-      const shopIds = shops.map(s => s.id);
-      
+      const shopIds = shops.map((s) => s.id);
+
       let dueQuery = `SELECT "shopId", SUM("remainingDue") as "totalDue" 
          FROM dues 
          WHERE "shopId" IN (${shopIds.join(',')}) 
@@ -125,7 +129,11 @@ export class ShopsService {
       if (user) {
         if (user.role === 'SR') {
           dueQuery += ` AND "srId" = '${user.id || user.sub}'`;
-        } else if (user.role === 'MANAGER' && user.allowedRouteIds && user.allowedRouteIds.length > 0) {
+        } else if (
+          user.role === 'MANAGER' &&
+          user.allowedRouteIds &&
+          user.allowedRouteIds.length > 0
+        ) {
           dueQuery += ` AND "routeId" IN (${user.allowedRouteIds.join(',')})`;
         }
       }
@@ -138,7 +146,7 @@ export class ShopsService {
       });
     }
 
-    const items = shops.map(shop => ({
+    const items = shops.map((shop) => ({
       ...shop,
       totalOrders: 0,
       totalDue: duesSummary[shop.id] || 0,

@@ -1,9 +1,24 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn, VersionColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+  VersionColumn,
+  Index,
+} from 'typeorm';
 import { Company } from '../../companies/entities/company.entity';
 import { Route } from '../../routes/entities/route.entity';
 import { Shop } from '../../shops/entities/shop.entity';
 import { Product } from '../../products/entities/product.entity';
-import { DiscountType, OrderStatus, ColumnNumericTransformer } from '../orders.constants';
+import {
+  DiscountType,
+  OrderStatus,
+  ColumnNumericTransformer,
+} from '../orders.constants';
 import { DeliveryPerson } from '../../delivery-ops/entities/delivery-person.entity';
 import { User } from '../../users/entities/user.entity';
 
@@ -62,31 +77,79 @@ export class Order {
   @JoinColumn({ name: 'shopId' })
   shop?: Shop;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   subtotal: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   discountAmount: number;
 
   @Column({ type: 'enum', enum: DiscountType, default: DiscountType.FIXED })
   discountType: DiscountType;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   discountValue: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   grandTotal: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   advancePaid: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   actualSoldAmount: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   collectedAmount: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   dueAmount: number;
 
   @Column({ type: 'timestamp', nullable: true })
@@ -156,42 +219,111 @@ export class OrderItem {
   @JoinColumn({ name: 'productId' })
   product: Product;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   quantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   freeQuantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   unitPrice: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   discountAmount: number;
 
   @Column({ type: 'enum', enum: DiscountType, default: DiscountType.FIXED })
   discountType: DiscountType;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   discountValue: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    transformer: new ColumnNumericTransformer(),
+  })
   lineTotal: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   deliveredPaidQuantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   deliveredFreeQuantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   returnedPaidQuantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   returnedFreeQuantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   damagedPaidQuantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   damagedFreeQuantity: number;
 }

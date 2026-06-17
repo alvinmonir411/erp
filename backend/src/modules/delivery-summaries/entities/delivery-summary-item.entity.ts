@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { DeliverySummary } from './delivery-summary.entity';
 import { Product } from '../../products/entities/product.entity';
 import { ColumnNumericTransformer } from '../../orders/orders.constants';
@@ -11,7 +17,9 @@ export class DeliverySummaryItem {
   @Column({ nullable: true })
   summaryId: number;
 
-  @ManyToOne(() => DeliverySummary, (summary) => summary.items, { onDelete: 'CASCADE' })
+  @ManyToOne(() => DeliverySummary, (summary) => summary.items, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'summaryId' })
   summary: DeliverySummary;
 
@@ -22,18 +30,48 @@ export class DeliverySummaryItem {
   @JoinColumn({ name: 'productId' })
   product: Product;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   orderedQuantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   returnedQuantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   soldQuantity: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   unitPrice: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   lineTotal: number;
 }

@@ -41,4 +41,3 @@ export class QueryShopsDto {
   @IsPositive()
   limit?: number;
 }
-

@@ -45,13 +45,33 @@ async function bootstrap() {
     // 2. Create Companies
     const companies = new Map<string, Company>();
     const companySeeds = [
-      { key: 'keya', name: 'Keya Cosmetics', code: 'KYC', address: 'Gazipur', phone: '01711111111' },
-      { key: 'pran', name: 'Pran RFL', code: 'PRAN', address: 'Dhaka', phone: '01711111112' },
-      { key: 'unilever', name: 'Unilever Bangladesh', code: 'ULB', address: 'Chittagong', phone: '01711111113' },
+      {
+        key: 'keya',
+        name: 'Keya Cosmetics',
+        code: 'KYC',
+        address: 'Gazipur',
+        phone: '01711111111',
+      },
+      {
+        key: 'pran',
+        name: 'Pran RFL',
+        code: 'PRAN',
+        address: 'Dhaka',
+        phone: '01711111112',
+      },
+      {
+        key: 'unilever',
+        name: 'Unilever Bangladesh',
+        code: 'ULB',
+        address: 'Chittagong',
+        phone: '01711111113',
+      },
     ];
 
     for (const seed of companySeeds) {
-      let company = await companiesRepository.findOne({ where: { code: seed.code } });
+      let company = await companiesRepository.findOne({
+        where: { code: seed.code },
+      });
       if (!company) {
         company = await companiesService.create(seed);
       }
@@ -68,9 +88,14 @@ async function bootstrap() {
     ];
 
     for (const seed of routeSeeds) {
-      let route = await routesRepository.findOne({ where: { name: seed.name } });
+      let route = await routesRepository.findOne({
+        where: { name: seed.name },
+      });
       if (!route) {
-        route = await routesService.create({ name: seed.name, area: seed.area });
+        route = await routesService.create({
+          name: seed.name,
+          area: seed.area,
+        });
       }
       routes.set(seed.key, route);
     }
@@ -78,13 +103,33 @@ async function bootstrap() {
 
     // 4. Create Shops
     const shopSeeds = [
-      { name: 'Rahman Store', routeKey: 'mirpur', ownerName: 'Md. Rahman', phone: '01810000001', address: 'Mirpur 10' },
-      { name: 'Noor Traders', routeKey: 'mirpur', ownerName: 'Nur Alam', phone: '01810000002', address: 'Mirpur 11' },
-      { name: 'Maa General Store', routeKey: 'uttara', ownerName: 'Shila Akter', phone: '01810000003', address: 'Uttara Sector 3' },
+      {
+        name: 'Rahman Store',
+        routeKey: 'mirpur',
+        ownerName: 'Md. Rahman',
+        phone: '01810000001',
+        address: 'Mirpur 10',
+      },
+      {
+        name: 'Noor Traders',
+        routeKey: 'mirpur',
+        ownerName: 'Nur Alam',
+        phone: '01810000002',
+        address: 'Mirpur 11',
+      },
+      {
+        name: 'Maa General Store',
+        routeKey: 'uttara',
+        ownerName: 'Shila Akter',
+        phone: '01810000003',
+        address: 'Uttara Sector 3',
+      },
     ];
 
     for (const seed of shopSeeds) {
-      let shop = await shopsRepository.findOne({ where: { name: seed.name } });
+      const shop = await shopsRepository.findOne({
+        where: { name: seed.name },
+      });
       if (!shop) {
         const route = routes.get(seed.routeKey);
         const company = companies.get('keya'); // Assign to a default company
@@ -104,14 +149,44 @@ async function bootstrap() {
 
     // 5. Create Products
     const productSeeds = [
-      { companyKey: 'keya', name: 'Keya Soap', sku: 'KYC-001', unit: ProductUnit.PCS, buyPrice: 45, salePrice: 55 },
-      { companyKey: 'keya', name: 'Keya Toothpaste', sku: 'KYC-002', unit: ProductUnit.PCS, buyPrice: 75, salePrice: 90 },
-      { companyKey: 'pran', name: 'Pran Frooto', sku: 'PRAN-001', unit: ProductUnit.PACK, buyPrice: 15, salePrice: 20 },
-      { companyKey: 'unilever', name: 'Lux Soap', sku: 'ULB-001', unit: ProductUnit.PCS, buyPrice: 50, salePrice: 60 },
+      {
+        companyKey: 'keya',
+        name: 'Keya Soap',
+        sku: 'KYC-001',
+        unit: ProductUnit.PCS,
+        buyPrice: 45,
+        salePrice: 55,
+      },
+      {
+        companyKey: 'keya',
+        name: 'Keya Toothpaste',
+        sku: 'KYC-002',
+        unit: ProductUnit.PCS,
+        buyPrice: 75,
+        salePrice: 90,
+      },
+      {
+        companyKey: 'pran',
+        name: 'Pran Frooto',
+        sku: 'PRAN-001',
+        unit: ProductUnit.PACK,
+        buyPrice: 15,
+        salePrice: 20,
+      },
+      {
+        companyKey: 'unilever',
+        name: 'Lux Soap',
+        sku: 'ULB-001',
+        unit: ProductUnit.PCS,
+        buyPrice: 50,
+        salePrice: 60,
+      },
     ];
 
     for (const seed of productSeeds) {
-      let product = await productsRepository.findOne({ where: { sku: seed.sku } });
+      const product = await productsRepository.findOne({
+        where: { sku: seed.sku },
+      });
       if (!product) {
         const company = companies.get(seed.companyKey);
         if (company) {
@@ -134,7 +209,8 @@ async function bootstrap() {
 }
 
 void bootstrap().catch((error: unknown) => {
-  const message = error instanceof Error ? error.stack ?? error.message : error;
+  const message =
+    error instanceof Error ? (error.stack ?? error.message) : error;
   Logger.error(message, undefined, 'DatabaseSeed');
   process.exit(1);
 });

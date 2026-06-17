@@ -7,9 +7,7 @@ import { DueCollection } from './entities/due-collection.entity';
 import { Order, OrderItem } from '../orders/entities/order.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Due, DueCollection, Order, OrderItem]),
-  ],
+  imports: [TypeOrmModule.forFeature([Due, DueCollection, Order, OrderItem])],
   controllers: [DuesController],
   providers: [DuesService],
   exports: [DuesService],

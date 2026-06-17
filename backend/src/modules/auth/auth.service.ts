@@ -11,14 +11,18 @@ export class AuthService {
 
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
   ) {}
 
   async validateUser(validateUserDto: ValidateUserDto): Promise<any> {
     try {
-      const user = await this.usersService.findByIdentifier(validateUserDto.identifier);
+      const user = await this.usersService.findByIdentifier(
+        validateUserDto.identifier,
+      );
       if (!user) {
-        this.logger.warn(`Login failed: User not found for identifier: ${validateUserDto.identifier}`);
+        this.logger.warn(
+          `Login failed: User not found for identifier: ${validateUserDto.identifier}`,
+        );
         return null;
       }
 
@@ -27,14 +31,19 @@ export class AuthService {
         return null;
       }
 
-      const isMatch = await bcrypt.compare(validateUserDto.password, user.passwordHash);
+      const isMatch = await bcrypt.compare(
+        validateUserDto.password,
+        user.passwordHash,
+      );
       if (isMatch) {
         const { passwordHash, ...result } = user;
         // Explicitly add isActive since it's a getter and won't be serialized automatically
         return { ...result, isActive: user.isActive };
       }
 
-      this.logger.warn(`Login failed: Invalid password for user: ${user.username}`);
+      this.logger.warn(
+        `Login failed: Invalid password for user: ${user.username}`,
+      );
       return null;
     } catch (error) {
       this.logger.error('Error during user validation:', error);
@@ -43,7 +52,12 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const payload = { email: user.email, username: user.username, sub: user.id, role: user.role };
+    const payload = {
+      email: user.email,
+      username: user.username,
+      sub: user.id,
+      role: user.role,
+    };
     return {
       access_token: this.jwtService.sign(payload),
       user,

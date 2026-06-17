@@ -18,7 +18,7 @@ export class ProductsService {
     private readonly productsRepository: Repository<Product>,
     @InjectRepository(Company)
     private readonly companiesRepository: Repository<Company>,
-  ) { }
+  ) {}
 
   async create(createProductDto: CreateProductDto) {
     await this.ensureCompanyExists(createProductDto.companyId);
@@ -62,7 +62,9 @@ export class ProductsService {
     if (query.stockLevel === 'out') {
       queryBuilder.andWhere('product.currentStock <= 0');
     } else if (query.stockLevel === 'low') {
-      queryBuilder.andWhere('product.currentStock > 0 AND product.currentStock <= 10');
+      queryBuilder.andWhere(
+        'product.currentStock > 0 AND product.currentStock <= 10',
+      );
     } else if (query.stockLevel === 'normal') {
       queryBuilder.andWhere('product.currentStock > 10');
     }
@@ -74,7 +76,7 @@ export class ProductsService {
 
     try {
       const total = await queryBuilder.getCount();
-      
+
       // If no pagination requested, return simple array for backward compatibility
       if (!query.page && !query.limit) {
         return queryBuilder.getMany() as any;
@@ -84,10 +86,7 @@ export class ProductsService {
       const limit = query.limit || 100;
       const skip = (page - 1) * limit;
 
-      const items = await queryBuilder
-        .skip(skip)
-        .take(limit)
-        .getMany();
+      const items = await queryBuilder.skip(skip).take(limit).getMany();
 
       return {
         items,
@@ -113,11 +112,26 @@ export class ProductsService {
 
     const metrics = await baseQuery
       .select('COUNT(*)', 'totalProducts')
-      .addSelect('SUM(CASE WHEN p."isActive" = true THEN 1 ELSE 0 END)', 'activeProducts')
-      .addSelect('SUM(CASE WHEN p."isActive" = false THEN 1 ELSE 0 END)', 'inactiveProducts')
-      .addSelect(`SUM(CASE WHEN p."isActive" = true AND p."currentStock" > 0 AND p."currentStock" <= ${LOW_STOCK_THRESHOLD} THEN 1 ELSE 0 END)`, 'lowStockProducts')
-      .addSelect('SUM(CASE WHEN p."isActive" = true AND p."currentStock" <= 0 THEN 1 ELSE 0 END)', 'outOfStockProducts')
-      .addSelect(`SUM(CASE WHEN p."isActive" = true AND p."currentStock" > ${LOW_STOCK_THRESHOLD} THEN 1 ELSE 0 END)`, 'inStockProducts')
+      .addSelect(
+        'SUM(CASE WHEN p."isActive" = true THEN 1 ELSE 0 END)',
+        'activeProducts',
+      )
+      .addSelect(
+        'SUM(CASE WHEN p."isActive" = false THEN 1 ELSE 0 END)',
+        'inactiveProducts',
+      )
+      .addSelect(
+        `SUM(CASE WHEN p."isActive" = true AND p."currentStock" > 0 AND p."currentStock" <= ${LOW_STOCK_THRESHOLD} THEN 1 ELSE 0 END)`,
+        'lowStockProducts',
+      )
+      .addSelect(
+        'SUM(CASE WHEN p."isActive" = true AND p."currentStock" <= 0 THEN 1 ELSE 0 END)',
+        'outOfStockProducts',
+      )
+      .addSelect(
+        `SUM(CASE WHEN p."isActive" = true AND p."currentStock" > ${LOW_STOCK_THRESHOLD} THEN 1 ELSE 0 END)`,
+        'inStockProducts',
+      )
       .addSelect('SUM(p."currentStock")', 'totalStockQuantity')
       .addSelect('SUM(p."currentStock" * p."buyPrice")', 'totalStockValue')
       .getRawOne();
@@ -125,16 +139,32 @@ export class ProductsService {
     // 2. Company-wise Summary (Only if global summary)
     let companyWiseProducts = [];
     if (!companyId) {
-      companyWiseProducts = await this.productsRepository.createQueryBuilder('p')
+      companyWiseProducts = await this.productsRepository
+        .createQueryBuilder('p')
         .leftJoin('p.company', 'c')
         .select('c.id', 'companyId')
         .addSelect('c.name', 'companyName')
         .addSelect('COUNT(*)', 'totalProducts')
-        .addSelect('SUM(CASE WHEN p."isActive" = true THEN 1 ELSE 0 END)', 'activeProducts')
-        .addSelect('SUM(CASE WHEN p."isActive" = false THEN 1 ELSE 0 END)', 'inactiveProducts')
-        .addSelect(`SUM(CASE WHEN p."isActive" = true AND p."currentStock" > 0 AND p."currentStock" <= ${LOW_STOCK_THRESHOLD} THEN 1 ELSE 0 END)`, 'lowStockProducts')
-        .addSelect('SUM(CASE WHEN p."isActive" = true AND p."currentStock" <= 0 THEN 1 ELSE 0 END)', 'outOfStockProducts')
-        .addSelect(`SUM(CASE WHEN p."isActive" = true AND p."currentStock" > ${LOW_STOCK_THRESHOLD} THEN 1 ELSE 0 END)`, 'inStockProducts')
+        .addSelect(
+          'SUM(CASE WHEN p."isActive" = true THEN 1 ELSE 0 END)',
+          'activeProducts',
+        )
+        .addSelect(
+          'SUM(CASE WHEN p."isActive" = false THEN 1 ELSE 0 END)',
+          'inactiveProducts',
+        )
+        .addSelect(
+          `SUM(CASE WHEN p."isActive" = true AND p."currentStock" > 0 AND p."currentStock" <= ${LOW_STOCK_THRESHOLD} THEN 1 ELSE 0 END)`,
+          'lowStockProducts',
+        )
+        .addSelect(
+          'SUM(CASE WHEN p."isActive" = true AND p."currentStock" <= 0 THEN 1 ELSE 0 END)',
+          'outOfStockProducts',
+        )
+        .addSelect(
+          `SUM(CASE WHEN p."isActive" = true AND p."currentStock" > ${LOW_STOCK_THRESHOLD} THEN 1 ELSE 0 END)`,
+          'inStockProducts',
+        )
         .addSelect('SUM(p."currentStock")', 'totalStockQuantity')
         .addSelect('SUM(p."currentStock" * p."buyPrice")', 'totalStockValue')
         .groupBy('c.id')
@@ -153,7 +183,7 @@ export class ProductsService {
       inStockProducts: safeNum(metrics.inStockProducts),
       totalStockQuantity: safeNum(metrics.totalStockQuantity),
       totalStockValue: safeNum(metrics.totalStockValue),
-      companyWiseProducts: companyWiseProducts.map(c => ({
+      companyWiseProducts: companyWiseProducts.map((c) => ({
         ...c,
         totalProducts: safeNum(c.totalProducts),
         activeProducts: safeNum(c.activeProducts),
@@ -163,7 +193,7 @@ export class ProductsService {
         inStockProducts: safeNum(c.inStockProducts),
         totalStockQuantity: safeNum(c.totalStockQuantity),
         totalStockValue: safeNum(c.totalStockValue),
-      }))
+      })),
     };
   }
 
@@ -203,9 +233,12 @@ export class ProductsService {
       await this.productsRepository.remove(product);
       return { success: true };
     } catch (error: any) {
-      if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
+      if (
+        error.code === '23503' ||
+        error.message?.includes('foreign key constraint')
+      ) {
         throw new ConflictException(
-          'Cannot delete this product because it has been used in sales orders or stock history. Please Edit the product and mark it as Inactive instead.'
+          'Cannot delete this product because it has been used in sales orders or stock history. Please Edit the product and mark it as Inactive instead.',
         );
       }
       throw error;

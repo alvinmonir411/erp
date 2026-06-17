@@ -36,8 +36,11 @@ export class RoutesService {
     const queryBuilder = this.routesRepository
       .createQueryBuilder('route')
       .loadRelationCountAndMap('route.shopCount', 'route.shops')
-      .loadRelationCountAndMap('route.activeShopCount', 'route.shops', 'shop', (qb) =>
-        qb.where('shop.isActive = :isActive', { isActive: true }),
+      .loadRelationCountAndMap(
+        'route.activeShopCount',
+        'route.shops',
+        'shop',
+        (qb) => qb.where('shop.isActive = :isActive', { isActive: true }),
       )
       .orderBy('route.name', 'ASC');
 
@@ -64,14 +67,23 @@ export class RoutesService {
       queryBuilder.skip(skip).take(limit);
 
       const [items, total] = await queryBuilder.getManyAndCount();
-      const [totalRoutes, activeRoutes, totalShops, activeShops, uniqueAreasResult] = await Promise.all([
+      const [
+        totalRoutes,
+        activeRoutes,
+        totalShops,
+        activeShops,
+        uniqueAreasResult,
+      ] = await Promise.all([
         this.routesRepository.count(),
         this.routesRepository.count({ where: { isActive: true } }),
         this.shopsRepository.count(),
         this.shopsRepository.count({ where: { isActive: true } }),
-        this.routesRepository.createQueryBuilder('route')
+        this.routesRepository
+          .createQueryBuilder('route')
           .select('COUNT(DISTINCT(route.area))', 'count')
-          .where('route.area IS NOT NULL AND route.area != :empty', { empty: '' })
+          .where('route.area IS NOT NULL AND route.area != :empty', {
+            empty: '',
+          })
           .getRawOne(),
       ]);
 
@@ -133,7 +145,9 @@ export class RoutesService {
 
   async remove(id: number) {
     const route = await this.findRouteEntity(id);
-    const shopCount = await this.shopsRepository.count({ where: { routeId: id } });
+    const shopCount = await this.shopsRepository.count({
+      where: { routeId: id },
+    });
     if (shopCount > 0) {
       throw new Error(
         `Route cannot be deleted because it has ${shopCount} shop(s) assigned to it.`,

@@ -1,4 +1,11 @@
-import { Controller, Post, Body, UnauthorizedException, Get, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UnauthorizedException,
+  Get,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ValidateUserDto } from './dto/validate-user.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -10,8 +17,8 @@ import { UsersService } from '../users/users.service';
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly usersService: UsersService
-  ) { }
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post('login')
   async login(@Body() validateUserDto: ValidateUserDto) {

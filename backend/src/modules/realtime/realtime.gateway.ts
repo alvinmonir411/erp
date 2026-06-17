@@ -16,7 +16,9 @@ const isVercel = process.env.VERCEL === '1';
   },
 })
 @Injectable()
-export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(RealtimeGateway.name);
 
   @WebSocketServer()

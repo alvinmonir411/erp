@@ -1,12 +1,12 @@
-
 import { Client } from 'pg';
 
-const url = 'postgresql://neondb_owner:npg_9ByhcsjYMR7H@ep-square-paper-an5uie01-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+const url =
+  'postgresql://neondb_owner:npg_9ByhcsjYMR7H@ep-square-paper-an5uie01-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
 
 async function verify() {
   const client = new Client({ connectionString: url });
   await client.connect();
-  
+
   console.log('--- DATABASE VERIFICATION START ---');
 
   // 1. Check for dues with null routeId/shopId/srId
@@ -22,7 +22,9 @@ async function verify() {
     LEFT JOIN dues d ON o.id = d."orderId"
     WHERE o."dueAmount" > 0 AND d.id IS NULL AND o.status = 'SETTLED'
   `);
-  console.log(`Settled orders with dueAmount > 0 but NO Due record: ${missingDues.rows[0].count}`);
+  console.log(
+    `Settled orders with dueAmount > 0 but NO Due record: ${missingDues.rows[0].count}`,
+  );
 
   // 3. Check for duplicate dues
   const duplicates = await client.query(`
@@ -35,14 +37,18 @@ async function verify() {
   const invalidCollections = await client.query(`
     SELECT count(*) FROM due_collections WHERE "collectedAmount" <= 0
   `);
-  console.log(`Collections with zero/negative amount: ${invalidCollections.rows[0].count}`);
+  console.log(
+    `Collections with zero/negative amount: ${invalidCollections.rows[0].count}`,
+  );
 
   // 5. Check if remainingDue matches math
   // (Note: This is complex if there are pending collections, but we check if remainingDue < 0)
   const negativeRemaining = await client.query(`
     SELECT count(*) FROM dues WHERE "remainingDue" < 0
   `);
-  console.log(`Dues with negative remaining amount: ${negativeRemaining.rows[0].count}`);
+  console.log(
+    `Dues with negative remaining amount: ${negativeRemaining.rows[0].count}`,
+  );
 
   console.log('--- DATABASE VERIFICATION COMPLETED ---');
   await client.end();

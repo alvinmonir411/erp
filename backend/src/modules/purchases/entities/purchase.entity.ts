@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Company } from '../../companies/entities/company.entity';
 import { Product } from '../../products/entities/product.entity';
 import { numericColumnTransformer } from '../../../common/database/numeric.transformer';
@@ -86,7 +95,9 @@ export class PurchaseItem {
   @Column()
   purchaseId: number;
 
-  @ManyToOne(() => Purchase, (purchase) => purchase.items, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Purchase, (purchase) => purchase.items, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'purchaseId' })
   purchase: Purchase;
 

@@ -1,4 +1,11 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { DispatchBatch } from './dispatch-batch.entity';
 import { Order } from '../../orders/entities/order.entity';
 import { ColumnNumericTransformer } from '../../orders/orders.constants';
@@ -13,7 +20,9 @@ export class DispatchBatchOrder {
   @Column()
   batchId: number;
 
-  @ManyToOne(() => DispatchBatch, (batch) => batch.orders, { onDelete: 'CASCADE' })
+  @ManyToOne(() => DispatchBatch, (batch) => batch.orders, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'batchId' })
   batch: DispatchBatch;
 
@@ -81,7 +90,10 @@ export class DispatchBatchOrder {
   @Column({ type: 'timestamp', nullable: true })
   deliveryCompletedAt?: Date;
 
-  @OneToMany(() => DeliveryReturn, (deliveryReturn) => deliveryReturn.batchOrder)
+  @OneToMany(
+    () => DeliveryReturn,
+    (deliveryReturn) => deliveryReturn.batchOrder,
+  )
   returns: DeliveryReturn[];
 
   @OneToMany(() => CashCollection, (collection) => collection.batchOrder)

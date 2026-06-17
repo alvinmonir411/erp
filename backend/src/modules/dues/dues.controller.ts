@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Patch, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Patch,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { DuesService } from './dues.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -9,7 +18,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('dues')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DuesController {
-  constructor(private readonly duesService: DuesService) { }
+  constructor(private readonly duesService: DuesService) {}
 
   @Get()
   findAll(@CurrentUser() user: any) {
@@ -48,7 +57,11 @@ export class DuesController {
   @Post('upsert')
   @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
   upsert(@Body() data: { orderId: number; amount: number; note?: string }) {
-    return this.duesService.upsertByOrderId(data.orderId, data.amount, data.note);
+    return this.duesService.upsertByOrderId(
+      data.orderId,
+      data.amount,
+      data.note,
+    );
   }
 
   @Patch('approve/:id')
@@ -59,7 +72,11 @@ export class DuesController {
 
   @Patch('reject/:id')
   @Roles(Role.SUPER_ADMIN)
-  reject(@Param('id') id: string, @Body() data: { reason: string }, @CurrentUser() user: any) {
+  reject(
+    @Param('id') id: string,
+    @Body() data: { reason: string },
+    @CurrentUser() user: any,
+  ) {
     return this.duesService.rejectCollection(+id, data, user);
   }
 
@@ -71,7 +88,10 @@ export class DuesController {
 
   @Get('shop/:shopId')
   @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
-  getShopDues(@Param('shopId', ParseIntPipe) shopId: number, @CurrentUser() user: any) {
+  getShopDues(
+    @Param('shopId', ParseIntPipe) shopId: number,
+    @CurrentUser() user: any,
+  ) {
     return this.duesService.findShopDues(shopId, user);
   }
 }

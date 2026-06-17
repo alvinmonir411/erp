@@ -20,7 +20,8 @@ export class ReportsService {
   ) {}
 
   async getFreeQuantityReport(filters: any, user?: any) {
-    const qb = this.orderItemsRepository.createQueryBuilder('item')
+    const qb = this.orderItemsRepository
+      .createQueryBuilder('item')
       .leftJoinAndSelect('item.product', 'product')
       .leftJoinAndSelect('product.company', 'productCompany')
       .leftJoinAndSelect('item.order', 'order')
@@ -31,24 +32,35 @@ export class ReportsService {
       .where('item.freeQuantity > 0');
 
     if (user && user.role === Role.SR) {
-      qb.andWhere('order.createdById = :userId', { userId: user.id || user.sub });
+      qb.andWhere('order.createdById = :userId', {
+        userId: user.id || user.sub,
+      });
     }
 
     // Apply Filters
     if (filters.dateMode === 'Today') {
       const { startUtc, endUtc } = getBDDayRange();
-      qb.andWhere('order.orderDate BETWEEN :start AND :end', { start: startUtc, end: endUtc });
+      qb.andWhere('order.orderDate BETWEEN :start AND :end', {
+        start: startUtc,
+        end: endUtc,
+      });
     } else if (filters.dateMode === 'Selected Date' && filters.date) {
       qb.andWhere('order.orderDate = :date', { date: filters.date });
-    } else if (filters.dateMode === 'Date Range' && filters.fromDate && filters.toDate) {
-      qb.andWhere('order.orderDate BETWEEN :fromDate AND :toDate', { 
-        fromDate: filters.fromDate, 
-        toDate: filters.toDate 
+    } else if (
+      filters.dateMode === 'Date Range' &&
+      filters.fromDate &&
+      filters.toDate
+    ) {
+      qb.andWhere('order.orderDate BETWEEN :fromDate AND :toDate', {
+        fromDate: filters.fromDate,
+        toDate: filters.toDate,
       });
     }
 
     if (filters.companyId) {
-      qb.andWhere('product.companyId = :companyId', { companyId: filters.companyId });
+      qb.andWhere('product.companyId = :companyId', {
+        companyId: filters.companyId,
+      });
     }
     if (filters.routeId) {
       qb.andWhere('order.routeId = :routeId', { routeId: filters.routeId });
@@ -57,24 +69,41 @@ export class ReportsService {
       qb.andWhere('order.shopId = :shopId', { shopId: filters.shopId });
     }
     if (filters.deliveryManId) {
-      qb.andWhere('order.deliveryPersonId = :deliveryManId', { deliveryManId: filters.deliveryManId });
+      qb.andWhere('order.deliveryPersonId = :deliveryManId', {
+        deliveryManId: filters.deliveryManId,
+      });
     }
     if (filters.productId) {
-      qb.andWhere('item.productId = :productId', { productId: filters.productId });
+      qb.andWhere('item.productId = :productId', {
+        productId: filters.productId,
+      });
     }
     if (filters.orderStatus) {
-      qb.andWhere('order.status = :orderStatus', { orderStatus: filters.orderStatus });
+      qb.andWhere('order.status = :orderStatus', {
+        orderStatus: filters.orderStatus,
+      });
     }
 
     const items = await qb.getMany();
 
     // Summary Calculations
-    const safeNum = (val: any) => isNaN(Number(val)) ? 0 : Number(val);
-    const totalFreeQty = items.reduce((sum, i) => sum + safeNum(i.freeQuantity), 0);
-    const todayFreeQty = items.filter(i => i.order && isTodayBDDate(i.order.orderDate)).reduce((sum, i) => sum + safeNum(i.freeQuantity), 0);
-    const totalFreeValue = items.reduce((sum, i) => sum + (safeNum(i.freeQuantity) * safeNum(i.product?.salePrice)), 0);
-    const totalOrders = new Set(items.map(i => i.orderId).filter(Boolean)).size;
-    const totalShops = new Set(items.map(i => i.order?.shopId).filter(Boolean)).size;
+    const safeNum = (val: any) => (isNaN(Number(val)) ? 0 : Number(val));
+    const totalFreeQty = items.reduce(
+      (sum, i) => sum + safeNum(i.freeQuantity),
+      0,
+    );
+    const todayFreeQty = items
+      .filter((i) => i.order && isTodayBDDate(i.order.orderDate))
+      .reduce((sum, i) => sum + safeNum(i.freeQuantity), 0);
+    const totalFreeValue = items.reduce(
+      (sum, i) => sum + safeNum(i.freeQuantity) * safeNum(i.product?.salePrice),
+      0,
+    );
+    const totalOrders = new Set(items.map((i) => i.orderId).filter(Boolean))
+      .size;
+    const totalShops = new Set(
+      items.map((i) => i.order?.shopId).filter(Boolean),
+    ).size;
 
     // Grouping Helpers
     const groupBy = (arr: any[], keyGetter: (item: any) => any) => {
@@ -91,20 +120,48 @@ export class ReportsService {
       return map;
     };
 
-    const mapToSummary = (map: Map<any, any[]>, labelGetter: (items: any[]) => string) => {
-      return Array.from(map.entries()).map(([key, groupItems]) => ({
-        id: key,
-        label: labelGetter(groupItems),
-        totalQty: groupItems.reduce((sum, i) => sum + safeNum(i.freeQuantity), 0),
-        totalValue: groupItems.reduce((sum, i) => sum + (safeNum(i.freeQuantity) * safeNum(i.product?.salePrice || 0)), 0),
-      })).sort((a, b) => b.totalQty - a.totalQty);
+    const mapToSummary = (
+      map: Map<any, any[]>,
+      labelGetter: (items: any[]) => string,
+    ) => {
+      return Array.from(map.entries())
+        .map(([key, groupItems]) => ({
+          id: key,
+          label: labelGetter(groupItems),
+          totalQty: groupItems.reduce(
+            (sum, i) => sum + safeNum(i.freeQuantity),
+            0,
+          ),
+          totalValue: groupItems.reduce(
+            (sum, i) =>
+              sum +
+              safeNum(i.freeQuantity) * safeNum(i.product?.salePrice || 0),
+            0,
+          ),
+        }))
+        .sort((a, b) => b.totalQty - a.totalQty);
     };
 
-    const companySummary = mapToSummary(groupBy(items, i => i.product?.companyId), items => items[0]?.product?.company?.name || 'Unknown');
-    const routeSummary = mapToSummary(groupBy(items, i => i.order?.routeId), items => items[0]?.order?.route?.name || 'Unknown');
-    const productSummary = mapToSummary(groupBy(items, i => i.productId), items => items[0]?.product?.name || 'Unknown');
-    const shopSummary = mapToSummary(groupBy(items, i => i.order?.shopId), items => items[0]?.order?.shop?.name || 'Direct Order');
-    const deliveryManSummary = mapToSummary(groupBy(items, i => i.order?.deliveryPersonId), items => items[0]?.order?.deliveryPerson?.name || 'Unassigned');
+    const companySummary = mapToSummary(
+      groupBy(items, (i) => i.product?.companyId),
+      (items) => items[0]?.product?.company?.name || 'Unknown',
+    );
+    const routeSummary = mapToSummary(
+      groupBy(items, (i) => i.order?.routeId),
+      (items) => items[0]?.order?.route?.name || 'Unknown',
+    );
+    const productSummary = mapToSummary(
+      groupBy(items, (i) => i.productId),
+      (items) => items[0]?.product?.name || 'Unknown',
+    );
+    const shopSummary = mapToSummary(
+      groupBy(items, (i) => i.order?.shopId),
+      (items) => items[0]?.order?.shop?.name || 'Direct Order',
+    );
+    const deliveryManSummary = mapToSummary(
+      groupBy(items, (i) => i.order?.deliveryPersonId),
+      (items) => items[0]?.order?.deliveryPerson?.name || 'Unassigned',
+    );
 
     return {
       summary: {
@@ -117,11 +174,12 @@ export class ReportsService {
         topRoute: routeSummary[0]?.label || 'N/A',
         topCompany: companySummary[0]?.label || 'N/A',
       },
-      detailRows: items.map(i => ({
+      detailRows: items.map((i) => ({
         id: i.id,
         date: i.order?.orderDate,
         orderId: i.orderId,
-        company: i.product?.company?.name || i.order?.company?.name || 'Unknown',
+        company:
+          i.product?.company?.name || i.order?.company?.name || 'Unknown',
         route: i.order?.route?.name,
         shop: i.order?.shop?.name || 'Direct Order',
         deliveryMan: i.order?.deliveryPerson?.name || 'Unassigned',
@@ -142,7 +200,8 @@ export class ReportsService {
   }
 
   async getDamageReport(filters: any, user?: any) {
-    const qb = this.damageRecordRepository.createQueryBuilder('damage')
+    const qb = this.damageRecordRepository
+      .createQueryBuilder('damage')
       .leftJoinAndSelect('damage.product', 'product')
       .leftJoinAndSelect('product.company', 'productCompany')
       .leftJoinAndSelect('damage.order', 'order')
@@ -153,24 +212,35 @@ export class ReportsService {
       .leftJoinAndSelect('damage.batch', 'batch');
 
     if (user && user.role === Role.SR) {
-      qb.andWhere('order.createdById = :userId', { userId: user.id || user.sub });
+      qb.andWhere('order.createdById = :userId', {
+        userId: user.id || user.sub,
+      });
     }
 
     // Apply Filters
     if (filters.dateMode === 'Today') {
       const { startUtc, endUtc } = getBDDayRange();
-      qb.andWhere('damage.createdAt BETWEEN :start AND :end', { start: startUtc, end: endUtc });
+      qb.andWhere('damage.createdAt BETWEEN :start AND :end', {
+        start: startUtc,
+        end: endUtc,
+      });
     } else if (filters.dateMode === 'Selected Date' && filters.date) {
       qb.andWhere('DATE(damage.createdAt) = :date', { date: filters.date });
-    } else if (filters.dateMode === 'Date Range' && filters.fromDate && filters.toDate) {
-      qb.andWhere('DATE(damage.createdAt) BETWEEN :fromDate AND :toDate', { 
-        fromDate: filters.fromDate, 
-        toDate: filters.toDate 
+    } else if (
+      filters.dateMode === 'Date Range' &&
+      filters.fromDate &&
+      filters.toDate
+    ) {
+      qb.andWhere('DATE(damage.createdAt) BETWEEN :fromDate AND :toDate', {
+        fromDate: filters.fromDate,
+        toDate: filters.toDate,
       });
     }
 
     if (filters.companyId) {
-      qb.andWhere('product.companyId = :companyId', { companyId: filters.companyId });
+      qb.andWhere('product.companyId = :companyId', {
+        companyId: filters.companyId,
+      });
     }
     if (filters.routeId) {
       qb.andWhere('order.routeId = :routeId', { routeId: filters.routeId });
@@ -179,21 +249,36 @@ export class ReportsService {
       qb.andWhere('order.shopId = :shopId', { shopId: filters.shopId });
     }
     if (filters.deliveryManId) {
-      qb.andWhere('order.deliveryPersonId = :deliveryManId', { deliveryManId: filters.deliveryManId });
+      qb.andWhere('order.deliveryPersonId = :deliveryManId', {
+        deliveryManId: filters.deliveryManId,
+      });
     }
     if (filters.productId) {
-      qb.andWhere('damage.productId = :productId', { productId: filters.productId });
+      qb.andWhere('damage.productId = :productId', {
+        productId: filters.productId,
+      });
     }
 
     const items = await qb.getMany();
 
     // Summary Calculations
-    const safeNum = (val: any) => isNaN(Number(val)) ? 0 : Number(val);
-    const totalDamagedQty = items.reduce((sum, i) => sum + safeNum(i.quantity), 0);
-    const todayDamagedQty = items.filter(i => isTodayBDDate(i.createdAt)).reduce((sum, i) => sum + safeNum(i.quantity), 0);
-    const totalDamageValue = items.reduce((sum, i) => sum + (safeNum(i.quantity) * safeNum(i.product?.salePrice)), 0);
-    const totalOrders = new Set(items.map(i => i.orderId).filter(Boolean)).size;
-    const totalShops = new Set(items.map(i => i.order?.shopId).filter(Boolean)).size;
+    const safeNum = (val: any) => (isNaN(Number(val)) ? 0 : Number(val));
+    const totalDamagedQty = items.reduce(
+      (sum, i) => sum + safeNum(i.quantity),
+      0,
+    );
+    const todayDamagedQty = items
+      .filter((i) => isTodayBDDate(i.createdAt))
+      .reduce((sum, i) => sum + safeNum(i.quantity), 0);
+    const totalDamageValue = items.reduce(
+      (sum, i) => sum + safeNum(i.quantity) * safeNum(i.product?.salePrice),
+      0,
+    );
+    const totalOrders = new Set(items.map((i) => i.orderId).filter(Boolean))
+      .size;
+    const totalShops = new Set(
+      items.map((i) => i.order?.shopId).filter(Boolean),
+    ).size;
 
     // Grouping Helpers
     const groupBy = (arr: any[], keyGetter: (item: any) => any) => {
@@ -210,20 +295,44 @@ export class ReportsService {
       return map;
     };
 
-    const mapToSummary = (map: Map<any, any[]>, labelGetter: (items: any[]) => string) => {
-      return Array.from(map.entries()).map(([key, groupItems]) => ({
-        id: key,
-        label: labelGetter(groupItems),
-        totalQty: groupItems.reduce((sum, i) => sum + safeNum(i.quantity), 0),
-        totalValue: groupItems.reduce((sum, i) => sum + (safeNum(i.quantity) * safeNum(i.product?.salePrice)), 0),
-      })).sort((a, b) => b.totalQty - a.totalQty);
+    const mapToSummary = (
+      map: Map<any, any[]>,
+      labelGetter: (items: any[]) => string,
+    ) => {
+      return Array.from(map.entries())
+        .map(([key, groupItems]) => ({
+          id: key,
+          label: labelGetter(groupItems),
+          totalQty: groupItems.reduce((sum, i) => sum + safeNum(i.quantity), 0),
+          totalValue: groupItems.reduce(
+            (sum, i) =>
+              sum + safeNum(i.quantity) * safeNum(i.product?.salePrice),
+            0,
+          ),
+        }))
+        .sort((a, b) => b.totalQty - a.totalQty);
     };
 
-    const companySummary = mapToSummary(groupBy(items, i => i.product?.companyId), items => items[0]?.product?.company?.name || 'Unknown');
-    const routeSummary = mapToSummary(groupBy(items, i => i.order?.routeId), items => items[0]?.order?.route?.name || 'Unknown');
-    const productSummary = mapToSummary(groupBy(items, i => i.productId), items => items[0]?.product?.name || 'Unknown');
-    const shopSummary = mapToSummary(groupBy(items, i => i.order?.shopId), items => items[0]?.order?.shop?.name || 'Direct Order');
-    const deliveryManSummary = mapToSummary(groupBy(items, i => i.order?.deliveryPersonId), items => items[0]?.order?.deliveryPerson?.name || 'Unassigned');
+    const companySummary = mapToSummary(
+      groupBy(items, (i) => i.product?.companyId),
+      (items) => items[0]?.product?.company?.name || 'Unknown',
+    );
+    const routeSummary = mapToSummary(
+      groupBy(items, (i) => i.order?.routeId),
+      (items) => items[0]?.order?.route?.name || 'Unknown',
+    );
+    const productSummary = mapToSummary(
+      groupBy(items, (i) => i.productId),
+      (items) => items[0]?.product?.name || 'Unknown',
+    );
+    const shopSummary = mapToSummary(
+      groupBy(items, (i) => i.order?.shopId),
+      (items) => items[0]?.order?.shop?.name || 'Direct Order',
+    );
+    const deliveryManSummary = mapToSummary(
+      groupBy(items, (i) => i.order?.deliveryPersonId),
+      (items) => items[0]?.order?.deliveryPerson?.name || 'Unassigned',
+    );
 
     return {
       summary: {
@@ -236,11 +345,12 @@ export class ReportsService {
         topRoute: routeSummary[0]?.label || 'N/A',
         topCompany: companySummary[0]?.label || 'N/A',
       },
-      detailRows: items.map(i => ({
+      detailRows: items.map((i) => ({
         id: i.id,
         date: i.createdAt,
         orderId: i.orderId,
-        company: i.product?.company?.name || i.order?.company?.name || 'Unknown',
+        company:
+          i.product?.company?.name || i.order?.company?.name || 'Unknown',
         route: i.order?.route?.name,
         shop: i.order?.shop?.name || 'Direct Order',
         deliveryMan: i.order?.deliveryPerson?.name || 'Unassigned',

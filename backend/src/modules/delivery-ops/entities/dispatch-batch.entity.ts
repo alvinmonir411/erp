@@ -17,7 +17,6 @@ import { DispatchBatchItem } from './dispatch-batch-item.entity';
 import { ColumnNumericTransformer } from '../../orders/orders.constants';
 import { User } from '../../users/entities/user.entity';
 
-
 export enum DispatchBatchStatus {
   DRAFT = 'DRAFT',
   PRINTED = 'PRINTED',

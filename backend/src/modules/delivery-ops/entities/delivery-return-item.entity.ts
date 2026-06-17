@@ -1,4 +1,10 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { DeliveryReturn } from './delivery-return.entity';
 import { Product } from '../../products/entities/product.entity';
 import { ColumnNumericTransformer } from '../../orders/orders.constants';

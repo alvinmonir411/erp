@@ -1,12 +1,12 @@
-
 import { Client } from 'pg';
 
-const url = 'postgresql://neondb_owner:npg_9ByhcsjYMR7H@ep-square-paper-an5uie01-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+const url =
+  'postgresql://neondb_owner:npg_9ByhcsjYMR7H@ep-square-paper-an5uie01-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
 
 async function backfill() {
   const client = new Client({ connectionString: url });
   await client.connect();
-  
+
   console.log('--- FINANCE BACKFILL START ---');
 
   // 1. Fill missing routeId, shopId, srId in dues from orders

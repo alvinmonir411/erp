@@ -12,18 +12,20 @@ export function getBDDayRange(date: Date = new Date()) {
     timeZone: 'Asia/Dhaka',
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit'
+    day: '2-digit',
   }).format(date);
 
   // 2. Create the start and end of that day in Asia/Dhaka
-  // Note: We use the YYYY-MM-DD + time + " Asia/Dhaka" parsing if supported, 
+  // Note: We use the YYYY-MM-DD + time + " Asia/Dhaka" parsing if supported,
   // or calculate UTC manually by knowing BD is always UTC+6.
   const [year, month, day] = bdDateStr.split('-').map(Number);
-  
+
   // Start of day in BD (00:00:00) is UTC-6
-  const startUtc = new Date(Date.UTC(year, month - 1, day, 0, 0, 0) - (6 * 60 * 60 * 1000));
+  const startUtc = new Date(
+    Date.UTC(year, month - 1, day, 0, 0, 0) - 6 * 60 * 60 * 1000,
+  );
   const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
-  
+
   return { startUtc, endUtc };
 }
 
@@ -45,7 +47,7 @@ export function getBDTodayString(): string {
     timeZone: 'Asia/Dhaka',
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit'
+    day: '2-digit',
   }).format(new Date());
 }
 
@@ -54,15 +56,15 @@ export function getBDTodayString(): string {
  */
 export function isTodayBDDate(date: Date | string | undefined): boolean {
   if (!date) return false;
-  
+
   const d = typeof date === 'string' ? new Date(date) : date;
-  
+
   const dateStr = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Dhaka',
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit'
+    day: '2-digit',
   }).format(d);
-  
+
   return dateStr === getBDTodayString();
 }

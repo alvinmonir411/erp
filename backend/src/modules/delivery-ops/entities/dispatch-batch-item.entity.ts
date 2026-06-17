@@ -1,4 +1,10 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { DispatchBatch } from './dispatch-batch.entity';
 import { Product } from '../../products/entities/product.entity';
 import { ColumnNumericTransformer } from '../../orders/orders.constants';
@@ -11,7 +17,9 @@ export class DispatchBatchItem {
   @Column()
   batchId: number;
 
-  @ManyToOne(() => DispatchBatch, (batch) => batch.items, { onDelete: 'CASCADE' })
+  @ManyToOne(() => DispatchBatch, (batch) => batch.items, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'batchId' })
   batch: DispatchBatch;
 

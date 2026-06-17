@@ -68,9 +68,7 @@ export class SalesSummaryQueryDto {
   dueOnly?: boolean;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   search?: string;
 

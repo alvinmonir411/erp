@@ -12,17 +12,17 @@ export class RolesGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    
+
     if (!requiredRoles) {
       return true;
     }
-    
+
     const { user } = context.switchToHttp().getRequest();
-    
+
     if (!user) {
-        return false;
+      return false;
     }
-    
+
     // Super Admins can do everything
     if (user.role === Role.SUPER_ADMIN) {
       return true;

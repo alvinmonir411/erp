@@ -1,7 +1,14 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Between } from 'typeorm';
-import { DeliverySummary, DeliverySummaryStatus } from './entities/delivery-summary.entity';
+import {
+  DeliverySummary,
+  DeliverySummaryStatus,
+} from './entities/delivery-summary.entity';
 import { DeliverySummaryItem } from './entities/delivery-summary-item.entity';
 import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/entities/order.entity';
@@ -18,10 +25,11 @@ export class DeliverySummariesService {
     private readonly ordersService: OrdersService,
     private readonly stockService: StockService,
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
 
   async findAll(query: any = {}) {
-    const qb = this.summaryRepository.createQueryBuilder('s')
+    const qb = this.summaryRepository
+      .createQueryBuilder('s')
       .leftJoinAndSelect('s.company', 'company')
       .leftJoinAndSelect('s.route', 'route')
       .orderBy('s.deliveryDate', 'DESC')
@@ -75,7 +83,9 @@ export class DeliverySummariesService {
     })) as Order[];
 
     if (orders.length === 0) {
-      throw new BadRequestException('No orders found for the selected date, company, and route');
+      throw new BadRequestException(
+        'No orders found for the selected date, company, and route',
+      );
     }
 
     return await this.dataSource.transaction(async (manager) => {
@@ -84,7 +94,7 @@ export class DeliverySummariesService {
         where: {
           deliveryDate: new Date(date),
           companyId,
-          routeId
+          routeId,
         },
         relations: ['items'],
       });
@@ -100,14 +110,20 @@ export class DeliverySummariesService {
       }
 
       // 3. Aggregate product quantities
-      const productMap = new Map<number, { ordered: number, price: number }>();
+      const productMap = new Map<number, { ordered: number; price: number }>();
 
       for (const order of orders) {
         for (const item of order.items) {
           if (item.product?.companyId !== companyId) continue;
-          const existing = productMap.get(item.productId) || { ordered: 0, price: item.unitPrice };
+          const existing = productMap.get(item.productId) || {
+            ordered: 0,
+            price: item.unitPrice,
+          };
           productMap.set(item.productId, {
-            ordered: existing.ordered + Number(item.quantity) + Number(item.freeQuantity || 0),
+            ordered:
+              existing.ordered +
+              Number(item.quantity) +
+              Number(item.freeQuantity || 0),
             price: item.unitPrice, // We use the price from the orders
           });
         }
@@ -118,7 +134,7 @@ export class DeliverySummariesService {
       let totalAmount = 0;
 
       for (const [productId, data] of productMap.entries()) {
-        let item = summary.items?.find(i => i.productId === productId);
+        let item = summary.items?.find((i) => i.productId === productId);
 
         if (!item) {
           item = manager.create(DeliverySummaryItem, {
@@ -149,14 +165,19 @@ export class DeliverySummariesService {
     });
   }
 
-  async updateReturns(id: number, items: { productId: number, returnedQuantity: number }[]) {
+  async updateReturns(
+    id: number,
+    items: { productId: number; returnedQuantity: number }[],
+  ) {
     const summary = await this.findOne(id);
 
     return await this.dataSource.transaction(async (manager) => {
       let totalAmount = 0;
 
       for (const update of items) {
-        const item = summary.items.find(i => i.productId === update.productId);
+        const item = summary.items.find(
+          (i) => i.productId === update.productId,
+        );
         if (item) {
           const oldReturned = Number(item.returnedQuantity);
           const newReturned = Number(update.returnedQuantity);
@@ -171,14 +192,18 @@ export class DeliverySummariesService {
           // Stock Integration: Record the return
           const diff = newReturned - oldReturned;
           if (diff !== 0) {
-            await this.stockService.create({
-              productId: item.productId,
-              companyId: summary.companyId,
-              type: StockMovementType.RETURN_IN,
-              quantity: diff, // Positive means stock coming back
-              note: `Return from Delivery Summary #${summary.id}`,
-              reference: `DS #${summary.id}`,
-            }, 'Admin', manager);
+            await this.stockService.create(
+              {
+                productId: item.productId,
+                companyId: summary.companyId,
+                type: StockMovementType.RETURN_IN,
+                quantity: diff, // Positive means stock coming back
+                note: `Return from Delivery Summary #${summary.id}`,
+                reference: `DS #${summary.id}`,
+              },
+              'Admin',
+              manager,
+            );
           }
         }
       }
@@ -206,14 +231,18 @@ export class DeliverySummariesService {
       for (const item of summary.items) {
         const returned = Number(item.returnedQuantity || 0);
         if (returned > 0) {
-          await this.stockService.create({
-            productId: item.productId,
-            companyId: summary.companyId,
-            type: StockMovementType.ADJUSTMENT,
-            quantity: -returned,
-            note: `Reverted returned stock due to deletion of Delivery Summary #${summary.id}`,
-            reference: `DS #${summary.id}`,
-          }, 'Admin', manager);
+          await this.stockService.create(
+            {
+              productId: item.productId,
+              companyId: summary.companyId,
+              type: StockMovementType.ADJUSTMENT,
+              quantity: -returned,
+              note: `Reverted returned stock due to deletion of Delivery Summary #${summary.id}`,
+              reference: `DS #${summary.id}`,
+            },
+            'Admin',
+            manager,
+          );
         }
       }
       return manager.remove(DeliverySummary, summary);
@@ -228,20 +257,36 @@ export class DeliverySummariesService {
       routeId,
     })) as Order[];
 
-    const companyMap = new Map<number, { name: string, items: Map<number, { name: string, qty: number, price: number }> }>();
+    const companyMap = new Map<
+      number,
+      {
+        name: string;
+        items: Map<number, { name: string; qty: number; price: number }>;
+      }
+    >();
 
     for (const order of orders) {
       for (const item of order.items) {
-        const prodCompanyId = Number(item.product?.companyId || order.companyId || 0);
-        const prodCompanyName = item.product?.company?.name || order.company?.name || 'Unknown';
+        const prodCompanyId = Number(
+          item.product?.companyId || order.companyId || 0,
+        );
+        const prodCompanyName =
+          item.product?.company?.name || order.company?.name || 'Unknown';
 
         if (!companyMap.has(prodCompanyId)) {
-          companyMap.set(prodCompanyId, { name: prodCompanyName, items: new Map() });
+          companyMap.set(prodCompanyId, {
+            name: prodCompanyName,
+            items: new Map(),
+          });
         }
 
         const co = companyMap.get(prodCompanyId)!;
         if (!co.items.has(item.productId)) {
-          co.items.set(item.productId, { name: item.product.name, qty: 0, price: item.unitPrice });
+          co.items.set(item.productId, {
+            name: item.product.name,
+            qty: 0,
+            price: item.unitPrice,
+          });
         }
         const prod = co.items.get(item.productId)!;
         prod.qty += Number(item.quantity) + Number(item.freeQuantity || 0);
@@ -269,7 +314,10 @@ export class DeliverySummariesService {
       };
     });
 
-    const grandTotalQuantity = groups.reduce((s, g) => s + g.subtotalQuantity, 0);
+    const grandTotalQuantity = groups.reduce(
+      (s, g) => s + g.subtotalQuantity,
+      0,
+    );
     const grandTotalAmount = groups.reduce((s, g) => s + g.subtotalAmount, 0);
 
     return {

@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { Due } from './due.entity';
 import { Order } from '../../orders/entities/order.entity';
 import { Shop } from '../../shops/entities/shop.entity';
@@ -55,7 +64,13 @@ export class DueCollection {
   @Column()
   srName: string;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   collectedAmount: number;
 
   @Column({ type: 'date' })
@@ -65,7 +80,11 @@ export class DueCollection {
   note: string;
 
   @Index()
-  @Column({ type: 'enum', enum: CollectionStatus, default: CollectionStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: CollectionStatus,
+    default: CollectionStatus.PENDING,
+  })
   status: CollectionStatus;
 
   @Column({ nullable: true })

@@ -10,12 +10,21 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) { }
+  constructor(private readonly dashboardService: DashboardService) {}
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Get('metrics')
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  async getMetrics(@Query('companyId') companyId: string | undefined, @CurrentUser() user: any) {
-    return this.dashboardService.getDashboardData(companyId ? parseInt(companyId) : undefined, user);
+  @Header(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate',
+  )
+  async getMetrics(
+    @Query('companyId') companyId: string | undefined,
+    @CurrentUser() user: any,
+  ) {
+    return this.dashboardService.getDashboardData(
+      companyId ? parseInt(companyId) : undefined,
+      user,
+    );
   }
 }

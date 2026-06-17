@@ -18,7 +18,6 @@ import { SettleDispatchBatchDto } from './dto/settle-dispatch-batch.dto';
 import { DeliveryResultDto } from './dto/delivery-result.dto';
 import { CreateShopForOrderDto } from './dto/create-shop-for-order.dto';
 
-
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -30,7 +29,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 @Controller('delivery-ops')
 @UseGuards(JwtAuthGuard, RolesGuard, ThrottlerGuard)
 export class DeliveryOpsController {
-  constructor(private readonly deliveryOpsService: DeliveryOpsService) { }
+  constructor(private readonly deliveryOpsService: DeliveryOpsService) {}
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Post('delivery-result/:orderId')
@@ -39,7 +38,10 @@ export class DeliveryOpsController {
     @Body() dto: DeliveryResultDto,
     @CurrentUser() user: any,
   ) {
-    console.log(`[DeliveryOps] Submitting delivery result for order ${orderId}`, dto);
+    console.log(
+      `[DeliveryOps] Submitting delivery result for order ${orderId}`,
+      dto,
+    );
     return this.deliveryOpsService.submitDeliveryResult(orderId, dto, user);
   }
 
@@ -61,14 +63,19 @@ export class DeliveryOpsController {
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('reports')
-  getReports(@Query() query: QueryDispatchBatchesDto, @CurrentUser() user: any) {
+  getReports(
+    @Query() query: QueryDispatchBatchesDto,
+    @CurrentUser() user: any,
+  ) {
     return this.deliveryOpsService.getReports(query, user);
   }
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Get('personnel')
   getDeliveryPeople(@Query('includeInactive') includeInactive?: string) {
-    return this.deliveryOpsService.getDeliveryPeople(includeInactive === 'true');
+    return this.deliveryOpsService.getDeliveryPeople(
+      includeInactive === 'true',
+    );
   }
 
   @Roles(Role.SUPER_ADMIN, Role.MANAGER)
@@ -100,13 +107,19 @@ export class DeliveryOpsController {
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Get('confirmed-orders')
-  getEligibleOrders(@Query() query: QueryDispatchBatchesDto, @CurrentUser() user: any) {
+  getEligibleOrders(
+    @Query() query: QueryDispatchBatchesDto,
+    @CurrentUser() user: any,
+  ) {
     return this.deliveryOpsService.getEligibleOrders(query, user);
   }
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('batches')
-  getDispatchBatches(@Query() query: QueryDispatchBatchesDto, @CurrentUser() user: any) {
+  getDispatchBatches(
+    @Query() query: QueryDispatchBatchesDto,
+    @CurrentUser() user: any,
+  ) {
     return this.deliveryOpsService.getDispatchBatches(query, user);
   }
 
@@ -118,19 +131,28 @@ export class DeliveryOpsController {
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('batches/:id')
-  getDispatchBatch(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+  getDispatchBatch(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
     return this.deliveryOpsService.getDispatchBatch(id, user);
   }
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Get('batches/:id/reports/morning')
-  getMorningReport(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+  getMorningReport(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
     return this.deliveryOpsService.getMorningReport(id, user);
   }
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Get('batches/:id/reports/final')
-  getFinalReport(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+  getFinalReport(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
     return this.deliveryOpsService.getFinalReport(id, user);
   }
 

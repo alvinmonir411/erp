@@ -1,4 +1,14 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Unique, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Unique,
+  Index,
+} from 'typeorm';
 import { Order } from '../../orders/entities/order.entity';
 import { Shop } from '../../shops/entities/shop.entity';
 import { Route } from '../../routes/entities/route.entity';
@@ -48,19 +58,37 @@ export class Due {
   @Column()
   srName: string;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   dueAmount: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   paidAmount: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0, transformer: new ColumnNumericTransformer() })
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   remainingDue: number;
 
   @Index()
   @Column({ type: 'enum', enum: DueStatus, default: DueStatus.DUE })
   status: DueStatus;
-  
+
   @Column({ type: 'text', nullable: true })
   note: string;
 

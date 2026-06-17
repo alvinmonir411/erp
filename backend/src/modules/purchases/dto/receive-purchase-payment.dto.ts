@@ -18,9 +18,7 @@ export class ReceivePurchasePaymentDto {
   paymentDate: Date;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   note?: string;
 }

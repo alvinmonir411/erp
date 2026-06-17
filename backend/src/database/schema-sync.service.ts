@@ -9,7 +9,7 @@ export class SchemaSyncService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap() {
     this.logger.log('--- DEFENSIVE SCHEMA SYNC START ---');
-    
+
     // 1. Sync products table
     try {
       this.logger.log('Ensuring products table columns exist...');
@@ -34,8 +34,14 @@ export class SchemaSyncService implements OnApplicationBootstrap {
 
       // Handle unique constraint and initial username values
       try {
-        await this.dataSource.query('UPDATE "users" SET "username" = "email" WHERE "username" IS NULL');
-        await this.dataSource.query('ALTER TABLE "users" ADD CONSTRAINT "UQ_users_username" UNIQUE ("username")').catch(() => {});
+        await this.dataSource.query(
+          'UPDATE "users" SET "username" = "email" WHERE "username" IS NULL',
+        );
+        await this.dataSource
+          .query(
+            'ALTER TABLE "users" ADD CONSTRAINT "UQ_users_username" UNIQUE ("username")',
+          )
+          .catch(() => {});
       } catch (e) {
         // Ignore if constraint already exists or update fails
       }
@@ -304,7 +310,9 @@ export class SchemaSyncService implements OnApplicationBootstrap {
 
     // 10. Sync delivery_people table
     try {
-      this.logger.log('Ensuring delivery_people table exists and is up to date...');
+      this.logger.log(
+        'Ensuring delivery_people table exists and is up to date...',
+      );
       await this.dataSource.query(`
         CREATE TABLE IF NOT EXISTS "delivery_people" (
           "id" SERIAL PRIMARY KEY,
@@ -358,7 +366,10 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       `);
     } catch (e) {
       if (!e.message.includes('does not exist')) {
-        this.logger.error('Failed to sync dispatch_batches columns:', e.message);
+        this.logger.error(
+          'Failed to sync dispatch_batches columns:',
+          e.message,
+        );
       }
     }
 
@@ -370,13 +381,18 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       `);
     } catch (e) {
       if (!e.message.includes('does not exist')) {
-        this.logger.error('Failed to sync cash_collections columns:', e.message);
+        this.logger.error(
+          'Failed to sync cash_collections columns:',
+          e.message,
+        );
       }
     }
 
     // 13. Create Database Indexes for Performance Optimization
     try {
-      this.logger.log('Ensuring database indexes exist for high performance...');
+      this.logger.log(
+        'Ensuring database indexes exist for high performance...',
+      );
       await this.dataSource.query(`
         CREATE INDEX IF NOT EXISTS "idx_orders_status" ON "orders" ("status");
         CREATE INDEX IF NOT EXISTS "idx_orders_company_route" ON "orders" ("companyId", "routeId");

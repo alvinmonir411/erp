@@ -1,5 +1,11 @@
 import { Transform, Type } from 'class-transformer';
-import { IsDate, IsInt, IsOptional, IsPositive, IsString } from 'class-validator';
+import {
+  IsDate,
+  IsInt,
+  IsOptional,
+  IsPositive,
+  IsString,
+} from 'class-validator';
 
 export class QueryPurchasesDto {
   @IsOptional()
@@ -19,9 +25,7 @@ export class QueryPurchasesDto {
   toDate?: Date;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   search?: string;
 }

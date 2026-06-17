@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsNumber, IsPositive, IsOptional, IsIn, Min, IsString } from 'class-validator';
+import {
+  IsInt,
+  IsNumber,
+  IsPositive,
+  IsOptional,
+  IsIn,
+  Min,
+  IsString,
+} from 'class-validator';
 
 export class CreateSaleItemDto {
   @Type(() => Number)

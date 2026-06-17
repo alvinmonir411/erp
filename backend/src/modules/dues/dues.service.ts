@@ -1,8 +1,16 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Due, DueStatus } from './entities/due.entity';
-import { DueCollection, CollectionStatus } from './entities/due-collection.entity';
+import {
+  DueCollection,
+  CollectionStatus,
+} from './entities/due-collection.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Role } from '../../common/enums/role.enum';
 import { User } from '../users/entities/user.entity';
@@ -22,8 +30,9 @@ export class DuesService {
   async findAll(user: any) {
     const role = user.role;
     const userId = user.id || user.sub;
-    
-    const query = this.duesRepository.createQueryBuilder('due')
+
+    const query = this.duesRepository
+      .createQueryBuilder('due')
       .leftJoinAndSelect('due.order', 'order')
       .leftJoinAndSelect('due.shop', 'shop')
       .leftJoinAndSelect('due.route', 'route')
@@ -34,12 +43,19 @@ export class DuesService {
     } else if (role === Role.MANAGER) {
       // Filter by manager's allowed routes if assigned
       if (user.allowedRouteIds && user.allowedRouteIds.length > 0) {
-        query.where('due.routeId IN (:...routeIds)', { routeIds: user.allowedRouteIds });
+        query.where('due.routeId IN (:...routeIds)', {
+          routeIds: user.allowedRouteIds,
+        });
       }
     } else if (role === Role.DELIVERY_MAN) {
-      const person = await this.dataSource.manager.findOne('delivery_people' as any, { where: { userId } } as any);
+      const person = await this.dataSource.manager.findOne(
+        'delivery_people' as any,
+        { where: { userId } } as any,
+      );
       if (person) {
-        query.where('order.deliveryPersonId = :personId', { personId: (person as any).id });
+        query.where('order.deliveryPersonId = :personId', {
+          personId: (person as any).id,
+        });
       } else {
         query.where('due.id = -1');
       }
@@ -52,22 +68,32 @@ export class DuesService {
     const role = user.role;
     const userId = user.id || user.sub;
 
-    const query = this.collectionsRepository.createQueryBuilder('collection')
+    const query = this.collectionsRepository
+      .createQueryBuilder('collection')
       .leftJoinAndSelect('collection.order', 'order')
       .leftJoinAndSelect('collection.shop', 'shop')
-      .where('collection.status = :status', { status: CollectionStatus.PENDING })
+      .where('collection.status = :status', {
+        status: CollectionStatus.PENDING,
+      })
       .orderBy('collection.createdAt', 'DESC');
 
     if (role === Role.SR) {
       query.andWhere('collection.srId = :userId', { userId });
     } else if (role === Role.MANAGER) {
       if (user.allowedRouteIds && user.allowedRouteIds.length > 0) {
-        query.andWhere('collection.routeId IN (:...routeIds)', { routeIds: user.allowedRouteIds });
+        query.andWhere('collection.routeId IN (:...routeIds)', {
+          routeIds: user.allowedRouteIds,
+        });
       }
     } else if (role === Role.DELIVERY_MAN) {
-      const person = await this.dataSource.manager.findOne('delivery_people' as any, { where: { userId } } as any);
+      const person = await this.dataSource.manager.findOne(
+        'delivery_people' as any,
+        { where: { userId } } as any,
+      );
       if (person) {
-        query.andWhere('order.deliveryPersonId = :personId', { personId: (person as any).id });
+        query.andWhere('order.deliveryPersonId = :personId', {
+          personId: (person as any).id,
+        });
       } else {
         query.andWhere('collection.id = -1');
       }
@@ -80,7 +106,8 @@ export class DuesService {
     const role = user.role;
     const userId = user.id || user.sub;
 
-    const query = this.collectionsRepository.createQueryBuilder('collection')
+    const query = this.collectionsRepository
+      .createQueryBuilder('collection')
       .leftJoinAndSelect('collection.order', 'order')
       .leftJoinAndSelect('collection.shop', 'shop')
       .orderBy('collection.createdAt', 'DESC');
@@ -89,12 +116,19 @@ export class DuesService {
       query.where('collection.srId = :userId', { userId });
     } else if (role === Role.MANAGER) {
       if (user.allowedRouteIds && user.allowedRouteIds.length > 0) {
-        query.where('collection.routeId IN (:...routeIds)', { routeIds: user.allowedRouteIds });
+        query.where('collection.routeId IN (:...routeIds)', {
+          routeIds: user.allowedRouteIds,
+        });
       }
     } else if (role === Role.DELIVERY_MAN) {
-      const person = await this.dataSource.manager.findOne('delivery_people' as any, { where: { userId } } as any);
+      const person = await this.dataSource.manager.findOne(
+        'delivery_people' as any,
+        { where: { userId } } as any,
+      );
       if (person) {
-        query.where('order.deliveryPersonId = :personId', { personId: (person as any).id });
+        query.where('order.deliveryPersonId = :personId', {
+          personId: (person as any).id,
+        });
       } else {
         query.where('collection.id = -1');
       }
@@ -107,16 +141,19 @@ export class DuesService {
     return this.collectionsRepository.find({
       where: { orderId },
       relations: ['shop'],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
-  async collectDue(data: {
-    orderId: number;
-    amount: number;
-    note?: string;
-    collectionDate?: string;
-  }, user: any) {
+  async collectDue(
+    data: {
+      orderId: number;
+      amount: number;
+      note?: string;
+      collectionDate?: string;
+    },
+    user: any,
+  ) {
     const due = await this.duesRepository.findOne({
       where: { orderId: data.orderId },
     });
@@ -127,7 +164,9 @@ export class DuesService {
 
     // Role check: SR can only collect own due
     if (user.role === Role.SR && due.srId !== (user.id || user.sub)) {
-      throw new ConflictException('You can only collect payments for your own assigned dues');
+      throw new ConflictException(
+        'You can only collect payments for your own assigned dues',
+      );
     }
 
     if (data.amount <= 0) {
@@ -135,17 +174,20 @@ export class DuesService {
     }
 
     // Check pending collections to prevent over-collection
-    const pendingAmount = await this.collectionsRepository.createQueryBuilder('c')
+    const pendingAmount = await this.collectionsRepository
+      .createQueryBuilder('c')
       .select('SUM(c.collectedAmount)', 'sum')
       .where('c.dueId = :dueId', { dueId: due.id })
       .andWhere('c.status = :status', { status: CollectionStatus.PENDING })
       .getRawOne();
-    
+
     const totalPending = Number(pendingAmount?.sum || 0);
     const maxCollectable = due.remainingDue - totalPending;
 
     if (data.amount > maxCollectable) {
-      throw new ConflictException(`Collected amount exceeds remaining balance. Remaining: ${due.remainingDue}, Pending: ${totalPending}, Max Allowed: ${maxCollectable}`);
+      throw new ConflictException(
+        `Collected amount exceeds remaining balance. Remaining: ${due.remainingDue}, Pending: ${totalPending}, Max Allowed: ${maxCollectable}`,
+      );
     }
 
     const collection = this.collectionsRepository.create({
@@ -156,7 +198,9 @@ export class DuesService {
       srId: user.id || user.sub,
       srName: user.name || user.username,
       collectedAmount: data.amount,
-      collectionDate: data.collectionDate ? new Date(data.collectionDate) : new Date(),
+      collectionDate: data.collectionDate
+        ? new Date(data.collectionDate)
+        : new Date(),
       note: data.note,
       status: CollectionStatus.PENDING,
     });
@@ -167,7 +211,7 @@ export class DuesService {
   async upsertByOrderId(orderId: number, dueAmount: number, note?: string) {
     const order = await this.ordersRepository.findOne({
       where: { id: orderId },
-      relations: ['shop', 'route']
+      relations: ['shop', 'route'],
     });
     if (!order) {
       throw new NotFoundException('Order not found');
@@ -175,13 +219,18 @@ export class DuesService {
     return this.upsertDue(order, dueAmount, this.dataSource.manager, note);
   }
 
-  async upsertDue(order: Order, dueAmount: number, manager: any, note?: string) {
+  async upsertDue(
+    order: Order,
+    dueAmount: number,
+    manager: any,
+    note?: string,
+  ) {
     if (dueAmount <= 0) {
       if (dueAmount < 0) {
         throw new BadRequestException('Due cannot be negative.');
       }
       // If due amount is explicitly 0, we can mark it as PAID or just not create it
-      let due = await manager.findOne(Due, { where: { orderId: order.id } });
+      const due = await manager.findOne(Due, { where: { orderId: order.id } });
       if (due) {
         due.remainingDue = 0;
         due.status = DueStatus.PAID;
@@ -208,7 +257,9 @@ export class DuesService {
     const maxAllowed = Math.max(0, finalAmount - advance);
 
     if (dueAmount > maxAllowed + 0.01) {
-      throw new BadRequestException(`Due amount cannot be greater than final amount. Max allowed is BDT ${maxAllowed}.`);
+      throw new BadRequestException(
+        `Due amount cannot be greater than final amount. Max allowed is BDT ${maxAllowed}.`,
+      );
     }
 
     let due = await manager.findOne(Due, { where: { orderId: order.id } });
@@ -252,7 +303,7 @@ export class DuesService {
       // Update existing due
       due.dueAmount = dueAmount;
       due.remainingDue = Math.max(0, dueAmount - Number(due.paidAmount || 0));
-      
+
       if (due.remainingDue <= 0) {
         due.status = DueStatus.PAID;
         due.remainingDue = 0;
@@ -261,7 +312,7 @@ export class DuesService {
       } else {
         due.status = DueStatus.DUE;
       }
-      
+
       if (note) {
         due.note = note;
       }
@@ -298,9 +349,10 @@ export class DuesService {
 
       // Update Due Record
       const due = collection.due;
-      due.paidAmount = Number(due.paidAmount) + Number(collection.collectedAmount);
+      due.paidAmount =
+        Number(due.paidAmount) + Number(collection.collectedAmount);
       due.remainingDue = Math.max(0, Number(due.dueAmount) - due.paidAmount);
-      
+
       if (due.remainingDue <= 0) {
         due.status = DueStatus.PAID;
         due.remainingDue = 0;
@@ -311,11 +363,19 @@ export class DuesService {
       await queryRunner.manager.save(due);
 
       // Also update the Order collectedAmount and dueAmount for consistency
-      const order = await queryRunner.manager.findOne(Order, { where: { id: due.orderId } });
+      const order = await queryRunner.manager.findOne(Order, {
+        where: { id: due.orderId },
+      });
       if (order) {
-        order.collectedAmount = Number(order.collectedAmount) + Number(collection.collectedAmount);
-        order.dueAmount = Math.max(0, Number(order.actualSoldAmount) - Number(order.advancePaid || 0) - Number(order.collectedAmount));
-        
+        order.collectedAmount =
+          Number(order.collectedAmount) + Number(collection.collectedAmount);
+        order.dueAmount = Math.max(
+          0,
+          Number(order.actualSoldAmount) -
+            Number(order.advancePaid || 0) -
+            Number(order.collectedAmount),
+        );
+
         if (order.dueAmount <= 0) {
           order.dueAmount = 0;
           order.status = 'SETTLED' as any;
@@ -352,7 +412,8 @@ export class DuesService {
   }
 
   async getSRDueSummary() {
-    return this.duesRepository.createQueryBuilder('due')
+    return this.duesRepository
+      .createQueryBuilder('due')
       .select('due.srName', 'srName')
       .addSelect('due.srId', 'srId')
       .addSelect('SUM(due.dueAmount)', 'totalDue')
@@ -364,7 +425,8 @@ export class DuesService {
   }
 
   async getStats(user: any) {
-    const query = this.duesRepository.createQueryBuilder('due')
+    const query = this.duesRepository
+      .createQueryBuilder('due')
       .select('SUM(due.dueAmount)', 'totalDue')
       .addSelect('SUM(due.paidAmount)', 'totalPaid')
       .addSelect('SUM(due.remainingDue)', 'totalRemaining');
@@ -373,36 +435,44 @@ export class DuesService {
       query.where('due.srId = :userId', { userId: user.id || user.sub });
     } else if (user.role === Role.MANAGER) {
       if (user.allowedRouteIds && user.allowedRouteIds.length > 0) {
-        query.where('due.routeId IN (:...routeIds)', { routeIds: user.allowedRouteIds });
+        query.where('due.routeId IN (:...routeIds)', {
+          routeIds: user.allowedRouteIds,
+        });
       }
     }
 
     const mainStats = await query.getRawOne();
-    
-    const pendingCollections = await this.collectionsRepository.createQueryBuilder('c')
+
+    const pendingCollections = await this.collectionsRepository
+      .createQueryBuilder('c')
       .select('SUM(c.collectedAmount)', 'sum')
       .where('c.status = :status', { status: CollectionStatus.PENDING });
-    
+
     if (user.role === Role.SR) {
-      pendingCollections.andWhere('c.srId = :userId', { userId: user.id || user.sub });
+      pendingCollections.andWhere('c.srId = :userId', {
+        userId: user.id || user.sub,
+      });
     } else if (user.role === Role.MANAGER) {
       if (user.allowedRouteIds && user.allowedRouteIds.length > 0) {
-        pendingCollections.andWhere('c.routeId IN (:...routeIds)', { routeIds: user.allowedRouteIds });
+        pendingCollections.andWhere('c.routeId IN (:...routeIds)', {
+          routeIds: user.allowedRouteIds,
+        });
       }
     }
-    
+
     const pending = await pendingCollections.getRawOne();
 
     return {
       totalDue: Number(mainStats.totalDue || 0),
       totalPaid: Number(mainStats.totalPaid || 0),
       totalRemaining: Number(mainStats.totalRemaining || 0),
-      pendingApproval: Number(pending.sum || 0)
+      pendingApproval: Number(pending.sum || 0),
     };
   }
 
   async findShopDues(shopId: number, user: any) {
-    const query = this.duesRepository.createQueryBuilder('due')
+    const query = this.duesRepository
+      .createQueryBuilder('due')
       .leftJoinAndSelect('due.order', 'order')
       .leftJoinAndSelect('due.shop', 'shop')
       .leftJoinAndSelect('due.route', 'route')

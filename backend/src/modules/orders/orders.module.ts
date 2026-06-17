@@ -12,7 +12,7 @@ import { DispatchBatchOrder } from '../delivery-ops/entities/dispatch-batch-orde
   imports: [
     TypeOrmModule.forFeature([Order, OrderItem, Due, DispatchBatchOrder]),
     StockModule,
-    DuesModule
+    DuesModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

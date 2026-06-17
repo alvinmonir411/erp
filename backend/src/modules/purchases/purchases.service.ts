@@ -1,7 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { Purchase, PurchaseItem, PurchaseStatus } from './entities/purchase.entity';
+import {
+  Purchase,
+  PurchaseItem,
+  PurchaseStatus,
+} from './entities/purchase.entity';
 import { StockService } from '../stock/stock.service';
 import { StockMovementType } from '../stock/stock.constants';
 import { Product } from '../products/entities/product.entity';
@@ -18,7 +26,8 @@ export class PurchasesService {
   ) {}
 
   async findAll(query: any = {}) {
-    const qb = this.purchaseRepository.createQueryBuilder('p')
+    const qb = this.purchaseRepository
+      .createQueryBuilder('p')
       .leftJoinAndSelect('p.company', 'company')
       .leftJoinAndSelect('p.items', 'items')
       .leftJoinAndSelect('items.product', 'product')
@@ -64,17 +73,22 @@ export class PurchasesService {
       for (const itemDto of dto.items) {
         const lineTotal = Number(itemDto.quantity) * Number(itemDto.unitCost);
         totalAmount += lineTotal;
-        items.push(manager.create(PurchaseItem, {
-          productId: itemDto.productId,
-          quantity: itemDto.quantity,
-          unitCost: itemDto.unitCost,
-          lineTotal,
-        }));
+        items.push(
+          manager.create(PurchaseItem, {
+            productId: itemDto.productId,
+            quantity: itemDto.quantity,
+            unitCost: itemDto.unitCost,
+            lineTotal,
+          }),
+        );
       }
 
       purchase.totalAmount = totalAmount;
-      purchase.dueAmount = Math.max(0, totalAmount - Number(purchase.paidAmount));
-      
+      purchase.dueAmount = Math.max(
+        0,
+        totalAmount - Number(purchase.paidAmount),
+      );
+
       const savedPurchase = await manager.save(purchase);
       for (const item of items) {
         item.purchaseId = savedPurchase.id;
@@ -103,14 +117,18 @@ export class PurchasesService {
 
       for (const item of purchase.items) {
         // Update Stock
-        await this.stockService.create({
-          productId: item.productId,
-          companyId: purchase.companyId,
-          type: StockMovementType.STOCK_IN,
-          quantity: Number(item.quantity),
-          reference: `PUR-${purchase.invoiceNo}`,
-          note: `Purchase confirmed: ${purchase.invoiceNo}`,
-        }, 'Admin', m);
+        await this.stockService.create(
+          {
+            productId: item.productId,
+            companyId: purchase.companyId,
+            type: StockMovementType.STOCK_IN,
+            quantity: Number(item.quantity),
+            reference: `PUR-${purchase.invoiceNo}`,
+            note: `Purchase confirmed: ${purchase.invoiceNo}`,
+          },
+          'Admin',
+          m,
+        );
 
         // Update Product Buy Price (Latest Cost)
         await m.update(Product, item.productId, {
@@ -133,20 +151,22 @@ export class PurchasesService {
 
     return this.dataSource.transaction(async (manager) => {
       await manager.delete(PurchaseItem, { purchaseId: id });
-      
+
       let totalAmount = 0;
       const items: PurchaseItem[] = [];
 
       for (const itemDto of dto.items) {
         const lineTotal = Number(itemDto.quantity) * Number(itemDto.unitCost);
         totalAmount += lineTotal;
-        items.push(manager.create(PurchaseItem, {
-          purchaseId: id,
-          productId: itemDto.productId,
-          quantity: itemDto.quantity,
-          unitCost: itemDto.unitCost,
-          lineTotal,
-        }));
+        items.push(
+          manager.create(PurchaseItem, {
+            purchaseId: id,
+            productId: itemDto.productId,
+            quantity: itemDto.quantity,
+            unitCost: itemDto.unitCost,
+            lineTotal,
+          }),
+        );
       }
 
       await manager.update(Purchase, id, {

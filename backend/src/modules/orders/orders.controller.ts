@@ -1,4 +1,15 @@
-import { Controller, Post, Body, Get, Param, ParseIntPipe, Query, Patch, Delete, Header } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  ParseIntPipe,
+  Query,
+  Patch,
+  Delete,
+  Header,
+} from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { SettleOrderDto } from './dto/settle-order.dto';
@@ -19,7 +30,10 @@ export class OrdersController {
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('stats')
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate',
+  )
   getStats(@CurrentUser() user: any) {
     return this.ordersService.getStats(user);
   }
@@ -32,7 +46,10 @@ export class OrdersController {
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate',
+  )
   findAll(@Query() query: any, @CurrentUser() user: any) {
     return this.ordersService.findAll(query, user);
   }
@@ -81,7 +98,6 @@ export class OrdersController {
   ) {
     return this.ordersService.updateStatus(id, status);
   }
-
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
   @Post(':id/settle')

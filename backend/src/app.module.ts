@@ -31,10 +31,12 @@ import { CacheModule } from '@nestjs/cache-manager';
       load: [configuration],
       validationSchema: envValidationSchema,
     }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100, // Safe default rate limit: 100 requests per minute
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100, // Safe default rate limit: 100 requests per minute
+      },
+    ]),
     CacheModule.register({
       isGlobal: true,
       ttl: 600, // 10 minutes cache TTL by default

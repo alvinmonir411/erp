@@ -1,4 +1,10 @@
-import { Injectable, ConflictException, NotFoundException, OnApplicationBootstrap, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  OnApplicationBootstrap,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -14,12 +20,12 @@ export class UsersService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) { }
+  ) {}
 
   async onApplicationBootstrap() {
     this.logger.log('--- STARTING USER SEEDING ---');
     // Wait a brief moment for SchemaSyncService to ensure columns exist
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const adminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@erp.com';
     const adminUsername = process.env.SUPER_ADMIN_USERNAME || 'admin';
@@ -39,12 +45,16 @@ export class UsersService implements OnApplicationBootstrap {
   }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const existingEmail = await this.userRepository.findOne({ where: { email: createUserDto.email } });
+    const existingEmail = await this.userRepository.findOne({
+      where: { email: createUserDto.email },
+    });
     if (existingEmail) {
       throw new ConflictException('Email already exists');
     }
 
-    const existingUsername = await this.userRepository.findOne({ where: { username: createUserDto.username } });
+    const existingUsername = await this.userRepository.findOne({
+      where: { username: createUserDto.username },
+    });
     if (existingUsername) {
       throw new ConflictException('Username already exists');
     }
@@ -57,7 +67,9 @@ export class UsersService implements OnApplicationBootstrap {
     const user = this.userRepository.create({
       ...rest,
       passwordHash,
-      status: status || (isActive === false ? UserStatus.INACTIVE : UserStatus.ACTIVE),
+      status:
+        status ||
+        (isActive === false ? UserStatus.INACTIVE : UserStatus.ACTIVE),
     });
 
     return this.userRepository.save(user);
@@ -65,14 +77,23 @@ export class UsersService implements OnApplicationBootstrap {
 
   async findAll(): Promise<User[]> {
     const users = await this.userRepository.find({
-      select: ['id', 'email', 'username', 'name', 'role', 'status', 'createdAt', 'updatedAt'],
+      select: [
+        'id',
+        'email',
+        'username',
+        'name',
+        'role',
+        'status',
+        'createdAt',
+        'updatedAt',
+      ],
       order: { createdAt: 'DESC' },
     });
-    
+
     // Manually add isActive since it's a getter and won't be serialized in plain objects
-    return users.map(user => ({
+    return users.map((user) => ({
       ...user,
-      isActive: user.isActive
+      isActive: user.isActive,
     })) as any;
   }
 
@@ -82,9 +103,9 @@ export class UsersService implements OnApplicationBootstrap {
       select: ['id', 'email', 'username', 'name', 'role', 'status'],
       order: { name: 'ASC' },
     });
-    return users.map(user => ({
+    return users.map((user) => ({
       ...user,
-      isActive: user.isActive
+      isActive: user.isActive,
     })) as any;
   }
 
@@ -95,9 +116,9 @@ export class UsersService implements OnApplicationBootstrap {
       order: { name: 'ASC' },
     });
 
-    return users.map(user => ({
+    return users.map((user) => ({
       ...user,
-      isActive: user.isActive
+      isActive: user.isActive,
     })) as any;
   }
 
@@ -127,7 +148,9 @@ export class UsersService implements OnApplicationBootstrap {
     const user = await this.findOne(id);
 
     if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existing = await this.userRepository.findOne({ where: { email: updateUserDto.email } });
+      const existing = await this.userRepository.findOne({
+        where: { email: updateUserDto.email },
+      });
       if (existing) {
         throw new ConflictException('Email already exists');
       }
@@ -135,7 +158,9 @@ export class UsersService implements OnApplicationBootstrap {
     }
 
     if (updateUserDto.username && updateUserDto.username !== user.username) {
-      const existing = await this.userRepository.findOne({ where: { username: updateUserDto.username } });
+      const existing = await this.userRepository.findOne({
+        where: { username: updateUserDto.username },
+      });
       if (existing) {
         throw new ConflictException('Username already exists');
       }
@@ -149,18 +174,27 @@ export class UsersService implements OnApplicationBootstrap {
 
     if (updateUserDto.name) user.name = updateUserDto.name;
     if (updateUserDto.role) user.role = updateUserDto.role;
-    
+
     if (updateUserDto.status) {
       user.status = updateUserDto.status;
     } else if (updateUserDto.isActive !== undefined) {
-      user.status = updateUserDto.isActive ? UserStatus.ACTIVE : UserStatus.INACTIVE;
+      user.status = updateUserDto.isActive
+        ? UserStatus.ACTIVE
+        : UserStatus.INACTIVE;
     }
 
     return this.userRepository.save(user);
   }
 
-  async createSuperAdmin(data: { email: string; username: string; password: string; name: string }): Promise<User> {
-    const existing = await this.findByIdentifier(data.email) || await this.findByIdentifier(data.username);
+  async createSuperAdmin(data: {
+    email: string;
+    username: string;
+    password: string;
+    name: string;
+  }): Promise<User> {
+    const existing =
+      (await this.findByIdentifier(data.email)) ||
+      (await this.findByIdentifier(data.username));
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(data.password, salt);

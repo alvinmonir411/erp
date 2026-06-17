@@ -30,7 +30,9 @@ async function bootstrap() {
     ];
 
     for (const table of tablesToTruncate) {
-      await queryRunner.query(`TRUNCATE TABLE "${table}" RESTART IDENTITY CASCADE`);
+      await queryRunner.query(
+        `TRUNCATE TABLE "${table}" RESTART IDENTITY CASCADE`,
+      );
       Logger.log(`Truncated table: ${table}`, 'DatabaseReset');
     }
 

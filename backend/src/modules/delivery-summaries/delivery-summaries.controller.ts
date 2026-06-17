@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { DeliverySummariesService } from './delivery-summaries.service';
 
 @Controller('delivery-summaries')
@@ -19,20 +29,22 @@ export class DeliverySummariesController {
   getDailyReport(
     @Query('date') date: string,
     @Query('companyId') companyId?: number,
-    @Query('routeId') routeId?: number
+    @Query('routeId') routeId?: number,
   ) {
     return this.service.getDailyReport(date, companyId, routeId);
   }
 
   @Post('sync')
-  syncOrders(@Body() dto: { date: string, companyId: number, routeId: number }) {
+  syncOrders(
+    @Body() dto: { date: string; companyId: number; routeId: number },
+  ) {
     return this.service.syncOrders(dto.date, dto.companyId, dto.routeId);
   }
 
   @Patch(':id/returns')
   updateReturns(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: { items: { productId: number, returnedQuantity: number }[] }
+    @Body() dto: { items: { productId: number; returnedQuantity: number }[] },
   ) {
     return this.service.updateReturns(id, dto.items);
   }
@@ -40,7 +52,7 @@ export class DeliverySummariesController {
   @Patch(':id/print')
   markAsPrinted(
     @Param('id', ParseIntPipe) id: number,
-    @Query('mode') mode: 'morning' | 'final'
+    @Query('mode') mode: 'morning' | 'final',
   ) {
     return this.service.markAsPrinted(id, mode);
   }
