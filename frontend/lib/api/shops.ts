@@ -1,7 +1,19 @@
 import { apiRequest } from './client';
 import type { CreateShopPayload, Shop, UpdateShopPayload } from '@/types/api';
 
-export function getShops(query?: { routeId?: number; companyId?: number; search?: string; isActive?: boolean; page?: number; limit?: number }) {
+export function getShops(
+  queryOrRouteId?: number | { routeId?: number; companyId?: number; search?: string; isActive?: boolean; page?: number; limit?: number },
+  companyId?: number,
+) {
+  let query: any = undefined;
+  if (typeof queryOrRouteId === 'number') {
+    query = { routeId: queryOrRouteId };
+    if (companyId !== undefined) {
+      query.companyId = companyId;
+    }
+  } else if (queryOrRouteId && typeof queryOrRouteId === 'object') {
+    query = queryOrRouteId;
+  }
   return apiRequest<any>('shops', { query });
 }
 
