@@ -12,6 +12,8 @@ import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import * as bcrypt from 'bcrypt';
 import { Role } from '../../common/enums/role.enum';
 import { UserStatus } from '../../common/enums/user-status.enum';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class UsersService implements OnApplicationBootstrap {
@@ -41,6 +43,37 @@ export class UsersService implements OnApplicationBootstrap {
       this.logger.log(`Super Admin ensured: ${adminUsername} (${adminEmail})`);
     } catch (error) {
       this.logger.error('Failed to seed Super Admin:', error);
+    }
+
+    try {
+      const deliveryMen = await this.userRepository.find({
+        where: { role: Role.DELIVERY_MAN },
+      });
+      if (deliveryMen.length === 0) {
+        this.logger.log('No delivery men found. Seeding a default delivery man user...');
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash('password123', salt);
+        const defaultDeliveryMan = this.userRepository.create({
+          email: 'delivery1@erp.com',
+          username: 'delivery1',
+          name: 'Delivery Man 1',
+          passwordHash,
+          role: Role.DELIVERY_MAN,
+          status: UserStatus.ACTIVE,
+        });
+        await this.userRepository.save(defaultDeliveryMan);
+        this.logger.log('Default delivery man seeded: delivery1 / password123');
+      } else {
+        this.logger.log(`Found ${deliveryMen.length} delivery men in database.`);
+      }
+
+      const allUsers = await this.userRepository.find();
+      fs.writeFileSync(
+        path.join(process.cwd(), 'all_users.txt'),
+        JSON.stringify(allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role, status: u.status })), null, 2),
+      );
+    } catch (err) {
+      this.logger.error('Failed to seed delivery man or dump users:', err);
     }
   }
 

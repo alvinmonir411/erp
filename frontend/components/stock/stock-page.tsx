@@ -187,9 +187,6 @@ export function StockPage() {
         <button onClick={() => openAction('ADJUSTMENT')} className="flex items-center gap-2 rounded-xl bg-white border border-border px-5 py-3 text-sm font-bold text-muted hover:bg-secondary transition-all">
           <RefreshCcw className="h-4 w-4" /> Adjustment
         </button>
-        <button onClick={() => openAction('DAMAGE')} className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-100 px-5 py-3 text-sm font-bold text-rose-600 hover:bg-rose-100 transition-all">
-          <AlertTriangle className="h-4 w-4" /> Damage Entry
-        </button>
       </div>
 
       {/* Main Content Area */}

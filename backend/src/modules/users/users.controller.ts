@@ -41,7 +41,7 @@ export class UsersController {
     return this.usersService.findByRole(role);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Get('delivery-men')
   findDeliveryMen() {
     return this.usersService.findActiveDeliveryMen();

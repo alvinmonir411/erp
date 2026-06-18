@@ -406,6 +406,26 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       this.logger.error('Failed to create performance indexes:', e.message);
     }
 
+    // 14. Sync damage_records table constraints and columns
+    try {
+      this.logger.log('Ensuring damage_records columns are nullable and exist...');
+      await this.dataSource.query(`
+        ALTER TABLE "damage_records" ALTER COLUMN "batchId" DROP NOT NULL;
+        ALTER TABLE "damage_records" ALTER COLUMN "orderId" DROP NOT NULL;
+        ALTER TABLE "damage_records" ADD COLUMN IF NOT EXISTS "companyId" INTEGER;
+        ALTER TABLE "damage_records" ADD COLUMN IF NOT EXISTS "routeId" INTEGER;
+        ALTER TABLE "damage_records" ADD COLUMN IF NOT EXISTS "shopId" INTEGER;
+        ALTER TABLE "damage_records" ADD COLUMN IF NOT EXISTS "assignedDeliveryManId" UUID;
+      `);
+    } catch (e) {
+      if (!e.message.includes('does not exist')) {
+        this.logger.error(
+          'Failed to sync columns/constraints on damage_records table:',
+          e.message,
+        );
+      }
+    }
+
     this.logger.log('--- DEFENSIVE SCHEMA SYNC COMPLETED ---');
   }
 }

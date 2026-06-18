@@ -19,6 +19,8 @@ import {
   CollectionStatus,
 } from '../dues/entities/due-collection.entity';
 import { ProductsService } from '../products/products.service';
+import { DispatchBatch } from '../delivery-ops/entities/dispatch-batch.entity';
+
 
 @Injectable()
 export class DashboardService {
@@ -340,9 +342,39 @@ export class DashboardService {
       count: safeNum(aggResult?.todayOrdersCount),
     };
 
-    const todayDispatch = safeNum(aggResult?.todayDispatchCount);
+    // Calculate dispatch metrics based on dispatch batches instead of individual orders
+    const batchRepo = this.dataSource.getRepository(DispatchBatch);
+    const batchQb = batchRepo.createQueryBuilder('batch');
+
+    if (companyId) {
+      batchQb.andWhere('batch.companyId = :companyId', { companyId });
+    }
+
+    if (isSR) {
+      batchQb.innerJoin('batch.orders', 'batchOrder')
+        .innerJoin('batchOrder.order', 'order')
+        .andWhere('order.createdById = :userId', { userId });
+    }
+
+    const batchMetrics = await batchQb
+      .select(
+        "COUNT(DISTINCT CASE WHEN batch.dispatchedAt >= :todayStartUTC AND batch.dispatchedAt <= :todayEndUTC AND batch.status <> 'CANCELLED' THEN batch.id END)",
+        'todayDispatchCount',
+      )
+      .addSelect(
+        "COUNT(DISTINCT CASE WHEN batch.dispatchedAt IS NOT NULL AND batch.status <> 'CANCELLED' THEN batch.id END)",
+        'totalDispatchCount',
+      )
+      .setParameters({ todayStartUTC, todayEndUTC })
+      .getRawOne();
+
+    const todayDispatchCount = safeNum(batchMetrics?.todayDispatchCount);
+    const totalDispatchCount = safeNum(batchMetrics?.totalDispatchCount);
+
+    const todayDispatch = todayDispatchCount;
     const todaySettledValue = safeNum(aggResult?.todaySettledValue);
     const todayCancelled = safeNum(aggResult?.todayCancelledCount);
+
 
     // 5. Stock metrics from ProductsService (Unified Source)
     let productMetrics: any = {
@@ -549,7 +581,7 @@ export class DashboardService {
           todayCancelled,
         },
         delivery: {
-          totalDispatch: safeNum(aggResult?.totalDispatchCount),
+          totalDispatch: totalDispatchCount,
           todayDispatch,
           todayDispatchAmount: safeNum(aggResult?.todayDispatchValue),
           pendingDispatch: safeNum(aggResult?.pendingDispatchCount),

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -7,12 +7,24 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { CreateManualDamageDto } from './dto/create-manual-damage.dto';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.SR)
+@Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
+
+  @Post('damage')
+  async createManualDamage(@Body() dto: CreateManualDamageDto) {
+    return this.reportsService.createManualDamage(dto);
+  }
+
+  @Delete('damage/:id')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  async deleteDamageRecord(@Param('id') id: string) {
+    return this.reportsService.deleteDamageRecord(Number(id));
+  }
 
   @Get('free-quantity')
   async getFreeQuantityReport(

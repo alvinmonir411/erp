@@ -2,14 +2,14 @@ import { apiRequest } from './client';
 import type { CreateShopPayload, Shop, UpdateShopPayload } from '@/types/api';
 
 export function getShops(
-  queryOrRouteId?: number | { routeId?: number; companyId?: number; search?: string; isActive?: boolean; page?: number; limit?: number },
+  queryOrRouteId?: number | string | { routeId?: number; companyId?: number; search?: string; isActive?: boolean; page?: number; limit?: number },
   companyId?: number,
 ) {
   let query: any = undefined;
-  if (typeof queryOrRouteId === 'number') {
-    query = { routeId: queryOrRouteId };
+  if (typeof queryOrRouteId === 'number' || (typeof queryOrRouteId === 'string' && !isNaN(Number(queryOrRouteId)))) {
+    query = { routeId: Number(queryOrRouteId) };
     if (companyId !== undefined) {
-      query.companyId = companyId;
+      query.companyId = Number(companyId);
     }
   } else if (queryOrRouteId && typeof queryOrRouteId === 'object') {
     query = queryOrRouteId;

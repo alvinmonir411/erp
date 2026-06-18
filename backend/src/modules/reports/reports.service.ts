@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Brackets } from 'typeorm';
 import { Order, OrderItem } from '../orders/entities/order.entity';
@@ -28,7 +28,7 @@ export class ReportsService {
       .leftJoinAndSelect('order.company', 'company')
       .leftJoinAndSelect('order.route', 'route')
       .leftJoinAndSelect('order.shop', 'shop')
-      .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
+      .leftJoinAndSelect('order.assignedDeliveryMan', 'assignedDeliveryMan')
       .where('item.freeQuantity > 0');
 
     if (user && user.role === Role.SR) {
@@ -69,7 +69,7 @@ export class ReportsService {
       qb.andWhere('order.shopId = :shopId', { shopId: filters.shopId });
     }
     if (filters.deliveryManId) {
-      qb.andWhere('order.deliveryPersonId = :deliveryManId', {
+      qb.andWhere('order.assignedDeliveryManId = :deliveryManId', {
         deliveryManId: filters.deliveryManId,
       });
     }
@@ -159,8 +159,8 @@ export class ReportsService {
       (items) => items[0]?.order?.shop?.name || 'Direct Order',
     );
     const deliveryManSummary = mapToSummary(
-      groupBy(items, (i) => i.order?.deliveryPersonId),
-      (items) => items[0]?.order?.deliveryPerson?.name || 'Unassigned',
+      groupBy(items, (i) => i.order?.assignedDeliveryManId),
+      (items) => items[0]?.order?.assignedDeliveryMan?.name || 'Unassigned',
     );
 
     return {
@@ -182,7 +182,7 @@ export class ReportsService {
           i.product?.company?.name || i.order?.company?.name || 'Unknown',
         route: i.order?.route?.name,
         shop: i.order?.shop?.name || 'Direct Order',
-        deliveryMan: i.order?.deliveryPerson?.name || 'Unassigned',
+        deliveryMan: i.order?.assignedDeliveryMan?.name || 'Unassigned',
         product: i.product?.name,
         orderedQty: i.quantity,
         freeQty: i.freeQuantity,
@@ -208,11 +208,15 @@ export class ReportsService {
       .leftJoinAndSelect('order.company', 'company')
       .leftJoinAndSelect('order.route', 'route')
       .leftJoinAndSelect('order.shop', 'shop')
-      .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
-      .leftJoinAndSelect('damage.batch', 'batch');
+      .leftJoinAndSelect('order.assignedDeliveryMan', 'assignedDeliveryMan')
+      .leftJoinAndSelect('damage.batch', 'batch')
+      .leftJoinAndSelect('damage.company', 'damageCompany')
+      .leftJoinAndSelect('damage.route', 'damageRoute')
+      .leftJoinAndSelect('damage.shop', 'damageShop')
+      .leftJoinAndSelect('damage.assignedDeliveryMan', 'damageDeliveryMan');
 
     if (user && user.role === Role.SR) {
-      qb.andWhere('order.createdById = :userId', {
+      qb.andWhere('(order.createdById = :userId OR damage.companyId IN (SELECT p.companyId FROM products p WHERE p.id = damage.productId))', {
         userId: user.id || user.sub,
       });
     }
@@ -238,18 +242,18 @@ export class ReportsService {
     }
 
     if (filters.companyId) {
-      qb.andWhere('product.companyId = :companyId', {
+      qb.andWhere('(product.companyId = :companyId OR damage.companyId = :companyId)', {
         companyId: filters.companyId,
       });
     }
     if (filters.routeId) {
-      qb.andWhere('order.routeId = :routeId', { routeId: filters.routeId });
+      qb.andWhere('(order.routeId = :routeId OR damage.routeId = :routeId)', { routeId: filters.routeId });
     }
     if (filters.shopId) {
-      qb.andWhere('order.shopId = :shopId', { shopId: filters.shopId });
+      qb.andWhere('(order.shopId = :shopId OR damage.shopId = :shopId)', { shopId: filters.shopId });
     }
     if (filters.deliveryManId) {
-      qb.andWhere('order.deliveryPersonId = :deliveryManId', {
+      qb.andWhere('(order.assignedDeliveryManId = :deliveryManId OR damage.assignedDeliveryManId = :deliveryManId)', {
         deliveryManId: filters.deliveryManId,
       });
     }
@@ -314,24 +318,24 @@ export class ReportsService {
     };
 
     const companySummary = mapToSummary(
-      groupBy(items, (i) => i.product?.companyId),
-      (items) => items[0]?.product?.company?.name || 'Unknown',
+      groupBy(items, (i) => i.companyId || i.product?.companyId),
+      (items) => items[0]?.company?.name || items[0]?.product?.company?.name || 'Unknown',
     );
     const routeSummary = mapToSummary(
-      groupBy(items, (i) => i.order?.routeId),
-      (items) => items[0]?.order?.route?.name || 'Unknown',
+      groupBy(items, (i) => i.routeId || i.order?.routeId),
+      (items) => items[0]?.route?.name || items[0]?.order?.route?.name || 'Manual Entry',
     );
     const productSummary = mapToSummary(
       groupBy(items, (i) => i.productId),
       (items) => items[0]?.product?.name || 'Unknown',
     );
     const shopSummary = mapToSummary(
-      groupBy(items, (i) => i.order?.shopId),
-      (items) => items[0]?.order?.shop?.name || 'Direct Order',
+      groupBy(items, (i) => i.shopId || i.order?.shopId),
+      (items) => items[0]?.shop?.name || items[0]?.order?.shop?.name || 'Direct Order',
     );
     const deliveryManSummary = mapToSummary(
-      groupBy(items, (i) => i.order?.deliveryPersonId),
-      (items) => items[0]?.order?.deliveryPerson?.name || 'Unassigned',
+      groupBy(items, (i) => i.assignedDeliveryManId || i.order?.assignedDeliveryManId),
+      (items) => items[0]?.assignedDeliveryMan?.name || items[0]?.order?.assignedDeliveryMan?.name || 'Unassigned',
     );
 
     return {
@@ -350,10 +354,10 @@ export class ReportsService {
         date: i.createdAt,
         orderId: i.orderId,
         company:
-          i.product?.company?.name || i.order?.company?.name || 'Unknown',
-        route: i.order?.route?.name,
-        shop: i.order?.shop?.name || 'Direct Order',
-        deliveryMan: i.order?.deliveryPerson?.name || 'Unassigned',
+          i.company?.name || i.product?.company?.name || i.order?.company?.name || 'Unknown',
+        route: i.route?.name || i.order?.route?.name || 'Manual Entry',
+        shop: i.shop?.name || i.order?.shop?.name || 'Direct Order',
+        deliveryMan: i.assignedDeliveryMan?.name || i.order?.assignedDeliveryMan?.name || 'Unassigned',
         product: i.product?.name,
         damagedQty: i.quantity,
         unit: i.product?.unit,
@@ -368,5 +372,36 @@ export class ReportsService {
       shopSummary,
       deliveryManSummary,
     };
+  }
+
+  async createManualDamage(dto: {
+    productId: number;
+    quantity: number;
+    reason?: string;
+    note?: string;
+    companyId?: number;
+    routeId?: number;
+    shopId?: number;
+    assignedDeliveryManId?: string;
+  }) {
+    const record = this.damageRecordRepository.create({
+      productId: dto.productId,
+      quantity: dto.quantity,
+      reason: dto.reason,
+      note: dto.note,
+      companyId: dto.companyId,
+      routeId: dto.routeId,
+      shopId: dto.shopId,
+      assignedDeliveryManId: dto.assignedDeliveryManId,
+    });
+    return this.damageRecordRepository.save(record);
+  }
+
+  async deleteDamageRecord(id: number) {
+    const record = await this.damageRecordRepository.findOne({ where: { id } });
+    if (!record) {
+      throw new NotFoundException(`Damage record #${id} not found`);
+    }
+    return this.damageRecordRepository.remove(record);
   }
 }

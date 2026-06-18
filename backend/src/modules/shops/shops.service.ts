@@ -39,38 +39,42 @@ export class ShopsService {
   }
 
   async findAll(query: QueryShopsDto, user?: any) {
-    const queryBuilder = this.shopsRepository
-      .createQueryBuilder('shop')
-      .leftJoinAndSelect('shop.route', 'route')
-      .orderBy('shop.name', 'ASC');
+    const buildQueryBuilder = () => {
+      const qb = this.shopsRepository
+        .createQueryBuilder('shop')
+        .leftJoinAndSelect('shop.route', 'route')
+        .orderBy('shop.name', 'ASC');
 
-    if (query.routeId) {
-      queryBuilder.andWhere('shop.routeId = :routeId', {
-        routeId: query.routeId,
-      });
-    }
+      if (query.routeId) {
+        qb.andWhere('shop.routeId = :routeId', {
+          routeId: query.routeId,
+        });
+      }
 
-    if (query.companyId) {
-      queryBuilder.andWhere('shop.companyId = :companyId', {
-        companyId: query.companyId,
-      });
-    }
+      if (query.companyId) {
+        qb.andWhere('shop.companyId = :companyId', {
+          companyId: query.companyId,
+        });
+      }
 
-    if (query.search) {
-      queryBuilder.andWhere(
-        '(shop.name ILIKE :search OR shop.ownerName ILIKE :search OR route.name ILIKE :search)',
-        { search: `%${query.search}%` },
-      );
-    }
+      if (query.search) {
+        qb.andWhere(
+          '(shop.name ILIKE :search OR shop.ownerName ILIKE :search OR route.name ILIKE :search)',
+          { search: `%${query.search}%` },
+        );
+      }
 
-    if (query.isActive !== undefined) {
-      queryBuilder.andWhere('shop.isActive = :isActive', {
-        isActive: query.isActive,
-      });
-    }
+      if (query.isActive !== undefined) {
+        qb.andWhere('shop.isActive = :isActive', {
+          isActive: query.isActive,
+        });
+      }
+
+      return qb;
+    };
 
     // 1. Fetch matching info for summary totals
-    const allMatchingShops = await queryBuilder
+    const allMatchingShops = await buildQueryBuilder()
       .select(['shop.id', 'shop.isActive'])
       .getMany();
 
@@ -108,11 +112,12 @@ export class ShopsService {
     const page = Number(query.page || 1);
     const limit = Number(query.limit || 12);
 
+    const itemsQueryBuilder = buildQueryBuilder();
     if (query.page === undefined && query.limit === undefined) {
-      shops = await queryBuilder.getMany();
+      shops = await itemsQueryBuilder.getMany();
     } else {
       const skip = (page - 1) * limit;
-      shops = await queryBuilder.skip(skip).take(limit).getMany();
+      shops = await itemsQueryBuilder.skip(skip).take(limit).getMany();
     }
 
     // 3. Compute dues for the returned shops only

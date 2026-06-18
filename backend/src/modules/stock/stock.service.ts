@@ -149,23 +149,28 @@ export class StockService implements OnModuleInit {
     }
 
     const qty = Number(dto.quantity);
-
-    // 3. Prevent negative stock if it's an outgoing movement
-    if (qty < 0) {
-      const current = Number(product.currentStock || 0);
-      if (current + qty < -0.001) {
-        // Floating point safety
-        throw new BadRequestException(
-          `Insufficient stock for product ${product.name}. Current: ${current}, Requested: ${Math.abs(qty)}`,
-        );
-      }
-    }
-
-    // 4. Update Product currentStock (Optimistic Locking handled by @VersionColumn)
     const oldBalance = Number(product.currentStock || 0);
-    const newBalance = oldBalance + qty;
-    product.currentStock = newBalance;
-    await productRepo.save(product);
+    const isDamage = dto.type === StockMovementType.DAMAGE;
+
+    let newBalance = oldBalance;
+
+    if (!isDamage) {
+      // 3. Prevent negative stock if it's an outgoing movement
+      if (qty < 0) {
+        const current = Number(product.currentStock || 0);
+        if (current + qty < -0.001) {
+          // Floating point safety
+          throw new BadRequestException(
+            `Insufficient stock for product ${product.name}. Current: ${current}, Requested: ${Math.abs(qty)}`,
+          );
+        }
+      }
+
+      // 4. Update Product currentStock (Optimistic Locking handled by @VersionColumn)
+      newBalance = oldBalance + qty;
+      product.currentStock = newBalance;
+      await productRepo.save(product);
+    }
 
     // 5. Create StockMovement audit record with balanceAfter
     const movement = movementRepo.create({

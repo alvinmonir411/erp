@@ -28,7 +28,7 @@ const getSocketUrl = () => {
   try {
     const url = new URL(apiUrl);
     if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-      return `${url.protocol}//${url.hostname}:5002`;
+      return `${url.protocol}//${url.hostname}:5003`;
     }
     // Vercel Serverless does not support persistent WebSockets.
     return null;

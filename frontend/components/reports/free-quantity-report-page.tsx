@@ -12,7 +12,7 @@ import { PageCard } from '@/components/ui/page-card';
 import { useToast } from '@/components/ui/toast-provider';
 import { useCompanies, useRoutes, useShops, useProducts } from '@/hooks/use-common-queries';
 import { getFreeQuantityReport } from '@/lib/api/reports';
-import { getDeliveryPeople } from '@/lib/api/delivery-ops';
+import { getDeliveryMen } from '@/lib/api/users';
 import { formatCurrency, formatDate, formatNumber, getTodayBDDate } from '@/lib/utils/format';
 import { StateMessage } from '@/components/ui/state-message';
 import { LoadingBlock } from '@/components/ui/loading-block';
@@ -59,7 +59,7 @@ export function FreeQuantityReportPage() {
     try {
       setIsLoading(true);
       const [people, reportData] = await Promise.all([
-        getDeliveryPeople(),
+        getDeliveryMen(),
         getFreeQuantityReport(filters),
       ]);
       setDeliveryPeople(people);

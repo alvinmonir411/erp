@@ -10,7 +10,7 @@ import { Injectable, Logger } from '@nestjs/common';
 
 const isVercel = process.env.VERCEL === '1';
 
-@WebSocketGateway(isVercel ? undefined : 5002, {
+@WebSocketGateway(isVercel ? undefined : 5003, {
   cors: {
     origin: '*',
   },
