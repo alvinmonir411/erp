@@ -22,6 +22,14 @@ export class QueryDispatchBatchesDto {
   dispatchDate?: string;
 
   @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
   @IsString()
   status?: string;
 

@@ -20,7 +20,12 @@ const PAGE_SIZE = 10;
 
 export function DeliveryOpsDashboardPage() {
   const { error: showErrorToast, success: showSuccessToast } = useToast();
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [companyId, setCompanyId] = useState('');
   const [routeId, setRouteId] = useState('');
   const [search, setSearch] = useState('');
@@ -42,9 +47,10 @@ export function DeliveryOpsDashboardPage() {
     try {
       setIsLoading(true);
       const [dashboardData, batchData] = await Promise.all([
-        getDeliveryDashboard(date),
+        getDeliveryDashboard(endDate),
         getDispatchBatches({
-          dispatchDate: date,
+          startDate,
+          endDate,
           companyId: companyId ? Number(companyId) : undefined,
           routeId: routeId ? Number(routeId) : undefined,
           search: search || undefined,
@@ -70,7 +76,7 @@ export function DeliveryOpsDashboardPage() {
 
   useEffect(() => {
     fetchData();
-  }, [date, companyId, routeId, page]);
+  }, [startDate, endDate, companyId, routeId, page]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -90,7 +96,7 @@ export function DeliveryOpsDashboardPage() {
       window.removeEventListener('batch-refresh', handleRefresh);
       window.removeEventListener('order-refresh', handleRefresh);
     };
-  }, [date, companyId, routeId, search, page]);
+  }, [startDate, endDate, companyId, routeId, search, page]);
 
   const handleDeleteClick = (id: number, batchNo: string, isSettled: boolean) => {
     setBatchToDelete({ id, batchNo, isSettled });
@@ -166,13 +172,22 @@ export function DeliveryOpsDashboardPage() {
           </div>
 
           {showFilters && (
-            <div className="grid gap-6 border-t border-border p-6 md:grid-cols-3 animate-in fade-in slide-in-from-top-4">
+            <div className="grid gap-6 border-t border-border p-6 md:grid-cols-4 animate-in fade-in slide-in-from-top-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Dispatch Date</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted">From Date</label>
                 <input
                   type="date"
-                  value={date}
-                  onChange={(e) => { setDate(e.target.value); setPage(1); }}
+                  value={startDate}
+                  onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                  className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm focus:bg-white outline-none transition"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted">To Date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
                   className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm focus:bg-white outline-none transition"
                 />
               </div>

@@ -303,7 +303,12 @@ export class DeliveryOpsService {
     }
     if (query.routeId)
       qb.andWhere('batch.routeId = :routeId', { routeId: query.routeId });
-    if (query.dispatchDate) {
+    if (query.startDate && query.endDate) {
+      qb.andWhere('batch.dispatchDate BETWEEN :startDate AND :endDate', {
+        startDate: query.startDate,
+        endDate: query.endDate,
+      });
+    } else if (query.dispatchDate) {
       qb.andWhere('batch.dispatchDate = :dispatchDate', {
         dispatchDate: query.dispatchDate,
       });

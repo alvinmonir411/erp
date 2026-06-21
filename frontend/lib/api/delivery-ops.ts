@@ -6,6 +6,8 @@ export type DispatchBatchQuery = {
   routeId?: number;
   deliveryPersonId?: number;
   dispatchDate?: string;
+  startDate?: string;
+  endDate?: string;
   status?: string;
   search?: string;
   page?: number;

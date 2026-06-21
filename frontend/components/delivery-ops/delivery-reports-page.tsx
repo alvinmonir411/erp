@@ -19,7 +19,12 @@ import { DeleteBatchConfirmModal } from './delivery-ops-dashboard-page';
 export function DeliveryReportsPage() {
   const router = useRouter();
   const { error: showErrorToast, success: showSuccessToast } = useToast();
-  const [dispatchDate, setDispatchDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [companyId, setCompanyId] = useState('');
   const [routeId, setRouteId] = useState('');
   const [deliveryPersonId, setDeliveryPersonId] = useState('');
@@ -45,7 +50,8 @@ export function DeliveryReportsPage() {
       const [men, reportData] = await Promise.all([
         getUsersByRole(Role.DELIVERY_MAN),
         getDispatchReports({
-          dispatchDate,
+          startDate,
+          endDate,
           companyId: companyId ? Number(companyId) : undefined,
           routeId: routeId ? Number(routeId) : undefined,
           deliveryPersonId: deliveryPersonId ? Number(deliveryPersonId) : undefined,
@@ -60,7 +66,7 @@ export function DeliveryReportsPage() {
 
   useEffect(() => {
     fetchReport();
-  }, [dispatchDate, companyId, routeId, deliveryPersonId]);
+  }, [startDate, endDate, companyId, routeId, deliveryPersonId]);
 
   const handleDeleteClick = (id: number, batchNo: string, status: string) => {
     const isSettled = status === 'SETTLED' || status === 'PARTIALLY_SETTLED';
@@ -114,13 +120,22 @@ export function DeliveryReportsPage() {
 
       <div className={`${showFilters ? 'block' : 'hidden'} lg:block pt-12 lg:pt-0`}>
         <PageCard>
-          <div className="grid gap-4 lg:grid-cols-4">
+          <div className="grid gap-4 lg:grid-cols-5">
             <div className="space-y-1.5">
-              <label className="ml-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Dispatch Date</label>
+              <label className="ml-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">From Date</label>
               <input
                 type="date"
-                value={dispatchDate}
-                onChange={(event) => setDispatchDate(event.target.value)}
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none transition"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="ml-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">To Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none transition"
               />
             </div>
