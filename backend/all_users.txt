@@ -1,0 +1,58 @@
+[
+  {
+    "id": "25ffe73a-8765-4a95-a035-5c735d7de8f5",
+    "name": "ARIFUL",
+    "username": "DSR",
+    "role": "DELIVERY_MAN",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "386394cd-2711-45ea-b45c-21ef626d13ea",
+    "name": "Rajjak",
+    "username": "Rajjak",
+    "role": "SR",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "6ca06d69-7ff5-4572-806b-6e95ea65c468",
+    "name": "Jahangir",
+    "username": "alam",
+    "role": "SUPER_ADMIN",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "de80739a-65b1-4a1c-8fca-fe1da586d0a0",
+    "name": "RIPON",
+    "username": "MIYA",
+    "role": "DELIVERY_MAN",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "ad130f42-3884-4885-929b-8274cbda5ee8",
+    "name": "DSR juwel",
+    "username": "khan",
+    "role": "DELIVERY_MAN",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "ae33adf1-0d72-4318-a51f-7fac0d2f2f6f",
+    "name": "Super Admin",
+    "username": "admin",
+    "role": "SUPER_ADMIN",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "0b18c11e-df84-4e57-b6c8-5f4e765aa86d",
+    "name": "Jahangir",
+    "username": "karim@gmail.com",
+    "role": "DELIVERY_MAN",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "90baf6fd-3105-4fd3-b0be-450ab6a62dfd",
+    "name": "md monir",
+    "username": "alvinmonir",
+    "role": "SUPER_ADMIN",
+    "status": "ACTIVE"
+  }
+]
