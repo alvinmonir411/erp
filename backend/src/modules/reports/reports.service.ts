@@ -89,14 +89,14 @@ export class ReportsService {
     // Summary Calculations
     const safeNum = (val: any) => (isNaN(Number(val)) ? 0 : Number(val));
     const totalFreeQty = items.reduce(
-      (sum, i) => sum + safeNum(i.freeQuantity),
+      (sum, i) => sum + Math.max(0, safeNum(i.freeQuantity) - safeNum(i.returnedFreeQuantity)),
       0,
     );
     const todayFreeQty = items
       .filter((i) => i.order && isTodayBDDate(i.order.orderDate))
-      .reduce((sum, i) => sum + safeNum(i.freeQuantity), 0);
+      .reduce((sum, i) => sum + Math.max(0, safeNum(i.freeQuantity) - safeNum(i.returnedFreeQuantity)), 0);
     const totalFreeValue = items.reduce(
-      (sum, i) => sum + safeNum(i.freeQuantity) * safeNum(i.product?.salePrice),
+      (sum, i) => sum + Math.max(0, safeNum(i.freeQuantity) - safeNum(i.returnedFreeQuantity)) * safeNum(i.product?.salePrice),
       0,
     );
     const totalOrders = new Set(items.map((i) => i.orderId).filter(Boolean))
@@ -129,13 +129,13 @@ export class ReportsService {
           id: key,
           label: labelGetter(groupItems),
           totalQty: groupItems.reduce(
-            (sum, i) => sum + safeNum(i.freeQuantity),
+            (sum, i) => sum + Math.max(0, safeNum(i.freeQuantity) - safeNum(i.returnedFreeQuantity)),
             0,
           ),
           totalValue: groupItems.reduce(
             (sum, i) =>
               sum +
-              safeNum(i.freeQuantity) * safeNum(i.product?.salePrice || 0),
+              Math.max(0, safeNum(i.freeQuantity) - safeNum(i.returnedFreeQuantity)) * safeNum(i.product?.salePrice || 0),
             0,
           ),
         }))
@@ -185,10 +185,10 @@ export class ReportsService {
         deliveryMan: i.order?.assignedDeliveryMan?.name || 'Unassigned',
         product: i.product?.name,
         orderedQty: i.quantity,
-        freeQty: i.freeQuantity,
+        freeQty: Math.max(0, Number(i.freeQuantity) - Number(i.returnedFreeQuantity)),
         unit: i.product?.unit,
         price: i.product?.salePrice,
-        freeValue: Number(i.freeQuantity) * Number(i.product?.salePrice || 0),
+        freeValue: Math.max(0, Number(i.freeQuantity) - Number(i.returnedFreeQuantity)) * Number(i.product?.salePrice || 0),
         status: i.order?.status || 'Unknown',
       })),
       companySummary,
