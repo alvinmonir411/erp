@@ -53,6 +53,14 @@ class DueEntryDto {
   @IsNumber()
   amount: number;
 
+  @IsNumber()
+  @IsOptional()
+  shopId?: number;
+
+  @IsNumber()
+  @IsOptional()
+  productId?: number; // Reserved for future use, currently ignored by backend
+
   @IsString()
   @IsOptional()
   note?: string;

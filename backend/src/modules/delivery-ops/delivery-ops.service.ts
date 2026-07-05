@@ -1258,12 +1258,13 @@ export class DeliveryOpsService {
             `Order #${bo.orderId} is already settled. Batch settlement rejected.`,
           );
         }
-        const requestedDue =
-          dto.dueEntries?.find((d) => Number(d.orderId) === Number(bo.orderId))
-            ?.amount || 0;
-        if (!bo.order?.shopId && Number(requestedDue) > 0) {
+        const orderDueEntries = dto.dueEntries?.filter((d) => Number(d.orderId) === Number(bo.orderId)) || [];
+        const requestedDue = orderDueEntries.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
+        const hasDuesWithoutShopId = orderDueEntries.some(d => !d.shopId);
+
+        if (!bo.order?.shopId && Number(requestedDue) > 0 && (orderDueEntries.length === 0 || hasDuesWithoutShopId)) {
           throw new BadRequestException(
-            `Order #${bo.orderId} is a direct order (no shop) and cannot have a due. Settlement rejected.`,
+            `Order #${bo.orderId} is a direct order (no shop) and cannot have a due without specifying a shop. Settlement rejected.`,
           );
         }
       }
@@ -1306,10 +1307,14 @@ export class DeliveryOpsService {
             : Number(batchOrder.collectedAmount || 0),
         );
 
-        const requestedDue =
-          dto.dueEntries?.find(
-            (d) => Number(d.orderId) === Number(batchOrder.orderId),
-          )?.amount || 0;
+        const orderDueEntries = dto.dueEntries
+          ?.filter((d) => Number(d.orderId) === Number(batchOrder.orderId))
+          .map((d) => ({
+            shopId: d.shopId,
+            productId: d.productId,
+            amount: d.amount,
+            note: d.note || dto.note || batchOrder.deliveryNote,
+          }));
 
         // Settle individual order (Calculates finalSoldAmount and returns stock)
         const settledOrder = await this.ordersService.settleOrder(
@@ -1317,8 +1322,8 @@ export class DeliveryOpsService {
           {
             items: settlementItems,
             collectedAmount: Number(collectedAmount),
-            dueAmount: Number(requestedDue),
             settlementNote: dto.note || batchOrder.deliveryNote,
+            dueEntries: orderDueEntries,
           } as any,
           manager,
         );

@@ -232,23 +232,29 @@ export class DuesService {
     dueAmount: number,
     manager: any,
     note?: string,
+    targetShopId?: number,
   ) {
+    const finalShopId = targetShopId ?? order.shopId;
+
     if (dueAmount <= 0) {
       if (dueAmount < 0) {
         throw new BadRequestException('Due cannot be negative.');
       }
       // If due amount is explicitly 0, we can mark it as PAID or just not create it
-      const due = await manager.findOne(Due, { where: { orderId: order.id } });
-      if (due) {
-        due.remainingDue = 0;
-        due.status = DueStatus.PAID;
-        await manager.save(due);
+      if (finalShopId) {
+        const due = await manager.findOne(Due, { where: { orderId: order.id, shopId: finalShopId } });
+        if (due) {
+          due.remainingDue = 0;
+          due.status = DueStatus.PAID;
+          await manager.save(due);
+        }
+        return due;
       }
-      return due;
+      return null;
     }
 
     // Basic validations as requested
-    if (!order.shopId) {
+    if (!finalShopId) {
       throw new BadRequestException('Shop is required before creating due.');
     }
     if (!order.createdById) {
@@ -260,8 +266,6 @@ export class DuesService {
 
     const finalAmount = Number(order.actualSoldAmount || order.grandTotal || 0);
     const advance = Number(order.advancePaid || 0);
-    // Note: do NOT subtract alreadyCollected here — the caller (settleOrder) already passes the
-    // correctly-calculated net dueAmount after collection. Double-subtracting causes false rejections.
     const maxAllowed = Math.max(0, finalAmount - advance);
 
     if (dueAmount > maxAllowed + 0.01) {
@@ -269,8 +273,6 @@ export class DuesService {
         `Due amount cannot be greater than final amount. Max allowed is BDT ${maxAllowed}.`,
       );
     }
-
-    let due = await manager.findOne(Due, { where: { orderId: order.id } });
 
     let srId = order.createdById;
     let srName = order.createdBy;
@@ -294,39 +296,72 @@ export class DuesService {
       }
     }
 
-    if (!due) {
-      due = manager.create(Due, {
-        orderId: order.id,
-        shopId: order.shopId,
-        routeId: order.routeId,
-        srId: srId,
-        srName: srName,
-        dueAmount: dueAmount,
-        paidAmount: 0,
-        remainingDue: dueAmount,
-        status: DueStatus.DUE,
-        note: note,
-      });
-    } else {
-      // Update existing due
-      due.dueAmount = dueAmount;
-      due.remainingDue = Math.max(0, dueAmount - Number(due.paidAmount || 0));
+    let due = await manager.findOne(Due, {
+      where: { orderId: order.id, shopId: finalShopId },
+      lock: { mode: 'pessimistic_write' },
+    });
 
-      if (due.remainingDue <= 0) {
-        due.status = DueStatus.PAID;
-        due.remainingDue = 0;
-      } else if (due.paidAmount > 0) {
-        due.status = DueStatus.PARTIAL;
+    try {
+      if (!due) {
+        // Safe insert using QueryBuilder with OR UPDATE to handle concurrent insert race conditions
+        await manager
+          .createQueryBuilder()
+          .insert()
+          .into(Due)
+          .values({
+            orderId: order.id,
+            shopId: finalShopId,
+            routeId: order.routeId,
+            srId: srId,
+            srName: srName,
+            dueAmount: dueAmount,
+            paidAmount: 0,
+            remainingDue: dueAmount,
+            status: DueStatus.DUE,
+            note: note,
+          })
+          .orUpdate(
+            ['dueAmount', 'remainingDue', 'status', 'note'],
+            ['orderId', 'shopId']
+          )
+          .execute();
+
+        due = await manager.findOne(Due, {
+          where: { orderId: order.id, shopId: finalShopId },
+        });
       } else {
-        due.status = DueStatus.DUE;
-      }
+        // Update existing due
+        due.dueAmount = dueAmount;
+        due.remainingDue = Math.max(0, dueAmount - Number(due.paidAmount || 0));
 
-      if (note) {
-        due.note = note;
+        if (due.remainingDue <= 0) {
+          due.status = DueStatus.PAID;
+          due.remainingDue = 0;
+        } else if (due.paidAmount > 0) {
+          due.status = DueStatus.PARTIAL;
+        } else {
+          due.status = DueStatus.DUE;
+        }
+
+        if (note) {
+          due.note = note;
+        }
+        await manager.save(due);
+      }
+    } catch (err) {
+      // Fallback update in case of concurrency anomalies
+      due = await manager.findOne(Due, {
+        where: { orderId: order.id, shopId: finalShopId },
+      });
+      if (due) {
+        due.dueAmount = dueAmount;
+        due.remainingDue = Math.max(0, dueAmount - Number(due.paidAmount || 0));
+        due.status = due.remainingDue <= 0 ? DueStatus.PAID : (due.paidAmount > 0 ? DueStatus.PARTIAL : DueStatus.DUE);
+        if (note) due.note = note;
+        await manager.save(due);
       }
     }
 
-    await manager.save(due);
     return due;
   }
 

@@ -3,6 +3,7 @@ import {
   IsOptional,
   IsString,
   ValidateNested,
+  IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -23,6 +24,22 @@ class SettleOrderItemDto {
   damagedFreeQuantity: number;
 }
 
+class SettleOrderDueEntryDto {
+  @IsNumber()
+  shopId: number;
+
+  @IsNumber()
+  @IsOptional()
+  productId?: number; // Reserved for future use, currently ignored by backend
+
+  @IsNumber()
+  amount: number;
+
+  @IsString()
+  @IsOptional()
+  note?: string;
+}
+
 export class SettleOrderDto {
   @ValidateNested({ each: true })
   @Type(() => SettleOrderItemDto)
@@ -35,4 +52,10 @@ export class SettleOrderDto {
   @IsString()
   @IsOptional()
   settlementNote?: string;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => SettleOrderDueEntryDto)
+  dueEntries?: SettleOrderDueEntryDto[];
 }

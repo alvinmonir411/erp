@@ -85,7 +85,7 @@ export class DashboardService {
           'cancelledOrdersCount',
         )
         .addSelect(
-          `SUM(CASE WHEN order.status = 'SETTLED' THEN
+          `SUM(CASE WHEN order.status IN ('SETTLED', 'PARTIAL_DUE') THEN
           COALESCE(item.deliveredPaidQuantity, 0) * (
             CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
             ELSE COALESCE(item.unitPrice, 0) END
@@ -113,7 +113,7 @@ export class DashboardService {
           'todayDispatchValue',
         )
         .addSelect(
-          `SUM(CASE WHEN order.status = 'SETTLED' AND order.settledAt >= :todayStartUTC AND order.settledAt <= :todayEndUTC THEN
+          `SUM(CASE WHEN order.status IN ('SETTLED', 'PARTIAL_DUE') AND order.settledAt >= :todayStartUTC AND order.settledAt <= :todayEndUTC THEN
           COALESCE(item.deliveredPaidQuantity, 0) * (
             CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
             ELSE COALESCE(item.unitPrice, 0) END
@@ -158,7 +158,7 @@ export class DashboardService {
           'cancelledOrdersCount',
         )
         .addSelect(
-          `SUM(CASE WHEN order.status = 'SETTLED' THEN COALESCE(order.actualSoldAmount, 0) ELSE 0 END)`,
+          `SUM(CASE WHEN order.status IN ('SETTLED', 'PARTIAL_DUE') THEN COALESCE(order.actualSoldAmount, 0) ELSE 0 END)`,
           'netSales',
         )
 
@@ -181,7 +181,7 @@ export class DashboardService {
           'todayDispatchValue',
         )
         .addSelect(
-          `SUM(CASE WHEN order.status = 'SETTLED' AND order.settledAt >= :todayStartUTC AND order.settledAt <= :todayEndUTC THEN COALESCE(order.actualSoldAmount, 0) ELSE 0 END)`,
+          `SUM(CASE WHEN order.status IN ('SETTLED', 'PARTIAL_DUE') AND order.settledAt >= :todayStartUTC AND order.settledAt <= :todayEndUTC THEN COALESCE(order.actualSoldAmount, 0) ELSE 0 END)`,
           'todaySettledValue',
         )
         .addSelect(
@@ -220,7 +220,7 @@ export class DashboardService {
       )`,
         'profit',
       )
-      .where('order.status = :status', { status: OrderStatus.SETTLED })
+      .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
       .andWhere(companyId ? 'product.companyId = :companyId' : '1=1', {
         companyId,
       })
@@ -254,15 +254,11 @@ export class DashboardService {
         .getRawOne();
       totalDueAmount = safeNum(dueRes?.totalDue);
 
-      // Fetch today's new dues
       const todayDuesQb = this.duesRepository
         .createQueryBuilder('due')
-        .leftJoin('due.order', 'order')
+        .innerJoin('due.order', 'order')
         .select('SUM(COALESCE(due.dueAmount, 0))', 'todayDue')
-        .where(
-          'due.createdAt >= :todayStartUTC AND due.createdAt <= :todayEndUTC',
-          { todayStartUTC, todayEndUTC },
-        );
+        .where('order.orderDate = :todayDateStr', { todayDateStr });
       if (companyId) {
         todayDuesQb
           .innerJoin('order.items', 'item')
@@ -426,7 +422,7 @@ export class DashboardService {
         )`,
           'daySales',
         )
-        .where('order.status = :status', { status: OrderStatus.SETTLED })
+        .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
         .andWhere('product.companyId = :companyId', { companyId })
         .andWhere('order.settledAt >= :startRangeUtc', { startRangeUtc })
         .groupBy(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`);
@@ -437,7 +433,7 @@ export class DashboardService {
           'dayDate',
         )
         .addSelect('SUM(COALESCE(order.actualSoldAmount, 0))', 'daySales')
-        .where('order.status = :status', { status: OrderStatus.SETTLED })
+        .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
         .andWhere('order.settledAt >= :startRangeUtc', { startRangeUtc })
         .groupBy(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`);
     }
@@ -486,7 +482,7 @@ export class DashboardService {
       )`,
         'sales',
       )
-      .where('order.status = :status', { status: OrderStatus.SETTLED });
+      .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] });
 
     if (companyId) {
       salesQb.andWhere('product.companyId = :companyId', { companyId });
@@ -533,7 +529,7 @@ export class DashboardService {
           )`,
             'profit',
           )
-          .where('order.status = :status', { status: OrderStatus.SETTLED });
+          .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] });
 
         if (companyId) {
           profitQb.andWhere('product.companyId = :companyId', { companyId });

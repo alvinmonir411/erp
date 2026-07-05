@@ -754,7 +754,42 @@ export class OrdersService {
       // from the DB fetch above, and rejects legitimate dues with a false "amount > max" error.
       order.actualSoldAmount = grandTotal;
       order.collectedAmount = collectedAmount;
-      await this.duesService.upsertDue(order, dueAmount, m, dto.settlementNote);
+
+      if (dto.dueEntries && dto.dueEntries.length > 0) {
+        // 1. Merge duplicate shop entries by summing their amounts
+        const mergedDues = new Map<number, { amount: number; note?: string }>();
+        for (const entry of dto.dueEntries) {
+          const shopId = entry.shopId;
+          const current = mergedDues.get(shopId) || { amount: 0, note: entry.note };
+          mergedDues.set(shopId, {
+            amount: current.amount + entry.amount,
+            note: entry.note || current.note || dto.settlementNote,
+          });
+        }
+
+        // 2. Validate shop existence and route belonging
+        for (const [shopId, data] of mergedDues.entries()) {
+          const shop = await m.getRepository(Shop).findOne({ where: { id: shopId } });
+          if (!shop) {
+            throw new BadRequestException(`Shop #${shopId} not found.`);
+          }
+          if (shop.routeId && order.routeId && shop.routeId !== order.routeId) {
+            throw new BadRequestException(`Shop #${shopId} belongs to a different route than the order.`);
+          }
+
+          // 3. Upsert due record
+          await this.duesService.upsertDue(
+            order,
+            data.amount,
+            m,
+            data.note,
+            shopId,
+          );
+        }
+      } else {
+        // Fallback to standard flow
+        await this.duesService.upsertDue(order, dueAmount, m, dto.settlementNote);
+      }
 
       return m.findOne(Order, {
         where: { id },

@@ -21,7 +21,6 @@ export enum DueStatus {
 }
 
 @Entity('dues')
-@Unique(['orderId'])
 @Index(['srId', 'status'])
 @Index(['routeId', 'status'])
 export class Due {

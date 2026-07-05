@@ -14,12 +14,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  ChevronRight
+  ChevronRight,
+  Trash2
 } from 'lucide-react';
 import { formatCurrency, formatDate, toNumber } from '@/lib/utils/format';
 import { getShops, createShop } from '@/lib/api/shops';
-import { updateOrderShop } from '@/lib/api/orders';
-// Removed unused upsertDue import
 import { useToast } from '@/components/ui/toast-provider';
 import type { Order, Shop, Route } from '@/types/api';
 
@@ -29,10 +28,10 @@ interface DueModalProps {
   productName: string;
   productId: number;
   batchOrders: any[]; // DispatchBatchOrder with order relation
-  draftDues: Record<number, number>;
+  draftDues: Record<number, Array<{ shopId: number; shopName: string; amount: number; note?: string }>>;
   route: Route;
   companyId: number;
-  onAddDraftDue: (orderId: number, amount: number) => void;
+  onAddDraftDue: (orderId: number, dues: Array<{ shopId: number; shopName: string; amount: number; note?: string }>) => void;
   onSuccess: () => void;
 }
 
@@ -55,12 +54,16 @@ export function DueModal({
   const [isSaving, setIsSaving] = useState(false);
   
   // Shop management state
+  const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [showShopSelector, setShowShopSelector] = useState(false);
   const [showCreateShop, setShowCreateShop] = useState(false);
   const [allShops, setAllShops] = useState<Shop[]>([]);
   const [isLoadingShops, setIsLoadingShops] = useState(false);
   const [shopSearch, setShopSearch] = useState('');
   
+  // List of added dues for this order/product
+  const [orderDues, setOrderDues] = useState<Array<{ shopId: number; shopName: string; amount: number; note?: string }>>([]);
+
   // New shop form
   const [newShop, setNewShop] = useState({
     name: '',
@@ -88,86 +91,51 @@ export function DueModal({
     [relevantOrders, selectedOrderId]
   );
 
+  const maxAllowed = useMemo(() => {
+    if (!selectedOrder) return 0;
+    const finalAmount = Number(selectedOrder.finalSoldAmount || 0);
+    const advance = Number(selectedOrder.order?.advancePaid || 0);
+    return Math.max(0, finalAmount - advance);
+  }, [selectedOrder]);
+
+  const currentTotalDues = useMemo(() => {
+    return orderDues.reduce((sum, d) => sum + d.amount, 0);
+  }, [orderDues]);
+
+  const remainingBalanceForDues = useMemo(() => {
+    return Math.max(0, maxAllowed - currentTotalDues);
+  }, [maxAllowed, currentTotalDues]);
+
   useEffect(() => {
     if (isOpen) {
-      // Auto-select if only one order
       if (relevantOrders.length === 1) {
-        setSelectedOrderId(relevantOrders[0].orderId);
-        if (toNumber(relevantOrders[0].dueAmount) > 0) {
-          setDueAmount(String(relevantOrders[0].dueAmount));
-        }
+        const oid = relevantOrders[0].orderId;
+        setSelectedOrderId(oid);
+        setOrderDues(draftDues[oid] || []);
       }
       fetchShops();
     } else {
-      // Reset state on close
       setSelectedOrderId(null);
       setDueAmount('');
       setNote('');
+      setOrderDues([]);
+      setSelectedShop(null);
       setShowShopSelector(false);
       setShowCreateShop(false);
     }
-  }, [isOpen, relevantOrders]);
+  }, [isOpen, relevantOrders, draftDues]);
 
-  const maxAllowed = useMemo(() => {
-    if (!selectedOrder) return 0;
-    
-    // The final sold amount is the actual delivered value of the order
-    const finalAmount = Number(selectedOrder.finalSoldAmount || 0);
-    const advance = Number(selectedOrder.order?.advancePaid || 0);
-    
-    // Note: Do not subtract selectedOrder.dueAmount here! 
-    // selectedOrder.dueAmount contains the initial order's remaining due (e.g. 650),
-    // which caused the bug where maxAllowed became 0.
-    // The max allowed should be the final amount minus advance minus any ALREADY SAVED delivery dues (if we had them).
-    // Also, we do NOT subtract the draft due for this order because the user is currently editing it.
-    const existingSavedDueForThisOrder = 0; 
-    
-    return Math.max(0, finalAmount - advance - existingSavedDueForThisOrder);
-  }, [selectedOrder]);
-
-  // Auto-fill due amount when order is selected
-  useEffect(() => {
-    if (selectedOrderId && maxAllowed > 0) {
-       // If there is an existing draft for THIS order, show that
-       if (draftDues[selectedOrderId]) {
-         setDueAmount(String(draftDues[selectedOrderId]));
-       } else {
-         // Otherwise auto-fill with max
-         setDueAmount(String(maxAllowed));
-       }
-    } else if (selectedOrderId && maxAllowed === 0) {
-       setDueAmount('0');
-    }
-  }, [selectedOrderId, maxAllowed, draftDues]);
-
-  const validation = useMemo(() => {
-    if (!selectedOrderId) return { isValid: false, message: 'Select an order first.' };
-    
-    if (maxAllowed === 0) {
-      return { isValid: false, message: 'Max allowed is BDT 0.' };
-    }
-    
-    if (!dueAmount) return { isValid: false, message: 'Enter a due amount.' };
-    
-    const amount = Number(dueAmount);
-    if (isNaN(amount)) return { isValid: false, message: 'Invalid amount.' };
-    if (amount < 0) return { isValid: false, message: 'Due cannot be negative.' };
-    if (amount === 0) return { isValid: false, message: 'Due amount must be greater than 0.' };
-    
-    if (amount > maxAllowed) {
-      return { 
-        isValid: false, 
-        message: `Due amount cannot be greater than final amount. Max allowed is BDT ${maxAllowed}.` 
-      };
-    }
-    
-    return { isValid: true, message: 'Ready to save' };
-  }, [dueAmount, maxAllowed, selectedOrderId]);
+  const handleOrderChange = (oid: number) => {
+    setSelectedOrderId(oid);
+    setOrderDues(draftDues[oid] || []);
+    setSelectedShop(null);
+    setDueAmount('');
+    setNote('');
+  };
 
   const fetchShops = async () => {
     try {
       setIsLoadingShops(true);
-      // Fetch shops for the current route
       const shops = await getShops(route.id);
       setAllShops(shops);
     } catch (error) {
@@ -187,25 +155,64 @@ export function DueModal({
     );
   }, [allShops, shopSearch]);
 
-  const handleLinkShop = async (shopId: number) => {
-    if (!selectedOrderId) return;
-    try {
-      setIsSaving(true);
-      await updateOrderShop(selectedOrderId, shopId);
-      showSuccessToast('Shop linked to order successfully');
-      // Update local state to reflect the link
-      onSuccess(); // Refresh batch data
+  const handleAddShopDue = () => {
+    if (!selectedShop) {
+      showErrorToast('Please select a shop first.');
+      return;
+    }
+    const amount = Number(dueAmount);
+    if (isNaN(amount) || amount <= 0) {
+      showErrorToast('Please enter a valid amount greater than 0.');
+      return;
+    }
+    
+    const potentialTotal = currentTotalDues + amount;
+
+    if (potentialTotal > maxAllowed + 0.01) {
+      showErrorToast(`Total dues (${potentialTotal}) cannot exceed max allowed BDT ${maxAllowed}.`);
+      return;
+    }
+
+    const existingIndex = orderDues.findIndex(d => d.shopId === selectedShop.id);
+    if (existingIndex > -1) {
+      setOrderDues(prev => {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          amount: updated[existingIndex].amount + amount,
+          note: note ? note.trim() : updated[existingIndex].note,
+        };
+        return updated;
+      });
+      showSuccessToast(`Dues merged for ${selectedShop.name}.`);
+    } else {
+      setOrderDues(prev => [
+        ...prev,
+        { shopId: selectedShop.id, shopName: selectedShop.name, amount, note: note ? note.trim() : undefined }
+      ]);
+      showSuccessToast(`Due added for ${selectedShop.name}.`);
+    }
+
+    setSelectedShop(null);
+    setDueAmount('');
+    setNote('');
+  };
+
+  const handleRemoveShopDue = (shopId: number) => {
+    setOrderDues(prev => prev.filter(d => d.shopId !== shopId));
+    showSuccessToast('Due entry removed.');
+  };
+
+  const handleLinkShop = (shopId: number) => {
+    const shop = allShops.find(s => s.id === shopId);
+    if (shop) {
+      setSelectedShop(shop);
       setShowShopSelector(false);
-    } catch (error: any) {
-      showErrorToast(error.message || 'Failed to link shop');
-    } finally {
-      setIsSaving(false);
     }
   };
 
   const handleCreateShop = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrderId) return;
     try {
       setIsSaving(true);
       const shop = await createShop({
@@ -213,9 +220,9 @@ export function DueModal({
         routeId: route.id,
         companyId: companyId
       });
-      await updateOrderShop(selectedOrderId, shop.id);
-      showSuccessToast('Shop created and linked to order');
-      onSuccess(); // Refresh batch data
+      showSuccessToast('Shop created successfully.');
+      setSelectedShop(shop);
+      fetchShops();
       setShowCreateShop(false);
       setShowShopSelector(false);
     } catch (error: any) {
@@ -225,23 +232,10 @@ export function DueModal({
     }
   };
 
-  const handleSaveDue = async () => {
-    if (!selectedOrder || !dueAmount) return;
-    
-    if (!validation.isValid) {
-      showErrorToast(validation.message);
-      return;
-    }
-
-    if (!selectedOrder.order.shopId) {
-      showErrorToast('Please link a shop before adding due');
-      setShowShopSelector(true);
-      return;
-    }
-
-    // Instead of API call, we just update the draft in parent
-    onAddDraftDue(selectedOrder.orderId, Number(dueAmount));
-    showSuccessToast('Due added to settlement draft');
+  const handleSaveAllDues = () => {
+    if (!selectedOrderId) return;
+    onAddDraftDue(selectedOrderId, orderDues);
+    showSuccessToast('Dues updated in settlement draft');
     onClose();
   };
 
@@ -262,10 +256,11 @@ export function DueModal({
             </div>
           </div>
         )}
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
           <div>
-            <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Assign Due for {productName}</h2>
+            <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Assign Shop Dues: {productName}</h2>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{route.name} Route</p>
           </div>
           <button 
@@ -280,7 +275,7 @@ export function DueModal({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
           {/* Order Selection */}
-          {!selectedOrderId || (!showShopSelector && !showCreateShop) ? (
+          {relevantOrders.length > 1 && !selectedOrderId ? (
             <div className="space-y-4">
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
                 <Package className="h-3 w-3" />
@@ -290,7 +285,7 @@ export function DueModal({
                 {relevantOrders.map(ro => (
                   <button
                     key={ro.orderId}
-                    onClick={() => setSelectedOrderId(ro.orderId)}
+                    onClick={() => handleOrderChange(ro.orderId)}
                     className={`w-full flex flex-col gap-3 rounded-2xl border-2 p-4 text-left transition-all ${
                       selectedOrderId === ro.orderId 
                         ? 'border-cyan-600 bg-cyan-50/30' 
@@ -304,9 +299,7 @@ export function DueModal({
                           </div>
                           <div>
                              <p className="text-sm font-black text-slate-900 leading-tight mb-0.5">
-                               {ro.order.shop?.name || (
-                                 <span className="text-amber-500">⚠ No Shop — Link Below</span>
-                               )}
+                               {ro.order.shop?.name || "Consolidated Fast-Track Order"}
                              </p>
                              <p className="text-[10px] font-bold text-slate-500 uppercase">
                                Order #{ro.orderId} · SR: {ro.order.createdBy || '—'}
@@ -318,116 +311,146 @@ export function DueModal({
                           <p className="text-[10px] font-bold text-slate-400 uppercase">Final Amount</p>
                        </div>
                     </div>
-                    
-                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100/50">
-                       <div>
-                          <p className="text-[8px] font-black uppercase text-slate-400">Ordered Qty</p>
-                          <p className="text-xs font-bold text-slate-700">{ro.orderItem.quantity} {ro.orderItem.product.unit}</p>
-                       </div>
-                       <div>
-                          <p className="text-[8px] font-black uppercase text-slate-400">Date</p>
-                          <p className="text-xs font-bold text-slate-700">{formatDate(ro.order.orderDate)}</p>
-                       </div>
-                       <div>
-                          <p className="text-[8px] font-black uppercase text-slate-400">Advance</p>
-                          <p className="text-xs font-bold text-emerald-600">{formatCurrency(ro.order.advancePaid || 0)}</p>
-                       </div>
-                    </div>
                   </button>
                 ))}
               </div>
             </div>
           ) : null}
 
-          {/* Due Entry Form */}
-          {selectedOrder && !showShopSelector && !showCreateShop && (
-            <div className="space-y-6 pt-2 border-t border-slate-100 mt-6">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                       <Plus className="h-3 w-3 text-cyan-600" />
-                       Due Amount
-                    </label>
-                    <div className="relative">
-                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
-                       <input 
-                        type="number"
-                        value={dueAmount}
-                        onChange={(e) => setDueAmount(e.target.value)}
-                        placeholder="0.00"
-                        className={`w-full rounded-2xl border-2 py-3.5 pl-8 pr-4 text-lg font-black outline-none transition-all ${
-                          dueAmount && !validation.isValid 
-                            ? 'border-rose-500 bg-rose-50 text-rose-900 focus:border-rose-600' 
-                            : 'border-slate-100 bg-slate-50 text-slate-900 focus:border-cyan-600 focus:bg-white'
-                        }`}
-                       />
-                    </div>
-                    <p className={`text-[10px] font-bold uppercase ${dueAmount && !validation.isValid ? 'text-rose-500' : 'text-slate-400'}`}>
-                      {dueAmount && !validation.isValid ? validation.message : `Max allowed: ${formatCurrency(maxAllowed)}`}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Note (Optional)</label>
-                    <textarea 
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      rows={2}
-                      placeholder="Enter a reason or note..."
-                      className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 p-4 text-sm font-medium text-slate-900 outline-none focus:border-cyan-600 focus:bg-white transition-all resize-none"
-                    />
-                  </div>
-               </div>
-
-               {!selectedOrder.order.shopId ? (
-                 <div className="rounded-2xl bg-amber-50 p-4 flex items-start gap-3 border border-amber-100">
-                    <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-xl bg-amber-100 text-amber-600 mt-0.5">
-                       <AlertCircle className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1">
-                       <p className="text-sm font-bold text-amber-900">Shop missing for this order</p>
-                       <p className="text-xs text-amber-700 mt-0.5">একটি Order একটি Shop এর সাথে linked। Due দেওয়ার আগে Shop link করুন।</p>
-                       <button 
-                         onClick={() => setShowShopSelector(true)}
-                         className="mt-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-black uppercase text-white hover:bg-amber-700 transition-colors"
-                       >
-                         Shop Link করুন
-                       </button>
-                    </div>
-                 </div>
-               ) : validation.isValid ? (
-                 <div className="rounded-2xl bg-emerald-50 p-4 flex items-center justify-between gap-3 border border-emerald-100">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                         <CheckCircle2 className="h-5 w-5" />
+          {/* Dues Entry Forms */}
+          {selectedOrderId && !showShopSelector && !showCreateShop && (
+            <div className="space-y-6">
+              
+              {/* List of Added Dues */}
+              <div className="space-y-3">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  Already Added Dues
+                </h3>
+                <div className="border border-slate-100 rounded-2xl divide-y divide-slate-100 bg-slate-50/30">
+                  {orderDues.map((due) => (
+                    <div key={due.shopId} className="flex items-center justify-between p-4 group">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-900 truncate">{due.shopName}</p>
+                        {due.note && <p className="text-xs text-slate-400 truncate mt-0.5">{due.note}</p>}
                       </div>
-                      <div>
-                         <p className="text-sm font-bold text-emerald-900">Ready to save</p>
-                         <p className="text-xs text-emerald-700">Shop: <span className="font-bold">{selectedOrder.order.shop?.name || 'Linked Shop'}</span></p>
+                      <div className="flex items-center gap-4 ml-4">
+                        <span className="text-sm font-black text-slate-900">{formatCurrency(due.amount)}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveShopDue(due.shopId)}
+                          className="text-slate-400 hover:text-rose-600 transition-colors p-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setShowShopSelector(true)}
-                      className="flex-shrink-0 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-emerald-700 hover:bg-emerald-100 transition-colors"
-                    >
-                      Change
-                    </button>
-                 </div>
-               ) : dueAmount ? (
-                 <div className="rounded-2xl bg-rose-50 p-4 flex items-center gap-3 border border-rose-100">
-                    <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-rose-100 text-rose-600">
-                       <AlertCircle className="h-5 w-5" />
+                  ))}
+                  {orderDues.length === 0 && (
+                    <div className="p-6 text-center text-slate-400 font-bold text-sm">
+                      No dues added yet.
                     </div>
-                    <div>
-                       <p className="text-sm font-bold text-rose-900">Cannot save</p>
-                       <p className="text-xs text-rose-700">{validation.message}</p>
+                  )}
+                  
+                  {/* Summary Totals Footer */}
+                  <div className="p-4 bg-slate-50/50 flex items-center justify-between font-black text-sm text-slate-700">
+                    <span>Total Due Added:</span>
+                    <div className="text-right">
+                      <p className="text-cyan-700 font-black">{formatCurrency(currentTotalDues)}</p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">
+                        Max Allowed: {formatCurrency(maxAllowed)}
+                      </p>
                     </div>
-                 </div>
-               ) : null}
+                  </div>
+                </div>
+              </div>
+
+              {/* Form to Add Shop Due */}
+              <div className="border-t border-slate-100 pt-6 space-y-4">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  Add Shop Due
+                </h3>
+
+                <div className="space-y-4">
+                  {/* Shop Select Button */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-slate-400 px-1">Shop</label>
+                    {selectedShop ? (
+                      <div className="flex items-center justify-between border-2 border-cyan-100 bg-cyan-50/20 rounded-2xl p-4">
+                        <div className="flex items-center gap-3">
+                          <Store className="h-5 w-5 text-cyan-600" />
+                          <div>
+                            <p className="text-sm font-black text-slate-900">{selectedShop.name}</p>
+                            <p className="text-xs text-slate-400">{selectedShop.ownerName}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedShop(null)}
+                          className="text-xs font-bold text-rose-600 hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowShopSelector(true)}
+                        className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 py-4 text-sm font-black text-slate-400 hover:border-cyan-600 hover:text-cyan-600 transition-all bg-slate-50/30"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Select Shop from Route
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Due Amount Input */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-slate-400 px-1">Due Amount</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
+                        <input 
+                          type="number"
+                          value={dueAmount}
+                          onChange={(e) => setDueAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 py-3 pl-8 pr-4 text-base font-black outline-none focus:border-cyan-600 focus:bg-white transition-all"
+                        />
+                      </div>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase px-1">
+                        Remaining Limit: {formatCurrency(remainingBalanceForDues)}
+                      </p>
+                    </div>
+
+                    {/* Note Input */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-slate-400 px-1">Note (Optional)</label>
+                      <input 
+                        type="text"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="Due reason..."
+                        className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-3 text-sm font-medium outline-none focus:border-cyan-600 focus:bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddShopDue}
+                    disabled={!selectedShop || !dueAmount || Number(dueAmount) <= 0 || Number(dueAmount) > remainingBalanceForDues}
+                    className="w-full py-3.5 rounded-2xl bg-cyan-700 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-cyan-100 hover:bg-cyan-800 disabled:opacity-50 disabled:bg-slate-300 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add/Merge Due Entry
+                  </button>
+                </div>
+              </div>
+
             </div>
           )}
 
-          {/* Shop Selector */}
+          {/* Shop Selector Section */}
           {showShopSelector && !showCreateShop && (
             <div className="space-y-4">
                <div className="flex items-center justify-between">
@@ -456,8 +479,7 @@ export function DueModal({
                     <button
                       key={shop.id}
                       onClick={() => handleLinkShop(shop.id)}
-                      disabled={isSaving}
-                      className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-cyan-200 hover:bg-cyan-50/20 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-cyan-200 hover:bg-cyan-50/20 transition-all text-left group"
                     >
                        <div className="flex items-center gap-3">
                           <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 group-hover:bg-cyan-100 group-hover:text-cyan-600">
@@ -557,12 +579,6 @@ export function DueModal({
 
         {/* Footer */}
         <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:px-6 sm:py-5 flex flex-col gap-3 pb-8 sm:pb-5">
-           {/* Architectural note */}
-           <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-2.5">
-             <p className="text-[10px] font-bold text-blue-700 uppercase leading-relaxed">
-               ℹ️ একটি Order = একটি Shop। আলাদা দোকানের জন্য Fast Track Dispatch থেকে আলাদা Order বানান।
-             </p>
-           </div>
            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3">
              <button 
               onClick={onClose}
@@ -572,12 +588,12 @@ export function DueModal({
              </button>
              {!showShopSelector && !showCreateShop && (
               <button 
-                onClick={handleSaveDue}
-                disabled={isSaving || !selectedOrderId || !dueAmount || !validation.isValid || maxAllowed === 0}
-                className="w-full sm:w-auto px-10 py-3.5 sm:py-3 rounded-xl bg-slate-900 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-slate-200 hover:bg-slate-800 disabled:opacity-50 disabled:bg-slate-400 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+                onClick={handleSaveAllDues}
+                disabled={isSaving || !selectedOrderId}
+                className="w-full sm:w-auto px-10 py-3.5 sm:py-3 rounded-xl bg-slate-900 text-sm font-black uppercase tracking-widest text-white shadow-xl tracking-widest hover:bg-slate-800 disabled:opacity-50 disabled:bg-slate-400 disabled:shadow-none transition-all flex items-center justify-center gap-2"
                >
-               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-               Add Due to Settlement
+               <CheckCircle2 className="h-4 w-4" />
+               Save All Dues
              </button>
             )}
            </div>

@@ -277,6 +277,53 @@ export class SchemaSyncService implements OnApplicationBootstrap {
         );
         ALTER TABLE "dues" ADD COLUMN IF NOT EXISTS "note" TEXT;
       `);
+
+      try {
+        this.logger.log('Performing sanity checks on dues data...');
+        // Clean up duplicate (orderId, shopId) pairs if any exist before applying constraint
+        await this.dataSource.query(`
+          DELETE FROM dues a USING dues b 
+          WHERE a.id < b.id 
+            AND a."orderId" = b."orderId" 
+            AND a."shopId" = b."shopId";
+        `);
+
+        this.logger.log('Dropping old single-column orderId unique constraints/indexes...');
+        await this.dataSource.query(`
+          ALTER TABLE "dues" DROP CONSTRAINT IF EXISTS "unique_due_order_id";
+        `);
+
+        // Drop any other single-column unique constraints on orderId dynamically
+        await this.dataSource.query(`
+          DO $$
+          DECLARE
+              r RECORD;
+          BEGIN
+              FOR r IN (
+                  SELECT conname 
+                  FROM pg_constraint 
+                  WHERE conrelid = 'dues'::regclass 
+                    AND contype = 'u' 
+                    AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'dues'::regclass AND attname = 'orderId')]
+              ) LOOP
+                  EXECUTE 'ALTER TABLE dues DROP CONSTRAINT ' || quote_ident(r.conname);
+              END LOOP;
+          END $$;
+        `);
+
+        // Drop any single-column unique indexes on orderId
+        await this.dataSource.query(`
+          DROP INDEX IF EXISTS "UQ_dues_orderId";
+          DROP INDEX IF EXISTS "UQ_8de71cc0cf02d8479e0a0a56ff6";
+        `);
+
+        this.logger.log('Creating composite unique index on (orderId, shopId)...');
+        await this.dataSource.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS "UQ_dues_orderId_shopId" ON dues("orderId", "shopId");
+        `);
+      } catch (e) {
+        this.logger.error('Failed to migrate dues constraints:', e.message);
+      }
     } catch (e) {
       this.logger.error('Failed to sync dues table:', e.message);
     }
