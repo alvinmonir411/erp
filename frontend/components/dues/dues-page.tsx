@@ -87,7 +87,7 @@ export function DuesPage() {
 
   const filteredDues = dues.filter((due: any) => 
     due.shop?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    due.srName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    due.deliveryManName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     due.orderId.toString().includes(searchTerm)
   );
 
@@ -203,7 +203,7 @@ export function DuesPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input
               type="text"
-              placeholder="Search by shop or SR..."
+              placeholder="Search by shop or delivery man..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
@@ -216,7 +216,7 @@ export function DuesPage() {
             <thead className="bg-zinc-50/50 text-xs font-semibold uppercase tracking-wider text-muted">
               <tr>
                 <th className="px-6 py-4">Shop & Order</th>
-                <th className="px-6 py-4">SR / Delivery Man</th>
+                <th className="px-6 py-4">Delivery Man</th>
                 <th className="px-6 py-4">Due Amount</th>
                 <th className="px-6 py-4">Paid</th>
                 <th className="px-6 py-4">Remaining</th>
@@ -258,21 +258,11 @@ export function DuesPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[9px] font-bold flex-shrink-0">
-                            {due.srName?.charAt(0) || 'S'}
-                          </div>
-                          <span className="font-bold text-zinc-900 text-xs">{due.srName || '—'}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-[9px] font-bold flex-shrink-0">
+                          {due.deliveryManName?.charAt(0) || 'D'}
                         </div>
-                        {due.deliveryManName && (
-                          <div className="flex items-center gap-2 pl-0.5">
-                            <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-[9px] font-bold flex-shrink-0">
-                              {due.deliveryManName?.charAt(0)}
-                            </div>
-                            <span className="text-[10px] font-medium text-zinc-500">{due.deliveryManName}</span>
-                          </div>
-                        )}
+                        <span className="font-bold text-zinc-900 text-xs">{due.deliveryManName || '—'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">{formatCurrency(due.dueAmount)}</td>
@@ -346,7 +336,7 @@ export function DuesPage() {
                       >
                         Order #{due.orderId}
                       </button>
-                      <p className="text-[10px] font-medium text-muted uppercase tracking-tight">SR: {due.srName}{due.deliveryManName ? ` · DM: ${due.deliveryManName}` : ''}</p>
+                      <p className="text-[10px] font-medium text-muted uppercase tracking-tight">Delivery Man: {due.deliveryManName || '—'}</p>
                     </div>
                   </div>
                   <span className={`px-2 py-1 rounded-md text-[10px] font-black border ${getStatusColor(due.status)}`}>

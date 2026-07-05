@@ -1,8 +1,8 @@
 [
   {
-    "id": "ae33adf1-0d72-4318-a51f-7fac0d2f2f6f",
-    "name": "Super Admin",
-    "username": "admin",
+    "id": "d43e1f28-d7ee-4be8-98e7-6caa120d0558",
+    "name": "Alvin Monir",
+    "username": "alvinmonir411",
     "role": "SUPER_ADMIN",
     "status": "ACTIVE"
   },
@@ -60,6 +60,13 @@
     "name": "ARIFUL",
     "username": "ARIFUL",
     "role": "DELIVERY_MAN",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "ae33adf1-0d72-4318-a51f-7fac0d2f2f6f",
+    "name": "Super Admin",
+    "username": "admin",
+    "role": "SUPER_ADMIN",
     "status": "ACTIVE"
   }
 ]

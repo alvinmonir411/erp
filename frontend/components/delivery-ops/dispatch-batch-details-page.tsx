@@ -30,7 +30,7 @@ import {
   deleteDispatchBatch,
 } from '@/lib/api/delivery-ops';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils/format';
-import type { DispatchBatch } from '@/types/api';
+import type { DispatchBatch, DispatchBatchOrder } from '@/types/api';
 import { batchStatusConfig, orderStatusConfig, StatusBadge } from './delivery-ops-ui';
 import { PrintSummary } from './print-summary';
 import { DueModal } from './due-modal';
@@ -71,6 +71,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     free: string;
   }>>({});
   const [draftDues, setDraftDues] = useState<Record<number, number>>({});
+  const [draftDueProductIds, setDraftDueProductIds] = useState<Record<number, number>>({});
   const [dueModalProduct, setDueModalProduct] = useState<{ id: number; name: string } | null>(null);
   const [actualCashReceived, setActualCashReceived] = useState<string>('');
   const [batchToDelete, setBatchToDelete] = useState<{ id: number; batchNo: string; isSettled: boolean } | null>(null);
@@ -270,6 +271,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   useEffect(() => {
     setActualCashReceived('');
     setDraftDues({});
+    setDraftDueProductIds({});
     setBatchReturnState({});
     cashManuallyEdited.current = false; // allow auto-fill for fresh batch
   }, [batchId]);
@@ -321,6 +323,23 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
   const batchStatus = batch ? batchStatusConfig[batch.status] : null;
   const isBatchSettled = batch ? ['SETTLED', 'PARTIALLY_SETTLED'].includes(batch.status) : false;
+
+  const getDueForProductRow = (batchOrder: DispatchBatchOrder, productId: number) => {
+    const dueAmount = isBatchSettled
+      ? Number(batchOrder.dueAmount || 0)
+      : Number(draftDues[batchOrder.orderId] || 0);
+
+    if (dueAmount <= 0) return 0;
+
+    const selectedProductId = draftDueProductIds[batchOrder.orderId];
+    if (selectedProductId !== undefined) {
+      return selectedProductId === productId ? dueAmount : 0;
+    }
+
+    return batchOrder.order.items.some((item) => item.productId === productId)
+      ? dueAmount
+      : 0;
+  };
 
   const settledDuesTotal = useMemo(() => {
     if (!batch) return 0;
@@ -873,11 +892,9 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   const itemCashValue = sold * item.price;
                   const itemDraftDue = isBatchSettled
                     ? batch.orders
-                      .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                      .reduce((sum, bo) => sum + Number(bo.dueAmount || 0), 0)
+                      .reduce((sum, bo) => sum + getDueForProductRow(bo, item.productId), 0)
                     : batch.orders
-                      .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                      .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0);
+                      .reduce((sum, bo) => sum + getDueForProductRow(bo, item.productId), 0);
 
                   return (
                     <tr
@@ -1000,11 +1017,9 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               const itemCashValue = sold * item.price;
               const itemDraftDue = isBatchSettled
                 ? batch.orders
-                    .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                    .reduce((sum, bo) => sum + Number(bo.dueAmount || 0), 0)
+                    .reduce((sum, bo) => sum + getDueForProductRow(bo, item.productId), 0)
                 : batch.orders
-                    .filter(bo => bo.order.items.some(i => i.productId === item.productId))
-                    .reduce((sum, bo) => sum + (draftDues[bo.orderId] || 0), 0);
+                    .reduce((sum, bo) => sum + getDueForProductRow(bo, item.productId), 0);
 
               return (
                 <div key={item.productId} className="p-4 space-y-4">
@@ -1253,6 +1268,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         companyId={batch.companyId || batch.orders[0]?.order.companyId || 0}
         onAddDraftDue={(orderId, amount) => {
           setDraftDues(prev => ({ ...prev, [orderId]: Number(amount) }));
+          setDraftDueProductIds(prev => dueModalProduct
+            ? { ...prev, [orderId]: dueModalProduct.id }
+            : prev
+          );
         }}
         onSuccess={fetchBatch}
       />
@@ -1327,12 +1346,9 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               const finalSold = Math.max(0, item.totalPaidQty - rPaid - dPaid);
               const deliveredFree = Math.max(0, item.totalFreeQty - rFree);
               const lineTotal = finalSold * item.price;
-              // Sum due from all orders containing this product
               const itemDue = dynamicOrders
-                .filter(bo => bo.order.items.some((i: any) => i.productId === item.productId))
                 .reduce((sum, bo) => {
-                  const d = isBatchSettled ? Number(bo.dueAmount || 0) : (draftDues[bo.orderId] || 0);
-                  return sum + d;
+                  return sum + getDueForProductRow(bo, item.productId);
                 }, 0);
 
               return (
