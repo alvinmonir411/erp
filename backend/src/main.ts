@@ -1,3 +1,5 @@
+process.env.TZ = 'Asia/Dhaka';
+
 import {
   ValidationPipe,
   ExceptionFilter,
