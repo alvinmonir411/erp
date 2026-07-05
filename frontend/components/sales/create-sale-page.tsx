@@ -499,7 +499,40 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
 
   function updateSaleItem(itemId: string, updater: (item: SaleItemForm) => SaleItemForm) {
     setItems((current) =>
-      current.map((item) => (item.id === itemId ? updater(item) : item)),
+      current.map((item) => {
+        if (item.id !== itemId) return item;
+        const updatedItem = updater(item);
+        
+        if (updatedItem.productId) {
+          const prodId = Number(updatedItem.productId);
+          const stock = stockSummary[prodId] || 0;
+          
+          const qty = Number(updatedItem.quantity || 0);
+          const free = Number(updatedItem.freeQuantity || 0);
+          
+          if (qty + free > stock) {
+            const oldQty = Number(item.quantity || 0);
+            const oldFree = Number(item.freeQuantity || 0);
+            
+            if (qty !== oldQty) {
+              const maxQty = Math.max(0, stock - free);
+              updatedItem.quantity = maxQty === 0 ? '' : String(maxQty);
+            } else if (free !== oldFree) {
+              const maxFree = Math.max(0, stock - qty);
+              updatedItem.freeQuantity = maxFree === 0 ? '' : String(maxFree);
+            } else {
+              if (qty > stock) {
+                updatedItem.quantity = stock === 0 ? '' : String(stock);
+                updatedItem.freeQuantity = '';
+              } else {
+                updatedItem.freeQuantity = String(stock - qty);
+              }
+            }
+          }
+        }
+        
+        return updatedItem;
+      }),
     );
   }
 

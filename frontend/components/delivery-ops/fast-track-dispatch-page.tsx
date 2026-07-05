@@ -177,6 +177,32 @@ export function FastTrackDispatchPage() {
       }
     }
 
+    // Limit quantity and freeQuantity to available stock
+    if (line.productId) {
+      const stock = stockMap[line.productId] || 0;
+
+      if (updates.productId) {
+        if (line.quantity + line.freeQuantity > stock) {
+          if (line.quantity > stock) {
+            line.quantity = stock;
+            line.freeQuantity = 0;
+          } else {
+            line.freeQuantity = stock - line.quantity;
+          }
+        }
+      } else {
+        const qty = updates.quantity !== undefined ? updates.quantity : line.quantity;
+        const free = updates.freeQuantity !== undefined ? updates.freeQuantity : line.freeQuantity;
+        if (qty + free > stock) {
+          if (updates.quantity !== undefined) {
+            line.quantity = Math.max(0, stock - line.freeQuantity);
+          } else if (updates.freeQuantity !== undefined) {
+            line.freeQuantity = Math.max(0, stock - line.quantity);
+          }
+        }
+      }
+    }
+
     line.lineTotal = calculateLineTotal(line);
     newLines[index] = line;
     setLines(newLines);
