@@ -4,7 +4,7 @@ import { Repository, DataSource, Brackets } from 'typeorm';
 import { Order, OrderItem } from '../orders/entities/order.entity';
 import { DamageRecord } from '../delivery-ops/entities/damage-record.entity';
 import { OrderStatus } from '../orders/orders.constants';
-import { getBDDayRange, isTodayBDDate } from '../../common/utils/date.utils';
+import { getBDDayRange, isTodayBDDate, getBDTodayString } from '../../common/utils/date.utils';
 import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
@@ -39,10 +39,8 @@ export class ReportsService {
 
     // Apply Filters
     if (filters.dateMode === 'Today') {
-      const { startUtc, endUtc } = getBDDayRange();
-      qb.andWhere('order.orderDate BETWEEN :start AND :end', {
-        start: startUtc,
-        end: endUtc,
+      qb.andWhere('order.orderDate = :today', {
+        today: getBDTodayString(),
       });
     } else if (filters.dateMode === 'Selected Date' && filters.date) {
       qb.andWhere('order.orderDate = :date', { date: filters.date });
@@ -83,6 +81,9 @@ export class ReportsService {
         orderStatus: filters.orderStatus,
       });
     }
+
+    qb.orderBy('order.orderDate', 'DESC')
+      .addOrderBy('order.id', 'DESC');
 
     const items = await qb.getMany();
 

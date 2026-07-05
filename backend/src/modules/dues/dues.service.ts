@@ -34,16 +34,20 @@ export class DuesService {
     const query = this.duesRepository
       .createQueryBuilder('due')
       .leftJoinAndSelect('due.order', 'order')
+      .leftJoinAndSelect('order.assignedDeliveryMan', 'assignedDeliveryMan')
+      .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
+      .leftJoinAndSelect('order.company', 'orderCompany')
       .leftJoinAndSelect('due.shop', 'shop')
       .leftJoinAndSelect('due.route', 'route')
+      .where('due.status != :paidStatus', { paidStatus: DueStatus.PAID })
       .orderBy('due.createdAt', 'DESC');
 
     if (role === Role.SR) {
-      query.where('due.srId = :userId', { userId });
+      query.andWhere('due.srId = :userId', { userId });
     } else if (role === Role.MANAGER) {
       // Filter by manager's allowed routes if assigned
       if (user.allowedRouteIds && user.allowedRouteIds.length > 0) {
-        query.where('due.routeId IN (:...routeIds)', {
+        query.andWhere('due.routeId IN (:...routeIds)', {
           routeIds: user.allowedRouteIds,
         });
       }
@@ -53,15 +57,19 @@ export class DuesService {
         { where: { userId } } as any,
       );
       if (person) {
-        query.where('order.deliveryPersonId = :personId', {
+        query.andWhere('order.deliveryPersonId = :personId', {
           personId: (person as any).id,
         });
       } else {
-        query.where('due.id = -1');
+        query.andWhere('due.id = -1');
       }
     }
 
-    return query.take(200).getMany();
+    const dues = await query.take(200).getMany();
+    return dues.map(due => ({
+      ...due,
+      deliveryManName: due.order?.assignedDeliveryMan?.name || due.order?.deliveryPerson?.name || null,
+    }));
   }
 
   async findPendingCollections(user: any) {
@@ -474,6 +482,9 @@ export class DuesService {
     const query = this.duesRepository
       .createQueryBuilder('due')
       .leftJoinAndSelect('due.order', 'order')
+      .leftJoinAndSelect('order.assignedDeliveryMan', 'assignedDeliveryMan')
+      .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
+      .leftJoinAndSelect('order.company', 'orderCompany')
       .leftJoinAndSelect('due.shop', 'shop')
       .leftJoinAndSelect('due.route', 'route')
       .where('due.shopId = :shopId', { shopId });
@@ -482,6 +493,10 @@ export class DuesService {
       query.andWhere('due.srId = :userId', { userId: user.id || user.sub });
     }
 
-    return query.orderBy('due.createdAt', 'DESC').take(200).getMany();
+    const dues = await query.orderBy('due.createdAt', 'DESC').take(200).getMany();
+    return dues.map(due => ({
+      ...due,
+      deliveryManName: due.order?.assignedDeliveryMan?.name || due.order?.deliveryPerson?.name || null,
+    }));
   }
 }

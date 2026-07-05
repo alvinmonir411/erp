@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, 
@@ -26,6 +26,8 @@ import { formatCurrency } from '@/lib/utils/format';
 import { useAuth } from '../auth/auth-provider';
 import { useToast } from '@/components/ui/toast-provider';
 import { Role } from '@/types/api';
+import { useCompanies, useRoutes } from '@/hooks/use-common-queries';
+import { getUsers } from '@/lib/api/users';
 
 import Link from 'next/link';
 import { getOrder } from '@/lib/api/orders';
@@ -37,6 +39,11 @@ export function DuesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDeliveryMan, setSelectedDeliveryMan] = useState('');
+  const [selectedSR, setSelectedSR] = useState('');
+  const [selectedCompany, setSelectedCompany] = useState('');
+  const [selectedRoute, setSelectedRoute] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedDue, setSelectedDue] = useState<any>(null);
@@ -59,6 +66,34 @@ export function DuesPage() {
   });
 
   const { success: showSuccessToast, error: showErrorToast } = useToast();
+
+  // Fetch companies, routes and users for complete filter options
+  const { data: companies = [] } = useCompanies();
+  const { data: routes = [] } = useRoutes();
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: getUsers,
+  });
+
+  const uniqueDeliveryMen = useMemo(() => {
+    return Array.from(new Set(
+      users.filter((u: any) => u.role === Role.DELIVERY_MAN).map((u: any) => u.name)
+    )) as string[];
+  }, [users]);
+
+  const uniqueSRs = useMemo(() => {
+    return Array.from(new Set(
+      users.filter((u: any) => u.role === Role.SR || u.role === Role.ADMIN || u.role === Role.SUPER_ADMIN).map((u: any) => u.name)
+    )) as string[];
+  }, [users]);
+
+  const uniqueCompanies = useMemo(() => {
+    return Array.from(new Set(companies.map((c: any) => c.name))) as string[];
+  }, [companies]);
+
+  const uniqueRoutes = useMemo(() => {
+    return Array.from(new Set(routes.map((r: any) => r.name))) as string[];
+  }, [routes]);
 
   const collectMutation = useMutation({
     mutationFn: collectDue,
@@ -85,11 +120,68 @@ export function DuesPage() {
     }
   };
 
-  const filteredDues = dues.filter((due: any) => 
-    due.shop?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    due.deliveryManName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    due.orderId.toString().includes(searchTerm)
-  );
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setSelectedDeliveryMan('');
+    setSelectedSR('');
+    setSelectedCompany('');
+    setSelectedRoute('');
+    setSelectedDate('');
+  };
+
+  const filteredDues = useMemo(() => {
+    return dues.filter((due: any) => {
+      // 1. Search Term filter
+      const matchesSearch = !searchTerm ? true : (
+        due.shop?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        due.shop?.ownerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        due.shop?.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        due.deliveryManName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        due.orderId.toString().includes(searchTerm)
+      );
+
+      if (!matchesSearch) return false;
+
+      // 2. Delivery Man filter
+      if (selectedDeliveryMan && due.deliveryManName !== selectedDeliveryMan) {
+        return false;
+      }
+
+      // 3. SR Name filter
+      if (selectedSR && due.srName !== selectedSR) {
+        return false;
+      }
+
+      // 4. Company filter
+      if (selectedCompany) {
+        const orderCompany = due.order?.company?.name;
+        const shopCompany = due.shop?.company?.name;
+        if (orderCompany !== selectedCompany && shopCompany !== selectedCompany) {
+          return false;
+        }
+      }
+
+      // 5. Route filter
+      if (selectedRoute && due.route?.name !== selectedRoute) {
+        return false;
+      }
+
+      // 6. Date filter (compare order date or created date)
+      if (selectedDate) {
+        const orderDateStr = due.order?.orderDate;
+        const createdAtDateStr = due.createdAt ? new Date(due.createdAt).toISOString().split('T')[0] : '';
+        if (orderDateStr !== selectedDate && createdAtDateStr !== selectedDate) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [dues, searchTerm, selectedDeliveryMan, selectedSR, selectedCompany, selectedRoute, selectedDate]);
+
+  const filteredDuesTotalRemaining = useMemo(() => {
+    return filteredDues.reduce((sum: number, due: any) => sum + Number(due.remainingDue || 0), 0);
+  }, [filteredDues]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -198,16 +290,101 @@ export function DuesPage() {
       </div>
 
       <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden no-print">
-        <div className="p-4 border-b border-border bg-zinc-50/50 flex flex-col sm:flex-row gap-4 justify-between">
-          <div className="relative max-w-sm w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-            <input
-              type="text"
-              placeholder="Search by shop or delivery man..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
-            />
+        <div className="p-4 border-b border-border bg-zinc-50/50 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Search Input */}
+            <div className="relative col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+              <input
+                type="text"
+                placeholder="Search shop, owner, phone, delivery man..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+              />
+            </div>
+
+            {/* Delivery Man Select */}
+            <div>
+              <select
+                value={selectedDeliveryMan}
+                onChange={(e) => setSelectedDeliveryMan(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white text-zinc-700 font-medium"
+              >
+                <option value="">All Delivery Men</option>
+                {uniqueDeliveryMen.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* SR Select */}
+            <div>
+              <select
+                value={selectedSR}
+                onChange={(e) => setSelectedSR(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white text-zinc-700 font-medium"
+              >
+                <option value="">All SRs</option>
+                {uniqueSRs.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Company Select */}
+            <div>
+              <select
+                value={selectedCompany}
+                onChange={(e) => setSelectedCompany(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white text-zinc-700 font-medium"
+              >
+                <option value="">All Companies</option>
+                {uniqueCompanies.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Route Select */}
+            <div>
+              <select
+                value={selectedRoute}
+                onChange={(e) => setSelectedRoute(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white text-zinc-700 font-medium"
+              >
+                <option value="">All Routes</option>
+                {uniqueRoutes.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-100">
+            {/* Date Filter & Summary */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted font-medium">Order Date:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-1.5 text-xs border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white text-zinc-700"
+              />
+              {(searchTerm || selectedDeliveryMan || selectedSR || selectedCompany || selectedRoute || selectedDate) && (
+                <button
+                  onClick={handleResetFilters}
+                  className="text-xs text-rose-600 hover:text-rose-700 font-bold hover:underline"
+                >
+                  Reset Filters
+                </button>
+              )}
+            </div>
+
+            {/* Total due showing of filtered list */}
+            <div className="text-xs text-zinc-600 font-bold">
+              Total Due in Filtered List: <span className="text-rose-600 font-black text-sm">{formatCurrency(filteredDuesTotalRemaining)}</span>
+            </div>
           </div>
         </div>
 
@@ -247,10 +424,18 @@ export function DuesPage() {
                           <Store className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="font-bold text-foreground">{due.shop?.name || 'Direct Sale'}</p>
+                          <button
+                            onClick={() => {
+                              setSelectedDue(due);
+                              setIsHistoryModalOpen(true);
+                            }}
+                            className="font-bold text-foreground hover:text-primary transition-colors text-left hover:underline block"
+                          >
+                            {due.shop?.name || 'Direct Sale'}
+                          </button>
                           <button
                             onClick={() => handleViewOrder(due.orderId)}
-                            className="text-[10px] font-black text-primary hover:underline uppercase tracking-tight block text-left"
+                            className="text-[10px] font-black text-primary hover:underline uppercase tracking-tight block text-left mt-0.5"
                           >
                             Order #{due.orderId}
                           </button>
@@ -329,7 +514,15 @@ export function DuesPage() {
                       <Store className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="font-bold text-foreground text-sm">{due.shop?.name || 'Direct Sale'}</p>
+                      <button
+                        onClick={() => {
+                          setSelectedDue(due);
+                          setIsHistoryModalOpen(true);
+                        }}
+                        className="font-bold text-foreground hover:text-primary text-sm transition-colors text-left hover:underline block"
+                      >
+                        {due.shop?.name || 'Direct Sale'}
+                      </button>
                       <button
                         onClick={() => handleViewOrder(due.orderId)}
                         className="text-[10px] font-black text-primary hover:underline uppercase tracking-tight block text-left mb-0.5"

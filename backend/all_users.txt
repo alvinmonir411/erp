@@ -56,17 +56,17 @@
     "status": "ACTIVE"
   },
   {
-    "id": "25ffe73a-8765-4a95-a035-5c735d7de8f5",
-    "name": "ARIFUL",
-    "username": "ARIFUL",
-    "role": "DELIVERY_MAN",
-    "status": "ACTIVE"
-  },
-  {
     "id": "ae33adf1-0d72-4318-a51f-7fac0d2f2f6f",
     "name": "Super Admin",
     "username": "admin",
     "role": "SUPER_ADMIN",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "25ffe73a-8765-4a95-a035-5c735d7de8f5",
+    "name": "ARIFUL",
+    "username": "ARIFUL",
+    "role": "DELIVERY_MAN",
     "status": "ACTIVE"
   }
 ]
