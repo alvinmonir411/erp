@@ -1,113 +1,163 @@
-# ERP Project Analysis
 
-## 1. Overall Project Overview
-This project is a specialized **Inventory & Sales Management ERP**. Its primary purpose is to streamline the supply chain operations of a distribution-based business. It handles everything from acquiring products from multiple companies to distributing them through defined routes and shops, tracking every movement and financial transaction in between.
+```markdown
+# 🏢 Enterprise Distribution & Inventory ERP System
 
----
-
-## 2. Tech Stack
-*   **Frontend Framework:** Next.js 15 (React 19) with App Router.
-*   **Styling:** Tailwind CSS for a modern, responsive UI.
-*   **State Management & Data Fetching:** TanStack Query (React Query) for server-state, caching, and background syncing.
-*   **Backend Framework:** Node.js with NestJS (TypeScript).
-*   **Database:** Relational database (handled via TypeORM or similar, based on NestJS patterns).
-*   **Authentication:** JWT-based auth system with persistent sessions.
-*   **UI Components:** Custom component-based architecture using Lucide Icons.
+An enterprise-grade, full-stack Enterprise Resource Planning (ERP) solution built for wholesale distribution, inventory tracking, multi-channel order fulfillment, and automated financial ledgers. Designed with modern architecture, real-time background sync, and strict data integrity.
 
 ---
 
-## 3. Implemented Modules
+## 🔑 Demo Admin Credentials
 
-### Company Management
-*   Full CRUD for suppliers/companies.
-*   Tracking of active/inactive status.
-*   Company-wise filtering used globally across stock and sales.
-
-### Product Management
-*   Centralized product catalog linked to specific companies.
-*   Attributes: SKU, Unit (PCS, KG, etc.), Buy Price, Sale Price.
-
-### Stock Management
-*   **Opening Stock:** Initial balance entry for new items.
-*   **Stock In:** Recording incoming shipments.
-*   **Stock Adjustment:** Manual corrections for quantity mismatches.
-*   **Damage Tracking:** Recording and monitoring unsellable inventory.
-
-### Sales Module
-*   Multi-item invoice creation.
-*   Automated profit/margin calculation per sale.
-*   Support for direct sales and shop-based distribution.
-
-### Purchase Module
-*   Full Purchase order recording.
-*   **Company Payable Ledger:** Tracking debt and payments to suppliers.
-*   Reference number and note tracking for each purchase.
-
-### Route & Shop System
-*   **Routes:** Logical grouping of distribution areas.
-*   **Shops:** Individual customers linked to specific routes.
-*   Used for targeted sales tracking and due collection.
-
-### Payment & Due System
-*   Real-time tracking of Paid vs Due amounts.
-*   **Shop Due Details:** Comprehensive ledger for individual customers.
-*   Partial payment support with history logs.
+Try out the live system using the pre-configured admin login:
+- **Email:** `admin@gmail.com`
+- **Password:** `136633`
 
 ---
 
-## 4. Stock System
-*   **Operations:** Supports Opening, Stock In, Stock Out (Sales), Return In, Adjustment, and Damage.
-*   **Management:** Calculates "Live Stock" by aggregating all movements.
-*   **Summaries:**
-    *   **Low Stock Alerts:** Items below safety thresholds.
-    *   **Zero Stock Alerts:** Items currently out of stock.
-    *   **Capital Investment:** Total value of inventory based on buy prices.
+## 🚀 Key Features & Business Modules
+
+### 📦 Complete Stock & Inventory Audit
+- **Movement-Based Live Stock:** Calculates live stock by aggregating transaction movements (Opening, Stock In, Stock Out, Return, Adjustment, Damage) rather than storing flat integers—ensuring a 100% audit trail.
+- **Inventory Health Alerts:** Low stock and zero stock automated triggers.
+- **Capital Investment Metrics:** Real-time metrics showing total inventory value based on buy prices.
+
+### 💼 Order, Sales & Profit Analytics
+- **Dynamic Multi-Item Invoicing:** Quick sale creation with line-item discounts and automatically generated invoices.
+- **Profitability Tracking:** Automated profit and margin calculation per sale and per item.
+- **Daily Print Reports:** Optimized A4 layout for daily sales summaries and field sheets.
+
+### 🛣️ Route & Shop Distribution System
+- **Logical Mapping:** Group customers/shops by logical routes for efficient field sales and localized distribution.
+- **Shop Ledger & Dues Management:** Real-time tracking of paid vs. due amounts, partial payment logs, and approval workflows.
+
+### 🏢 Supplier Accounts & Purchases Ledger
+- **Supplier Operations:** Purchase order recording linked directly to company catalogs.
+- **Payable Ledger:** Comprehensive accounts payable system tracking debts, references, and supplier payments.
 
 ---
 
-## 5. Sales System
-*   **Creation:** Dynamic form for adding multiple products with quantity, price, and discounts.
-*   **Data Stored:** Product IDs, quantities, line totals, total profit, paid/due amounts, invoice numbers, and dates.
-*   **Payment Handling:** Integrated payment recording within the sale or later through the due collection workspace.
+## 🛠️ Tech Stack
+
+### **Frontend**
+- **Framework:** Next.js 15 (React 19)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS, Lucide Icons
+- **State Management & Caching:** TanStack Query (React Query) v5 with optimistic updates and global sync indicator
+
+### **Backend**
+- **Framework:** NestJS (Node.js)
+- **Language:** TypeScript
+- **Database & ORM:** PostgreSQL with TypeORM
+- **Real-Time Operations:** Socket.IO
+- **Security:** JWT Authentication with persistent sessions & RBAC
 
 ---
 
-## 6. UI / Frontend Features
-*   **Key Pages:** Dashboard, Stock Workspace, Sales Workspace, Purchase Ledger, Shop/Route Management.
-*   **Dashboard Elements:** 
-    *   High-level KPI cards (Sales, Collection, Due, Profit).
-    *   Inventory health alerts.
-    *   Performance progress bars (Revenue/Stock distribution).
-    *   Recent transaction feed.
-*   **Advanced UI:** 
-    *   **Global Sync Indicator:** Real-time feedback for background data operations.
-    *   **Premium Filters:** Deep filtering by Company, Route, Shop, Date, and Type.
-    *   **Print Support:** Professional Daily Sales Summary reports (A4 optimized).
+## 📁 Repository Structure
+
+```text
+├── backend/                  # NestJS API Engine
+│   ├── src/
+│   │   ├── modules/          # Auth, Companies, Products, Stock, Sales, Purchases, Routes, Shops, Dues
+│   │   ├── database/         # TypeORM Config, Migrations, Seeders
+│   │   └── main.ts
+│   └── package.json
+└── frontend/                 # Next.js App Router Application
+    ├── app/                  # App Router Pages & Layouts
+    ├── components/           # Workspace-specific components (Stock, Sales, Dashboard, Dues)
+    ├── lib/
+    │   └── api/              # Standardized API integration layer
+    └── package.json
+
+```
 
 ---
 
-## 7. API Structure
-*   **Main Endpoints:** `/auth`, `/companies`, `/products`, `/stock`, `/sales`, `/purchases`, `/routes`, `/shops`.
-*   **Data Flow:** The frontend communicates via a standardized `lib/api` layer. TanStack Query manages the lifecycle of this data, providing optimistic updates and automatic cache invalidation when mutations (like a new sale) occur.
+## 🌐 API Overview
+
+| Endpoint | Description |
+| --- | --- |
+| `/auth` | JWT Login, session verification, user role authorization |
+| `/companies` | Supplier management & global filtering context |
+| `/products` | Centralized catalog management linked to suppliers |
+| `/stock` | Stock movements, live stock calculation, damages |
+| `/sales` | Invoice generation, profit margin calculations, dues |
+| `/purchases` | Purchase orders & company payable ledger |
+| `/routes` & `/shops` | Area distribution & shop customer ledgers |
 
 ---
 
-## 8. What is Working Well
-*   **High Performance:** Thanks to React Query and debounced searching, the UI is extremely responsive.
-*   **UI Aesthetics:** Consistent, premium design with clear visual hierarchy and micro-animations.
-*   **Modular Architecture:** Very clear separation between Business Logic (Backend), API layer, and UI Components.
-*   **Data Integrity:** Stock is derived from movements rather than just a flat number, ensuring a reliable audit trail.
+## ⚡ Quick Start & Setup
+
+### Prerequisites
+
+* **Node.js** (v18+)
+* **PostgreSQL** (v14+)
+* **npm** or **yarn**
+
+
+### 1. Backend Setup
+
+```bash
+cd backend
+npm install
+
+# Copy environment variables
+cp .env.example .env
+
+```
+
+Configure your `.env`:
+
+```env
+PORT=3001
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=your_password
+DB_DATABASE=erp_db
+JWT_SECRET=your_jwt_secret
+
+```
+
+```bash
+# Seed database with initial data
+npm run seed
+
+# Run in development mode
+npm run start: dev
+
+```
 
 ---
 
-## 9. Missing or Incomplete Features
-*   **Advanced Analytics:** Needs more charting (line/pie charts) for long-term trend analysis.
-*   **Notifications:** Real-time push notifications for low stock or high dues.
-*   **Export Options:** While Print is implemented, Excel/CSV export for data analysts is currently missing.
-*   **Automated Backups:** System-level database backup triggers.
+### 2. Frontend Setup
+
+```bash
+cd frontend
+npm install
+
+# Copy environment variables
+cp .env.local.example .env.local
+
+```
+
+Configure `.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+
+```
+
+```bash
+npm run dev
+
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 10. Overall Project Status
-*   **Status:** **Mid-Level to Production-Ready (85% Complete).**
-*   **Summary:** The core ERP engine (Inventory + Sales + Purchases + Ledger) is fully functional and optimized. The system is ready for daily business operations, with only high-end analytics and automated administrative tools remaining for a "Enterprise" level release.
+## 📄 License
+
+This project is licensed under the MIT License.
