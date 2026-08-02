@@ -7,49 +7,53 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-class RecordBatchReturnItemDto {
+export class RecordBatchReturnItemDto {
+  @IsOptional()
+  @IsNumber()
+  orderItemId?: number;
+
   @IsNumber()
   productId: number;
 
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   dispatchedQuantity?: number;
 
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   returnedPaidQuantity?: number;
 
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   returnedFreeQuantity?: number;
 
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   damagedPaidQuantity?: number;
 
-  @IsNumber()
   @IsOptional()
+  @IsNumber()
   damagedFreeQuantity?: number;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   reason?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   note?: string;
 }
 
-class RecordBatchReturnOrderDto {
+export class RecordBatchReturnOrderDto {
   @IsNumber()
   orderId: number;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   returnReason?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   note?: string;
 
   @IsArray()
@@ -64,7 +68,7 @@ export class RecordBatchReturnsDto {
   @Type(() => RecordBatchReturnOrderDto)
   orders: RecordBatchReturnOrderDto[];
 
-  @IsString()
   @IsOptional()
+  @IsString()
   note?: string;
 }

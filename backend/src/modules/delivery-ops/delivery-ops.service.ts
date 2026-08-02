@@ -19,6 +19,7 @@ import { DeliveryReturn } from './entities/delivery-return.entity';
 import { DeliveryReturnItem } from './entities/delivery-return-item.entity';
 import { CashCollection } from './entities/cash-collection.entity';
 import { DamageRecord } from './entities/damage-record.entity';
+import { DispatchBatchExpense } from './entities/dispatch-batch-expense.entity';
 import { CreateDeliveryPersonDto } from './dto/create-delivery-person.dto';
 import { CreateDispatchBatchDto } from './dto/create-dispatch-batch.dto';
 import { QueryDispatchBatchesDto } from './dto/query-dispatch-batches.dto';
@@ -86,6 +87,8 @@ export class DeliveryOpsService {
     private readonly productRepository: Repository<Product>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(DispatchBatchExpense)
+    private readonly expenseRepository: Repository<DispatchBatchExpense>,
     private readonly stockService: StockService,
     private readonly duesService: DuesService,
     @Inject(forwardRef(() => OrdersService))
@@ -136,10 +139,43 @@ export class DeliveryOpsService {
   }
 
   async getDeliveryPeople(includeInactive = false) {
-    return this.deliveryPersonRepository.find({
-      where: includeInactive ? {} : { isActive: true },
+    const deliveryUsers = await this.userRepository.find({
+      where: { role: Role.DELIVERY_MAN },
       order: { name: 'ASC' },
     });
+
+    const userPeople = deliveryUsers.map((user) => ({
+      id: user.id,
+      userId: user.id,
+      name: user.name,
+      phone: (user as any).phone || user.email || '',
+      isActive: user.status === UserStatus.ACTIVE,
+    }));
+
+    const legacyPeople = await this.deliveryPersonRepository.find({
+      order: { name: 'ASC' },
+    });
+
+    const combined: any[] = [...userPeople];
+    for (const legacy of legacyPeople) {
+      if (
+        !combined.some(
+          (p) =>
+            String(p.id) === String(legacy.id) ||
+            p.name.trim().toLowerCase() === legacy.name.trim().toLowerCase(),
+        )
+      ) {
+        combined.push({
+          id: legacy.id,
+          userId: undefined,
+          name: legacy.name,
+          phone: legacy.phone || '',
+          isActive: legacy.isActive,
+        });
+      }
+    }
+
+    return combined;
   }
 
   async getDeliveryPersonById(id: number) {
@@ -218,10 +254,17 @@ export class DeliveryOpsService {
     }
     if (query.routeId)
       qb.andWhere('order.routeId = :routeId', { routeId: query.routeId });
-    if (query.deliveryPersonId)
-      qb.andWhere('order.deliveryPersonId = :deliveryPersonId', {
-        deliveryPersonId: query.deliveryPersonId,
-      });
+    if (query.deliveryPersonId) {
+      const rawId = String(query.deliveryPersonId);
+      const numId = Number(rawId);
+      qb.andWhere(
+        '(order.deliveryPersonId = :numId OR order.assignedDeliveryManId = :rawId)',
+        {
+          numId: isNaN(numId) ? -1 : numId,
+          rawId,
+        },
+      );
+    }
     if (query.dispatchDate)
       qb.andWhere('order.orderDate = :dispatchDate', {
         dispatchDate: query.dispatchDate,
@@ -503,6 +546,7 @@ export class DeliveryOpsService {
         'assignedDeliveryMan',
         'items',
         'items.product',
+        'expenses',
       ],
     });
     if (!batch) throw new NotFoundException('Batch not found');
@@ -584,12 +628,10 @@ export class DeliveryOpsService {
         0,
       ),
       grossDispatchedValue: batch.grossDispatchedValue,
-      returnAdjustedValue:
-        batch.returnAdjustedValue ||
-        (batch.items || []).reduce(
-          (sum: number, bi: any) => sum + Number(bi.finalSoldAmount),
-          0,
-        ),
+      returnAdjustedValue: Math.max(
+        0,
+        Number(batch.grossDispatchedValue || 0) - Number(batch.finalSoldValue || 0),
+      ),
       finalSoldValue:
         batch.finalSoldValue ||
         (batch.items || []).reduce(
@@ -689,13 +731,15 @@ export class DeliveryOpsService {
   }
 
   async recordReturns(id: number, dto: RecordBatchReturnsDto) {
-    const batch = (await this.getDispatchBatch(id)) as any;
-    this.assertBatchEditableByDelivery(batch);
+    try {
+      const batch = (await this.getDispatchBatch(id)) as any;
+      this.assertBatchEditableByDelivery(batch);
 
-    return this.dataSource.transaction(async (manager) => {
+      return await this.dataSource.transaction(async (manager) => {
+        console.log(`[recordReturns] Batch #${id} DTO:`, JSON.stringify(dto));
       for (const orderDto of dto.orders || []) {
         const batchOrder = batch.orders.find(
-          (bo: DispatchBatchOrder) => bo.orderId === orderDto.orderId,
+          (bo: DispatchBatchOrder) => Number(bo.orderId) === Number(orderDto.orderId),
         );
         if (!batchOrder) {
           throw new BadRequestException(
@@ -708,7 +752,9 @@ export class DeliveryOpsService {
 
         for (const itemDto of orderDto.items || []) {
           const orderItem = order.items.find(
-            (item: OrderItem) => item.productId === itemDto.productId,
+            (item: OrderItem) =>
+              (itemDto.orderItemId && Number(item.id) === Number(itemDto.orderItemId)) ||
+              (!itemDto.orderItemId && Number(item.productId) === Number(itemDto.productId)),
           );
           if (!orderItem) continue;
 
@@ -733,6 +779,13 @@ export class DeliveryOpsService {
             orderItem,
             finalPaidDelivered,
           );
+
+          orderItem.deliveredPaidQuantity = finalPaidDelivered;
+          orderItem.deliveredFreeQuantity = finalDeliveredFree;
+          orderItem.returnedPaidQuantity = returnedPaidQty;
+          orderItem.returnedFreeQuantity = returnedFreeQty;
+          orderItem.damagedPaidQuantity = damagedPaidQty;
+          orderItem.damagedFreeQuantity = damagedFreeQty;
 
           await manager.update(OrderItem, orderItem.id, {
             deliveredPaidQuantity: finalPaidDelivered,
@@ -776,9 +829,13 @@ export class DeliveryOpsService {
       await this.recalculateBatchTotals(manager, id);
     });
 
-    const result = await this.getDispatchBatch(id);
-    this.realtimeGateway.emitPayload('batchUpdated', result);
-    return result;
+      const result = await this.getDispatchBatch(id);
+      this.realtimeGateway.emitPayload('batchUpdated', result);
+      return result;
+    } catch (error: any) {
+      console.error('[recordReturns ERROR]:', error);
+      throw error;
+    }
   }
 
   async createShopForOrder(
@@ -1116,9 +1173,29 @@ export class DeliveryOpsService {
   private async recalculateBatchTotals(manager: any, batchId: number) {
     const batch = await manager.findOne(DispatchBatch, {
       where: { id: batchId },
-      relations: ['orders', 'orders.order', 'orders.order.items', 'items'],
+      relations: ['orders', 'items'],
     });
     if (!batch) return;
+
+    const batchOrderIds = (batch.orders || []).map((bo: any) => bo.id);
+    const orderIds = (batch.orders || []).map((bo: any) => bo.orderId);
+
+    // Fetch fresh batch orders and order items directly from DB to avoid entity manager caching stale values
+    let freshOrderItems: OrderItem[] = [];
+    if (orderIds.length > 0) {
+      freshOrderItems = await manager
+        .createQueryBuilder(OrderItem, 'oi')
+        .where('oi.orderId IN (:...orderIds)', { orderIds })
+        .getMany();
+    }
+
+    let freshBatchOrders: DispatchBatchOrder[] = [];
+    if (batchOrderIds.length > 0) {
+      freshBatchOrders = await manager
+        .createQueryBuilder(DispatchBatchOrder, 'dbo')
+        .where('dbo.id IN (:...batchOrderIds)', { batchOrderIds })
+        .getMany();
+    }
 
     const productTotals = new Map<
       number,
@@ -1140,46 +1217,48 @@ export class DeliveryOpsService {
     let totalCollectedAmount = 0;
     let totalDueAmount = 0;
 
-    for (const batchOrder of batch.orders) {
+    for (const batchOrder of freshBatchOrders) {
       finalSoldValue += Number(batchOrder.finalSoldAmount || 0);
       totalCollectedAmount += Number(batchOrder.collectedAmount || 0);
       totalDueAmount += Number(batchOrder.dueAmount || 0);
+    }
 
-      for (const orderItem of batchOrder.order?.items || []) {
-        const existing = productTotals.get(orderItem.productId) || {
-          returned: 0,
-          returnedPaid: 0,
-          returnedFree: 0,
-          damaged: 0,
-          damagedPaid: 0,
-          damagedFree: 0,
-          delivered: 0,
-          deliveredPaid: 0,
-          deliveredFree: 0,
-          finalSoldAmount: 0,
-        };
-        const deliveredPaid = Number(orderItem.deliveredPaidQuantity || 0);
-        const deliveredFree = Number(orderItem.deliveredFreeQuantity || 0);
-        const returnedPaid = Number(orderItem.returnedPaidQuantity || 0);
-        const returnedFree = Number(orderItem.returnedFreeQuantity || 0);
-        const damagedPaid = Number(orderItem.damagedPaidQuantity || 0);
-        const damagedFree = Number(orderItem.damagedFreeQuantity || 0);
+    console.log(`[recalculateBatchTotals] Batch #${batchId} freshOrderItems:`, JSON.stringify(freshOrderItems.map(oi => ({ id: oi.id, orderId: oi.orderId, productId: oi.productId, returnedPaidQuantity: oi.returnedPaidQuantity }))));
 
-        existing.returned += returnedPaid + returnedFree;
-        existing.returnedPaid += returnedPaid;
-        existing.returnedFree += returnedFree;
-        existing.damaged += damagedPaid + damagedFree;
-        existing.damagedPaid += damagedPaid;
-        existing.damagedFree += damagedFree;
-        existing.delivered += deliveredPaid + deliveredFree;
-        existing.deliveredPaid += deliveredPaid;
-        existing.deliveredFree += deliveredFree;
-        existing.finalSoldAmount += this.calculateItemSoldAmount(
-          orderItem,
-          deliveredPaid,
-        );
-        productTotals.set(orderItem.productId, existing);
-      }
+    for (const orderItem of freshOrderItems) {
+      const existing = productTotals.get(orderItem.productId) || {
+        returned: 0,
+        returnedPaid: 0,
+        returnedFree: 0,
+        damaged: 0,
+        damagedPaid: 0,
+        damagedFree: 0,
+        delivered: 0,
+        deliveredPaid: 0,
+        deliveredFree: 0,
+        finalSoldAmount: 0,
+      };
+      const deliveredPaid = Number(orderItem.deliveredPaidQuantity || 0);
+      const deliveredFree = Number(orderItem.deliveredFreeQuantity || 0);
+      const returnedPaid = Number(orderItem.returnedPaidQuantity || 0);
+      const returnedFree = Number(orderItem.returnedFreeQuantity || 0);
+      const damagedPaid = Number(orderItem.damagedPaidQuantity || 0);
+      const damagedFree = Number(orderItem.damagedFreeQuantity || 0);
+
+      existing.returned += returnedPaid + returnedFree;
+      existing.returnedPaid += returnedPaid;
+      existing.returnedFree += returnedFree;
+      existing.damaged += damagedPaid + damagedFree;
+      existing.damagedPaid += damagedPaid;
+      existing.damagedFree += damagedFree;
+      existing.delivered += deliveredPaid + deliveredFree;
+      existing.deliveredPaid += deliveredPaid;
+      existing.deliveredFree += deliveredFree;
+      existing.finalSoldAmount += this.calculateItemSoldAmount(
+        orderItem,
+        deliveredPaid,
+      );
+      productTotals.set(orderItem.productId, existing);
     }
 
     for (const item of batch.items || []) {
@@ -1209,8 +1288,11 @@ export class DeliveryOpsService {
       });
     }
 
+    const grossDispatched = Number(batch.grossDispatchedValue || 0);
+    const returnAdjustedValue = Math.max(0, grossDispatched - finalSoldValue);
+
     await manager.update(DispatchBatch, batchId, {
-      returnAdjustedValue: finalSoldValue,
+      returnAdjustedValue,
       finalSoldValue,
       totalCollectedAmount,
       totalDueAmount,
@@ -1346,40 +1428,105 @@ export class DeliveryOpsService {
         );
       }
 
-      // 4. Triple-Check Reconciliation with Explicit Numeric Casting
-      const totalAmount = Number(totalFinalValue || 0);
-      const actualCashReceived = Number(
-        dto.actualCashReceived ?? totalReportedCollected,
+      // --- EXPENSE PROCESSING & RECONCILIATION ---
+      const vanRent = Math.max(0, Number(dto.vanRent || 0));
+      const salary = Math.max(0, Number(dto.salary || 0));
+      let customExpensesTotal = 0;
+
+      const validExpensesToInsert: Array<{
+        dispatchBatchId: number;
+        expenseType: string;
+        name: string;
+        amount: number;
+        note?: string;
+      }> = [];
+
+      if (dto.customExpenses && dto.customExpenses.length > 0) {
+        for (const exp of dto.customExpenses) {
+          const amt = Number(exp.amount || 0);
+          if (isNaN(amt) || amt < 0) {
+            throw new BadRequestException(`Invalid expense amount for "${exp.name || 'Expense'}"`);
+          }
+          if (amt === 0 || !exp.name || !exp.name.trim()) {
+            continue; // Ignore empty rows
+          }
+          customExpensesTotal += amt;
+          validExpensesToInsert.push({
+            dispatchBatchId: id,
+            expenseType: exp.expenseType || 'Other',
+            name: exp.name.trim(),
+            amount: amt,
+            note: exp.note?.trim(),
+          });
+        }
+      }
+
+      const totalExpenses = Number(
+        (vanRent + salary + customExpensesTotal).toFixed(2),
       );
 
-      const finalDueBaki = Number(
-        (totalAmount - actualCashReceived).toFixed(2),
+      // Validate totalExpenses against Gross Cash Collectable across all orders
+      const grossCashCollectable = totalExpectedCash;
+      if (totalExpenses > grossCashCollectable + 0.01) {
+        throw new BadRequestException(
+          `Total Expenses (${totalExpenses}) cannot exceed Gross Cash Collectable (${grossCashCollectable})`,
+        );
+      }
+
+      const netExpectedCash = Math.max(
+        0,
+        Number((grossCashCollectable - totalExpenses).toFixed(2)),
       );
+
+      // Clear previous DispatchBatchExpense records for this batch
+      await manager.delete(DispatchBatchExpense, { dispatchBatchId: id });
+      if (validExpensesToInsert.length > 0) {
+        await manager.save(
+          DispatchBatchExpense,
+          validExpensesToInsert.map((e) => manager.create(DispatchBatchExpense, e)),
+        );
+      }
+
+      if (dto.actualCashReceived === undefined || dto.actualCashReceived === null || isNaN(Number(dto.actualCashReceived))) {
+        throw new BadRequestException(
+          'Actual Cash Received by Admin is required (অ্যাডমিন কতৃক প্রাপ্ত নগদ টাকা ফিল্ডটি বাধ্যতামূলক)',
+        );
+      }
+      const actualCashReceived = Number(dto.actualCashReceived);
+
+      const finalDueBaki = totalDueAmount;
       const finalCashCollectable = Number(actualCashReceived);
 
-      console.log('=== PERSISTING SETTLEMENT VALUES ===');
-      console.log('totalAmountSold (Total Amount Sold):', totalAmount);
-      console.log(
-        'actualCashReceived (Actual Cash Received):',
-        actualCashReceived,
-      );
-      console.log('cashCollectable:', finalCashCollectable);
-      console.log('dueBaki:', finalDueBaki);
-
       const cashDiscrepancy = Number(
-        actualCashReceived - totalReportedCollected,
+        (actualCashReceived - netExpectedCash).toFixed(2),
       );
+
+      // Compute grossDispatchedValue across all orders in currentBatch
+      let grossDispatchedValue = 0;
+      for (const bo of currentBatch.orders) {
+        if (bo.order && bo.order.items) {
+          for (const item of bo.order.items) {
+            grossDispatchedValue += Number(item.quantity || 0) * Number(item.unitPrice || 0);
+          }
+        }
+      }
+      const returnAdjustedValue = Math.max(0, grossDispatchedValue - totalFinalValue);
 
       // 5. Update Batch with Audit Metadata
       await manager.update(DispatchBatch, id, {
         status: DispatchBatchStatus.SETTLED,
         settledAt: new Date(),
+        grossDispatchedValue,
+        returnAdjustedValue,
         totalCollectedAmount: finalCashCollectable,
-        finalSoldValue: totalAmount,
+        finalSoldValue: totalFinalValue,
         totalDueAmount: finalDueBaki,
+        vanRent,
+        salary,
+        totalExpenses,
         shortageOrExcess: cashDiscrepancy,
         settlementNote:
-          `${dto.note || ''} [Triple-Check: ExpectedCash=${totalExpectedCash}, Reported=${totalReportedCollected}, Actual=${actualCashReceived}]`.trim(),
+          `${dto.note || ''} [Expenses: VanRent=${vanRent}, Salary=${salary}, Custom=${customExpensesTotal}, Total=${totalExpenses} | NetExpectedCash=${netExpectedCash}, Actual=${actualCashReceived}]`.trim(),
       });
 
       return this.getDispatchBatch(id);
@@ -1394,6 +1541,117 @@ export class DeliveryOpsService {
       }
     }
     return result;
+  }
+
+  async getDeliveryExpenseReport(query: QueryDispatchBatchesDto, user?: any) {
+    const qb = this.batchRepository
+      .createQueryBuilder('batch')
+      .leftJoinAndSelect('batch.route', 'route')
+      .leftJoinAndSelect('batch.deliveryPerson', 'deliveryPerson')
+      .leftJoinAndSelect('batch.assignedDeliveryMan', 'assignedDeliveryMan')
+      .leftJoinAndSelect('batch.expenses', 'expenses')
+      .where('batch.status = :status', { status: DispatchBatchStatus.SETTLED });
+
+    if (query.startDate && query.endDate) {
+      qb.andWhere('batch.dispatchDate BETWEEN :startDate AND :endDate', {
+        startDate: query.startDate,
+        endDate: query.endDate,
+      });
+    } else if (query.dispatchDate) {
+      qb.andWhere('batch.dispatchDate = :dispatchDate', {
+        dispatchDate: query.dispatchDate,
+      });
+    }
+
+    if (query.routeId) {
+      qb.andWhere('batch.routeId = :routeId', { routeId: query.routeId });
+    }
+
+    if (query.deliveryPersonId) {
+      const numId = Number(query.deliveryPersonId);
+      qb.andWhere(
+        '(batch.deliveryPersonId = :deliveryPersonId OR batch.assignedDeliveryManId = :deliveryPersonIdUuid)',
+        {
+          deliveryPersonId: isNaN(numId) ? -1 : numId,
+          deliveryPersonIdUuid: String(query.deliveryPersonId),
+        },
+      );
+    }
+
+    if (user && user.role === Role.DELIVERY_MAN) {
+      const userId = user.id || user.sub;
+      if (userId) {
+        qb.andWhere('batch.assignedDeliveryManId = :userId', { userId });
+      } else {
+        qb.andWhere('batch.id = -1');
+      }
+    }
+
+    qb.orderBy('batch.dispatchDate', 'DESC').addOrderBy('batch.createdAt', 'DESC');
+
+    const batches = await qb.getMany();
+
+    let totalVanRent = 0;
+    let totalSalary = 0;
+    let totalOtherExpenses = 0;
+
+    const rows = batches.map((batch) => {
+      const vanRent = Number(batch.vanRent || 0);
+      const salary = Number(batch.salary || 0);
+      const customExpensesList = batch.expenses || [];
+      const otherExpensesTotal = customExpensesList.reduce(
+        (sum, e) => sum + Number(e.amount || 0),
+        0,
+      );
+      const totalExpense = Number(
+        (batch.totalExpenses || vanRent + salary + otherExpensesTotal).toFixed(2),
+      );
+
+      totalVanRent += vanRent;
+      totalSalary += salary;
+      totalOtherExpenses += otherExpensesTotal;
+
+      const grossCashCollectable = Number(batch.finalSoldValue || batch.grossDispatchedValue || 0) - Number(batch.totalDueAmount || 0);
+      const netExpectedCash = Math.max(0, Number((grossCashCollectable - totalExpense).toFixed(2)));
+
+      return {
+        id: batch.id,
+        batchNo: batch.batchNo,
+        dispatchDate: batch.dispatchDate,
+        route: batch.route?.name || 'Unknown Route',
+        deliveryPerson:
+          batch.assignedDeliveryMan?.name ||
+          batch.deliveryPerson?.name ||
+          'Unassigned',
+        grossCashCollectable,
+        vanRent,
+        salary,
+        otherExpenses: otherExpensesTotal,
+        totalExpense,
+        netExpectedCash,
+        actualCashReceived: Number(batch.totalCollectedAmount || 0),
+        shortageOrExcess: Number(batch.shortageOrExcess || 0),
+        customExpenses: customExpensesList.map((exp) => ({
+          id: exp.id,
+          expenseType: exp.expenseType,
+          name: exp.name,
+          amount: Number(exp.amount || 0),
+          note: exp.note,
+        })),
+      };
+    });
+
+    const totalExpenses = Number((totalVanRent + totalSalary + totalOtherExpenses).toFixed(2));
+
+    return {
+      summary: {
+        totalExpenses,
+        totalVanRent,
+        totalSalary,
+        totalOtherExpenses,
+      },
+      rows,
+    };
   }
 
   async getDashboard(date?: string, user?: any) {
@@ -1517,12 +1775,12 @@ export class DeliveryOpsService {
       ].includes(batch.status);
       const orderIds = fullBatch.orders.map((bo) => bo.orderId);
 
-      // 2. Process each order in the batch
+      // 2. Process each order in the batch: restore stock and delete order & related entries
       for (const batchOrder of fullBatch.orders) {
         const order = batchOrder.order;
         if (!order) continue;
 
-        for (const orderItem of order.items) {
+        for (const orderItem of order.items || []) {
           const dispatchedQty =
             Number(orderItem.quantity || 0) +
             Number(orderItem.freeQuantity || 0);
@@ -1530,13 +1788,6 @@ export class DeliveryOpsService {
             Number(orderItem.returnedPaidQuantity || 0) +
             Number(orderItem.returnedFreeQuantity || 0);
 
-          // ── SINGLE RETURN_IN: avoid double-write TypeORM cache bug ──
-          // For SETTLED batches: settleOrder() already did RETURN_IN for returnedQty.
-          //   So only restore the undelivered portion: dispatchedQty - returnedQty.
-          //   Net: current(S₀ - dispatched + returned) + (dispatched - returned) = S₀ ✓
-          // For ACTIVE batches: no RETURN_IN has happened yet (settlement never ran).
-          //   Restore the full dispatched qty.
-          //   Net: current(S₀ - dispatched) + dispatched = S₀ ✓
           const qtyToRestore = isSettled
             ? Math.max(0, dispatchedQty - returnedQty)
             : Math.max(0, dispatchedQty);
@@ -1549,66 +1800,61 @@ export class DeliveryOpsService {
                 type: StockMovementType.RETURN_IN,
                 quantity: qtyToRestore,
                 reference: `Delete Batch #${id}`,
-                note: `Restored ${qtyToRestore} units — batch #${id} (${isSettled ? 'settled' : 'active'}) deleted, order #${order.id} reverted`,
+                note: `Restored ${qtyToRestore} units — batch #${id} deleted, order #${order.id} permanently removed`,
               },
               'System',
               manager,
             );
           }
-
-          if (isSettled) {
-            await manager.query(
-              'DELETE FROM due_collections WHERE "orderId" = $1',
-              [order.id],
-            );
-            await manager.query('DELETE FROM dues WHERE "orderId" = $1', [
-              order.id,
-            ]);
-            await manager.query(
-              'DELETE FROM damage_records WHERE "orderId" = $1',
-              [order.id],
-            );
-          }
         }
 
-        // 3. Revert Order fields to CONFIRMED state
-        await manager.update(Order, order.id, {
-          status: OrderStatus.CONFIRMED,
-          deliveryPersonId: null as any,
-          assignedDeliveryManId: null as any,
-          dispatchedAt: null as any,
-          deliveredAt: null as any,
-          settledAt: null as any,
-          actualSoldAmount: order.grandTotal,
-          collectedAmount: 0,
-          dueAmount: Math.max(
-            0,
-            Number(order.grandTotal) - Number(order.advancePaid || 0),
-          ),
-          deliveryNote: null as any,
-          settlementNote: null as any,
-          isLocked: false,
-        });
-
-        // 4. Revert OrderItem fields
-        for (const orderItem of order.items) {
-          await manager.update(OrderItem, orderItem.id, {
-            deliveredPaidQuantity: 0,
-            deliveredFreeQuantity: 0,
-            returnedPaidQuantity: 0,
-            returnedFreeQuantity: 0,
-            damagedPaidQuantity: 0,
-            damagedFreeQuantity: 0,
-          });
-        }
+        // Delete all dependent records for this order
+        await manager.query(
+          'DELETE FROM due_collections WHERE "orderId" = $1',
+          [order.id],
+        );
+        await manager.query('DELETE FROM dues WHERE "orderId" = $1', [
+          order.id,
+        ]);
+        await manager.query(
+          'DELETE FROM damage_records WHERE "orderId" = $1',
+          [order.id],
+        );
+        await manager.query(
+          'DELETE FROM dispatch_batch_orders WHERE "orderId" = $1',
+          [order.id],
+        );
+        await manager.query(
+          'DELETE FROM order_items WHERE "orderId" = $1',
+          [order.id],
+        );
+        await manager.query(
+          'DELETE FROM orders WHERE "id" = $1',
+          [order.id],
+        );
       }
 
-      // 5. Delete the batch
-      await manager.remove(DispatchBatch, fullBatch);
+      // 3. Delete batch items, expenses, and batch record
+      await manager.query(
+        'DELETE FROM dispatch_batch_items WHERE "batchId" = $1',
+        [id],
+      );
+      await manager.query(
+        'DELETE FROM dispatch_batch_expenses WHERE "dispatchBatchId" = $1',
+        [id],
+      );
+      await manager.query(
+        'DELETE FROM dispatch_batch_orders WHERE "batchId" = $1',
+        [id],
+      );
+      await manager.query(
+        'DELETE FROM dispatch_batches WHERE "id" = $1',
+        [id],
+      );
 
       return {
         success: true,
-        message: `Batch #${id} deleted and related orders reverted to CONFIRMED.`,
+        message: `Batch #${id} and all related orders, free items, and dues have been permanently deleted.`,
         orderIds,
       };
     });
@@ -1616,28 +1862,7 @@ export class DeliveryOpsService {
     this.realtimeGateway.emitPayload('batchDeleted', { id });
     if (result && result.orderIds) {
       for (const orderId of result.orderIds) {
-        try {
-          const updatedOrder = await this.orderRepository.findOne({
-            where: { id: orderId },
-            relations: [
-              'items',
-              'items.product',
-              'company',
-              'route',
-              'shop',
-              'deliveryPerson',
-              'assignedDeliveryMan',
-            ],
-          });
-          if (updatedOrder) {
-            this.realtimeGateway.emitPayload('orderUpdated', updatedOrder);
-          }
-        } catch (e) {
-          console.error(
-            `Failed to fetch and emit orderUpdated for order #${orderId}`,
-            e,
-          );
-        }
+        this.realtimeGateway.emitPayload('orderDeleted', { id: orderId });
       }
     }
 

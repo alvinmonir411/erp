@@ -365,6 +365,17 @@ export type DispatchBatchOrder = {
   deliveryCompletedAt?: string | null;
 };
 
+export type DispatchBatchExpense = {
+  id: number;
+  dispatchBatchId: number;
+  expenseType: string;
+  name: string;
+  amount: number;
+  note?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type DispatchBatch = {
   items: any[];
   id: number;
@@ -386,6 +397,10 @@ export type DispatchBatch = {
   totalCollectedAmount: number | string;
   totalDueAmount: number | string;
   shortageOrExcess: number | string;
+  vanRent?: number | string;
+  salary?: number | string;
+  totalExpenses?: number | string;
+  expenses?: DispatchBatchExpense[];
   isMorningPrinted: boolean;
   isFinalPrinted: boolean;
   morningPrintedAt?: string;

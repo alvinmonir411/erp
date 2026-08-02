@@ -7,7 +7,7 @@ import { Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 
 export default function LoginPage() {
-  const SESSION_DURATION_MS = 60 * 60 * 1000;
+  const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   const router = useRouter();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');

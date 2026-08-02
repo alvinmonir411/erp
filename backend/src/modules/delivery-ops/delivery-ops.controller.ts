@@ -70,6 +70,15 @@ export class DeliveryOpsController {
     return this.deliveryOpsService.getReports(query, user);
   }
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
+  @Get('expenses')
+  getDeliveryExpenseReport(
+    @Query() query: QueryDispatchBatchesDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.deliveryOpsService.getDeliveryExpenseReport(query, user);
+  }
+
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
   @Get('personnel')
   getDeliveryPeople(@Query('includeInactive') includeInactive?: string) {

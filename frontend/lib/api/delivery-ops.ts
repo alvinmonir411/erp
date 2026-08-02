@@ -55,6 +55,13 @@ export type RecordReturnPayload = {
   }[];
 };
 
+export type CustomExpenseItemPayload = {
+  expenseType?: string;
+  name: string;
+  amount: number;
+  note?: string;
+};
+
 export type SettlementPayload = {
   note?: string;
   collections: {
@@ -68,6 +75,9 @@ export type SettlementPayload = {
     amount: number;
     note?: string;
   }[];
+  vanRent?: number;
+  salary?: number;
+  customExpenses?: CustomExpenseItemPayload[];
   actualCashReceived?: number;
 };
 
@@ -206,5 +216,11 @@ export function getDispatchReports(query: DispatchBatchQuery = {}) {
 export function deleteDispatchBatch(id: number) {
   return apiRequest<{ success: boolean; message: string }>(`delivery-ops/batches/${id}`, {
     method: 'DELETE',
+  });
+}
+
+export function getDeliveryExpenseReport(query: DispatchBatchQuery = {}) {
+  return apiRequest<any>('delivery-ops/expenses', {
+    query,
   });
 }

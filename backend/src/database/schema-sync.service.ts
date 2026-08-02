@@ -389,6 +389,21 @@ export class SchemaSyncService implements OnApplicationBootstrap {
         ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "assignedDeliveryManId" UUID;
         ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "version" INTEGER DEFAULT 1;
         ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "shortageOrExcess" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "vanRent" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "salary" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "totalExpenses" DECIMAL(12,2) DEFAULT 0;
+
+        CREATE TABLE IF NOT EXISTS "dispatch_batch_expenses" (
+          "id" SERIAL PRIMARY KEY,
+          "dispatchBatchId" INTEGER NOT NULL,
+          "expenseType" VARCHAR(50) DEFAULT 'Other',
+          "name" VARCHAR(150) NOT NULL,
+          "amount" DECIMAL(12,2) DEFAULT 0,
+          "note" TEXT,
+          "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS "idx_dispatch_batch_expenses_batch" ON "dispatch_batch_expenses" ("dispatchBatchId");
         ALTER TABLE "dispatch_batch_orders" ADD COLUMN IF NOT EXISTS "deliveryStatus" VARCHAR(30) DEFAULT 'PENDING';
         ALTER TABLE "dispatch_batch_orders" ADD COLUMN IF NOT EXISTS "deliveryNote" TEXT;
         ALTER TABLE "dispatch_batch_orders" ADD COLUMN IF NOT EXISTS "deliveryCompletedAt" TIMESTAMP;

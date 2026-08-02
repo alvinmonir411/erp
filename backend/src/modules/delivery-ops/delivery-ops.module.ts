@@ -6,6 +6,7 @@ import { DeliveryPerson } from './entities/delivery-person.entity';
 import { DispatchBatch } from './entities/dispatch-batch.entity';
 import { DispatchBatchOrder } from './entities/dispatch-batch-order.entity';
 import { DispatchBatchItem } from './entities/dispatch-batch-item.entity';
+import { DispatchBatchExpense } from './entities/dispatch-batch-expense.entity';
 import { DeliveryReturn } from './entities/delivery-return.entity';
 import { DeliveryReturnItem } from './entities/delivery-return-item.entity';
 import { CashCollection } from './entities/cash-collection.entity';
@@ -25,6 +26,7 @@ import { OrdersModule } from '../orders/orders.module';
       DispatchBatch,
       DispatchBatchOrder,
       DispatchBatchItem,
+      DispatchBatchExpense,
       DeliveryReturn,
       DeliveryReturnItem,
       CashCollection,

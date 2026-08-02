@@ -73,6 +73,15 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const [draftDues, setDraftDues] = useState<Record<string, Array<{ shopId: number; shopName: string; amount: number; note?: string }>>>({});
   const [dueModalProduct, setDueModalProduct] = useState<{ id: number; name: string } | null>(null);
   const [actualCashReceived, setActualCashReceived] = useState<string>('');
+  const [vanRent, setVanRent] = useState<string>('');
+  const [salary, setSalary] = useState<string>('');
+  const [customExpenses, setCustomExpenses] = useState<Array<{
+    id: string;
+    expenseType: string;
+    name: string;
+    amount: string;
+    note: string;
+  }>>([]);
   const [batchToDelete, setBatchToDelete] = useState<{ id: number; batchNo: string; isSettled: boolean } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
@@ -122,7 +131,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       }> = {};
       aggregatedItems.forEach(item => {
         // Find aggregated batch item for this product
-        const batchItem = (batch.items || []).find(bi => bi.productId === item.productId) as any;
+        const batchItem = (batch.items || []).find(bi => Number(bi.productId) === Number(item.productId)) as any;
 
         // Preferred source: Split fields from BatchItem (if already recalculated)
         if (batchItem && (batchItem.returnedPaidQty !== undefined || batchItem.returnedFreeQty !== undefined)) {
@@ -133,7 +142,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           };
         } else {
           // Fallback: Aggregate split quantities from individual order items
-          const productItems = batch.orders.flatMap(bo => bo.order.items).filter(i => i.productId === item.productId);
+          const productItems = batch.orders.flatMap(bo => bo.order?.items || []).filter(i => Number(i.productId) === Number(item.productId));
           const totalReturnedPaid = productItems.reduce((sum, i) => sum + Number(i.returnedPaidQuantity || 0), 0);
           const totalReturnedFree = productItems.reduce((sum, i) => sum + Number(i.returnedFreeQuantity || 0), 0);
           const totalDamagedPaid = productItems.reduce((sum, i) => sum + Number(i.damagedPaidQuantity || 0), 0);
@@ -239,15 +248,18 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     let damaged = 0;
     let finalSold = 0;
     let finalAmount = 0;
+    let grossDispatchedValue = 0;
 
     dynamicOrders.forEach(bo => {
       finalAmount += bo.finalSoldAmount;
       bo.order.items.forEach(item => {
-        totalQty += Number(item.quantity || 0);
+        const orderPaid = Number(item.quantity || 0);
+        totalQty += orderPaid;
         totalFree += Number(item.deliveredFreeQuantity || 0);
         returned += Number(item.returnedPaidQuantity || 0);
         damaged += Number(item.damagedPaidQuantity || 0);
         finalSold += Number(item.deliveredPaidQuantity || 0);
+        grossDispatchedValue += orderPaid * Number(item.unitPrice || 0);
       });
     });
 
@@ -264,6 +276,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       damaged,
       finalSold,
       finalAmount,
+      grossDispatchedValue,
+      returnAdjustedValue: Math.max(0, grossDispatchedValue - finalAmount),
       totalDueDraft,
       cashCollectable,
     };
@@ -272,16 +286,49 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   // Reset states when batch ID changes to prevent stale data from previous batches
   useEffect(() => {
     setActualCashReceived('');
-    setDraftDues({});
     setBatchReturnState({});
     cashManuallyEdited.current = false; // allow auto-fill for fresh batch
+    try {
+      const savedDues = sessionStorage.getItem(`draft_dues_${batchId}`);
+      if (savedDues) {
+        setDraftDues(JSON.parse(savedDues));
+      } else {
+        setDraftDues({});
+      }
+    } catch (e) {
+      setDraftDues({});
+    }
   }, [batchId]);
+
+  // Sync draft dues to sessionStorage so page refresh won't lose entered dues
+  useEffect(() => {
+    try {
+      if (Object.keys(draftDues).length > 0) {
+        sessionStorage.setItem(`draft_dues_${batchId}`, JSON.stringify(draftDues));
+      } else {
+        sessionStorage.removeItem(`draft_dues_${batchId}`);
+      }
+    } catch (e) {}
+  }, [draftDues, batchId]);
 
   const fetchBatch = async () => {
     try {
       setIsLoading(true);
       const data = await getDispatchBatch(batchId);
       setBatch(data);
+      if (data.vanRent) setVanRent(String(data.vanRent));
+      if (data.salary) setSalary(String(data.salary));
+      if (data.expenses && Array.isArray(data.expenses)) {
+        setCustomExpenses(
+          data.expenses.map((e: any) => ({
+            id: String(e.id || Math.random()),
+            expenseType: e.expenseType || 'Other',
+            name: e.name || '',
+            amount: String(e.amount || ''),
+            note: e.note || '',
+          })),
+        );
+      }
     } catch (error) {
       showErrorToast('Failed to load dispatch batch');
     } finally {
@@ -315,15 +362,50 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     };
   }, [batchId]);
 
-  // Auto-fill actual cash received ONCE when the batch first loads — never overwrites user-typed value
-  useEffect(() => {
-    if (finalMetrics && finalMetrics.cashCollectable > 0 && !cashManuallyEdited.current && actualCashReceived === '') {
-      setActualCashReceived(String(finalMetrics.cashCollectable));
-    }
-  }, [finalMetrics?.cashCollectable]);
-
   const batchStatus = batch ? batchStatusConfig[batch.status] : null;
   const isBatchSettled = batch ? ['SETTLED', 'PARTIALLY_SETTLED'].includes(batch.status) : false;
+
+  const currentGrossDispatched = useMemo(() => {
+    if (isBatchSettled && batch && Number(batch.grossDispatchedValue || 0) > 0) {
+      return Number(batch.grossDispatchedValue);
+    }
+    return Number(finalMetrics?.grossDispatchedValue || 0);
+  }, [isBatchSettled, batch, finalMetrics]);
+
+  const currentFinalAmount = useMemo(() => {
+    if (isBatchSettled && batch) {
+      return Number(batch.finalSoldValue || 0);
+    }
+    return Number(finalMetrics?.finalAmount || 0);
+  }, [isBatchSettled, batch, finalMetrics]);
+
+  const currentReturnAdjusted = useMemo(() => {
+    return Math.max(0, currentGrossDispatched - currentFinalAmount);
+  }, [currentGrossDispatched, currentFinalAmount]);
+
+  const currentCustomerDue = useMemo(() => {
+    if (isBatchSettled && batch) {
+      return Number(batch.totalDueAmount || 0);
+    }
+    return Number(finalMetrics?.totalDueDraft || 0);
+  }, [isBatchSettled, batch, finalMetrics]);
+
+  const currentCashCollectable = useMemo(() => {
+    return Math.max(0, currentFinalAmount - currentCustomerDue);
+  }, [currentFinalAmount, currentCustomerDue]);
+
+  const vanRentVal = Math.max(0, Number(vanRent || 0));
+  const salaryVal = Math.max(0, Number(salary || 0));
+  const customExpensesTotalVal = customExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const totalExpensesVal = vanRentVal + salaryVal + customExpensesTotalVal;
+  const netExpectedCashFromDeliveryMan = Math.max(0, currentCashCollectable - totalExpensesVal);
+
+  // Auto-fill actual cash received ONCE when the batch first loads — never overwrites user-typed value
+  useEffect(() => {
+    if (netExpectedCashFromDeliveryMan > 0 && !cashManuallyEdited.current && actualCashReceived === '') {
+      setActualCashReceived(String(netExpectedCashFromDeliveryMan));
+    }
+  }, [netExpectedCashFromDeliveryMan]);
 
   const getDueForProductRow = (batchOrder: DispatchBatchOrder, productId: number) => {
     if (isBatchSettled) {
@@ -348,27 +430,6 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     if (!batch) return 0;
     return batch.orders.reduce((sum, bo) => sum + Number(bo.dueAmount || 0), 0);
   }, [batch]);
-
-  const currentFinalAmount = useMemo(() => {
-    if (isBatchSettled && batch) {
-      return Number(batch.finalSoldValue || 0);
-    }
-    return Number(finalMetrics?.finalAmount || 0);
-  }, [isBatchSettled, batch, finalMetrics]);
-
-  const currentCustomerDue = useMemo(() => {
-    if (isBatchSettled && batch) {
-      return Number(batch.totalDueAmount || 0);
-    }
-    return Number(finalMetrics?.totalDueDraft || 0);
-  }, [isBatchSettled, batch, finalMetrics]);
-
-  const currentCashCollectable = useMemo(() => {
-    if (isBatchSettled && batch) {
-      return Number(batch.totalCollectedAmount || 0);
-    }
-    return Math.max(0, currentFinalAmount - currentCustomerDue);
-  }, [isBatchSettled, batch, currentFinalAmount, currentCustomerDue]);
 
   const handlePrintMorning = async () => {
     try {
@@ -456,8 +517,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     const ordersToUpdate = batch.orders.map((bo) => {
       return {
         orderId: bo.orderId,
-        items: bo.order.items.map((item) => {
-          const productId = item.productId;
+        items: (bo.order?.items || []).map((item) => {
+          const productId = Number(item.productId);
           const orderPaid = Number(item.quantity || 0);
           const orderFree = Number(item.freeQuantity || 0);
 
@@ -475,6 +536,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           const takeFreeDelivered = orderFree - takeFreeRet;
 
           return {
+            orderItemId: item.id,
             productId,
             returnedPaidQuantity: takeRet,
             returnedFreeQuantity: takeFreeRet,
@@ -484,6 +546,9 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         }),
       };
     });
+
+    console.log('[handleSaveReturns] batchReturnState:', batchReturnState);
+    console.log('[handleSaveReturns] ordersToUpdate:', JSON.stringify(ordersToUpdate));
 
     try {
       setIsSavingReturns(true);
@@ -545,14 +610,34 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         }
       });
 
+      if (actualCashReceived === '' || actualCashReceived === null || actualCashReceived === undefined || isNaN(Number(actualCashReceived))) {
+        showErrorToast('Actual Cash Received by Admin constraint: অ্যাডমিন কতৃক প্রাপ্ত নগদ টাকা ফিল্ডটি দেওয়া বাধ্যতামূলক!');
+        return;
+      }
+
+      const vanRentNum = Math.max(0, Number(vanRent || 0));
+      const salaryNum = Math.max(0, Number(salary || 0));
+      const validExpenses = customExpenses
+        .filter((e) => e.name.trim() && Number(e.amount || 0) > 0)
+        .map((e) => ({
+          expenseType: e.expenseType || 'Other',
+          name: e.name.trim(),
+          amount: Number(e.amount),
+          note: e.note.trim() || undefined,
+        }));
+
       // Complete Settlement
       await withLoading(() => settleDispatchBatch(batchId, {
         collections,
         dueEntries: dueEntries.length > 0 ? dueEntries : undefined,
-        actualCashReceived: actualCashReceived ? Number(actualCashReceived) : undefined
+        vanRent: vanRentNum,
+        salary: salaryNum,
+        customExpenses: validExpenses.length > 0 ? validExpenses : undefined,
+        actualCashReceived: Number(actualCashReceived)
       }), 'Settling batch...');
 
       showSuccessToast('Batch marked as settled and dues recorded');
+      try { sessionStorage.removeItem(`draft_dues_${batchId}`); } catch (e) {}
       setDraftDues({});
       setActualCashReceived('');
       fetchBatch();
@@ -948,10 +1033,17 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                           max={item.totalPaidQty}
                           value={state.returned}
                           disabled={isBatchSettled}
-                          onChange={(e) => setBatchReturnState(prev => ({
-                            ...prev,
-                            [item.productId]: { ...state, returned: e.target.value }
-                          }))}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val !== '' && Number(val) > item.totalPaidQty) {
+                              showErrorToast(`Return (Paid) cannot exceed total paid quantity (${item.totalPaidQty})`);
+                            }
+                            const clamped = val === '' ? '' : String(Math.min(item.totalPaidQty, Math.max(0, Number(val))));
+                            setBatchReturnState(prev => ({
+                              ...prev,
+                              [item.productId]: { ...state, returned: clamped }
+                            }));
+                          }}
                           className="w-20 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-center font-black text-rose-600 focus:bg-white focus:ring-2 focus:ring-rose-500/10 outline-none"
                         />
                       </td>
@@ -963,10 +1055,17 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                           max={item.totalFreeQty}
                           value={state.free}
                           disabled={isBatchSettled || item.totalFreeQty === 0}
-                          onChange={(e) => setBatchReturnState(prev => ({
-                            ...prev,
-                            [item.productId]: { ...state, free: e.target.value }
-                          }))}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val !== '' && Number(val) > item.totalFreeQty) {
+                              showErrorToast(`Return (Free) cannot exceed total free quantity (${item.totalFreeQty})`);
+                            }
+                            const clamped = val === '' ? '' : String(Math.min(item.totalFreeQty, Math.max(0, Number(val))));
+                            setBatchReturnState(prev => ({
+                              ...prev,
+                              [item.productId]: { ...state, free: clamped }
+                            }));
+                          }}
                           className={`w-20 rounded-xl border px-2 py-2 text-center font-black outline-none ${item.totalFreeQty > 0
                               ? 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:bg-white focus:ring-2 focus:ring-emerald-500/10'
                               : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
@@ -1062,10 +1161,17 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                         type="number"
                         value={state.returned}
                         disabled={isBatchSettled}
-                        onChange={(e) => setBatchReturnState(prev => ({
-                          ...prev,
-                          [item.productId]: { ...state, returned: e.target.value }
-                        }))}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== '' && Number(val) > item.totalPaidQty) {
+                            showErrorToast(`Return (Paid) cannot exceed total paid quantity (${item.totalPaidQty})`);
+                          }
+                          const clamped = val === '' ? '' : String(Math.min(item.totalPaidQty, Math.max(0, Number(val))));
+                          setBatchReturnState(prev => ({
+                            ...prev,
+                            [item.productId]: { ...state, returned: clamped }
+                          }));
+                        }}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-black text-rose-600 outline-none"
                       />
                     </div>
@@ -1088,10 +1194,17 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                         type="number"
                         value={state.free}
                         disabled={isBatchSettled}
-                        onChange={(e) => setBatchReturnState(prev => ({
-                          ...prev,
-                          [item.productId]: { ...state, free: e.target.value }
-                        }))}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== '' && Number(val) > item.totalFreeQty) {
+                            showErrorToast(`Return (Free) cannot exceed total free quantity (${item.totalFreeQty})`);
+                          }
+                          const clamped = val === '' ? '' : String(Math.min(item.totalFreeQty, Math.max(0, Number(val))));
+                          setBatchReturnState(prev => ({
+                            ...prev,
+                            [item.productId]: { ...state, free: clamped }
+                          }));
+                        }}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-black text-emerald-600 outline-none"
                       />
                     </div>
@@ -1190,55 +1303,168 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               </div>
 
               <div className="rounded-3xl border-2 border-slate-900 bg-white p-6 shadow-xl shadow-slate-100">
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div className="flex justify-between items-center text-sm font-bold text-slate-500">
-                    <span>Final Amount (Sold):</span>
-                    <span className="text-slate-900">{formatCurrency(currentFinalAmount)}</span>
+                    <span>Gross Cash Collectable:</span>
+                    <span className="text-slate-900 font-black">{formatCurrency(currentCashCollectable)}</span>
                   </div>
 
-                  <div className="flex justify-between items-center text-sm font-bold text-slate-500 border-b border-slate-100 pb-2">
-                    <span>Reported by Delivery Man:</span>
-                    <span className="text-blue-600">{formatCurrency(currentCashCollectable)}</span>
+                  {/* Expense Entry Section */}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                      <p className="text-xs font-black uppercase text-slate-900 tracking-wider">ডেলিভারি ম্যানের দৈনিক খরচ (EXPENSES)</p>
+                      <p className="text-xs font-black text-rose-600">মোট: {formatCurrency(totalExpensesVal)}</p>
+                    </div>
+
+                    {/* Default Field: Van Rent */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">ভ্যান ভাড়া (VAN RENT)</label>
+                      <input
+                        type="number"
+                        value={vanRent}
+                        onChange={(e) => setVanRent(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base font-bold text-slate-900 outline-none focus:border-slate-900 shadow-xs"
+                      />
+                    </div>
+
+                    {/* Custom Expenses List */}
+                    {customExpenses.length > 0 && (
+                      <div className="space-y-3 pt-2 border-t border-slate-200">
+                        <p className="text-[10px] font-black uppercase text-slate-500">অতিরিক্ত খরচের ফিল্ডসমূহ</p>
+                        {customExpenses.map((exp, idx) => (
+                          <div key={exp.id || idx} className="bg-white p-3 rounded-2xl border border-slate-200 space-y-2 shadow-xs">
+                            {/* Top row: Name Input & Remove Button */}
+                            <div className="flex items-center justify-between gap-2">
+                              <input
+                                type="text"
+                                placeholder="খরচের নাম (যেমন: বেতন/লেবার, ফুয়েল, খাবার)"
+                                value={exp.name}
+                                onChange={(e) => {
+                                  const updated = [...customExpenses];
+                                  updated[idx].name = e.target.value;
+                                  setCustomExpenses(updated);
+                                }}
+                                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-900 outline-none focus:bg-white focus:border-slate-900"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCustomExpenses(customExpenses.filter((_, i) => i !== idx));
+                                }}
+                                className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 transition-colors"
+                                title="Remove Field"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            {/* Bottom row: Price Input */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-400 uppercase">
+                                {exp.name.trim() ? `${exp.name.trim()} (পরিমাণ / কয় টাকা)` : 'পরিমাণ (কয় টাকা)'}
+                              </label>
+                              <input
+                                type="number"
+                                placeholder="0.00"
+                                value={exp.amount}
+                                onChange={(e) => {
+                                  const updated = [...customExpenses];
+                                  updated[idx].amount = e.target.value;
+                                  setCustomExpenses(updated);
+                                }}
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-slate-900"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomExpenses([
+                          ...customExpenses,
+                          { id: String(Date.now()), expenseType: 'Other', name: '', amount: '', note: '' }
+                        ]);
+                      }}
+                      className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 bg-white text-xs font-black uppercase tracking-wider text-slate-700 hover:bg-slate-100 transition-colors shadow-xs"
+                    >
+                      + ADD EXPENSE (অতিরিক্ত খরচ যোগ করুন)
+                    </button>
+                  </div>
+
+                  {/* Settlement Formula Card */}
+                  <div className="rounded-2xl bg-slate-900 text-white p-4 space-y-2">
+                    <div className="flex justify-between items-center text-xs font-medium text-slate-300">
+                      <span>Gross Order / Dispatch Amount (মোট অর্ডার মূল্য)</span>
+                      <span>{formatCurrency(currentGrossDispatched)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-medium text-rose-400">
+                      <span>(-) Total Paid Return Amount (রিটার্ন মূল্য)</span>
+                      <span>- {formatCurrency(currentReturnAdjusted)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-bold text-white border-t border-white/10 pt-1.5">
+                      <span>= Gross Sold Amount (বিক্রি মূল্য)</span>
+                      <span>{formatCurrency(currentFinalAmount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-medium text-rose-400">
+                      <span>(-) Total Customer Due/Baki (মোট বাকি)</span>
+                      <span>- {formatCurrency(currentCustomerDue)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-bold text-emerald-400 border-t border-white/10 pt-1.5">
+                      <span>= Gross Cash Collectable (সংগ্রহযোগ্য ক্যাশ)</span>
+                      <span>{formatCurrency(currentCashCollectable)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-medium text-rose-400">
+                      <span>(-) Total Daily Expenses (সর্বমোট খরচ)</span>
+                      <span>- {formatCurrency(totalExpensesVal)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm font-black text-emerald-400 border-t-2 border-white/20 pt-2">
+                      <span>= Net Expected Cash from Delivery Man (প্রত্যাশিত ক্যাশ)</span>
+                      <span>{formatCurrency(netExpectedCashFromDeliveryMan)}</span>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Actual Cash Received by Admin</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-900 flex items-center justify-between">
+                      <span>Actual Cash Received by Admin <span className="text-rose-600 font-black">*</span></span>
+                      <span className="text-rose-600 font-bold text-[9px] uppercase tracking-normal">(বাধ্যতামূলক)</span>
+                    </label>
                     <input
                       type="number"
                       value={actualCashReceived}
                       onChange={(e) => {
-                        // Store exactly what the user typed — no Number() conversion that would corrupt commas
                         cashManuallyEdited.current = true;
                         setActualCashReceived(e.target.value);
                       }}
-                      placeholder="Enter amount..."
+                      placeholder={String(netExpectedCashFromDeliveryMan)}
                       className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-5 py-4 text-2xl font-black text-slate-900 focus:border-slate-900 outline-none transition-all"
                     />
                   </div>
 
-                  {/* Live Calculation: Remaining Due/Baki */}
-                  <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100">
-                    <div className="flex justify-between items-center">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Remaining Due/Baki</p>
-                      <p className="text-xl font-black text-amber-700">
-                        {formatCurrency(Math.max(0, currentFinalAmount - Number(actualCashReceived || 0)))}
-                      </p>
-                    </div>
-                    <p className="mt-1 text-[8px] font-bold text-amber-500 uppercase leading-relaxed">
-                      This amount will stay as customer due and stay assigned to the original SR and Shop.
-                    </p>
-                  </div>
-
-                  {/* Mismatch Warning: Only if admin input differs from delivery man report */}
-                  {actualCashReceived && Math.abs(Number(actualCashReceived) - currentCashCollectable) > 0.01 && (
-                    <div className="rounded-2xl bg-rose-50 p-4 border border-rose-100 animate-pulse">
-                      <div className="flex items-center gap-2 text-rose-600">
-                        <ShieldAlert className="h-4 w-4" />
-                        <p className="text-xs font-black uppercase tracking-tight">Cash Mismatch Warning</p>
+                  {/* Difference Card */}
+                  {actualCashReceived !== '' && (
+                    <div className={`rounded-2xl p-4 border ${
+                      Math.abs(Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0.01
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : Number(actualCashReceived) < netExpectedCashFromDeliveryMan
+                        ? 'bg-rose-50 border-rose-200 text-rose-800'
+                        : 'bg-blue-50 border-blue-200 text-blue-800'
+                    }`}>
+                      <div className="flex justify-between items-center">
+                        <p className="text-[10px] font-black uppercase tracking-widest">
+                          {Math.abs(Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0.01
+                            ? 'Balanced'
+                            : Number(actualCashReceived) < netExpectedCashFromDeliveryMan
+                            ? 'Shortage (ঘাটতি)'
+                            : 'Excess (অতিরিক্ত)'}
+                        </p>
+                        <p className="text-lg font-black">
+                          {formatCurrency(Math.abs(Number(actualCashReceived) - netExpectedCashFromDeliveryMan))}
+                        </p>
                       </div>
-                      <p className="mt-1 text-[10px] font-bold text-rose-500 uppercase leading-relaxed">
-                        Delivery man reported {formatCurrency(currentCashCollectable)}, but you are settling with {formatCurrency(Number(actualCashReceived))}.
-                      </p>
                     </div>
                   )}
                 </div>
@@ -1380,7 +1606,28 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               const dPaid = Number(state.damaged || 0);
               const finalSold = Math.max(0, item.totalPaidQty - rPaid - dPaid);
               const deliveredFree = Math.max(0, item.totalFreeQty - rFree);
-              const lineTotal = finalSold * item.price;
+
+              const itemFinalSoldAmount = (() => {
+                const batchItem = (batch.items || []).find((bi: any) => Number(bi.productId) === Number(item.productId)) as any;
+                if (isBatchSettled && batchItem && Number(batchItem.finalSoldAmount || 0) > 0) {
+                  return Number(batchItem.finalSoldAmount);
+                }
+                const calc = dynamicOrders.reduce((sum, bo) => {
+                  const itemInOrder = bo.order.items.find((i: any) => Number(i.productId) === Number(item.productId));
+                  if (!itemInOrder) return sum;
+                  const finalPaidDelivered = Number(itemInOrder.deliveredPaidQuantity || 0);
+                  const orderPaid = Number(itemInOrder.quantity || 0);
+                  const unitPriceAfterItemDiscount = orderPaid > 0 ? Number(itemInOrder.lineTotal || 0) / orderPaid : 0;
+                  const itemSold = finalPaidDelivered * unitPriceAfterItemDiscount;
+                  const subtotal = Number(bo.order.subtotal || 0);
+                  const invoiceDiscountApplied = subtotal > 0
+                    ? Number(bo.order.discountAmount || 0) * (itemSold / subtotal)
+                    : 0;
+                  return sum + Math.max(0, itemSold - invoiceDiscountApplied);
+                }, 0);
+                return calc > 0 ? calc : finalSold * item.price;
+              })();
+
               const itemDue = dynamicOrders
                 .reduce((sum, bo) => {
                   return sum + getDueForProductRow(bo, item.productId);
@@ -1398,7 +1645,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   <td className="border-r border-black px-2 py-2 text-center text-blue-600">{formatNumber(finalSold)}</td>
                   <td className="border-r border-black px-2 py-2 text-center text-emerald-600">{formatNumber(deliveredFree)}</td>
                   <td className="border-r border-black px-2 py-2 text-center font-black text-slate-500">{formatCurrency(item.price)}</td>
-                  <td className="border-r border-black px-2 py-2 text-right font-black">{formatCurrency(lineTotal)}</td>
+                  <td className="border-r border-black px-2 py-2 text-right font-black">{formatCurrency(itemFinalSoldAmount)}</td>
                   <td className={`px-2 py-2 text-right font-black ${itemDue > 0 ? 'text-rose-700 bg-rose-50' : 'text-slate-300'}`}>
                     {itemDue > 0 ? formatCurrency(itemDue) : '—'}
                   </td>
@@ -1417,10 +1664,110 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             </tr>
             <tr className="border-t-2 border-black bg-white text-black">
               <td colSpan={11} className="border-r border-black px-4 py-2.5 text-right font-black">Cash Collected:</td>
-              <td className="px-2 py-2.5 text-right font-black text-black">{formatCurrency(isBatchSettled ? (batch.totalCollectedAmount || 0) : Number(actualCashReceived || currentCashCollectable))}</td>
+              <td className="px-2 py-2.5 text-right font-black text-black">{formatCurrency(isBatchSettled ? (batch.totalCollectedAmount || 0) : Number(actualCashReceived || netExpectedCashFromDeliveryMan))}</td>
             </tr>
           </tfoot>
         </table>
+
+        {/* Settlement Financial & Expense Reconciliation Table / Card for Print */}
+        <div className="border-2 border-black p-4 mb-6 rounded-none bg-white text-xs">
+          <h3 className="font-black uppercase tracking-wider text-sm border-b-2 border-black pb-2 mb-3">
+            Settlement Reconciliation & Daily Expenses Breakdown (হিসাব ও খরচ সমীকরণ)
+          </h3>
+
+          <div className="grid grid-cols-2 gap-6">
+            {/* Left Column: Expenses Itemization */}
+            <div className="space-y-1.5 border-r border-slate-300 pr-4">
+              <p className="font-black uppercase text-[11px] text-slate-700 mb-1 border-b border-slate-200 pb-1">
+                Delivery Daily Expenses (দৈনিক খরচসমূহ):
+              </p>
+
+              <div className="flex justify-between font-bold">
+                <span>1. Van Rent (ভ্যান ভাড়া):</span>
+                <span>{formatCurrency(isBatchSettled ? Number(batch.vanRent || 0) : vanRentVal)}</span>
+              </div>
+
+              {Number(isBatchSettled ? (batch.salary || 0) : salaryVal) > 0 && (
+                <div className="flex justify-between font-bold">
+                  <span>2. Salary/Labor (বেতন):</span>
+                  <span>{formatCurrency(isBatchSettled ? Number(batch.salary || 0) : salaryVal)}</span>
+                </div>
+              )}
+
+              {/* Custom Expenses List */}
+              {(isBatchSettled ? (batch.expenses || []) : customExpenses.filter(e => e.name.trim() && Number(e.amount || 0) > 0)).map((exp: any, i: number) => (
+                <div key={exp.id || i} className="flex justify-between font-bold text-slate-800">
+                  <span>{i + (Number(isBatchSettled ? (batch.salary || 0) : salaryVal) > 0 ? 3 : 2)}. {exp.name}:</span>
+                  <span>{formatCurrency(Number(exp.amount || 0))}</span>
+                </div>
+              ))}
+
+              <div className="flex justify-between font-black text-rose-700 border-t border-black pt-1.5 mt-2 text-sm">
+                <span>Total Expenses (সর্বমোট খরচ):</span>
+                <span>- {formatCurrency(isBatchSettled ? Number(batch.totalExpenses || 0) : totalExpensesVal)}</span>
+              </div>
+            </div>
+
+            {/* Right Column: Final Cash Reconciliation */}
+            <div className="space-y-2 font-bold">
+              <p className="font-black uppercase text-[11px] text-slate-700 mb-1 border-b border-slate-200 pb-1">
+                Cash Reconciliation (ক্যাশ হিসাব সমীকরণ):
+              </p>
+
+              <div className="flex justify-between">
+                <span>Gross Order / Dispatch Amount:</span>
+                <span>{formatCurrency(currentGrossDispatched)}</span>
+              </div>
+
+              <div className="flex justify-between text-rose-600">
+                <span>(-) Total Paid Return Amount:</span>
+                <span>- {formatCurrency(currentReturnAdjusted)}</span>
+              </div>
+
+              <div className="flex justify-between border-t border-slate-200 pt-1 font-black text-slate-900">
+                <span>= Gross Sold Amount:</span>
+                <span>{formatCurrency(currentFinalAmount)}</span>
+              </div>
+
+              <div className="flex justify-between text-rose-600">
+                <span>(-) Total Customer Due/Baki:</span>
+                <span>- {formatCurrency(currentCustomerDue)}</span>
+              </div>
+
+              <div className="flex justify-between border-t border-slate-200 pt-1 font-black text-slate-900">
+                <span>= Gross Cash Collectable:</span>
+                <span>{formatCurrency(currentCashCollectable)}</span>
+              </div>
+
+              <div className="flex justify-between text-rose-600">
+                <span>(-) Total Daily Expenses:</span>
+                <span>- {formatCurrency(isBatchSettled ? Number(batch.totalExpenses || 0) : totalExpensesVal)}</span>
+              </div>
+
+              <div className="flex justify-between border-t border-black pt-1.5 font-black text-emerald-700 text-sm">
+                <span>= Net Expected Cash:</span>
+                <span>{formatCurrency(netExpectedCashFromDeliveryMan)}</span>
+              </div>
+
+              <div className="flex justify-between bg-slate-100 p-2 rounded-none font-black text-slate-900 border border-black text-sm">
+                <span>Actual Cash Received by Admin:</span>
+                <span>{formatCurrency(isBatchSettled ? Number(batch.totalCollectedAmount || 0) : Number(actualCashReceived || netExpectedCashFromDeliveryMan))}</span>
+              </div>
+
+              {/* Discrepancy */}
+              {((isBatchSettled && Number(batch.shortageOrExcess || 0) !== 0) || (!isBatchSettled && actualCashReceived !== '' && Math.abs(Number(actualCashReceived) - netExpectedCashFromDeliveryMan) >= 0.01)) && (
+                <div className={`flex justify-between p-1.5 font-black text-xs ${
+                  (isBatchSettled ? Number(batch.shortageOrExcess || 0) : Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0
+                    ? 'text-rose-700 bg-rose-50 border border-rose-200'
+                    : 'text-blue-700 bg-blue-50 border border-blue-200'
+                }`}>
+                  <span>Discrepancy ({(isBatchSettled ? Number(batch.shortageOrExcess || 0) : Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0 ? 'Shortage / ঘাটতি' : 'Excess / অতিরিক্ত'}):</span>
+                  <span>{formatCurrency(Math.abs(isBatchSettled ? Number(batch.shortageOrExcess || 0) : (Number(actualCashReceived) - netExpectedCashFromDeliveryMan)))}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Signatures */}
         <div className="grid grid-cols-2 gap-10 mt-10 signature-grid">
@@ -1435,6 +1782,31 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         </div>
       </div>
 
+
+      {dueModalProduct && (
+        <DueModal
+          isOpen={!!dueModalProduct}
+          onClose={() => setDueModalProduct(null)}
+          productName={dueModalProduct.name}
+          productId={dueModalProduct.id}
+          batchOrders={dynamicOrders}
+          draftDues={draftDues}
+          route={batch.route}
+          companyId={batch.companyId}
+          onAddDraftDue={(orderId, dues) => {
+            if (dueModalProduct) {
+              const key = `${orderId}_${dueModalProduct.id}`;
+              setDraftDues((prev) => ({
+                ...prev,
+                [key]: dues,
+              }));
+            }
+          }}
+          onSuccess={() => {
+            fetchBatch();
+          }}
+        />
+      )}
 
       {batchToDelete && (
         <DeleteBatchConfirmModal

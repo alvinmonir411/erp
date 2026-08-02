@@ -4,20 +4,19 @@ import {
   OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnModuleDestroy,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
 
-const isVercel = process.env.VERCEL === '1';
-
-@WebSocketGateway(isVercel ? undefined : 5003, {
+@WebSocketGateway(5003, {
   cors: {
     origin: '*',
   },
 })
 @Injectable()
 export class RealtimeGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   private readonly logger = new Logger(RealtimeGateway.name);
 
@@ -25,7 +24,17 @@ export class RealtimeGateway
   server: Server;
 
   afterInit(server: Server) {
-    this.logger.log('Websocket Gateway Initialized');
+    this.logger.log('Websocket Gateway Initialized on port 5003');
+  }
+
+  onModuleDestroy() {
+    if (this.server) {
+      try {
+        this.server.close();
+      } catch (err) {
+        // Ignore close error on shutdown
+      }
+    }
   }
 
   handleConnection(client: Socket, ...args: any[]) {
@@ -37,7 +46,9 @@ export class RealtimeGateway
   }
 
   emitPayload(event: string, payload: any) {
-    this.server.emit(event, payload);
-    this.logger.log(`Emitted event ${event} to all connected clients`);
+    if (this.server) {
+      this.server.emit(event, payload);
+      this.logger.log(`Emitted event ${event} to all connected clients`);
+    }
   }
 }

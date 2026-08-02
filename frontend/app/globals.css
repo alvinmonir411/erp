@@ -45,6 +45,7 @@ body {
   font-family: Arial, Helvetica, ui-sans-serif, system-ui, sans-serif;
 }
 
+
 .glass-card {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(8px);
@@ -67,3 +68,14 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+/* Disable / Hide spinner arrows on number inputs globally */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}

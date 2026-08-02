@@ -635,6 +635,8 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
   const { user } = useAuth();
   const { success: showSuccessToast, error: showErrorToast } = useToast();
   const [shopId, setShopId] = useState('');
+  const [shopSearch, setShopSearch] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
@@ -648,6 +650,21 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
     queryKey: ['all-shops-for-due'],
     queryFn: () => getShops(),
   });
+
+  const selectedShop = useMemo(() => {
+    return shops.find((s: any) => String(s.id) === String(shopId));
+  }, [shops, shopId]);
+
+  const filteredShops = useMemo(() => {
+    if (!shopSearch.trim()) return shops;
+    const q = shopSearch.toLowerCase();
+    return shops.filter((s: any) =>
+      s.name?.toLowerCase().includes(q) ||
+      s.ownerName?.toLowerCase().includes(q) ||
+      s.phone?.includes(q) ||
+      s.route?.name?.toLowerCase().includes(q)
+    );
+  }, [shops, shopSearch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -697,23 +714,86 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 relative">
             <label className="text-xs font-bold uppercase tracking-wider text-muted">Select Shop</label>
-            <select
-              value={shopId}
-              onChange={(e) => setShopId(e.target.value)}
-              required
-              disabled={isLoading}
-              className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
-            >
-              <option value="">-- Choose Shop --</option>
-              {shops.map((shop: any) => (
-                <option key={shop.id} value={shop.id}>
-                  {shop.name} {shop.route ? `· ${shop.route.name}` : ''}
-                </option>
-              ))}
-            </select>
-            {isLoading && <p className="text-[10px] text-muted">Loading shops list...</p>}
+
+            {selectedShop ? (
+              <div className="flex items-center justify-between p-3 border border-primary/40 rounded-xl bg-primary/5 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+                    <Store className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">{selectedShop.name}</p>
+                    <p className="text-xs font-medium text-muted">
+                      {selectedShop.route?.name ? `Route: ${selectedShop.route.name}` : ''}
+                      {selectedShop.ownerName ? ` · ${selectedShop.ownerName}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setShopId(''); setShopSearch(''); setIsDropdownOpen(true); }}
+                  className="text-xs font-bold text-primary hover:underline px-2 py-1"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                  <input
+                    type="text"
+                    value={shopSearch}
+                    onChange={(e) => {
+                      setShopSearch(e.target.value);
+                      setIsDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    placeholder="Search shop by name, route, phone..."
+                    disabled={isLoading}
+                    className="w-full pl-9 pr-4 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                  />
+                </div>
+
+                {isLoading && <p className="text-[10px] text-muted mt-1">Loading shops list...</p>}
+
+                {isDropdownOpen && !isLoading && (
+                  <div className="absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto bg-white border border-border rounded-xl shadow-xl z-50 divide-y divide-zinc-100">
+                    {filteredShops.length > 0 ? (
+                      filteredShops.map((shop: any) => (
+                        <button
+                          key={shop.id}
+                          type="button"
+                          onClick={() => {
+                            setShopId(String(shop.id));
+                            setIsDropdownOpen(false);
+                            setShopSearch('');
+                          }}
+                          className="w-full text-left p-3 hover:bg-zinc-50 flex items-center justify-between transition-colors"
+                        >
+                          <div>
+                            <p className="text-sm font-bold text-foreground">{shop.name}</p>
+                            <p className="text-xs text-muted">
+                              {shop.route?.name ? `Route: ${shop.route.name}` : 'No route'}
+                              {shop.ownerName ? ` · ${shop.ownerName}` : ''}
+                            </p>
+                          </div>
+                          {shop.phone && (
+                            <span className="text-[11px] font-mono text-muted bg-zinc-100 px-2 py-0.5 rounded-md">
+                              {shop.phone}
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-xs text-muted">No shops found for &quot;{shopSearch}&quot;</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">

@@ -20,7 +20,9 @@ import {
   DollarSign,
   Truck,
   Gift,
-  AlertCircle
+  AlertCircle,
+  Receipt,
+  TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
@@ -44,9 +46,10 @@ const navigation = [
     ]
   },
   {
-    title: 'Delivery',
+    title: 'Analytics & Delivery',
     roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
+      { href: '/expenses', label: 'Business Analytics', icon: TrendingUp },
       { href: '/delivery-ops', label: 'Delivery Summary', icon: FileText },
     ]
   },

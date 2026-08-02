@@ -13,9 +13,9 @@ export class QueryDispatchBatchesDto {
   routeId?: number;
 
   @IsOptional()
-  @Transform(({ value }) => (value ? Number(value) : undefined))
-  @IsNumber()
-  deliveryPersonId?: number;
+  @Transform(({ value }) => (value ? String(value) : undefined))
+  @IsString()
+  deliveryPersonId?: string;
 
   @IsOptional()
   @IsDateString()

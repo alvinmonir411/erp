@@ -47,14 +47,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     }
 
+    if (exception instanceof Error) {
+      console.error('[AllExceptionsFilter STACK]:', exception.stack);
+    }
+    const exceptionRes = exception instanceof HttpException ? exception.getResponse() : null;
+    console.error('[AllExceptionsFilter]', JSON.stringify(exceptionRes || exception));
+    const details = typeof exceptionRes === 'object' && exceptionRes !== null ? (exceptionRes as any).message : null;
+
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
-      message:
-        exception instanceof Error
-          ? exception.message
-          : 'Internal server error',
+      message: details || (exception instanceof Error ? exception.message : 'Internal server error'),
     });
   }
 }
@@ -90,7 +94,7 @@ async function createApp(): Promise<Express> {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false,
     }),
   );
 

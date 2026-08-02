@@ -19,6 +19,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { DuesModule } from './modules/dues/dues.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 
@@ -59,6 +60,7 @@ import { CacheModule } from '@nestjs/cache-manager';
     DuesModule,
     SalesModule,
     RealtimeModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

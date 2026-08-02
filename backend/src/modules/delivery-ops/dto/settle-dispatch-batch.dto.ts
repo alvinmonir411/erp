@@ -66,6 +66,23 @@ class DueEntryDto {
   note?: string;
 }
 
+class DispatchExpenseItemDto {
+  @IsString()
+  @IsOptional()
+  expenseType?: string;
+
+  @IsString()
+  name: string;
+
+  @IsNumber()
+  @Type(() => Number)
+  amount: number;
+
+  @IsString()
+  @IsOptional()
+  note?: string;
+}
+
 export class SettleDispatchBatchDto {
   @IsArray()
   @IsOptional()
@@ -81,7 +98,23 @@ export class SettleDispatchBatchDto {
 
   @IsNumber()
   @IsOptional()
-  actualCashReceived?: number;
+  @Type(() => Number)
+  vanRent?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  salary?: number;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => DispatchExpenseItemDto)
+  customExpenses?: DispatchExpenseItemDto[];
+
+  @IsNumber()
+  @Type(() => Number)
+  actualCashReceived: number;
 
   @IsString()
   @IsOptional()

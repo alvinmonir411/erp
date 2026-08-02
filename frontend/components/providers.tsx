@@ -1,13 +1,42 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState, ReactNode } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { GlobalLoading } from './global-loading';
 import { AuthProvider } from './auth/auth-provider';
 import { LoadingProvider } from '@/lib/loading-context';
 import { SocketProvider } from './providers/socket-provider';
 
 export function Providers({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      if (
+        document.activeElement instanceof HTMLInputElement &&
+        document.activeElement.type === 'number'
+      ) {
+        e.preventDefault();
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+        document.activeElement instanceof HTMLInputElement &&
+        document.activeElement.type === 'number'
+      ) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const [queryClient] = useState(
     () =>
       new QueryClient({

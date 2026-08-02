@@ -479,7 +479,7 @@ export class OrdersService {
             note: `Returned ${qtyToRevert} units (net adjustment) from deleted order #${numericId}`,
             user: 'System',
             balanceAfter: balanceAfter,
-            idempotencyKey: `DEL_ORDER_RET_${numericId}_${item.productId}`,
+            idempotencyKey: `DEL_ORDER_RET_${numericId}_${item.id}`,
           }),
         );
       }
@@ -524,7 +524,11 @@ export class OrdersService {
       // Commit transaction
       await queryRunner.commitTransaction();
 
-      this.realtimeGateway.emitPayload('orderDeleted', { id: numericId });
+      try {
+        this.realtimeGateway?.emitPayload('orderDeleted', { id: numericId });
+      } catch (err: any) {
+        this.logger.warn(`Failed to emit orderDeleted event: ${err?.message}`);
+      }
 
       return deleteResult;
     } catch (error) {
@@ -533,7 +537,9 @@ export class OrdersService {
         `[OrdersService.deleteOrder] Transaction failed for Order #${numericId}. Rolling back. Error: ${error.message}`,
         error.stack,
       );
-      await queryRunner.rollbackTransaction();
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
 
       if (
         error instanceof NotFoundException ||
@@ -682,7 +688,7 @@ export class OrdersService {
               type: StockMovementType.RETURN_IN,
               quantity: totalReturned,
               reference: `Order #${id}`,
-              idempotencyKey: `SETTLE_RET_${id}_${orderItem.productId}`,
+              idempotencyKey: `SETTLE_RET_${id}_${orderItem.id}`,
               note: `Returned ${totalReturned} units (${returnedPaid} paid, ${returnedFree} free) from order #${id}`,
             },
             'Admin',

@@ -14,6 +14,7 @@ import { Route } from '../../routes/entities/route.entity';
 import { DeliveryPerson } from './delivery-person.entity';
 import { DispatchBatchOrder } from './dispatch-batch-order.entity';
 import { DispatchBatchItem } from './dispatch-batch-item.entity';
+import { DispatchBatchExpense } from './dispatch-batch-expense.entity';
 import { ColumnNumericTransformer } from '../../orders/orders.constants';
 import { User } from '../../users/entities/user.entity';
 
@@ -142,6 +143,33 @@ export class DispatchBatch {
   })
   shortageOrExcess: number;
 
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  vanRent: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  salary: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  totalExpenses: number;
+
   @Column({ default: false })
   isMorningPrinted: boolean;
 
@@ -173,6 +201,11 @@ export class DispatchBatch {
 
   @OneToMany(() => DispatchBatchItem, (item) => item.batch, { cascade: true })
   items: DispatchBatchItem[];
+
+  @OneToMany(() => DispatchBatchExpense, (expense) => expense.batch, {
+    cascade: true,
+  })
+  expenses: DispatchBatchExpense[];
 
   @CreateDateColumn()
   createdAt: Date;

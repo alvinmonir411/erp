@@ -21,7 +21,7 @@ export function DeliveryReportsPage() {
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 30);
+    d.setDate(d.getDate() - 7);
     return d.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
