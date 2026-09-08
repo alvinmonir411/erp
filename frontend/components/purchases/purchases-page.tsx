@@ -545,15 +545,6 @@ export function PurchasesPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={handleResetDemoData}
-              className="inline-flex items-center gap-2 rounded-2xl border border-rose-400/30 bg-rose-500/20 hover:bg-rose-500/30 px-4 py-3 text-xs font-bold text-rose-200 backdrop-blur-md transition-all hover:scale-105 active:scale-95"
-              title="টেস্ট চালান ও পেমেন্ট মুছে ফ্রেশ শুরু করুন"
-            >
-              <Trash2 className="h-4 w-4 text-rose-300" />
-              <span>ডেমো ডেটা মুছুন</span>
-            </button>
-
-            <button
               onClick={() => openPaymentModal()}
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
             >
