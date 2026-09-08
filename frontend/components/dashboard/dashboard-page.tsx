@@ -79,6 +79,9 @@ export function DashboardPage() {
   const [activeDrilldown, setActiveDrilldown] = useState<DrilldownType>(null);
   const [drilldownSearch, setDrilldownSearch] = useState('');
 
+  // Chart Hover & Active Tooltip State
+  const [hoveredChartDay, setHoveredChartDay] = useState<any>(null);
+
   // Order Details Modal State
   const [viewingOrder, setViewingOrder] = useState<any>(null);
   const [isViewingOrderLoading, setIsViewingOrderLoading] = useState(false);
@@ -902,33 +905,84 @@ export function DashboardPage() {
           </div>
         </div>
 
+        {/* 📊 Live Hover Detail Indicator */}
+        <div className="mb-4 min-h-[48px] flex items-center justify-between px-4 py-2.5 rounded-2xl bg-indigo-50/70 border border-indigo-100/80 transition-all">
+          {hoveredChartDay ? (
+            <div className="flex items-center gap-3">
+              <span className="h-3 w-3 rounded-full bg-indigo-600 animate-ping" />
+              <div>
+                <span className="text-xs font-black text-slate-800">
+                  {hoveredChartDay.day} {activeMonthBn || ''} ({hoveredChartDay.date}):
+                </span>{' '}
+                <span className="text-sm font-black text-indigo-700">
+                  {formatCurrency(hoveredChartDay.amount)}
+                </span>
+                <span className="ml-2 text-[11px] font-semibold text-slate-500">নগদ ডেলিভারি বিক্রি</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <Sparkles className="w-4 h-4 text-indigo-500" />
+              <span>যেকোনো তারিখের বিক্রি দেখতে নিচে বারের উপর মাউস রাখুন অথবা টাচ করুন</span>
+            </div>
+          )}
+          {hoveredChartDay && (
+            <button
+              onClick={() => setHoveredChartDay(null)}
+              className="text-[11px] font-bold text-slate-400 hover:text-slate-600 px-2 py-0.5 rounded-md hover:bg-white transition-colors"
+            >
+              রিসেট
+            </button>
+          )}
+        </div>
+
         {/* Dynamic Month Day Trend */}
         {d.charts?.monthlyTrend && d.charts.monthlyTrend.length > 0 ? (
           <div className="space-y-2">
-            <div className="flex h-56 sm:h-64 items-end gap-1 sm:gap-1.5 px-1 sm:px-2 overflow-x-auto pb-4 pt-8">
+            <div className="flex h-60 sm:h-68 items-end gap-1 sm:gap-1.5 px-1 sm:px-2 overflow-x-auto pb-4 pt-12">
               {d.charts.monthlyTrend.map((dayItem: any) => {
                 const max = Math.max(...d.charts.monthlyTrend.map((x: any) => x.amount), 1);
                 const height = (dayItem.amount / max) * 100;
                 const isTodayDate = dayItem.date === new Date().toISOString().split('T')[0];
+                const isHovered = hoveredChartDay?.day === dayItem.day;
 
                 return (
-                  <div key={dayItem.day} className="group relative flex flex-1 h-full flex-col items-center min-w-[22px] sm:min-w-[26px]">
-                    <div className="invisible group-hover:visible absolute -top-10 z-20 rounded-lg bg-slate-900 text-white px-2.5 py-1 text-[10px] font-black shadow-xl whitespace-nowrap">
-                      {dayItem.day} {activeMonthBn || ''}: {formatCurrency(dayItem.amount)}
+                  <div
+                    key={dayItem.day}
+                    onMouseEnter={() => setHoveredChartDay(dayItem)}
+                    onMouseLeave={() => setHoveredChartDay(null)}
+                    onClick={() => setHoveredChartDay(dayItem)}
+                    className="group relative flex flex-1 h-full flex-col items-center min-w-[24px] sm:min-w-[28px] cursor-pointer"
+                  >
+                    {/* Floating Tooltip with Arrow */}
+                    <div
+                      className={`pointer-events-none absolute -top-9 z-30 flex flex-col items-center transition-all duration-150 ${
+                        isHovered
+                          ? 'opacity-100 scale-100'
+                          : 'opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100'
+                      }`}
+                    >
+                      <div className="rounded-lg bg-slate-900 text-white px-2.5 py-1 text-[10px] font-black shadow-2xl whitespace-nowrap border border-slate-700">
+                        {dayItem.day} {activeMonthBn || ''}: {formatCurrency(dayItem.amount)}
+                      </div>
+                      <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 border-r border-b border-slate-700" />
                     </div>
+
                     <div className="flex-1 w-full flex items-end justify-center mb-2">
                       <div
                         className={`w-full rounded-t-md transition-all duration-300 ${
                           dayItem.amount > 0
-                            ? isTodayDate
-                              ? 'bg-gradient-to-t from-indigo-600 to-violet-500 shadow-md shadow-indigo-500/20'
+                            ? isTodayDate || isHovered
+                              ? 'bg-gradient-to-t from-indigo-600 to-violet-500 shadow-md shadow-indigo-500/30 scale-x-110'
                               : 'bg-indigo-500/85 group-hover:bg-indigo-600'
-                            : 'bg-slate-100 group-hover:bg-slate-200'
+                            : isHovered
+                              ? 'bg-slate-300'
+                              : 'bg-slate-100 group-hover:bg-slate-200'
                         }`}
                         style={{ height: `${Math.max(6, height)}%` }}
                       />
                     </div>
-                    <span className={`text-[9px] font-black ${isTodayDate ? 'text-indigo-700 font-black underline' : 'text-slate-400'}`}>
+                    <span className={`text-[9px] font-black ${isTodayDate || isHovered ? 'text-indigo-700 font-black underline scale-110' : 'text-slate-400'}`}>
                       {dayItem.day}
                     </span>
                   </div>
@@ -942,14 +996,20 @@ export function DashboardPage() {
             </div>
           </div>
         ) : (
-          <div className="flex h-56 sm:h-64 items-end gap-2 px-2 overflow-x-auto pb-4">
+          <div className="flex h-60 sm:h-68 items-end gap-2 px-2 overflow-x-auto pb-4 pt-12">
             {d.charts.last7Days.map((day: any) => {
               const max = Math.max(...d.charts.last7Days.map((x: any) => x.amount), 1);
               const height = (day.amount / max) * 100;
               return (
-                <div key={day.date} className="group relative flex flex-1 h-full flex-col items-center min-w-[32px]">
-                  <div className="invisible group-hover:visible absolute -top-10 z-20 rounded-lg bg-slate-900 text-white px-2.5 py-1 text-[10px] font-bold shadow-xl whitespace-nowrap">
-                    {formatCurrency(day.amount)}
+                <div
+                  key={day.date}
+                  className="group relative flex flex-1 h-full flex-col items-center min-w-[32px] cursor-pointer"
+                >
+                  <div className="pointer-events-none absolute -top-9 z-30 flex flex-col items-center opacity-0 group-hover:opacity-100 transition-all duration-150">
+                    <div className="rounded-lg bg-slate-900 text-white px-2.5 py-1 text-[10px] font-bold shadow-2xl whitespace-nowrap border border-slate-700">
+                      {formatCurrency(day.amount)}
+                    </div>
+                    <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 border-r border-b border-slate-700" />
                   </div>
                   <div className="flex-1 w-full flex items-end justify-center mb-2">
                     <div
