@@ -154,7 +154,31 @@ if (process.env['VERCEL'] !== '1') {
 
 // ── Vercel serverless default export ──────────────────────────────────────────
 // Vercel calls this for every incoming request.
-export default async function handler(req: Request, res: Response) {
-  const app = await createApp();
-  app(req, res);
+export default async function handler(req: any, res: any) {
+  const origin = req.headers?.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  );
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization',
+  );
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  try {
+    const app = await createApp();
+    app(req, res);
+  } catch (err: any) {
+    console.error('Serverless bootstrap error:', err);
+    return res.status(500).json({
+      statusCode: 500,
+      message: err.message || 'Server initialization error',
+    });
+  }
 }
