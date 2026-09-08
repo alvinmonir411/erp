@@ -37,6 +37,7 @@ import {
   Tag,
   Filter,
   ArrowUpDown,
+  ArrowUpRight,
   SlidersHorizontal,
   Zap,
 } from 'lucide-react';
