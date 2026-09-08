@@ -7,12 +7,13 @@ import {
   recordCompanyPayment,
   confirmPurchase,
 } from '@/lib/api/purchases';
+import { getProducts } from '@/lib/api/products';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { PageCard } from '@/components/ui/page-card';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
 import { formatCurrency, formatDate, formatDateTime, toNumber } from '@/lib/utils/format';
-import type { CompanyPayableLedger, ProductSupplySummary, Purchase, CompanyPayableHistoryEntry } from '@/types/api';
+import type { CompanyPayableLedger, ProductSupplySummary, Purchase, CompanyPayableHistoryEntry, Product } from '@/types/api';
 import {
   Building2,
   Calendar,
@@ -27,6 +28,7 @@ import {
   ChevronDown,
   ChevronUp,
   CreditCard,
+  Trash2,
 } from 'lucide-react';
 
 function formatDateInput(value: Date) {
@@ -36,8 +38,18 @@ function formatDateInput(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
+export type ProductPaymentRow = {
+  productId: number | '';
+  productName?: string;
+  unit?: string;
+  quantity?: string;
+  amount: string;
+  note?: string;
+};
+
 export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
   const [details, setDetails] = useState<CompanyPayableLedger | null>(null);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -55,6 +67,8 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
   const [transactionRef, setTransactionRef] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<number | undefined>(undefined);
+  const [isProductBreakdownMode, setIsProductBreakdownMode] = useState(false);
+  const [productPaymentRows, setProductPaymentRows] = useState<ProductPaymentRow[]>([]);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   useToastNotification({
@@ -68,8 +82,12 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
       try {
         if (showLoader) setIsLoading(true);
         setError(null);
-        const nextDetails = await getCompanyPayableLedger(companyId);
+        const [nextDetails, prods] = await Promise.all([
+          getCompanyPayableLedger(companyId),
+          getProducts({ companyId }).catch(() => getProducts().catch(() => [])),
+        ]);
         setDetails(nextDetails);
+        setAllProducts(Array.isArray(prods) ? prods : prods?.data || []);
       } catch (loadError: any) {
         setError(loadError.message || 'কোম্পানি লেজার লোড করা যায়নি');
       } finally {
@@ -99,7 +117,71 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     setPaymentMethod('CASH');
     setTransactionRef('');
     setPaymentNote(purchaseId ? `Invoice #${purchaseId} settlement` : '');
+    setIsProductBreakdownMode(false);
+    setProductPaymentRows([]);
     setIsPaymentModalOpen(true);
+  };
+
+  const handleAddProductRow = () => {
+    setIsProductBreakdownMode(true);
+    setProductPaymentRows((prev) => [
+      ...prev,
+      { productId: '', quantity: '', amount: '', note: '' },
+    ]);
+  };
+
+  const handleUpdateProductRow = (
+    index: number,
+    field: keyof ProductPaymentRow,
+    value: any,
+  ) => {
+    setProductPaymentRows((prev) => {
+      const updated = [...prev];
+      const target = { ...updated[index], [field]: value };
+      if (field === 'productId') {
+        const prod = allProducts.find((p) => p.id === Number(value));
+        if (prod) {
+          target.productName = prod.name;
+          target.unit = prod.unit || 'Pcs';
+          if (!target.amount && prod.buyPrice) {
+            target.amount = String(toNumber(prod.buyPrice) * (Number(target.quantity) || 1));
+          }
+        }
+      }
+      if (field === 'quantity' && target.productId) {
+        const prod = allProducts.find((p) => p.id === Number(target.productId));
+        if (prod && prod.buyPrice && !target.amount) {
+          target.amount = String(toNumber(prod.buyPrice) * (Number(value) || 1));
+        }
+      }
+      updated[index] = target;
+
+      const totalRowAmount = updated.reduce(
+        (sum, row) => sum + (parseFloat(row.amount) || 0),
+        0,
+      );
+      if (totalRowAmount > 0) {
+        setPaymentAmount(String(totalRowAmount));
+      }
+
+      return updated;
+    });
+  };
+
+  const handleRemoveProductRow = (index: number) => {
+    setProductPaymentRows((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      const totalRowAmount = updated.reduce(
+        (sum, row) => sum + (parseFloat(row.amount) || 0),
+        0,
+      );
+      if (totalRowAmount > 0) {
+        setPaymentAmount(String(totalRowAmount));
+      } else if (updated.length === 0) {
+        setIsProductBreakdownMode(false);
+      }
+      return updated;
+    });
   };
 
   const handleSavePayment = async (e: FormEvent) => {
@@ -111,6 +193,20 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
       return;
     }
 
+    const validBreakdown = productPaymentRows
+      .filter((row) => row.productId || parseFloat(row.amount) > 0)
+      .map((row) => {
+        const prod = allProducts.find((p) => p.id === Number(row.productId));
+        return {
+          productId: row.productId ? Number(row.productId) : undefined,
+          productName: prod?.name || row.productName || undefined,
+          unit: prod?.unit || row.unit || 'Pcs',
+          quantity: row.quantity ? Number(row.quantity) : undefined,
+          amount: parseFloat(row.amount) || 0,
+          note: row.note?.trim() || undefined,
+        };
+      });
+
     try {
       setIsSubmittingPayment(true);
       await recordCompanyPayment(companyId, {
@@ -120,6 +216,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
         transactionRef: transactionRef.trim() || undefined,
         note: paymentNote.trim() || undefined,
         purchaseId: selectedPurchaseId,
+        productBreakdown: validBreakdown.length > 0 ? validBreakdown : undefined,
       });
 
       setToastTone('success');
@@ -642,16 +739,16 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
 
       {/* 💳 RECORD PAYMENT MODAL */}
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
+          <div className="relative w-full max-w-2xl my-8 rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600">
+              <div className="flex items-center gap-2.5">
+                <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
                   <Wallet className="h-5 w-5" />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">{company.name} কে টাকা পরিশোধ</h3>
-                  <p className="text-xs text-slate-500">টাকা দেওয়ার হিসাব সেভ করুন</p>
+                  <p className="text-xs text-slate-500">সাধারণ বা একাধিক প্রোডাক্টের জন্য টাকা দেওয়ার হিসাব সেভ করুন</p>
                 </div>
               </div>
               <button
@@ -662,19 +759,179 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               </button>
             </div>
 
-            <form onSubmit={handleSavePayment} className="mt-5 space-y-4">
-              {currentPayable > 0 && (
+            <form onSubmit={handleSavePayment} className="mt-5 space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Balance Banner */}
+              {isAdvance ? (
+                <div className="rounded-xl bg-sky-50 p-3 border border-sky-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-sky-800">💎 আমাদের অগ্রিম জমা আছে:</span>
+                  <span className="text-sm font-black text-sky-700">{formatCurrency(advanceBalance)}</span>
+                </div>
+              ) : hasDue ? (
                 <div className="rounded-xl bg-rose-50 p-3 border border-rose-100 flex items-center justify-between">
-                  <span className="text-xs font-bold text-rose-700">কোম্পানির বর্তমান মোট পাওনা:</span>
+                  <span className="text-xs font-bold text-rose-700">⚠️ কোম্পানির বর্তমান মোট পাওনা:</span>
                   <span className="text-sm font-black text-rose-700">{formatCurrency(currentPayable)}</span>
                 </div>
+              ) : (
+                <div className="rounded-xl bg-emerald-50 p-3 border border-emerald-100 flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-700">✅ হিসাব পরিশোধিত (কোন বাকি বা অগ্রিম নেই)</span>
+                </div>
               )}
+
+              {/* 🔀 Payment Mode Selector */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    পেমেন্টের ধরণ:
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsProductBreakdownMode(false)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                        !isProductBreakdownMode
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      ⚡ সাধারণ এককালীন পেমেন্ট
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProductBreakdownMode(true);
+                        if (productPaymentRows.length === 0) handleAddProductRow();
+                      }}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                        isProductBreakdownMode
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      📦 প্রোডাক্টভিত্তিক বরাদ্দ ({productPaymentRows.length})
+                    </button>
+                  </div>
+                </div>
+
+                {/* 📦 MULTI-PRODUCT BREAKDOWN ROWS */}
+                {isProductBreakdownMode && (
+                  <div className="space-y-2.5 mt-3 pt-3 border-t border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700">
+                        কোন কোন প্রোডাক্টের জন্য কত টাকা দেওয়া হচ্ছে:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAddProductRow}
+                        className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 text-xs font-bold transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>+ আরো প্রোডাক্ট যোগ করুন</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {productPaymentRows.map((row, idx) => (
+                        <div
+                          key={idx}
+                          className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm"
+                        >
+                          <div className="flex-1 w-full sm:w-auto">
+                            <select
+                              value={row.productId}
+                              onChange={(e) =>
+                                handleUpdateProductRow(idx, 'productId', e.target.value ? Number(e.target.value) : '')
+                              }
+                              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
+                            >
+                              <option value="">-- প্রোডাক্ট সিলেক্ট করুন --</option>
+                              {allProducts
+                                .filter((p) => !p.companyId || p.companyId === companyId)
+                                .map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.name} {p.buyPrice ? `(ক্রয়: ৳${p.buyPrice})` : ''} {p.currentStock !== undefined ? `[স্টক: ${p.currentStock}]` : ''}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <div className="w-24">
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={row.quantity || ''}
+                                onChange={(e) => handleUpdateProductRow(idx, 'quantity', e.target.value)}
+                                placeholder="পরিমাণ"
+                                title="পরিমাণ (ঐচ্ছিক)"
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+                              />
+                            </div>
+
+                            <div className="w-32">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={row.amount}
+                                onChange={(e) => handleUpdateProductRow(idx, 'amount', e.target.value)}
+                                required={isProductBreakdownMode}
+                                placeholder="টাকা (BDT) *"
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-bold text-emerald-700 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                              />
+                            </div>
+
+                            <div className="flex-1 sm:w-28">
+                              <input
+                                type="text"
+                                value={row.note || ''}
+                                onChange={(e) => handleUpdateProductRow(idx, 'note', e.target.value)}
+                                placeholder="নোট (ঐচ্ছিক)"
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs text-slate-600 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveProductRow(idx)}
+                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                              title="প্রোডাক্ট সারি মুছুন"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                      {productPaymentRows.length === 0 && (
+                        <div className="p-3 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-200">
+                          কোন প্রোডাক্ট যোগ করা হয়নি। উপরে <b className="text-indigo-600">+ আরো প্রোডাক্ট যোগ করুন</b> বাটনে চাপ দিন।
+                        </div>
+                      )}
+                    </div>
+
+                    {productPaymentRows.length > 0 && (
+                      <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">
+                        <span>মোট প্রোডাক্ট: {productPaymentRows.filter((r) => r.productId || r.amount).length} টি</span>
+                        <span>
+                          প্রোডাক্টের মোট যোগফল:{' '}
+                          <b className="text-sm font-black">
+                            {formatCurrency(
+                              productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0),
+                            )}
+                          </b>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Amount & Date */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    টাকার পরিমাণ (BDT) *
+                    মোট পরিশোধের পরিমাণ (BDT) *
                   </label>
                   <input
                     type="number"
@@ -686,6 +943,11 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                     placeholder="যেমন: 50000"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
                   />
+                  {isProductBreakdownMode && (
+                    <p className="mt-1 text-[11px] text-indigo-600 font-medium">
+                      প্রোডাক্টের টাকার যোগফল স্বয়ংক্রিয়ভাবে এখানে হিসাব হচ্ছে।
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -739,13 +1001,13 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               {/* Note / Description */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  নোট / কোন প্রোডাক্ট বা চালানের জন্য দেওয়া হলো
+                  নোট / অতিরিক্ত বিবরণ
                 </label>
                 <textarea
                   value={paymentNote}
                   onChange={(e) => setPaymentNote(e.target.value)}
                   rows={2}
-                  placeholder="যেমন: সানলাইট কয়েল ৫০০ পিস চালান বাবদ ক্যাশ পরিশোধ..."
+                  placeholder="যেমন: সানলাইট কয়েল ও অন্যান্য পণ্য বাবদ ক্যাশ পরিশোধ..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
                 />
               </div>

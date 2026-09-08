@@ -520,6 +520,35 @@ export class PurchasesService {
         });
       }
 
+      // Format note with product breakdown if provided
+      let finalNote = dto.note || '';
+      if (Array.isArray(dto.productBreakdown) && dto.productBreakdown.length > 0) {
+        const validBreakdown = dto.productBreakdown.filter(
+          (b: any) => b && (b.productName || b.productId || b.amount),
+        );
+        if (validBreakdown.length > 0) {
+          const breakdownParts = validBreakdown.map((b: any, idx: number) => {
+            const name = b.productName || `Product #${b.productId}`;
+            const qty = b.quantity ? ` (${b.quantity} ${b.unit || 'টি'})` : '';
+            const amt = b.amount ? ` - ৳${b.amount}` : '';
+            const itemNote = b.note ? ` [${b.note}]` : '';
+            return `${idx + 1}. ${name}${qty}${amt}${itemNote}`;
+          });
+          const breakdownSummary = breakdownParts.join(' | ');
+          if (finalNote) {
+            finalNote = `${finalNote} [পণ্যসমূহ: ${breakdownSummary}]`;
+          } else {
+            finalNote = `পণ্য বাবদ পরিশোধ: ${breakdownSummary}`;
+          }
+        }
+      }
+
+      if (!finalNote) {
+        finalNote = linkedPurchase
+          ? `Payment for Invoice #${linkedPurchase.invoiceNo}`
+          : `Payment to ${company.name}`;
+      }
+
       // 1. Create Payment Record
       const payment = manager.create(CompanyPayment, {
         companyId,
@@ -528,7 +557,7 @@ export class PurchasesService {
         paymentDate: dto.paymentDate ? new Date(dto.paymentDate) : new Date(),
         paymentMethod: dto.paymentMethod || PaymentMethod.CASH,
         transactionRef: dto.transactionRef || null,
-        note: dto.note || (linkedPurchase ? `Payment for Invoice #${linkedPurchase.invoiceNo}` : `Payment to ${company.name}`),
+        note: finalNote,
         createdByName: user?.name || user?.username || 'Admin',
         createdById: user?.id || null,
       });
