@@ -52,6 +52,14 @@ export function recordCompanyPayment(
     transactionRef?: string;
     note?: string;
     purchaseId?: number;
+    productBreakdown?: Array<{
+      productId?: number;
+      productName?: string;
+      unit?: string;
+      quantity?: number;
+      amount?: number;
+      note?: string;
+    }>;
   },
 ) {
   return apiRequest<PurchasePayment>(`purchases/companies/${companyId}/payments`, {

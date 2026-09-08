@@ -81,6 +81,7 @@ export function PurchasesPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [companyStatusFilter, setCompanyStatusFilter] = useState<'all' | 'payable' | 'advance' | 'settled'>('all');
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -1244,152 +1245,116 @@ export function PurchasesPage() {
                 )}
               </div>
 
-              {/* 🔀 Payment Mode Selector */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    পেমেন্টের ধরণ:
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsProductBreakdownMode(false)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                        !isProductBreakdownMode
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                      }`}
-                    >
-                      ⚡ সাধারণ এককালীন পেমেন্ট
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsProductBreakdownMode(true);
-                        if (productPaymentRows.length === 0) handleAddProductRow();
-                      }}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                        isProductBreakdownMode
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                      }`}
-                    >
-                      📦 প্রোডাক্টভিত্তিক বরাদ্দ ({productPaymentRows.length})
-                    </button>
+              {/* 📦 MULTI-PRODUCT ALLOCATION (PERMANENTLY OPEN & DIRECT) */}
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-indigo-600" />
+                    <span className="text-xs font-bold text-slate-800">
+                      কোন কোন প্রোডাক্টের জন্য কত টাকা দেওয়া হচ্ছে:
+                    </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleAddProductRow}
+                    className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>+ প্রোডাক্ট যোগ করুন</span>
+                  </button>
                 </div>
 
-                {/* 📦 MULTI-PRODUCT BREAKDOWN ROWS */}
-                {isProductBreakdownMode && (
-                  <div className="space-y-2.5 mt-3 pt-3 border-t border-slate-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700">
-                        কোন কোন প্রোডাক্টের জন্য কত টাকা দেওয়া হচ্ছে:
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleAddProductRow}
-                        className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 text-xs font-bold transition-colors"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>+ আরো প্রোডাক্ট যোগ করুন</span>
-                      </button>
-                    </div>
-
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                      {productPaymentRows.map((row, idx) => (
-                        <div
-                          key={idx}
-                          className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm"
+                <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                  {productPaymentRows.map((row, idx) => (
+                    <div
+                      key={idx}
+                      className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm"
+                    >
+                      <div className="flex-1 w-full sm:w-auto">
+                        <select
+                          value={row.productId}
+                          onChange={(e) =>
+                            handleUpdateProductRow(idx, 'productId', e.target.value ? Number(e.target.value) : '')
+                          }
+                          className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
                         >
-                          <div className="flex-1 w-full sm:w-auto">
-                            <select
-                              value={row.productId}
-                              onChange={(e) =>
-                                handleUpdateProductRow(idx, 'productId', e.target.value ? Number(e.target.value) : '')
-                              }
-                              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
-                            >
-                              <option value="">-- প্রোডাক্ট সিলেক্ট করুন --</option>
-                              {allProducts
-                                .filter((p) => !paymentCompanyId || !p.companyId || p.companyId === paymentCompanyId)
-                                .map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.name} {p.buyPrice ? `(ক্রয়: ৳${p.buyPrice})` : ''} {p.currentStock !== undefined ? `[স্টক: ${p.currentStock}]` : ''}
-                                  </option>
-                                ))}
-                            </select>
-                          </div>
-
-                          <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <div className="w-24">
-                              <input
-                                type="number"
-                                step="any"
-                                min="0"
-                                value={row.quantity || ''}
-                                onChange={(e) => handleUpdateProductRow(idx, 'quantity', e.target.value)}
-                                placeholder="পরিমাণ"
-                                title="পরিমাণ (ঐচ্ছিক)"
-                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
-                              />
-                            </div>
-
-                            <div className="w-32">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={row.amount}
-                                onChange={(e) => handleUpdateProductRow(idx, 'amount', e.target.value)}
-                                required={isProductBreakdownMode}
-                                placeholder="টাকা (BDT) *"
-                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-bold text-emerald-700 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                              />
-                            </div>
-
-                            <div className="flex-1 sm:w-28">
-                              <input
-                                type="text"
-                                value={row.note || ''}
-                                onChange={(e) => handleUpdateProductRow(idx, 'note', e.target.value)}
-                                placeholder="নোট (ঐচ্ছিক)"
-                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs text-slate-600 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                              />
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveProductRow(idx)}
-                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
-                              title="প্রোডাক্ট সারি মুছুন"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-
-                      {productPaymentRows.length === 0 && (
-                        <div className="p-3 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-200">
-                          কোন প্রোডাক্ট যোগ করা হয়নি। উপরে <b className="text-indigo-600">+ আরো প্রোডাক্ট যোগ করুন</b> বাটনে চাপ দিন।
-                        </div>
-                      )}
-                    </div>
-
-                    {productPaymentRows.length > 0 && (
-                      <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">
-                        <span>মোট প্রোডাক্ট: {productPaymentRows.filter((r) => r.productId || r.amount).length} টি</span>
-                        <span>
-                          প্রোডাক্টের মোট যোগফল:{' '}
-                          <b className="text-sm font-black">
-                            {formatCurrency(
-                              productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0),
-                            )}
-                          </b>
-                        </span>
+                          <option value="">-- প্রোডাক্ট সিলেক্ট করুন --</option>
+                          {allProducts
+                            .filter((p) => !paymentCompanyId || !p.companyId || p.companyId === paymentCompanyId)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} {p.buyPrice ? `(ক্রয়: ৳${p.buyPrice})` : ''} {p.currentStock !== undefined ? `[স্টক: ${p.currentStock}]` : ''}
+                              </option>
+                            ))}
+                        </select>
                       </div>
-                    )}
+
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="w-24">
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            value={row.quantity || ''}
+                            onChange={(e) => handleUpdateProductRow(idx, 'quantity', e.target.value)}
+                            placeholder="পরিমাণ"
+                            title="পরিমাণ (ঐচ্ছিক)"
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="w-32">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={row.amount}
+                            onChange={(e) => handleUpdateProductRow(idx, 'amount', e.target.value)}
+                            placeholder="টাকা (BDT) *"
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-bold text-emerald-700 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="flex-1 sm:w-28">
+                          <input
+                            type="text"
+                            value={row.note || ''}
+                            onChange={(e) => handleUpdateProductRow(idx, 'note', e.target.value)}
+                            placeholder="নোট (ঐচ্ছিক)"
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs text-slate-600 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProductRow(idx)}
+                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                          title="প্রোডাক্ট সারি মুছুন"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {productPaymentRows.length === 0 && (
+                    <div className="p-3 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-200">
+                      কোনো নির্দিষ্ট প্রোডাক্ট সিলেক্ট করা নেই। প্রোডাক্ট সিলেক্ট করতে উপরে <b className="text-indigo-600">+ প্রোডাক্ট যোগ করুন</b> চাপুন।
+                    </div>
+                  )}
+                </div>
+
+                {productPaymentRows.length > 0 && (
+                  <div className="mt-2.5 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">
+                    <span>মোট প্রোডাক্ট: {productPaymentRows.filter((r) => r.productId || r.amount).length} টি</span>
+                    <span>
+                      প্রোডাক্টের মোট যোগফল:{' '}
+                      <b className="text-sm font-black">
+                        {formatCurrency(
+                          productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0),
+                        )}
+                      </b>
+                    </span>
                   </div>
                 )}
               </div>
