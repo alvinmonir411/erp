@@ -600,7 +600,8 @@ export class PurchasesService {
         if (validBreakdown.length > 0) {
           const breakdownParts = validBreakdown.map((b: any, idx: number) => {
             const name = b.productName || `Product #${b.productId}`;
-            const qty = b.quantity ? ` (${b.quantity} ${b.unit || 'টি'})` : '';
+            const rate = b.unitPrice ? ` @ ৳${b.unitPrice}` : '';
+            const qty = b.quantity ? ` (${b.quantity} ${b.unit || 'টি'}${rate})` : '';
             const amt = b.amount ? ` - ৳${b.amount}` : '';
             const itemNote = b.note ? ` [${b.note}]` : '';
             return `${idx + 1}. ${name}${qty}${amt}${itemNote}`;

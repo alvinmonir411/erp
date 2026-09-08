@@ -55,6 +55,7 @@ export function recordCompanyPayment(
     productBreakdown?: Array<{
       productId?: number;
       productName?: string;
+      unitPrice?: number;
       unit?: string;
       quantity?: number;
       amount?: number;

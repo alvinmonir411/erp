@@ -42,6 +42,7 @@ function formatDateInput(value: Date) {
 export type ProductPaymentRow = {
   productId: number | '';
   productName?: string;
+  unitPrice?: string;
   unit?: string;
   quantity?: string;
   amount: string;
@@ -122,16 +123,26 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     setPaymentNote(purchaseId ? `Invoice #${purchaseId} settlement` : '');
     setIsProductBreakdownMode(true);
     setProductPaymentRows([
-      { productId: '', quantity: '1', amount: '', note: '', searchText: '', showResults: false }
+      { productId: '', unitPrice: '', quantity: '1', amount: '', note: '', searchText: '', showResults: false }
     ]);
     setIsPaymentModalOpen(true);
+  };
+
+  const calculateRowAmount = (unitPriceStr?: string, quantityStr?: string): string => {
+    const price = parseFloat(unitPriceStr || '0');
+    const qty = parseFloat(quantityStr || '0');
+    if (!isNaN(price) && !isNaN(qty) && price >= 0 && qty > 0) {
+      const total = price * qty;
+      return total % 1 === 0 ? total.toString() : total.toFixed(2);
+    }
+    return '';
   };
 
   const handleAddProductRow = () => {
     setIsProductBreakdownMode(true);
     setProductPaymentRows((prev) => [
       ...prev,
-      { productId: '', quantity: '1', amount: '', note: '', searchText: '', showResults: false },
+      { productId: '', unitPrice: '', quantity: '1', amount: '', note: '', searchText: '', showResults: false },
     ]);
   };
 
@@ -144,13 +155,15 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
       target.unit = product.unit || 'Pcs';
       target.searchText = product.name;
       target.showResults = false;
+      target.unitPrice = product.buyPrice !== undefined && product.buyPrice !== null ? String(toNumber(product.buyPrice)) : target.unitPrice || '';
 
-      const qty = Number(target.quantity) || 1;
-      if (!target.quantity) {
+      if (!target.quantity || target.quantity === '0') {
         target.quantity = '1';
       }
-      if (product.buyPrice) {
-        target.amount = String(toNumber(product.buyPrice) * qty);
+
+      const calc = calculateRowAmount(target.unitPrice, target.quantity);
+      if (calc) {
+        target.amount = calc;
       }
 
       updated[index] = target;
@@ -160,7 +173,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
         0,
       );
       if (totalRowAmount > 0) {
-        setPaymentAmount(String(totalRowAmount));
+        setPaymentAmount(totalRowAmount % 1 === 0 ? totalRowAmount.toString() : totalRowAmount.toFixed(2));
       }
 
       return updated;
@@ -175,13 +188,48 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     setProductPaymentRows((prev) => {
       const updated = [...prev];
       const target = { ...updated[index], [field]: value };
-      
-      if (field === 'quantity' && target.productId) {
-        const prod = allProducts.find((p) => p.id === Number(target.productId));
-        const qty = Number(value) || 0;
-        if (prod && prod.buyPrice && qty > 0) {
-          target.amount = String(toNumber(prod.buyPrice) * qty);
+
+      if (field === 'searchText') {
+        target.searchText = value;
+        target.showResults = true;
+        if (value && typeof value === 'string') {
+          const trimmed = value.trim().toLowerCase();
+          const matched = allProducts.find(
+            (p) => p.name?.toLowerCase().trim() === trimmed || p.sku?.toLowerCase().trim() === trimmed,
+          );
+          if (matched) {
+            target.productId = matched.id;
+            target.productName = matched.name;
+            target.unit = matched.unit || 'Pcs';
+            if (matched.buyPrice !== undefined && matched.buyPrice !== null && !target.unitPrice) {
+              target.unitPrice = String(toNumber(matched.buyPrice));
+            }
+            const calc = calculateRowAmount(target.unitPrice, target.quantity);
+            if (calc) target.amount = calc;
+          }
         }
+      } else if (field === 'unitPrice') {
+        target.unitPrice = value;
+        const calc = calculateRowAmount(value, target.quantity);
+        if (calc) {
+          target.amount = calc;
+        }
+      } else if (field === 'quantity') {
+        target.quantity = value;
+        let rate = target.unitPrice;
+        if (!rate && target.productId) {
+          const prod = allProducts.find((p) => p.id === Number(target.productId));
+          if (prod && prod.buyPrice) {
+            rate = String(toNumber(prod.buyPrice));
+            target.unitPrice = rate;
+          }
+        }
+        const calc = calculateRowAmount(rate, value);
+        if (calc) {
+          target.amount = calc;
+        }
+      } else if (field === 'amount') {
+        target.amount = value;
       }
 
       updated[index] = target;
@@ -191,7 +239,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
         0,
       );
       if (totalRowAmount > 0) {
-        setPaymentAmount(String(totalRowAmount));
+        setPaymentAmount(totalRowAmount % 1 === 0 ? totalRowAmount.toString() : totalRowAmount.toFixed(2));
       }
 
       return updated;
@@ -206,7 +254,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
         0,
       );
       if (totalRowAmount > 0) {
-        setPaymentAmount(String(totalRowAmount));
+        setPaymentAmount(totalRowAmount % 1 === 0 ? totalRowAmount.toString() : totalRowAmount.toFixed(2));
       } else if (updated.length === 0) {
         setIsProductBreakdownMode(false);
       }
@@ -224,12 +272,16 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     }
 
     const validBreakdown = productPaymentRows
-      .filter((row) => row.productId || parseFloat(row.amount) > 0)
+      .filter((row) => row.productId || parseFloat(row.amount) > 0 || row.searchText)
       .map((row) => {
-        const prod = allProducts.find((p) => p.id === Number(row.productId));
+        let prod = allProducts.find((p) => p.id === Number(row.productId));
+        if (!prod && row.searchText) {
+          prod = allProducts.find((p) => p.name.toLowerCase().trim() === (row.searchText || '').toLowerCase().trim());
+        }
         return {
-          productId: row.productId ? Number(row.productId) : undefined,
-          productName: prod?.name || row.productName || undefined,
+          productId: prod?.id || (row.productId ? Number(row.productId) : undefined),
+          productName: prod?.name || row.productName || row.searchText || undefined,
+          unitPrice: row.unitPrice ? parseFloat(row.unitPrice) : prod?.buyPrice ? Number(prod.buyPrice) : undefined,
           unit: prod?.unit || row.unit || 'Pcs',
           quantity: row.quantity ? Number(row.quantity) : undefined,
           amount: parseFloat(row.amount) || 0,
@@ -808,8 +860,8 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               )}
 
               {/* 📦 MULTI-PRODUCT ALLOCATION (PERMANENTLY OPEN & DIRECT) */}
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4">
-                <div className="flex items-center justify-between mb-2.5">
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3 sm:p-4">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-indigo-600" />
                     <span className="text-xs font-bold text-slate-800">
@@ -819,26 +871,37 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                   <button
                     type="button"
                     onClick={handleAddProductRow}
-                    className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>+ প্রোডাক্ট যোগ করুন</span>
                   </button>
                 </div>
 
-                <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                {/* Column Headers for desktop */}
+                {productPaymentRows.length > 0 && (
+                  <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-3 pb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <div className="sm:col-span-4">প্রোডাক্ট সিলেক্ট / সার্চ</div>
+                    <div className="sm:col-span-2">ক্রয় দর (৳)</div>
+                    <div className="sm:col-span-2">পরিমাণ</div>
+                    <div className="sm:col-span-2 text-emerald-700">মোট টাকা (৳) *</div>
+                    <div className="sm:col-span-2">নোট (ঐচ্ছিক)</div>
+                  </div>
+                )}
+
+                <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
                   {productPaymentRows.map((row, idx) => (
                     <div
                       key={idx}
-                      className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm"
+                      className="flex flex-col sm:grid sm:grid-cols-12 items-stretch sm:items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:border-indigo-200 transition-colors"
                     >
                       {/* Searchable Product Input */}
-                      <div className="relative flex-1 w-full sm:w-auto">
+                      <div className="relative sm:col-span-4 w-full">
                         <div className="relative">
                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                           <input
                             type="text"
-                            placeholder="প্রোডাক্টের নাম লিখুন বা সার্চ করুন..."
+                            placeholder="প্রোডাক্ট খুঁজুন বা নাম লিখুন..."
                             value={
                               row.searchText !== undefined
                                 ? row.searchText
@@ -861,17 +924,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                               }, 250);
                             }}
                             onChange={(e) => {
-                              const text = e.target.value;
-                              setProductPaymentRows((prev) => {
-                                const updated = [...prev];
-                                updated[idx] = {
-                                  ...updated[idx],
-                                  searchText: text,
-                                  showResults: true,
-                                  productId: text ? updated[idx].productId : '',
-                                };
-                                return updated;
-                              });
+                              handleUpdateProductRow(idx, 'searchText', e.target.value);
                             }}
                             className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-7 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
                           />
@@ -885,6 +938,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                                     ...updated[idx],
                                     productId: '',
                                     productName: '',
+                                    unitPrice: '',
                                     searchText: '',
                                     showResults: false,
                                     amount: '',
@@ -967,8 +1021,25 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <div className="w-24">
+                      {/* Unit Buy Rate (ক্রয় দর ৳) */}
+                      <div className="sm:col-span-2 w-full">
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            value={row.unitPrice ?? ''}
+                            onChange={(e) => handleUpdateProductRow(idx, 'unitPrice', e.target.value)}
+                            placeholder="দর (৳)"
+                            title="একক ক্রয় দর (প্রতি পিস / ইউনিট)"
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quantity (পরিমাণ) */}
+                      <div className="sm:col-span-2 w-full">
+                        <div className="relative">
                           <input
                             type="number"
                             step="any"
@@ -976,12 +1047,15 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                             value={row.quantity || ''}
                             onChange={(e) => handleUpdateProductRow(idx, 'quantity', e.target.value)}
                             placeholder="পরিমাণ"
-                            title="পরিমাণ (ঐচ্ছিক)"
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+                            title="পরিমাণ / Quantity"
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
                           />
                         </div>
+                      </div>
 
-                        <div className="w-32">
+                      {/* Total Amount (মোট টাকা ৳) */}
+                      <div className="sm:col-span-2 w-full">
+                        <div className="relative">
                           <input
                             type="number"
                             step="0.01"
@@ -989,24 +1063,26 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                             value={row.amount}
                             onChange={(e) => handleUpdateProductRow(idx, 'amount', e.target.value)}
                             placeholder="টাকা (BDT) *"
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-bold text-emerald-700 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                            title="মোট টাকা (দর × পরিমাণ)"
+                            className="w-full rounded-lg border border-emerald-300 bg-emerald-50/60 py-1.5 px-2 text-xs font-black text-emerald-800 focus:border-emerald-500 focus:bg-white focus:outline-none"
                           />
                         </div>
+                      </div>
 
-                        <div className="flex-1 sm:w-28">
-                          <input
-                            type="text"
-                            value={row.note || ''}
-                            onChange={(e) => handleUpdateProductRow(idx, 'note', e.target.value)}
-                            placeholder="নোট (ঐচ্ছিক)"
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs text-slate-600 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                          />
-                        </div>
+                      {/* Note & Delete button */}
+                      <div className="sm:col-span-2 flex items-center gap-1.5 w-full">
+                        <input
+                          type="text"
+                          value={row.note || ''}
+                          onChange={(e) => handleUpdateProductRow(idx, 'note', e.target.value)}
+                          placeholder="নোট (ঐচ্ছিক)"
+                          className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs text-slate-600 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                        />
 
                         <button
                           type="button"
                           onClick={() => handleRemoveProductRow(idx)}
-                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                          className="shrink-0 rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
                           title="প্রোডাক্ট সারি মুছুন"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1023,11 +1099,20 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                 </div>
 
                 {productPaymentRows.length > 0 && (
-                  <div className="mt-2.5 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">
-                    <span>মোট প্রোডাক্ট: {productPaymentRows.filter((r) => r.productId || r.amount).length} টি</span>
+                  <div className="mt-2.5 flex items-center justify-between rounded-xl bg-emerald-50 px-3.5 py-2.5 text-xs font-bold text-emerald-800 border border-emerald-200/60">
+                    <div className="flex items-center gap-3">
+                      <span>
+                        মোট প্রোডাক্ট: <b className="text-sm font-black">{productPaymentRows.filter((r) => r.productId || r.amount || r.searchText).length}</b> টি
+                      </span>
+                      {productPaymentRows.some((r) => r.quantity && parseFloat(r.quantity) > 0) && (
+                        <span className="text-emerald-700">
+                          মোট কোয়ান্টিটি: <b className="text-sm font-black">{productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.quantity || '0') || 0), 0)}</b>
+                        </span>
+                      )}
+                    </div>
                     <span>
                       প্রোডাক্টের মোট যোগফল:{' '}
-                      <b className="text-sm font-black">
+                      <b className="text-sm font-black text-emerald-900">
                         {formatCurrency(
                           productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0),
                         )}
