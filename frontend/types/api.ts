@@ -281,9 +281,17 @@ export type CreatePurchasePayload = {
   invoiceNo?: string;
   referenceNo?: string;
   supplierName?: string;
+  warehouseName?: string;
+  vehicleNo?: string;
+  driverName?: string;
+  supplierInvoiceNo?: string;
   note?: string;
   paymentId?: number;
   paidAmount?: number;
+  paymentMethod?: string;
+  transactionRef?: string;
+  bankName?: string;
+  branchName?: string;
   status?: 'DRAFT' | 'CONFIRMED';
   confirmStockIn?: boolean;
   items: {
@@ -476,8 +484,13 @@ export type Purchase = {
   invoiceNo?: string;
   referenceNo?: string | null;
   companyId: number;
+  paymentId?: number | null;
   purchaseDate: string;
   supplierName?: string | null;
+  warehouseName?: string | null;
+  vehicleNo?: string | null;
+  driverName?: string | null;
+  supplierInvoiceNo?: string | null;
   totalAmount: number | string;
   paidAmount: number | string;
   dueAmount?: number | string;
@@ -489,6 +502,7 @@ export type Purchase = {
   company?: Company;
   items?: PurchaseItem[];
   payments?: PurchasePayment[];
+  payment?: PurchasePayment | null;
 };
 
 export type PurchaseItem = {
@@ -512,6 +526,8 @@ export type PurchasePayment = {
   paymentDate: string;
   paymentMethod?: string;
   transactionRef?: string | null;
+  bankName?: string | null;
+  branchName?: string | null;
   note?: string | null;
   productBreakdown?: Array<{
     productId?: number;
@@ -527,6 +543,7 @@ export type PurchasePayment = {
   updatedAt?: string;
   company?: Company;
   purchase?: Purchase;
+  purchases?: Purchase[];
 };
 
 export type CompanyWisePayableSummary = {

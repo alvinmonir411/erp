@@ -60,17 +60,25 @@ export default function PrintChallanPage({
     );
   }
 
-  const primaryPayment: PurchasePayment | undefined = purchase.payments && purchase.payments.length > 0 ? purchase.payments[0] : undefined;
+  const primaryPayment: PurchasePayment | undefined =
+    purchase.payments && purchase.payments.length > 0 ? purchase.payments[0] : (purchase.payment as any);
 
   const totalReceivedValue = toNumber(purchase.totalAmount);
   const totalPaid = toNumber(purchase.paidAmount);
   const advanceRemaining = Math.max(0, totalPaid - totalReceivedValue);
   const dueRemaining = Math.max(0, totalReceivedValue - totalPaid);
+  const isFullyReceived = Math.abs(totalReceivedValue - totalPaid) < 0.01 && totalReceivedValue > 0;
 
   // Extract ordered quantity from payment breakdown if available
   const getOrderedQty = (item: any): number => {
-    if (primaryPayment?.productBreakdown && Array.isArray(primaryPayment.productBreakdown)) {
-      const matched = primaryPayment.productBreakdown.find(
+    if (primaryPayment?.productBreakdown) {
+      const breakdown = Array.isArray(primaryPayment.productBreakdown)
+        ? primaryPayment.productBreakdown
+        : typeof primaryPayment.productBreakdown === 'string'
+        ? JSON.parse(primaryPayment.productBreakdown || '[]')
+        : [];
+
+      const matched = breakdown.find(
         (b: any) =>
           b.productId === item.productId ||
           (b.productName && item.product?.name && b.productName.trim().toLowerCase() === item.product.name.trim().toLowerCase())
@@ -79,12 +87,11 @@ export default function PrintChallanPage({
         return toNumber(matched.quantity);
       }
     }
-    // Default fallback to received qty if no separate pre-order breakdown was specified
     return toNumber(item.quantity);
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 py-6 px-4 sm:px-6 print:bg-white print:p-0 print:m-0 text-slate-900">
+    <div className="min-h-screen bg-slate-100 py-6 px-4 sm:px-6 print:bg-white print:p-0 print:m-0 text-slate-900 font-sans">
       {/* 🎛️ Action Bar (Hidden when printing) */}
       <div className="max-w-4xl mx-auto mb-6 flex items-center justify-between gap-4 print:hidden">
         <Link
@@ -103,10 +110,10 @@ export default function PrintChallanPage({
           </Link>
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95"
+            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-2.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95"
           >
             <Printer className="h-4 w-4" />
-            <span>🖨️ ভাউচার প্রিন্ট করুন</span>
+            <span>🖨️ ভাউচার প্রিন্ট করুন (A4 Print)</span>
           </button>
         </div>
       </div>
@@ -114,130 +121,67 @@ export default function PrintChallanPage({
       {/* 📄 Standard A4 Printable Voucher Container */}
       <div className="printable-voucher max-w-4xl mx-auto bg-white rounded-3xl p-8 sm:p-10 shadow-lg border border-slate-200 print:shadow-none print:border-0 print:p-0 print:rounded-none">
         
-        {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between border-b-2 border-slate-900 pb-6 mb-6 gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="rounded-lg bg-indigo-900 text-white px-2.5 py-1 text-xs font-black tracking-wider uppercase">
-                Stock In Voucher
-              </span>
-              <span className="rounded-lg bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-bold">
-                {purchase.status === 'CONFIRMED' ? '✅ স্টক ইন সম্পন্ন' : 'খসড়া চালান'}
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              চালান প্রাপ্তি ও ব্যাংক ড্রাফট সমন্বয় ভাউচার
-            </h1>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              ডিলার এন্টারপ্রাইজ ম্যানেজমেন্ট সিস্টেম • ইনওয়ার্ড চালান ও পেমেন্ট রিকনসিলিয়েশন
-            </p>
+        {/* Company Header */}
+        <div className="text-center border-b-2 border-slate-900 pb-5 mb-6">
+          <div className="inline-flex items-center gap-2 font-black text-xl text-indigo-950 uppercase tracking-wider mb-1">
+            <Building2 className="h-6 w-6 text-indigo-700" />
+            <span>ডিজেল ও অটোমোবাইল ডিলার এন্টারপ্রাইজ</span>
           </div>
-
-          <div className="text-left sm:text-right shrink-0 bg-slate-50 sm:bg-transparent p-3 sm:p-0 rounded-2xl border sm:border-0 border-slate-100">
-            <p className="text-xs uppercase tracking-wider font-bold text-slate-500">চালান / ইনভয়েস নং</p>
-            <p className="text-xl font-black text-indigo-900 mt-0.5">#{purchase.invoiceNo || purchase.referenceNo || purchase.id}</p>
-            <p className="text-xs text-slate-600 mt-1 font-semibold">
-              তারিখ: <b className="text-slate-800">{formatDate(purchase.purchaseDate)}</b>
-            </p>
-            <p className="text-[11px] text-slate-400">
-              এন্ট্রি সময়: {formatDateTime(purchase.createdAt)}
-            </p>
+          <p className="text-xs text-slate-600 font-medium">
+            প্রধান কার্যালয় ও কেন্দ্রীয় গোডাউন • ঢাকা-ময়মনসিংহ হাইওয়ে, গাজীপুর • ফোন: ০১XXXXXXXXX • ইমেইল: erp@company.com
+          </p>
+          <div className="mt-3 inline-block rounded-xl bg-slate-900 text-white px-6 py-1 text-sm font-black tracking-wide">
+            চালান ও ব্যাংক ড্রাফট সমন্বয় ভাউচার
           </div>
         </div>
 
-        {/* 🏢 Company & Bank Draft Information 2-Column Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {/* Supplier / Company Card */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-            <div className="flex items-center gap-2 text-indigo-800 mb-2 font-bold text-xs uppercase tracking-wider">
-              <Building2 className="h-4 w-4 text-indigo-600" />
-              <span>সাপ্লাইয়ার / কোম্পানির বিবরণ</span>
-            </div>
-            <h3 className="text-lg font-black text-slate-900">
-              {purchase.company?.name || purchase.supplierName || 'কোম্পানি সরবরাহকারী'}
-            </h3>
-            {purchase.company?.code && (
-              <p className="text-xs text-indigo-700 font-bold mt-0.5">কোড: {purchase.company.code}</p>
-            )}
-            {purchase.company?.phone && (
-              <p className="text-xs text-slate-600 mt-1">ফোন: {purchase.company.phone}</p>
-            )}
-            {purchase.company?.address && (
-              <p className="text-xs text-slate-500 mt-0.5">{purchase.company.address}</p>
-            )}
-            {purchase.supplierName && purchase.company?.name !== purchase.supplierName && (
-              <p className="text-xs text-slate-600 mt-1">সরবরাহকারী প্রতিনিধি: {purchase.supplierName}</p>
-            )}
+        {/* Voucher Meta & Supplier/Draft Details */}
+        <div className="grid grid-cols-2 gap-4 mb-6 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          {/* Supplier Info */}
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">সরবরাহকারী (Supplier):</p>
+            <p className="text-base font-black text-slate-900">
+              {purchase.company?.name || purchase.supplierName || 'কোম্পানি'}
+            </p>
+            {purchase.company?.code && <p className="text-slate-600 font-mono">কোড: {purchase.company.code}</p>}
+            {purchase.company?.phone && <p className="text-slate-600">ফোন: {purchase.company.phone}</p>}
+            {purchase.company?.address && <p className="text-slate-500">{purchase.company.address}</p>}
           </div>
 
-          {/* Linked Bank Draft / Payment Card */}
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
-            <div className="flex items-center gap-2 text-emerald-800 mb-2 font-bold text-xs uppercase tracking-wider">
-              <Wallet className="h-4 w-4 text-emerald-600" />
-              <span>সংশ্লিষ্ট ব্যাংক ড্রাফট ও পেমেন্ট বিবরণ</span>
-            </div>
-            {primaryPayment ? (
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">পেমেন্ট মেথড:</span>
-                  <span className="font-bold text-slate-800 uppercase">{primaryPayment.paymentMethod || 'BANK DRAFT'}</span>
-                </div>
-                {primaryPayment.transactionRef && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-600">ড্রাফট / চেক / ট্রানজেকশন নং:</span>
-                    <span className="font-black text-indigo-900 font-mono">{primaryPayment.transactionRef}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">ড্রাফট প্রদানের তারিখ:</span>
-                  <span className="font-bold text-slate-800">{formatDate(primaryPayment.paymentDate)}</span>
-                </div>
-                <div className="flex justify-between items-center pt-1 border-t border-emerald-200/60 mt-1">
-                  <span className="font-bold text-slate-700">ড্রাফটে পরিশোধিত টাকা:</span>
-                  <span className="font-black text-emerald-800 text-sm">{formatCurrency(primaryPayment.amount)}</span>
-                </div>
+          {/* Bank Draft & Voucher Info */}
+          <div className="space-y-1 text-right">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">ভাউচার নং (Voucher No):</p>
+            <p className="text-base font-black text-indigo-950 font-mono">
+              #{purchase.invoiceNo || purchase.referenceNo || purchase.id}
+            </p>
+            <p className="text-slate-600">তারিখ: <b className="text-slate-900">{formatDate(purchase.purchaseDate)}</b></p>
+            
+            {primaryPayment && (
+              <div className="pt-1 mt-1 border-t border-slate-200">
+                <p className="text-slate-700">ব্যাংক ড্রাফট: <b className="font-mono text-indigo-900">{primaryPayment.transactionRef || `BD-${primaryPayment.id}`}</b></p>
+                <p className="text-slate-600">ব্যাংক: <b>{primaryPayment.bankName || 'Sonali Bank'}</b> • শাখা: <b>{primaryPayment.branchName || 'Gazipur Branch'}</b></p>
               </div>
-            ) : totalPaid > 0 ? (
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">পরিশোধের স্থিতি:</span>
-                  <span className="font-bold text-emerald-700">অগ্রিম পরিশোধিত</span>
-                </div>
-                <div className="flex justify-between items-center pt-1 border-t border-emerald-200 mt-1">
-                  <span className="font-bold text-slate-700">পরিশোধিত মোট টাকা:</span>
-                  <span className="font-black text-emerald-800 text-sm">{formatCurrency(totalPaid)}</span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500 italic mt-2">
-                সরাসরি চালান এন্ট্রি (কোন পূর্ব ব্যাংক ড্রাফট লিংক করা নেই)
-              </p>
             )}
           </div>
         </div>
 
         {/* 📦 Product Reconciliation Table */}
         <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200">
-          <div className="bg-slate-900 px-4 py-2.5 text-white flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <Package className="h-3.5 w-3.5 text-indigo-400" />
-              <span>চালানের পণ্যের তালিকা ও হিসাব (Item Breakdown & Reconciliation)</span>
-            </span>
-            <span className="text-xs font-bold text-slate-300">
-              মোট আইটেম: {(purchase.items ?? []).length} টি
-            </span>
+          <div className="bg-slate-900 px-4 py-2 text-white flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+            <span>PRODUCT RECONCILIATION (পণ্য সমন্বয় বিবরণী)</span>
+            <span>আইটেম: {(purchase.items ?? []).length} টি</span>
           </div>
 
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase text-[11px]">
-                <th className="py-2.5 px-3 text-center w-10">#</th>
-                <th className="py-2.5 px-3">পণ্যের বিবরণ (Product Details)</th>
-                <th className="py-2.5 px-3 text-center">অর্ডার ছিল (Order Qty)</th>
-                <th className="py-2.5 px-3 text-center bg-indigo-50 text-indigo-900">প্রাপ্তি (Received Qty)</th>
-                <th className="py-2.5 px-3 text-center">পার্থক্য (Diff)</th>
-                <th className="py-2.5 px-3 text-right">ক্রয় দর (Rate)</th>
-                <th className="py-2.5 px-3 text-right">গৃহীত মোট মূল্য (৳)</th>
+              <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px]">
+                <th className="py-2.5 px-3 text-center w-8">#</th>
+                <th className="py-2.5 px-3">Product Name (পণ্যের বিবরণ)</th>
+                <th className="py-2.5 px-3 text-center">Order Qty</th>
+                <th className="py-2.5 px-3 text-center bg-indigo-50 text-indigo-900">Received Qty</th>
+                <th className="py-2.5 px-3 text-center">Short / Excess</th>
+                <th className="py-2.5 px-3 text-right">Buy Rate (৳)</th>
+                <th className="py-2.5 px-3 text-right">Total Value (৳)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -251,34 +195,30 @@ export default function PrintChallanPage({
 
                 return (
                   <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-3 text-center text-slate-400 font-mono font-bold">
-                      {idx + 1}
-                    </td>
-                    <td className="py-3 px-3">
+                    <td className="py-2.5 px-3 text-center text-slate-400 font-mono font-bold">{idx + 1}</td>
+                    <td className="py-2.5 px-3">
                       <p className="font-bold text-slate-900 text-xs">{item.product?.name || item.productName || `Product #${item.productId}`}</p>
-                      {item.product?.sku && (
-                        <p className="text-[10px] text-slate-400 font-mono">SKU: {item.product.sku}</p>
-                      )}
+                      {item.product?.sku && <p className="text-[10px] text-slate-400 font-mono">SKU: {item.product.sku}</p>}
                     </td>
-                    <td className="py-3 px-3 text-center font-bold text-slate-600">
+                    <td className="py-2.5 px-3 text-center font-bold text-slate-600">
                       {formatNumber(ordQty)} {unit}
                     </td>
-                    <td className="py-3 px-3 text-center font-black text-indigo-950 bg-indigo-50/40">
+                    <td className="py-2.5 px-3 text-center font-black text-indigo-950 bg-indigo-50/40">
                       {formatNumber(rcvQty)} {unit}
                     </td>
-                    <td className="py-3 px-3 text-center font-bold">
+                    <td className="py-2.5 px-3 text-center font-bold">
                       {diff === 0 ? (
-                        <span className="text-emerald-600 text-[11px]">✓ সম্পূর্ণ</span>
+                        <span className="text-emerald-700">0 (সঠিক)</span>
                       ) : diff < 0 ? (
-                        <span className="text-rose-600 font-black">{diff} {unit} (শর্ট)</span>
+                        <span className="text-rose-600 font-black">{Math.abs(diff)} (ঘাটতি)</span>
                       ) : (
-                        <span className="text-indigo-600 font-bold">+{diff} {unit}</span>
+                        <span className="text-indigo-600 font-bold">+{diff} (অতিরিক্ত)</span>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-right font-semibold text-slate-700">
+                    <td className="py-2.5 px-3 text-right font-semibold text-slate-700">
                       {formatCurrency(unitPrice)}
                     </td>
-                    <td className="py-3 px-3 text-right font-black text-slate-900">
+                    <td className="py-2.5 px-3 text-right font-black text-slate-900">
                       {formatCurrency(lineTotal)}
                     </td>
                   </tr>
@@ -288,94 +228,77 @@ export default function PrintChallanPage({
           </table>
         </div>
 
-        {/* ⚖️ Financial Summary Box */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t-2 border-slate-200 mb-8">
-          {/* Notes and instructions */}
-          <div className="space-y-2 text-xs text-slate-600">
-            <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">চালান ও সমন্বয় নোট:</h4>
-            <p className="bg-slate-50 p-3 rounded-xl border border-slate-100 italic">
-              {purchase.note || 'কোম্পানি প্রেরিত মাল ও সংশ্লিষ্ট ব্যাংক ড্রাফটের সাথে মিল রেখে পণ্য গোডাউনে স্টক ইন করা হয়েছে।'}
+        {/* 💰 Financial Summary */}
+        <div className="grid grid-cols-2 gap-4 mb-6 text-xs">
+          {/* Notes & Status */}
+          <div className="space-y-2 rounded-2xl bg-slate-50 p-4 border border-slate-200">
+            <p className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Receiving Status & Notes:</p>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-600">চালান স্থিতি:</span>
+              <span className="font-black text-indigo-900">
+                {isFullyReceived ? '🟢 সম্পূর্ণ প্রাপ্ত' : advanceRemaining > 0 ? '🟡 আংশিক প্রাপ্ত' : 'স্টক ইন সম্পন্ন'}
+              </span>
+            </div>
+            <p className="text-slate-500 italic mt-1 leading-relaxed">
+              {purchase.note || 'ব্যাংক ড্রাফটের বিপরীতে মাল বুঝে নিয়ে গোডাউনে স্টক ইন করা হয়েছে।'}
             </p>
           </div>
 
-          {/* Right Totals Calculation */}
-          <div className="space-y-2 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          {/* Financial Totals */}
+          <div className="rounded-2xl bg-slate-50 p-4 border border-slate-200 space-y-2">
             <div className="flex justify-between text-slate-600">
-              <span>মোট গৃহীত মালের মূল্য (Received Goods Value):</span>
+              <span>Advance Paid (ব্যাংক ড্রাফট প্রদান):</span>
+              <span className="font-black text-indigo-950 text-sm">{formatCurrency(totalPaid)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Order Value (প্রি-অর্ডার মূল্য):</span>
+              <span className="font-bold text-slate-800 text-sm">{formatCurrency(totalPaid > 0 ? totalPaid : totalReceivedValue)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600 pt-1 border-t border-slate-200">
+              <span>Received Goods Value (প্রাপ্ত মালের মূল্য):</span>
               <span className="font-black text-slate-900 text-sm">{formatCurrency(totalReceivedValue)}</span>
             </div>
-
-            <div className="flex justify-between text-slate-600 pt-1 border-t border-slate-200">
-              <span>ব্যাংক ড্রাফটে পরিশোধিত টাকা (Bank Draft Paid):</span>
-              <span className="font-black text-indigo-900 text-sm">{formatCurrency(totalPaid)}</span>
+            <div className="flex justify-between items-center text-emerald-800 bg-emerald-100/70 p-2 rounded-xl font-bold border border-emerald-200 mt-1">
+              <span>Remaining Advance (অবশিষ্ট অগ্রিম):</span>
+              <span className="font-black text-base">{formatCurrency(advanceRemaining)}</span>
             </div>
-
-            {/* Reconciliation Balance Outcome */}
-            {advanceRemaining > 0 ? (
-              <div className="flex justify-between items-center text-emerald-800 bg-emerald-100/80 p-2.5 rounded-xl font-bold mt-2 border border-emerald-200">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-                  <span>কোম্পানিতে আমাদের অগ্রিম জমা অবশিষ্ট:</span>
-                </span>
-                <span className="font-black text-base">{formatCurrency(advanceRemaining)}</span>
-              </div>
-            ) : dueRemaining > 0 ? (
-              <div className="flex justify-between items-center text-rose-800 bg-rose-100/80 p-2.5 rounded-xl font-bold mt-2 border border-rose-200">
-                <span className="flex items-center gap-1.5">
-                  <AlertCircle className="h-4 w-4 text-rose-700" />
-                  <span>কোম্পানির অতিরিক্ত পাওনা (Due):</span>
-                </span>
-                <span className="font-black text-base">{formatCurrency(dueRemaining)}</span>
-              </div>
-            ) : (
-              <div className="flex justify-between items-center text-indigo-800 bg-indigo-100/80 p-2.5 rounded-xl font-bold mt-2 border border-indigo-200">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-indigo-700" />
-                  <span>হিসাব স্থিতি:</span>
-                </span>
-                <span className="font-black text-sm">সম্পূর্ণ সমন্বিত (০ বকেয়া)</span>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* ✍️ Signature Blocks */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-12 border-t border-dashed border-slate-300 text-center text-xs text-slate-600">
+        {/* ✍️ Signature Blocks (Prepared By, Received By, Authorized By) */}
+        <div className="grid grid-cols-3 gap-6 pt-16 border-t border-dashed border-slate-300 text-center text-xs text-slate-700">
           <div>
-            <div className="border-t border-slate-400 pt-2 font-bold text-slate-800">
-              প্রস্তুতকারীর স্বাক্ষর
+            <div className="border-t-2 border-slate-700 pt-2 font-black text-slate-900">
+              প্রস্তুতকারী (Prepared By)
             </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Prepared By</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">স্বাক্ষর ও তারিখ</p>
           </div>
 
           <div>
-            <div className="border-t border-slate-400 pt-2 font-bold text-slate-800">
-              গোডাউন ইনচার্জ
+            <div className="border-t-2 border-slate-700 pt-2 font-black text-slate-900">
+              গোডাউন ইনচার্জ (Received By)
             </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Warehouse Store Incharge</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">স্বাক্ষর ও তারিখ</p>
           </div>
 
           <div>
-            <div className="border-t border-slate-400 pt-2 font-bold text-slate-800">
-              কোম্পানি চালক / প্রতিনিধি
+            <div className="border-t-2 border-slate-700 pt-2 font-black text-slate-900">
+              অনুমোদনকারী (Authorized By)
             </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Driver / Delivery Agent</p>
-          </div>
-
-          <div>
-            <div className="border-t border-slate-400 pt-2 font-bold text-slate-800">
-              অনুমোদনকারী স্বাক্ষর
-            </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Authorized Signature</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">স্বাক্ষর ও তারিখ</p>
           </div>
         </div>
 
-        {/* Print styling */}
+        {/* Print CSS Rules */}
         <style dangerouslySetInnerHTML={{__html: `
+          @page {
+            size: A4;
+            margin: 12mm;
+          }
           @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white !important; }
             .printable-voucher { box-shadow: none !important; border: 0 !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
-            nav, aside, header, footer { display: none !important; }
+            nav, aside, header, footer, button, a[href] { display: none !important; }
           }
         `}} />
       </div>

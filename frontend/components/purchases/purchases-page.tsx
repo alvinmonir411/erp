@@ -20,7 +20,7 @@ import { PageCard } from '@/components/ui/page-card';
 import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
-import { formatCurrency, formatDate, formatDateTime, toNumber } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatDateTime, formatNumber, toNumber } from '@/lib/utils/format';
 import type {
   Company,
   CompanyWisePayableSummary,
@@ -39,7 +39,7 @@ import {
   DollarSign,
   Wallet,
   AlertCircle,
-  CheckCircle,
+  CheckCircle2,
   ChevronRight,
   TrendingDown,
   ArrowUpRight,
@@ -53,6 +53,15 @@ import {
   Trash2,
   User,
   Printer,
+  Eye,
+  CheckCircle,
+  Phone,
+  MapPin,
+  Landmark,
+  ArrowRight,
+  Clock,
+  ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 
 const pageSize = 12;
@@ -64,12 +73,13 @@ function formatDateInput(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
-export type ProductPaymentRow = {
+export type PreOrderProductRow = {
   productId: number | '';
-  productName?: string;
-  unitPrice?: string;
-  unit?: string;
-  quantity?: string;
+  productName: string;
+  sku: string;
+  unit: string;
+  quantity: string;
+  unitPrice: string;
   amount: string;
   note?: string;
   searchText?: string;
@@ -77,7 +87,10 @@ export type ProductPaymentRow = {
 };
 
 export function PurchasesPage() {
-  const [activeTab, setActiveTab] = useState<'companies' | 'products' | 'invoices' | 'payments'>('companies');
+  // Main Navigation Tabs
+  const [activeTab, setActiveTab] = useState<'all' | 'preorders' | 'challans' | 'partial' | 'completed' | 'companies' | 'products'>('all');
+  
+  // Data Sources
   const [companies, setCompanies] = useState<Company[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -85,33 +98,52 @@ export function PurchasesPage() {
   const [productSupplies, setProductSupplies] = useState<ProductSupplySummary[]>([]);
   const [payments, setPayments] = useState<PurchasePayment[]>([]);
 
+  // Search & Filters
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [companyStatusFilter, setCompanyStatusFilter] = useState<'all' | 'payable' | 'advance' | 'settled'>('all');
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Loading & Notifications
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
 
-  // Payment Modal State
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentCompanyId, setPaymentCompanyId] = useState<number | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentDate, setPaymentDate] = useState(formatDateInput(new Date()));
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
-  const [transactionRef, setTransactionRef] = useState('');
-  const [paymentNote, setPaymentNote] = useState('');
-  const [isProductBreakdownMode, setIsProductBreakdownMode] = useState(false);
-  const [productPaymentRows, setProductPaymentRows] = useState<ProductPaymentRow[]>([]);
-  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
-
-  // Expanded Invoice Row state
+  // Expanded Invoices & Actions
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<number | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+
+  // -------------------------------------------------------------
+  // 🏦 BUTTON 1: BANK DRAFT / ADVANCE PAYMENT MODAL STATE
+  // -------------------------------------------------------------
+  const [isBankDraftModalOpen, setIsBankDraftModalOpen] = useState(false);
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Company | null>(null);
+
+  // Section B: Payment Info
+  const [paymentMethod, setPaymentMethod] = useState<'BANK' | 'CHEQUE' | 'TRANSFER' | 'CASH'>('BANK');
+  const [draftRefNo, setDraftRefNo] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [branchName, setBranchName] = useState('');
+  const [draftDate, setDraftDate] = useState(formatDateInput(new Date()));
+  const [draftAmount, setDraftAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+
+  // Section C: Pre-Order Products
+  const [preOrderItems, setPreOrderItems] = useState<PreOrderProductRow[]>([]);
+  const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
+
+  // Post-Save Success Dialog State
+  const [savedDraftResult, setSavedDraftResult] = useState<{
+    id: number;
+    draftNo: string;
+    supplierName: string;
+    amount: number;
+    productCount: number;
+  } | null>(null);
 
   useToastNotification({
     message: toastMessage,
@@ -162,7 +194,7 @@ export function PurchasesPage() {
     loadData();
   }, [selectedCompanyId, fromDate, toDate, searchTerm]);
 
-  // Overall Aggregate KPI Stats
+  // Overall Financial KPI Metrics
   const kpiStats = useMemo(() => {
     const totalPurchases = payableSummary.reduce(
       (sum, c) => sum + toNumber(c.totalPurchaseAmount ?? c.totalAmount),
@@ -181,6 +213,7 @@ export function PurchasesPage() {
       0,
     );
     const totalInvoices = purchases.length;
+    const totalPreOrders = payments.filter((p) => p.productBreakdown && Array.isArray(p.productBreakdown) && p.productBreakdown.length > 0).length;
 
     return {
       totalPurchases,
@@ -188,200 +221,137 @@ export function PurchasesPage() {
       totalPayable,
       totalAdvance,
       totalInvoices,
+      totalPreOrders,
       totalCompanies: payableSummary.length,
     };
-  }, [payableSummary, purchases]);
+  }, [payableSummary, purchases, payments]);
 
-  // Filtered Company Summaries
-  const filteredCompanySummaries = useMemo(() => {
-    return payableSummary.filter((c) => {
-      if (selectedCompanyId && c.companyId !== selectedCompanyId) return false;
-      const payable = toNumber(c.totalPayableAmount ?? c.totalPayable);
-      const advance = toNumber(c.advanceAmount ?? c.advanceBalance);
-
-      if (companyStatusFilter === 'payable' && payable <= 0) return false;
-      if (companyStatusFilter === 'advance' && advance <= 0) return false;
-      if (companyStatusFilter === 'settled' && (payable > 0 || advance > 0)) return false;
-
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        return (
-          c.companyName?.toLowerCase().includes(term) ||
-          c.companyCode?.toLowerCase().includes(term)
-        );
-      }
-      return true;
-    });
-  }, [payableSummary, selectedCompanyId, searchTerm, companyStatusFilter]);
-
-  // Filtered Product Supplies
-  const filteredProductSupplies = useMemo(() => {
-    return productSupplies.filter((p) => {
-      if (selectedCompanyId && p.companyId !== selectedCompanyId) return false;
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        return (
-          p.productName?.toLowerCase().includes(term) ||
-          p.companyName?.toLowerCase().includes(term)
-        );
-      }
-      return true;
-    });
-  }, [productSupplies, selectedCompanyId, searchTerm]);
-
-  // Filtered Invoices
-  const filteredPurchases = useMemo(() => {
-    return purchases.filter((p) => {
-      if (selectedCompanyId && p.companyId !== selectedCompanyId) return false;
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        return (
-          p.invoiceNo?.toLowerCase().includes(term) ||
-          p.referenceNo?.toLowerCase().includes(term) ||
-          p.supplierName?.toLowerCase().includes(term) ||
-          p.company?.name?.toLowerCase().includes(term)
-        );
-      }
-      return true;
-    });
-  }, [purchases, selectedCompanyId, searchTerm]);
-
-  // Filtered Payments
-  const filteredPayments = useMemo(() => {
-    return payments.filter((pay) => {
-      if (selectedCompanyId && pay.companyId !== selectedCompanyId) return false;
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        return (
-          pay.company?.name?.toLowerCase().includes(term) ||
-          pay.transactionRef?.toLowerCase().includes(term) ||
-          pay.note?.toLowerCase().includes(term)
-        );
-      }
-      return true;
-    });
-  }, [payments, selectedCompanyId, searchTerm]);
-
-  // Pagination Helper
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    if (activeTab === 'companies') return filteredCompanySummaries.slice(start, start + pageSize);
-    if (activeTab === 'products') return filteredProductSupplies.slice(start, start + pageSize);
-    if (activeTab === 'invoices') return filteredPurchases.slice(start, start + pageSize);
-    return filteredPayments.slice(start, start + pageSize);
-  }, [
-    activeTab,
-    currentPage,
-    filteredCompanySummaries,
-    filteredProductSupplies,
-    filteredPurchases,
-    filteredPayments,
-  ]);
-
-  const totalCurrentTabItems = useMemo(() => {
-    if (activeTab === 'companies') return filteredCompanySummaries.length;
-    if (activeTab === 'products') return filteredProductSupplies.length;
-    if (activeTab === 'invoices') return filteredPurchases.length;
-    return filteredPayments.length;
-  }, [
-    activeTab,
-    filteredCompanySummaries,
-    filteredProductSupplies,
-    filteredPurchases,
-    filteredPayments,
-  ]);
-
-  const openPaymentModal = (companyId?: number) => {
-    const cId = companyId || selectedCompanyId || null;
-    setPaymentCompanyId(cId);
-
-    // If company selected, auto suggest its payable due
-    if (cId) {
-      const match = payableSummary.find((s) => s.companyId === cId);
-      if (match && toNumber(match.totalPayableAmount ?? match.totalPayable) > 0) {
-        setPaymentAmount(String(toNumber(match.totalPayableAmount ?? match.totalPayable)));
+  // -------------------------------------------------------------
+  // 🔍 MODAL LOGIC: BANK DRAFT & PRE-ORDER
+  // -------------------------------------------------------------
+  const openBankDraftModal = (company?: Company) => {
+    if (company) {
+      setSelectedSupplier(company);
+      setSupplierSearch(company.name);
+    } else if (selectedCompanyId) {
+      const match = companies.find((c) => c.id === selectedCompanyId);
+      if (match) {
+        setSelectedSupplier(match);
+        setSupplierSearch(match.name);
       } else {
-        setPaymentAmount('');
+        setSelectedSupplier(null);
+        setSupplierSearch('');
       }
     } else {
-      setPaymentAmount('');
+      setSelectedSupplier(null);
+      setSupplierSearch('');
     }
 
-    setPaymentDate(formatDateInput(new Date()));
     setPaymentMethod('BANK');
-    setTransactionRef('');
+    setDraftRefNo('');
+    setBankName('Sonali Bank');
+    setBranchName('');
+    setDraftDate(formatDateInput(new Date()));
+    setDraftAmount('');
     setPaymentNote('');
-    setIsProductBreakdownMode(true);
-    setProductPaymentRows([
-      { productId: '', unitPrice: '', quantity: '1', amount: '', note: '', searchText: '', showResults: false }
+    setPreOrderItems([
+      {
+        productId: '',
+        productName: '',
+        sku: '',
+        unit: 'Pcs',
+        quantity: '1',
+        unitPrice: '',
+        amount: '',
+        note: '',
+        searchText: '',
+        showResults: false,
+      },
     ]);
-    setIsPaymentModalOpen(true);
+    setShowSupplierDropdown(false);
+    setSavedDraftResult(null);
+    setIsBankDraftModalOpen(true);
   };
 
-  const calculateRowAmount = (unitPriceStr?: string, quantityStr?: string): string => {
-    const price = parseFloat(unitPriceStr || '0');
-    const qty = parseFloat(quantityStr || '0');
-    if (!isNaN(price) && !isNaN(qty) && price >= 0 && qty > 0) {
-      const total = price * qty;
-      return total % 1 === 0 ? total.toString() : total.toFixed(2);
-    }
-    return '';
+  const handleSelectSupplier = (comp: Company) => {
+    setSelectedSupplier(comp);
+    setSupplierSearch(comp.name);
+    setShowSupplierDropdown(false);
   };
 
-  const handleAddProductRow = () => {
-    setIsProductBreakdownMode(true);
-    setProductPaymentRows((prev) => [
+  const handleAddPreOrderRow = () => {
+    setPreOrderItems((prev) => [
       ...prev,
-      { productId: '', unitPrice: '', quantity: '1', amount: '', note: '', searchText: '', showResults: false },
+      {
+        productId: '',
+        productName: '',
+        sku: '',
+        unit: 'Pcs',
+        quantity: '1',
+        unitPrice: '',
+        amount: '',
+        note: '',
+        searchText: '',
+        showResults: false,
+      },
     ]);
   };
 
-  const handleSelectProduct = (index: number, product: Product) => {
-    // Auto-select this product's company
-    const compId = product.companyId || (product as any).company?.id;
-    if (compId) {
-      setPaymentCompanyId(Number(compId));
+  const handleRemovePreOrderRow = (index: number) => {
+    setPreOrderItems((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      recalculateDraftAmount(updated);
+      return updated;
+    });
+  };
+
+  const handleSelectPreOrderProduct = (index: number, product: Product) => {
+    // If no supplier selected yet, auto-select product's supplier
+    if (!selectedSupplier && product.companyId) {
+      const comp = companies.find((c) => c.id === product.companyId);
+      if (comp) {
+        setSelectedSupplier(comp);
+        setSupplierSearch(comp.name);
+      }
     }
 
-    setProductPaymentRows((prev) => {
+    setPreOrderItems((prev) => {
       const updated = [...prev];
       const target = { ...updated[index] };
       target.productId = product.id;
       target.productName = product.name;
+      target.sku = product.sku || '';
       target.unit = product.unit || 'Pcs';
       target.searchText = product.name;
       target.showResults = false;
-      target.unitPrice = product.buyPrice !== undefined && product.buyPrice !== null ? String(toNumber(product.buyPrice)) : target.unitPrice || '';
+      target.unitPrice =
+        product.buyPrice !== undefined && product.buyPrice !== null
+          ? String(toNumber(product.buyPrice))
+          : target.unitPrice || '';
 
       if (!target.quantity || target.quantity === '0') {
         target.quantity = '1';
       }
 
-      const calc = calculateRowAmount(target.unitPrice, target.quantity);
-      if (calc) {
-        target.amount = calc;
+      const q = parseFloat(target.quantity || '0');
+      const p = parseFloat(target.unitPrice || '0');
+      if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
+        const total = q * p;
+        target.amount = total % 1 === 0 ? total.toString() : total.toFixed(2);
       }
 
       updated[index] = target;
-
-      const totalRowAmount = updated.reduce(
-        (sum, row) => sum + (parseFloat(row.amount) || 0),
-        0,
-      );
-      if (totalRowAmount > 0) {
-        setPaymentAmount(totalRowAmount % 1 === 0 ? totalRowAmount.toString() : totalRowAmount.toFixed(2));
-      }
-
+      recalculateDraftAmount(updated);
       return updated;
     });
   };
 
-  const handleUpdateProductRow = (
+  const handleUpdatePreOrderRow = (
     index: number,
-    field: keyof ProductPaymentRow,
+    field: keyof PreOrderProductRow,
     value: any,
   ) => {
-    setProductPaymentRows((prev) => {
+    setPreOrderItems((prev) => {
       const updated = [...prev];
       const target = { ...updated[index], [field]: value };
 
@@ -395,149 +365,180 @@ export function PurchasesPage() {
               (p) =>
                 p.name?.toLowerCase().trim() === trimmed ||
                 p.sku?.toLowerCase().trim() === trimmed ||
-                p.name?.toLowerCase().trim().startsWith(trimmed) ||
-                (trimmed.length >= 3 && p.name?.toLowerCase().includes(trimmed)),
+                p.name?.toLowerCase().trim().startsWith(trimmed),
             );
             if (matched) {
               target.productId = matched.id;
               target.productName = matched.name;
+              target.sku = matched.sku || '';
               target.unit = matched.unit || 'Pcs';
               if (matched.buyPrice !== undefined && matched.buyPrice !== null) {
                 target.unitPrice = String(toNumber(matched.buyPrice));
               }
-              const compId = matched.companyId || (matched as any).company?.id;
-              if (compId) {
-                setPaymentCompanyId(Number(compId));
+              const q = parseFloat(target.quantity || '1');
+              const p = parseFloat(target.unitPrice || '0');
+              if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
+                const total = q * p;
+                target.amount = total % 1 === 0 ? total.toString() : total.toFixed(2);
               }
-              const calc = calculateRowAmount(target.unitPrice, target.quantity);
-              if (calc) target.amount = calc;
             }
           }
         }
-      } else if (field === 'unitPrice') {
-        target.unitPrice = value;
-        const calc = calculateRowAmount(value, target.quantity);
-        if (calc) {
-          target.amount = calc;
+      } else if (field === 'quantity' || field === 'unitPrice') {
+        const q = parseFloat(field === 'quantity' ? value : target.quantity || '0');
+        const p = parseFloat(field === 'unitPrice' ? value : target.unitPrice || '0');
+        if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
+          const total = q * p;
+          target.amount = total % 1 === 0 ? total.toString() : total.toFixed(2);
+        } else {
+          target.amount = '';
         }
-      } else if (field === 'quantity') {
-        target.quantity = value;
-        let rate = target.unitPrice;
-        if (!rate && target.productId) {
-          const prod = allProducts.find((p) => p.id === Number(target.productId));
-          if (prod && prod.buyPrice) {
-            rate = String(toNumber(prod.buyPrice));
-            target.unitPrice = rate;
-          }
-        }
-        const calc = calculateRowAmount(rate, value);
-        if (calc) {
-          target.amount = calc;
-        }
-      } else if (field === 'amount') {
-        target.amount = value;
       }
 
       updated[index] = target;
-
-      const totalRowAmount = updated.reduce(
-        (sum, row) => sum + (parseFloat(row.amount) || 0),
-        0,
-      );
-      if (totalRowAmount > 0) {
-        setPaymentAmount(totalRowAmount % 1 === 0 ? totalRowAmount.toString() : totalRowAmount.toFixed(2));
-      }
-
+      recalculateDraftAmount(updated);
       return updated;
     });
   };
 
-  const handleRemoveProductRow = (index: number) => {
-    setProductPaymentRows((prev) => {
-      const updated = prev.filter((_, i) => i !== index);
-      const totalRowAmount = updated.reduce(
-        (sum, row) => sum + (parseFloat(row.amount) || 0),
-        0,
-      );
-      if (totalRowAmount > 0) {
-        setPaymentAmount(totalRowAmount % 1 === 0 ? totalRowAmount.toString() : totalRowAmount.toFixed(2));
-      } else if (updated.length === 0) {
-        setIsProductBreakdownMode(false);
-      }
-      return updated;
-    });
+  const recalculateDraftAmount = (rows: PreOrderProductRow[]) => {
+    const totalVal = rows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+    if (totalVal > 0) {
+      setDraftAmount(totalVal % 1 === 0 ? totalVal.toString() : totalVal.toFixed(2));
+    }
   };
 
-  const handleSavePayment = async (e: React.FormEvent) => {
+  // Section C/D Totals
+  const preOrderTotalAmount = useMemo(() => {
+    return preOrderItems.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+  }, [preOrderItems]);
+
+  const preOrderTotalQuantity = useMemo(() => {
+    return preOrderItems.reduce((sum, row) => sum + (parseFloat(row.quantity || '0') || 0), 0);
+  }, [preOrderItems]);
+
+  const effectiveDraftAmountNum = parseFloat(draftAmount || '0') || 0;
+  const draftAdvanceBalance = Math.max(0, effectiveDraftAmountNum);
+
+  // Submit Bank Draft / Pre-Order
+  const handleSubmitBankDraft = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentCompanyId) {
+
+    if (!selectedSupplier) {
       setToastTone('error');
-      setToastMessage('অনুগ্রহ করে কোম্পানি সিলেক্ট করুন');
-      return;
-    }
-    const amt = parseFloat(paymentAmount);
-    if (!amt || amt <= 0) {
-      setToastTone('error');
-      setToastMessage('সঠিক টাকার অংক লিখুন');
+      setToastMessage('অনুগ্রহ করে সরবরাহকারী / কোম্পানি নির্বাচন করুন');
       return;
     }
 
-    const validBreakdown = productPaymentRows
-      .filter((row) => row.productId || parseFloat(row.amount) > 0 || row.searchText)
+    const amt = parseFloat(draftAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setToastTone('error');
+      setToastMessage('সঠিক পরিশোধের টাকা লিখুন (১ বা তার বেশি)');
+      return;
+    }
+
+    const validBreakdown = preOrderItems
+      .filter((row) => (row.productId || row.productName || row.searchText) && parseFloat(row.quantity || '0') > 0)
       .map((row) => {
-        let prod = allProducts.find((p) => p.id === Number(row.productId));
-        if (!prod && row.searchText) {
-          prod = allProducts.find((p) => p.name.toLowerCase().trim() === (row.searchText || '').toLowerCase().trim());
-        }
+        const q = parseFloat(row.quantity || '1');
+        const p = parseFloat(row.unitPrice || '0');
+        const calculatedAmt = !isNaN(q) && !isNaN(p) && q > 0 && p >= 0 ? q * p : parseFloat(row.amount || '0') || 0;
+
         return {
-          productId: prod?.id || (row.productId ? Number(row.productId) : undefined),
-          productName: prod?.name || row.productName || row.searchText || undefined,
-          unitPrice: row.unitPrice ? parseFloat(row.unitPrice) : prod?.buyPrice ? Number(prod.buyPrice) : undefined,
-          unit: prod?.unit || row.unit || 'Pcs',
-          quantity: row.quantity ? Number(row.quantity) : undefined,
-          amount: parseFloat(row.amount) || 0,
+          productId: row.productId ? Number(row.productId) : undefined,
+          productName: row.productName || row.searchText || 'পণ্য',
+          sku: row.sku || undefined,
+          unit: row.unit || 'Pcs',
+          quantity: q,
+          unitPrice: p,
+          amount: calculatedAmt,
           note: row.note?.trim() || undefined,
         };
       });
 
+    if (validBreakdown.length === 0) {
+      setToastTone('error');
+      setToastMessage('প্রি-অর্ডারের জন্য কমপক্ষে ১টি পণ্য এবং সঠিক কোয়ান্টিটি যোগ করুন');
+      return;
+    }
+
     try {
-      setIsSubmittingPayment(true);
-      await recordCompanyPayment(paymentCompanyId, {
+      setIsSubmittingDraft(true);
+      const res = await recordCompanyPayment(selectedSupplier.id, {
         amount: amt,
-        paymentDate,
+        paymentDate: draftDate,
         paymentMethod,
-        transactionRef: transactionRef.trim() || undefined,
+        bankName: paymentMethod === 'BANK' ? bankName.trim() : undefined,
+        branchName: paymentMethod === 'BANK' ? branchName.trim() : undefined,
+        transactionRef: draftRefNo.trim() || undefined,
         note: paymentNote.trim() || undefined,
-        productBreakdown: validBreakdown.length > 0 ? validBreakdown : undefined,
+        productBreakdown: validBreakdown,
+      });
+
+      setSavedDraftResult({
+        id: res.id,
+        draftNo: draftRefNo.trim() || `BD-${res.id}`,
+        supplierName: selectedSupplier.name,
+        amount: amt,
+        productCount: validBreakdown.length,
       });
 
       setToastTone('success');
-      setToastMessage('কোম্পানিকে টাকা পরিশোধের হিসাব সফলভাবে সংরক্ষণ করা হয়েছে!');
-      setIsPaymentModalOpen(false);
+      setToastMessage('✅ ব্যাংক ড্রাফট ও প্রি-অর্ডার সফলভাবে সংরক্ষণ করা হয়েছে!');
       await loadData();
     } catch (err: any) {
       setToastTone('error');
-      setToastMessage(err.message || 'পেমেন্ট সংরক্ষণ করতে সমস্যা হয়েছে');
+      setToastMessage(err.message || 'ব্যাংক ড্রাফট সংরক্ষণ করতে সমস্যা হয়েছে');
     } finally {
-      setIsSubmittingPayment(false);
+      setIsSubmittingDraft(false);
     }
   };
 
-  const handleConfirmPurchase = async (id: number) => {
-    try {
-      setConfirmingId(id);
-      await confirmPurchase(id);
-      setToastTone('success');
-      setToastMessage('চালানটি সফলভাবে নিশ্চিত ও গোডাউনে স্টক ইন করা হয়েছে!');
-      await loadData();
-    } catch (err: any) {
-      setToastTone('error');
-      setToastMessage(err.message || 'চালান নিশ্চিত করতে সমস্যা হয়েছে');
-    } finally {
-      setConfirmingId(null);
-    }
-  };
+  // -------------------------------------------------------------
+  // 📋 TAB DATA FILTERING
+  // -------------------------------------------------------------
+  const filteredPurchasesList = useMemo(() => {
+    return purchases.filter((p) => {
+      if (selectedCompanyId && p.companyId !== selectedCompanyId) return false;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const matchInv = p.invoiceNo?.toLowerCase().includes(term);
+        const matchRef = p.referenceNo?.toLowerCase().includes(term);
+        const matchSup = p.supplierName?.toLowerCase().includes(term);
+        const matchComp = p.company?.name?.toLowerCase().includes(term);
+        if (!matchInv && !matchRef && !matchSup && !matchComp) return false;
+      }
 
+      const totalVal = toNumber(p.totalAmount);
+      const paidVal = toNumber(p.paidAmount);
+
+      if (activeTab === 'partial') {
+        // Partially received or has due/advance difference
+        return paidVal > totalVal || (paidVal > 0 && totalVal > paidVal);
+      }
+      if (activeTab === 'completed') {
+        // Fully received and settled
+        return p.status === 'CONFIRMED' || (totalVal > 0 && Math.abs(totalVal - paidVal) < 0.01);
+      }
+      return true;
+    });
+  }, [purchases, selectedCompanyId, searchTerm, activeTab]);
+
+  const filteredPreOrdersList = useMemo(() => {
+    return payments.filter((pay) => {
+      if (selectedCompanyId && pay.companyId !== selectedCompanyId) return false;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const matchComp = pay.company?.name?.toLowerCase().includes(term);
+        const matchRef = pay.transactionRef?.toLowerCase().includes(term);
+        const matchNote = pay.note?.toLowerCase().includes(term);
+        if (!matchComp && !matchRef && !matchNote) return false;
+      }
+      return true;
+    });
+  }, [payments, selectedCompanyId, searchTerm]);
+
+  // Handle Delete Purchase
   const handleDeletePurchase = async (id: number) => {
     if (!window.confirm('আপনি কি নিশ্চিত যে এই চালানটি মুছে ফেলতে চান?')) return;
     try {
@@ -554,13 +555,14 @@ export function PurchasesPage() {
     }
   };
 
+  // Handle Delete Payment
   const handleDeletePayment = async (paymentId: number) => {
-    if (!window.confirm('আপনি কি নিশ্চিত যে এই পেমেন্ট রেকর্ডটি মুছে ফেলতে চান?')) return;
+    if (!window.confirm('আপনি কি নিশ্চিত যে এই পেমেন্ট/ড্রাফট রেকর্ডটি মুছে ফেলতে চান?')) return;
     try {
       setIsLoading(true);
       await deleteCompanyPayment(paymentId);
       setToastTone('success');
-      setToastMessage('পেমেন্ট রেকর্ডটি সফলভাবে মুছে ফেলা হয়েছে');
+      setToastMessage('ড্রাফট রেকর্ডটি সফলভাবে মুছে ফেলা হয়েছে');
       await loadData();
     } catch (err: any) {
       setToastTone('error');
@@ -570,152 +572,159 @@ export function PurchasesPage() {
     }
   };
 
-  const handleResetDemoData = async () => {
-    const ok = window.confirm('⚠️ সতর্কতা: আপনি কি নিশ্চিত যে সমস্ত টেস্ট/ডেমো চালান ও কোম্পানির পেমেন্ট মুছে সব ব্যালেন্স ০ করতে চান?');
-    if (!ok) return;
-    try {
-      setIsLoading(true);
-      await resetPurchasesDemoData();
-      setToastTone('success');
-      setToastMessage('সমস্ত ডেমো চালান ও পেমেন্ট সফলভাবে মুছে ফেলা হয়েছে! সব কোম্পানির ব্যালেন্স এখন ফ্রেশ ও ০।');
-      await loadData();
-    } catch (err: any) {
-      setToastTone('error');
-      setToastMessage(err.message || 'ডেমো ডেটা মুছতে সমস্যা হয়েছে');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const selectedCompanyObj = companies.find((c) => c.id === paymentCompanyId);
-  const selectedCompanySummary = payableSummary.find((s) => s.companyId === paymentCompanyId);
-
   return (
-    <div className="space-y-6 pb-16 text-slate-800">
-      {/* 🌟 Header Section */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-5 sm:p-7 md:p-8 text-white shadow-xl">
+    <div className="space-y-6 pb-20 text-slate-800">
+      {/* ============================================================== */}
+      {/* 2. PURCHASE PAGE HEADER                                         */}
+      {/* ============================================================== */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white shadow-xl">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 backdrop-blur-md">
               <Building2 className="h-3.5 w-3.5" />
-              <span>কোম্পানি সাপ্লাইয়ার ও পারচেজ লেজার</span>
+              <span>ক্রয় ও সাপ্লায়ার রিকনসিলিয়েশন সিস্টেম</span>
             </div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white">
-              কোম্পানির মাল ও টাকা পরিশোধের হিসাব
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              কোম্পানি কোন কোন প্রোডাক্ট কত টাকার পাঠিয়েছে এবং কোম্পানিকে কত টাকা কোন পণ্যের জন্য দেওয়া হয়েছে তার পূর্ণাঙ্গ খতিয়ান ও ব্যালেন্স শিট।
-            </p>
+            <div>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white flex items-center gap-3">
+                <span>ক্রয় ব্যবস্থাপনা</span>
+                <span className="text-lg sm:text-xl font-normal text-indigo-300 font-sans tracking-normal">(Purchase Management)</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed font-medium">
+                অগ্রিম পেমেন্ট, প্রি-অর্ডার, চালান গ্রহণ এবং স্টক ইন ব্যবস্থাপনা
+              </p>
+            </div>
 
-            {/* Invoices & Companies Count Chips */}
-            <div className="flex items-center gap-2.5 pt-1 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold text-slate-200 backdrop-blur-md border border-white/10">
+            {/* Quick Metrics Badges */}
+            <div className="flex items-center gap-2.5 pt-2 flex-wrap text-xs font-bold">
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-slate-200 backdrop-blur-md border border-white/10">
                 <FileText className="h-3.5 w-3.5 text-amber-400" />
                 <span>মোট চালান: <b className="text-white">{kpiStats.totalInvoices} টি</b></span>
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold text-slate-200 backdrop-blur-md border border-white/10">
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-slate-200 backdrop-blur-md border border-white/10">
+                <Wallet className="h-3.5 w-3.5 text-emerald-400" />
+                <span>প্রি-অর্ডার ড্রাফট: <b className="text-white">{kpiStats.totalPreOrders} টি</b></span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-slate-200 backdrop-blur-md border border-white/10">
                 <Building2 className="h-3.5 w-3.5 text-indigo-400" />
-                <span>মোট কোম্পানি: <b className="text-white">{kpiStats.totalCompanies} টি</b></span>
+                <span>কোম্পানি: <b className="text-white">{kpiStats.totalCompanies} টি</b></span>
               </span>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 shrink-0">
+          {/* TWO PRIMARY ACTION BUTTONS (Distinct Visual Hierarchy) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+            {/* Button 1: Money Goes to Supplier */}
             <button
-              onClick={() => openPaymentModal()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95"
+              onClick={() => openBankDraftModal()}
+              className="group relative inline-flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-6 py-4 text-xs sm:text-sm font-black text-white shadow-xl shadow-emerald-950/40 transition-all hover:scale-[1.02] active:scale-95 border border-emerald-400/30"
             >
-              <Wallet className="h-4 w-4" />
-              <span>🏦 ব্যাংক ড্রাফট / টাকা পরিশোধ (অগ্রিম অর্ডার)</span>
+              <div className="rounded-xl bg-white/20 p-1.5">
+                <Wallet className="h-5 w-5 text-white" />
+              </div>
+              <div className="text-left">
+                <div className="font-black text-white leading-tight">🏦 ব্যাংক ড্রাফট / টাকা পরিশোধ</div>
+                <div className="text-[11px] font-semibold text-emerald-100">অগ্রিম অর্ডার ও পণ্যের বুকিং</div>
+              </div>
             </button>
+
+            {/* Button 2: Goods Come from Supplier */}
             <Link
               href="/purchases/create"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-95"
+              className="group relative inline-flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 px-6 py-4 text-xs sm:text-sm font-black text-white shadow-xl shadow-indigo-950/40 transition-all hover:scale-[1.02] active:scale-95 border border-indigo-400/30"
             >
-              <Plus className="h-4 w-4" />
-              <span>📦 চালান ইন ও স্টক ইন</span>
+              <div className="rounded-xl bg-white/20 p-1.5">
+                <Package className="h-5 w-5 text-white" />
+              </div>
+              <div className="text-left">
+                <div className="font-black text-white leading-tight">📦 চালান ইন ও স্টক ইন</div>
+                <div className="text-[11px] font-semibold text-indigo-100">ড্রাফট মিলিয়ে মাল গোডাউনে এন্ট্রি</div>
+              </div>
             </Link>
           </div>
         </div>
       </div>
 
-      {/* 📊 Top 4 Core Financial KPI Metrics (Spacious & Clean Layout) */}
+      {/* ============================================================== */}
+      {/* 📊 4 TOP FINANCIAL KPI CARDS                                   */}
+      {/* ============================================================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Goods In */}
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+        {/* Card 1: Goods Received */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              মোট প্রাপ্ত মাল (Goods In)
+              মোট প্রাপ্ত মাল (Goods Received)
             </span>
             <div className="rounded-2xl bg-indigo-50 p-2.5 text-indigo-600 shrink-0">
               <Package className="h-5 w-5" />
             </div>
           </div>
-          <p className="mt-3 text-xl sm:text-2xl md:text-2xl font-black text-slate-900">
+          <p className="mt-3 text-2xl font-black text-slate-900">
             {formatCurrency(kpiStats.totalPurchases)}
           </p>
           <p className="mt-1 text-xs text-slate-400 font-medium">
-            সকল চালান মিলিয়ে মোট মালের মূল্য
+            সকল চালান মিলিয়ে মোট ইনওয়ার্ড মালের মূল্য
           </p>
         </div>
 
-        {/* Card 2: Total Paid */}
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+        {/* Card 2: Total Advance / Paid */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              মোট পরিশোধিত টাকা (Total Paid)
+              মোট পরিশোধিত ড্রাফট (Total Paid)
             </span>
             <div className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-600 shrink-0">
-              <CheckCircle className="h-5 w-5" />
+              <CheckCircle2 className="h-5 w-5" />
             </div>
           </div>
-          <p className="mt-3 text-xl sm:text-2xl md:text-2xl font-black text-emerald-600">
+          <p className="mt-3 text-2xl font-black text-emerald-600">
             {formatCurrency(kpiStats.totalPaid)}
           </p>
           <p className="mt-1 text-xs text-slate-400 font-medium">
-            কোম্পানিগুলোকে এ পর্যন্ত মোট পরিশোধ
+            কোম্পানিগুলোকে দেওয়া ব্যাংক ড্রাফট ও ক্যাশ
           </p>
         </div>
 
-        {/* Card 3: Payable Due */}
-        <div className="relative overflow-hidden rounded-3xl border border-rose-200 bg-rose-50/50 p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+        {/* Card 3: Our Advance Balance */}
+        <div className="rounded-3xl border border-sky-200 bg-sky-50/50 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-700">
+              কোম্পানিতে আমাদের অগ্রিম (Advance)
+            </span>
+            <div className="rounded-2xl bg-sky-100 p-2.5 text-sky-600 shrink-0">
+              <Wallet className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-black text-sky-700">
+            {formatCurrency(kpiStats.totalAdvance)}
+          </p>
+          <p className="mt-1 text-xs text-sky-700/80 font-medium">
+            কোম্পানি এই মূল্যের মাল বা টাকা ফেরত দেবে
+          </p>
+        </div>
+
+        {/* Card 4: Supplier Payable */}
+        <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
-              কোম্পানির পাওনা (Payable)
+              কোম্পানির বাকি পাওনা (Payable)
             </span>
             <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-600 shrink-0">
               <TrendingDown className="h-5 w-5" />
             </div>
           </div>
-          <p className="mt-3 text-xl sm:text-2xl md:text-2xl font-black text-rose-600">
+          <p className="mt-3 text-2xl font-black text-rose-600">
             {formatCurrency(kpiStats.totalPayable)}
           </p>
           <p className="mt-1 text-xs text-rose-600/80 font-medium">
             কোম্পানি আমাদের কাছে এখনো পাবে
           </p>
         </div>
-
-        {/* Card 4: Advance Balance */}
-        <div className="relative overflow-hidden rounded-3xl border border-sky-200 bg-sky-50/50 p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-sky-700">
-              আমাদের অগ্রিম জমা (Advance)
-            </span>
-            <div className="rounded-2xl bg-sky-100 p-2.5 text-sky-600 shrink-0">
-              <Wallet className="h-5 w-5" />
-            </div>
-          </div>
-          <p className="mt-3 text-xl sm:text-2xl md:text-2xl font-black text-sky-700">
-            {formatCurrency(kpiStats.totalAdvance)}
-          </p>
-          <p className="mt-1 text-xs text-sky-700/80 font-medium">
-            কোম্পানি আমাদের পণ্য বা টাকা ফেরত দেবে
-          </p>
-        </div>
       </div>
 
-      {/* 🔍 Filter Bar (Aligned 3-Section Grid) */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm">
+      {/* ============================================================== */}
+      {/* 🔍 SEARCH & FILTERS BAR                                         */}
+      {/* ============================================================== */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
           {/* Search */}
           <div className="sm:col-span-2 lg:col-span-4 relative">
@@ -727,12 +736,12 @@ export function PurchasesPage() {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="সার্চ (কোম্পানি, প্রোডাক্ট, ইনভয়েস)..."
+              placeholder="সার্চ (কোম্পানি, ড্রাফট নং, চালান নং, পণ্য)..."
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
             />
           </div>
 
-          {/* Company Dropdown */}
+          {/* Supplier Dropdown */}
           <div className="sm:col-span-1 lg:col-span-4 relative">
             <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <select
@@ -743,7 +752,7 @@ export function PurchasesPage() {
               }}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all truncate"
             >
-              <option value="">🏢 সকল কোম্পানি</option>
+              <option value="">🏢 সকল সরবরাহকারী / কোম্পানি</option>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} {c.code ? `(${c.code})` : ''}
@@ -752,41 +761,36 @@ export function PurchasesPage() {
             </select>
           </div>
 
-          {/* Date Range & Clear */}
+          {/* Date Range */}
           <div className="sm:col-span-1 lg:col-span-4 flex items-center gap-2">
-            <div className="relative flex-1">
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => {
-                  setFromDate(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
-                title="শুরুর তারিখ"
-              />
-            </div>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+              title="শুরুর তারিখ"
+            />
             <span className="text-slate-400 text-xs font-bold">হতে</span>
-            <div className="relative flex-1">
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => {
-                  setToDate(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
-                title="শেষ তারিখ"
-              />
-            </div>
-            {(selectedCompanyId || fromDate || toDate || searchTerm || companyStatusFilter !== 'all') && (
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+              title="শেষ তারিখ"
+            />
+            {(selectedCompanyId || fromDate || toDate || searchTerm) && (
               <button
                 onClick={() => {
                   setSelectedCompanyId(null);
                   setFromDate('');
                   setToDate('');
                   setSearchTerm('');
-                  setCompanyStatusFilter('all');
                   setCurrentPage(1);
                 }}
                 className="rounded-2xl border border-rose-200 bg-rose-50 p-2.5 text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
@@ -799,21 +803,99 @@ export function PurchasesPage() {
         </div>
       </div>
 
-      {/* 🧭 Interactive 4 Tabs Navigation (Clean Responsive Grid) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      {/* ============================================================== */}
+      {/* 15. FILTER TABS (EXACT MATCH FOR USER PROMPT)                   */}
+      {/* ============================================================== */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <button
+          onClick={() => {
+            setActiveTab('all');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'all'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <span>সব (All)</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('preorders');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'preorders'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Wallet className="h-4 w-4 text-emerald-500" />
+          <span>🏦 অগ্রিম অর্ডার ({filteredPreOrdersList.length})</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('challans');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'challans'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Package className="h-4 w-4 text-indigo-500" />
+          <span>📦 চালান ({filteredPurchasesList.length})</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('partial');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'partial'
+              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+          <span>🟡 আংশিক প্রাপ্ত</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('completed');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'completed'
+              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+          <span>🟢 সম্পূর্ণ প্রাপ্ত</span>
+        </button>
+
+        <div className="h-6 w-px bg-slate-300 mx-1 shrink-0"></div>
+
         <button
           onClick={() => {
             setActiveTab('companies');
             setCurrentPage(1);
           }}
-          className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-xs sm:text-sm font-bold transition-all ${
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
             activeTab === 'companies'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              ? 'bg-slate-800 text-white shadow-md'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Building2 className="h-4 w-4 shrink-0" />
-          <span className="truncate">🏢 কোম্পানি খতিয়ান ({filteredCompanySummaries.length})</span>
+          <Building2 className="h-4 w-4 text-slate-500" />
+          <span>🏢 কোম্পানি লেজার</span>
         </button>
 
         <button
@@ -821,1008 +903,873 @@ export function PurchasesPage() {
             setActiveTab('products');
             setCurrentPage(1);
           }}
-          className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-xs sm:text-sm font-bold transition-all ${
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
             activeTab === 'products'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              ? 'bg-slate-800 text-white shadow-md'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Package className="h-4 w-4 shrink-0" />
-          <span className="truncate">📦 পণ্যভিত্তিক হিসাব ({filteredProductSupplies.length})</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('invoices');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-xs sm:text-sm font-bold transition-all ${
-            activeTab === 'invoices'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <FileText className="h-4 w-4 shrink-0" />
-          <span className="truncate">📑 সকল চালান ({filteredPurchases.length})</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('payments');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-xs sm:text-sm font-bold transition-all ${
-            activeTab === 'payments'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Wallet className="h-4 w-4 shrink-0" />
-          <span className="truncate">💳 প্রি-অর্ডার ও পেমেন্ট ({filteredPayments.length})</span>
+          <Layers className="h-4 w-4 text-slate-500" />
+          <span>📊 পণ্যভিত্তিক সরবরাহ</span>
         </button>
       </div>
 
+      {/* ============================================================== */}
+      {/* 📑 MAIN DATA TABLES (EXACT REQUIREMENTS)                       */}
+      {/* ============================================================== */}
       {isLoading ? (
         <LoadingBlock
-          label="কোম্পানি ও সাপ্লাই ডেটা লোড হচ্ছে..."
-          subLabel="অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন, সকল খতিয়ান ও চালানের হিসাব প্রস্তুত করা হচ্ছে..."
+          label="ক্রয় ও চালানের তথ্য লোড হচ্ছে..."
+          subLabel="অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন, সকল খতিয়ান ও স্টক রিকনসিলিয়েশন প্রস্তুত হচ্ছে..."
         />
       ) : (
         <>
-          {/* TAB 1: 🏢 COMPANY BALANCES & PAYABLES */}
+          {/* TAB 1: ALL / CHALLANS / PARTIAL / COMPLETED PURCHASES TABLE */}
+          {(activeTab === 'all' || activeTab === 'challans' || activeTab === 'partial' || activeTab === 'completed') && (
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                    <thead className="bg-slate-50/80 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="py-3.5 px-4 text-left">তারিখ (Date)</th>
+                        <th className="py-3.5 px-4 text-left">সরবরাহকারী (Supplier)</th>
+                        <th className="py-3.5 px-4 text-left">ড্রাফট / চালান নং</th>
+                        <th className="py-3.5 px-4 text-right">অর্ডার মূল্য (Order Value)</th>
+                        <th className="py-3.5 px-4 text-right">প্রাপ্ত মূল্য (Received Value)</th>
+                        <th className="py-3.5 px-4 text-right">অবশিষ্ট অগ্রিম (Advance Remaining)</th>
+                        <th className="py-3.5 px-4 text-center">স্ট্যাটাস (Status)</th>
+                        <th className="py-3.5 px-4 text-center">অ্যাকশন (Actions)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {filteredPurchasesList.map((p) => {
+                        const totalReceived = toNumber(p.totalAmount);
+                        const totalPaid = toNumber(p.paidAmount);
+                        const advanceRemaining = Math.max(0, totalPaid - totalReceived);
+                        const dueRemaining = Math.max(0, totalReceived - totalPaid);
+                        const isConfirmed = p.status === 'CONFIRMED';
+                        const isFullyReceived = Math.abs(totalReceived - totalPaid) < 0.01 && totalReceived > 0;
+
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                            {/* Date */}
+                            <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
+                              {formatDate(p.purchaseDate)}
+                              <div className="text-[10px] text-slate-400 font-normal">
+                                {formatDateTime(p.createdAt)}
+                              </div>
+                            </td>
+
+                            {/* Supplier */}
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-slate-900">
+                                {p.company?.name || p.supplierName || 'কোম্পানি'}
+                              </div>
+                              {p.company?.phone && (
+                                <div className="text-[11px] text-slate-400">
+                                  📞 {p.company.phone}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Draft / Challan No */}
+                            <td className="py-3.5 px-4">
+                              <span className="font-mono font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md">
+                                #{p.invoiceNo || p.referenceNo || p.id}
+                              </span>
+                              {p.supplierInvoiceNo && (
+                                <div className="text-[10px] text-slate-500 mt-0.5">
+                                  ইনভয়েস: {p.supplierInvoiceNo}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Order Value */}
+                            <td className="py-3.5 px-4 text-right font-bold text-slate-700 whitespace-nowrap">
+                              {formatCurrency(totalPaid > 0 ? totalPaid : totalReceived)}
+                            </td>
+
+                            {/* Received Value */}
+                            <td className="py-3.5 px-4 text-right font-black text-indigo-950 whitespace-nowrap">
+                              {formatCurrency(totalReceived)}
+                            </td>
+
+                            {/* Advance Remaining */}
+                            <td className="py-3.5 px-4 text-right font-black whitespace-nowrap">
+                              {advanceRemaining > 0 ? (
+                                <span className="text-sky-700 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200">
+                                  {formatCurrency(advanceRemaining)}
+                                </span>
+                              ) : dueRemaining > 0 ? (
+                                <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
+                                  বাকি: {formatCurrency(dueRemaining)}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-700 font-bold">৳০.০০</span>
+                              )}
+                            </td>
+
+                            {/* Receiving Status */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              {isFullyReceived || (isConfirmed && advanceRemaining === 0) ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
+                                  <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                  <span>🟢 সম্পূর্ণ প্রাপ্ত</span>
+                                </span>
+                              ) : advanceRemaining > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-200">
+                                  <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                                  <span>🟡 আংশিক প্রাপ্ত</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                                  <span>স্টক ইন সম্পন্ন</span>
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <Link
+                                  href={`/purchases/${p.id}`}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 transition-colors"
+                                  title="চালানের বিবরণ দেখুন"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  <span>👁️ দেখুন</span>
+                                </Link>
+
+                                <Link
+                                  href={`/purchases/${p.id}/print-challan`}
+                                  target="_blank"
+                                  className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:scale-105"
+                                  title="A4 চালান ভাউচার প্রিন্ট করুন"
+                                >
+                                  <Printer className="h-3.5 w-3.5" />
+                                  <span>🖨️ প্রিন্ট</span>
+                                </Link>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePurchase(p.id)}
+                                  className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                  title="চালান মুছুন"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredPurchasesList.length === 0 && (
+                  <div className="p-12 text-center">
+                    <StateMessage
+                      title="কোন চালান পাওয়া যায়নি"
+                      description="উপরে '📦 চালান ইন ও স্টক ইন' বাটনে ক্লিক করে নতুন চালান যুক্ত করুন।"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: 🏦 PRE-ORDERS / BANK DRAFTS LIST */}
+          {activeTab === 'preorders' && (
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                    <thead className="bg-slate-50/80 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                      <tr>
+                        <th className="py-3.5 px-4 text-left">তারিখ (Date)</th>
+                        <th className="py-3.5 px-4 text-left">কোম্পানি / সরবরাহকারী</th>
+                        <th className="py-3.5 px-4 text-left">ড্রাফট নং ও মেথড</th>
+                        <th className="py-3.5 px-4 text-left">ব্যাংক ও শাখা</th>
+                        <th className="py-3.5 px-4 text-center">প্রি-অর্ডার পণ্য সংখ্যা</th>
+                        <th className="py-3.5 px-4 text-right">পরিশোধিত টাকা (৳)</th>
+                        <th className="py-3.5 px-4 text-center">অ্যাকশন</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {filteredPreOrdersList.map((pay) => {
+                        const breakdown = Array.isArray(pay.productBreakdown)
+                          ? pay.productBreakdown
+                          : typeof pay.productBreakdown === 'string'
+                          ? JSON.parse(pay.productBreakdown || '[]')
+                          : [];
+
+                        return (
+                          <tr key={pay.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
+                              {formatDate(pay.paymentDate)}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-slate-900">{pay.company?.name || 'কোম্পানি'}</div>
+                              {pay.company?.phone && (
+                                <div className="text-[11px] text-slate-400">📞 {pay.company.phone}</div>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-mono font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md">
+                                {pay.transactionRef || `BD-${pay.id}`}
+                              </span>
+                              <div className="text-[10px] text-slate-500 mt-0.5 uppercase font-semibold">
+                                {pay.paymentMethod || 'BANK DRAFT'}
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-semibold text-slate-800">
+                                {pay.bankName || 'সোনালী ব্যাংক / সাধারণ'}
+                              </div>
+                              {pay.branchName && (
+                                <div className="text-[11px] text-slate-500">শাখা: {pay.branchName}</div>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
+                                <Package className="h-3 w-3" />
+                                <span>{breakdown.length > 0 ? `${breakdown.length} টি পণ্য` : 'জেনারেল ড্রাফট'}</span>
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-black text-emerald-600 text-sm whitespace-nowrap">
+                              {formatCurrency(pay.amount)}
+                            </td>
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-2">
+                                <Link
+                                  href={`/purchases/create?paymentId=${pay.id}&companyId=${pay.companyId}`}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:scale-105"
+                                >
+                                  <Package className="h-3.5 w-3.5" />
+                                  <span>📦 চালান ইন করুন</span>
+                                </Link>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePayment(pay.id)}
+                                  className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                  title="ড্রাফট মুছুন"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredPreOrdersList.length === 0 && (
+                  <div className="p-12 text-center">
+                    <StateMessage
+                      title="কোন অগ্রিম ব্যাংক ড্রাফট বা প্রি-অর্ডার পাওয়া যায়নি"
+                      description="উপরে '🏦 ব্যাংক ড্রাফট / টাকা পরিশোধ' বাটনে ক্লিক করে নতুন ড্রাফট তৈরি করুন।"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: 🏢 COMPANY LEDGER & PAYABLE SUMMARY */}
           {activeTab === 'companies' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar">
-                <button
-                  onClick={() => { setCompanyStatusFilter('all'); setCurrentPage(1); }}
-                  className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                >
-                  সব কোম্পানি ({payableSummary.length})
-                </button>
-                <button
-                  onClick={() => { setCompanyStatusFilter('payable'); setCurrentPage(1); }}
-                  className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'payable' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'}`}
-                >
-                  ⚠️ কোম্পানির পাওনা বাকি ({payableSummary.filter((c) => toNumber(c.totalPayableAmount ?? c.totalPayable) > 0).length})
-                </button>
-                <button
-                  onClick={() => { setCompanyStatusFilter('advance'); setCurrentPage(1); }}
-                  className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'advance' ? 'bg-sky-600 text-white' : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200'}`}
-                >
-                  💎 আমাদের অগ্রিম জমা ({payableSummary.filter((c) => toNumber(c.advanceAmount ?? c.advanceBalance) > 0).length})
-                </button>
-                <button
-                  onClick={() => { setCompanyStatusFilter('settled'); setCurrentPage(1); }}
-                  className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'settled' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
-                >
-                  ✅ সম্পূর্ণ পরিশোধ ({payableSummary.filter((c) => toNumber(c.totalPayableAmount ?? c.totalPayable) <= 0 && toNumber(c.advanceAmount ?? c.advanceBalance) <= 0).length})
-                </button>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {payableSummary.map((c) => {
+                const payable = toNumber(c.totalPayableAmount ?? c.totalPayable);
+                const advance = toNumber(c.advanceAmount ?? c.advanceBalance);
+                const totalGoods = toNumber(c.totalPurchaseAmount ?? c.totalAmount);
+                const totalPaid = toNumber(c.totalPaidAmount ?? c.totalPaid);
 
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
-                {(paginatedData as CompanyWisePayableSummary[]).map((c) => {
-                  const totalPurchases = toNumber(c.totalPurchaseAmount ?? c.totalAmount);
-                  const totalPaid = toNumber(c.totalPaidAmount ?? c.totalPaid);
-                  const payable = toNumber(c.totalPayableAmount ?? c.totalPayable);
-                  const advance = toNumber(c.advanceAmount ?? c.advanceBalance);
-                  const isAdvance = advance > 0;
-                  const hasDue = payable > 0;
-
-                  return (
-                    <div
-                      key={c.companyId}
-                      className={`group flex flex-col justify-between rounded-2xl border bg-white p-5 shadow-sm transition-all hover:shadow-md ${isAdvance ? 'border-sky-200 hover:border-sky-400' : hasDue ? 'border-rose-200 hover:border-rose-400' : 'border-slate-200 hover:border-emerald-300'}`}
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                              {c.companyName}
-                            </h3>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              {c.phone || c.companyCode || 'সাপ্লাইয়ার কোম্পানি'}
-                            </p>
-                          </div>
-                          {isAdvance ? (
-                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold bg-sky-100 text-sky-800 border border-sky-300">
-                              💎 অগ্রিম জমা আছে
-                            </span>
-                          ) : hasDue ? (
-                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              ⚠️ পাওনা বাকি আছে
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              ✅ সম্পূর্ণ পরিশোধ
-                            </span>
-                          )}
+                return (
+                  <div
+                    key={c.companyId}
+                    className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-black text-slate-900 text-base">{c.companyName}</h3>
+                          <p className="text-xs text-slate-400 font-mono">আইডি: #{c.companyId} {c.companyCode ? `• কোড: ${c.companyCode}` : ''}</p>
                         </div>
-
-                        <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-3 text-center">
-                          <div>
-                            <span className="text-[11px] font-medium text-slate-500">মোট মাল</span>
-                            <p className="text-xs font-bold text-slate-900 mt-0.5">
-                              {formatCurrency(totalPurchases)}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="text-[11px] font-medium text-emerald-600">পরিশোধ</span>
-                            <p className="text-xs font-bold text-emerald-600 mt-0.5">
-                              {formatCurrency(totalPaid)}
-                            </p>
-                          </div>
-                          <div>
-                            {isAdvance ? (
-                              <>
-                                <span className="text-[11px] font-bold text-sky-700">আমরা পাব</span>
-                                <p className="text-xs font-black text-sky-700 mt-0.5">
-                                  {formatCurrency(advance)}
-                                </p>
-                              </>
-                            ) : (
-                              <>
-                                <span className="text-[11px] font-medium text-rose-600">কোম্পানি পাবে</span>
-                                <p className="text-xs font-bold text-rose-600 mt-0.5">
-                                  {formatCurrency(payable)}
-                                </p>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        {isAdvance && (
-                          <div className="mt-2.5 rounded-lg bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700 text-center">
-                            কোম্পানি আমাদের <b>{formatCurrency(advance)}</b> টাকার মাল বা টাকা দেবে
-                          </div>
+                        {advance > 0 ? (
+                          <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 border border-sky-200">
+                            অগ্রিম: {formatCurrency(advance)}
+                          </span>
+                        ) : payable > 0 ? (
+                          <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200">
+                            পাওনা: {formatCurrency(payable)}
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                            ✓ সমতা
+                          </span>
                         )}
+                      </div>
 
-                        <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                          <span>মোট চালান: <b>{c.purchaseCount} টি</b></span>
-                          {c.lastPurchaseDate && (
-                            <span>শেষ চালান: {formatDate(c.lastPurchaseDate)}</span>
-                          )}
+                      <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs">
+                        <div>
+                          <span className="text-slate-400 font-medium">গৃহীত মোট মাল</span>
+                          <p className="font-bold text-slate-800 text-sm mt-0.5">{formatCurrency(totalGoods)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-medium">মোট পরিশোধ</span>
+                          <p className="font-black text-emerald-600 text-sm mt-0.5">{formatCurrency(totalPaid)}</p>
                         </div>
                       </div>
-
-                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
-                        <button
-                          onClick={() => openPaymentModal(c.companyId)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-2 text-xs font-bold transition-colors"
-                        >
-                          <Wallet className="h-3.5 w-3.5" />
-                          <span>টাকা দিন</span>
-                        </button>
-                        <Link
-                          href={`/purchases/companies/${c.companyId}`}
-                          className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 text-xs font-bold transition-colors"
-                        >
-                          <span>খতিয়ান দেখুন</span>
-                          <ArrowUpRight className="h-3.5 w-3.5" />
-                        </Link>
-                      </div>
                     </div>
-                  );
-                })}
-              </div>
 
-              {filteredCompanySummaries.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-                  <StateMessage
-                    title="কোন কোম্পানি পাওয়া যায়নি"
-                    description="সার্চ ফিল্টারের সাথে মিল রেখে কোনো রেকর্ড পাওয়া যায়নি।"
-                  />
-                </div>
-              )}
+                    <div className="flex items-center gap-2 mt-5 pt-3 border-t border-slate-100">
+                      <button
+                        onClick={() => {
+                          const comp = companies.find((x) => x.id === c.companyId);
+                          openBankDraftModal(comp);
+                        }}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-2 text-xs font-bold transition-colors"
+                      >
+                        <Wallet className="h-3.5 w-3.5" />
+                        <span>ড্রাফট দিন</span>
+                      </button>
+
+                      <Link
+                        href={`/purchases/create?companyId=${c.companyId}`}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 text-xs font-bold transition-colors"
+                      >
+                        <Package className="h-3.5 w-3.5" />
+                        <span>চালান ইন</span>
+                      </Link>
+
+                      <Link
+                        href={`/purchases/companies/${c.companyId}`}
+                        className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                        title="পূর্ণ লেজার দেখুন"
+                      >
+                        <ArrowUpRight className="h-4 w-4" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {/* TAB 2: 📦 PRODUCT-WISE SUPPLIES BREAKDOWN */}
+          {/* TAB 4: 📊 PRODUCT-WISE SUPPLIES */}
           {activeTab === 'products' && (
-            <div className="space-y-4">
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-600">
-                      <tr>
-                        <th className="px-5 py-3.5 text-left">প্রোডাক্টের নাম</th>
-                        <th className="px-5 py-3.5 text-left">কোম্পানি</th>
-                        <th className="px-5 py-3.5 text-right">মোট প্রাপ্ত সংখ্যা</th>
-                        <th className="px-5 py-3.5 text-right">মোট মালের মূল্য (টাকা)</th>
-                        <th className="px-5 py-3.5 text-right">গড় ক্রয় রেট</th>
-                        <th className="px-5 py-3.5 text-right">বর্তমান স্টক</th>
-                        <th className="px-5 py-3.5 text-center">চালান সংখ্যা</th>
-                        <th className="px-5 py-3.5 text-center">শেষ আসার তারিখ</th>
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
+                  <thead className="bg-slate-50/80 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-3.5 px-4 text-left">পণ্য ও কোড (Product)</th>
+                      <th className="py-3.5 px-4 text-left">সরবরাহকারী কোম্পানি</th>
+                      <th className="py-3.5 px-4 text-right">মোট প্রাপ্ত সংখ্যা</th>
+                      <th className="py-3.5 px-4 text-right">মোট গৃহীত মূল্য (৳)</th>
+                      <th className="py-3.5 px-4 text-right">গড় ক্রয় দর (৳)</th>
+                      <th className="py-3.5 px-4 text-right">বর্তমান স্টক</th>
+                      <th className="py-3.5 px-4 text-center">চালান সংখ্যা</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {productSupplies.map((p) => (
+                      <tr key={p.productId} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900">{p.productName}</div>
+                          <div className="text-[11px] text-slate-400">#{p.productId} • {p.unit || 'Pcs'}</div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                            🏢 {p.companyName}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-black text-slate-900">
+                          {p.totalQuantityReceived ?? p.totalQuantity} {p.unit}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-black text-indigo-950">
+                          {formatCurrency(p.totalCostValue ?? p.totalCost ?? 0)}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-semibold text-slate-700">
+                          ৳{p.avgUnitCost || p.latestBuyPrice || 0}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-black text-emerald-600">
+                          {p.currentStock || 0} {p.unit}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                            {p.purchaseCount} বার
+                          </span>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {(paginatedData as ProductSupplySummary[]).map((p) => (
-                        <tr key={p.productId} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-5 py-3.5">
-                            <div className="font-bold text-slate-900">{p.productName}</div>
-                            <div className="text-xs text-slate-500">#{p.productId} • ইউনিট: {p.unit}</div>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
-                              <Building2 className="h-3 w-3" />
-                              {p.companyName}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-right font-black text-slate-900">
-                            {p.totalQuantityReceived ?? p.totalQuantity} {p.unit}
-                          </td>
-                          <td className="px-5 py-3.5 text-right font-black text-indigo-700">
-                            {formatCurrency(p.totalCostValue ?? p.totalCost ?? 0)}
-                          </td>
-                          <td className="px-5 py-3.5 text-right text-slate-600 font-medium">
-                            ৳{p.avgUnitCost || p.latestBuyPrice || 0}
-                          </td>
-                          <td className="px-5 py-3.5 text-right font-bold text-emerald-600">
-                            {p.currentStock || 0} {p.unit}
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-bold text-slate-700">
-                              {p.purchaseCount} বার
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-center text-xs text-slate-500">
-                            {p.lastPurchaseDate ? formatDate(p.lastPurchaseDate) : '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              {filteredProductSupplies.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-                  <StateMessage
-                    title="কোন প্রোডাক্টের সাপ্লাই রেকর্ড নেই"
-                    description="কোম্পানি থেকে চালানের মাধ্যমে মাল স্টক ইন করলে এখানে প্রোডাক্টভিত্তিক তালিকা দেখতে পাবেন।"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 3: 📑 ALL PURCHASE INVOICES */}
-          {activeTab === 'invoices' && (
-            <div className="space-y-4">
-              <div className="space-y-3">
-                {(paginatedData as Purchase[]).map((purchase) => {
-                  const isPayable = toNumber(purchase.payableAmount ?? purchase.dueAmount) > 0;
-                  const isExpanded = expandedInvoiceId === purchase.id;
-                  const isConfirmed = purchase.status === 'CONFIRMED';
-
-                  return (
-                    <div
-                      key={purchase.id}
-                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all"
-                    >
-                      <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                          <button
-                            onClick={() => setExpandedInvoiceId(isExpanded ? null : purchase.id)}
-                            className="mt-1 rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200 transition-colors"
-                          >
-                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </button>
-
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-black text-slate-900 text-base">
-                                #{purchase.invoiceNo || purchase.referenceNo || `PUR-${purchase.id}`}
-                              </span>
-                              <span
-                                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                                  isConfirmed
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                }`}
-                              >
-                                {isConfirmed ? '✅ স্টক ইন সম্পন্ন' : '⏳ ড্রাফট (Draft)'}
-                              </span>
-                              <span
-                                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                  isPayable
-                                    ? 'bg-rose-50 text-rose-700'
-                                    : 'bg-slate-100 text-slate-600'
-                                }`}
-                              >
-                                {isPayable ? `বাকি: ${formatCurrency(purchase.payableAmount ?? purchase.dueAmount)}` : 'পরিশোধিত'}
-                              </span>
-                            </div>
-
-                            <p className="mt-1 text-xs text-slate-500">
-                              কোম্পানি: <b className="text-slate-800">{purchase.company?.name || 'Unknown'}</b> • তারিখ:{' '}
-                              {formatDate(purchase.purchaseDate)}
-                              {purchase.supplierName ? ` • সরবরাহকারী: ${purchase.supplierName}` : ''}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-4 lg:justify-end">
-                          <div className="text-left lg:text-right">
-                            <span className="text-xs text-slate-500 font-medium">মোট চালানের মূল্য</span>
-                            <p className="text-base font-black text-slate-900">
-                              {formatCurrency(purchase.totalAmount)}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {!isConfirmed && (
-                              <button
-                                onClick={() => handleConfirmPurchase(purchase.id)}
-                                disabled={confirmingId === purchase.id}
-                                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-50"
-                              >
-                                {confirmingId === purchase.id ? 'স্টক ইন হচ্ছে...' : 'স্টক ইন নিশ্চিত করুন'}
-                              </button>
-                            )}
-
-                            {isPayable && (
-                              <button
-                                onClick={() => {
-                                  setPaymentCompanyId(purchase.companyId);
-                                  setPaymentAmount(String(toNumber(purchase.payableAmount ?? purchase.dueAmount)));
-                                  setPaymentNote(`Payment for Invoice #${purchase.invoiceNo}`);
-                                  setIsPaymentModalOpen(true);
-                                }}
-                                className="rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3.5 py-2 text-xs font-bold transition-all"
-                              >
-                                টাকা দিন
-                              </button>
-                            )}
-
-                            <Link
-                              href={`/purchases/${purchase.id}/print-challan`}
-                              target="_blank"
-                              className="rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
-                              title="চালান ও ব্যাংক ড্রাফট সমন্বয় ভাউচার প্রিন্ট করুন"
-                            >
-                              <Printer className="h-3.5 w-3.5" />
-                              <span>প্রিন্ট</span>
-                            </Link>
-
-                            <Link
-                              href={`/purchases/companies/${purchase.companyId}`}
-                              className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 p-2 text-xs font-bold transition-colors"
-                              title="কোম্পানি লেজার দেখুন"
-                            >
-                              <ArrowUpRight className="h-4 w-4" />
-                            </Link>
-
-                            <button
-                              onClick={() => handleDeletePurchase(purchase.id)}
-                              className="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 p-2 text-xs font-bold transition-colors"
-                              title="চালানটি মুছুন"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Expandable Items Table */}
-                      {isExpanded && (
-                        <div className="border-t border-slate-100 bg-slate-50/50 p-4">
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                            চালানে থাকা প্রোডাক্টের তালিকা:
-                          </h4>
-                          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                            <table className="min-w-full divide-y divide-slate-100 text-xs">
-                              <thead className="bg-slate-50 text-slate-600 font-semibold">
-                                <tr>
-                                  <th className="px-4 py-2 text-left">প্রোডাক্ট</th>
-                                  <th className="px-4 py-2 text-right">পরিমাণ</th>
-                                  <th className="px-4 py-2 text-right">ক্রয় রেট</th>
-                                  <th className="px-4 py-2 text-right">মোট টাকা</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {(purchase.items || []).map((item, idx) => (
-                                  <tr key={idx}>
-                                    <td className="px-4 py-2 font-medium text-slate-900">
-                                      {item.product?.name || item.productName || `Product #${item.productId}`}
-                                    </td>
-                                    <td className="px-4 py-2 text-right font-bold text-slate-800">
-                                      {item.quantity} {item.unit || item.product?.unit || 'Pcs'}
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-slate-600">
-                                      {formatCurrency(item.unitCost ?? item.unitPrice)}
-                                    </td>
-                                    <td className="px-4 py-2 text-right font-black text-indigo-600">
-                                      {formatCurrency(item.lineTotal)}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                          {purchase.note && (
-                            <p className="mt-2 text-xs text-slate-500 italic">
-                              নোট: {purchase.note}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {filteredPurchases.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-                  <StateMessage
-                    title="কোন চালান পাওয়া যায়নি"
-                    description="নতুন মাল পৌঁছালে উপরের '+ নতুন চালান' বাটনে ক্লিক করে এন্ট্রি দিন।"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 4: 💳 PAYMENT HISTORY */}
-          {activeTab === 'payments' && (
-            <div className="space-y-4">
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-600">
-                      <tr>
-                        <th className="px-5 py-3.5 text-left">পরিশোধের তারিখ</th>
-                        <th className="px-5 py-3.5 text-left">কোম্পানির নাম</th>
-                        <th className="px-5 py-3.5 text-right">পরিশোধিত টাকা</th>
-                        <th className="px-5 py-3.5 text-center">মেথড</th>
-                        <th className="px-5 py-3.5 text-left">রেফারেন্স / স্লিপ</th>
-                        <th className="px-5 py-3.5 text-left">নোট / পণ্যের বিবরণ</th>
-                        <th className="px-5 py-3.5 text-center">এন্ট্রি কারী</th>
-                        <th className="px-5 py-3.5 text-center">অ্যাকশন</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {(paginatedData as PurchasePayment[]).map((pay) => (
-                        <tr key={pay.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-5 py-3.5 font-medium text-slate-900">
-                            <div>{formatDate(pay.paymentDate)}</div>
-                            {pay.createdAt && (
-                              <div className="text-[10px] text-slate-400 font-mono">
-                                {new Date(pay.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <div className="font-bold text-slate-900">
-                              {pay.company?.name || `Company #${pay.companyId}`}
-                            </div>
-                            {pay.company?.code && (
-                              <div className="text-[11px] text-slate-400 font-mono">
-                                কোড: {pay.company.code}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5 text-right font-black text-emerald-600">
-                            {formatCurrency(pay.amount)}
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                              {pay.paymentMethod || 'CASH'}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-slate-600 text-xs font-mono">
-                            {pay.transactionRef || '-'}
-                          </td>
-                          <td className="px-5 py-3.5 text-slate-700 text-xs max-w-xs">
-                            {pay.note || '-'}
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                              <User className="h-3 w-3 text-slate-400" />
-                              <span>{pay.createdByName || 'Admin'}</span>
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <Link
-                                href={`/purchases/create?companyId=${pay.companyId}&paymentId=${pay.id}`}
-                                className="inline-flex items-center gap-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 text-xs font-bold transition-all"
-                                title="এই পেমেন্টের মাল রিসিভ ও চালান স্টক ইন করুন"
-                              >
-                                <Package className="h-3.5 w-3.5" />
-                                <span>চালান ইন</span>
-                              </Link>
-                              <button
-                                onClick={() => handleDeletePayment(pay.id)}
-                                className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
-                                title="পেমেন্ট হিস্ট্রি মুছুন"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {filteredPayments.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-                  <StateMessage
-                    title="কোন পেমেন্টের হিসাব নেই"
-                    description="কোম্পানিকে টাকা দেওয়ার পর 'কোম্পানিকে টাকা দিন' বাটনে চাপ দিয়ে হিসাব সেভ করুন।"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 📄 Pagination */}
-          {totalCurrentTabItems > pageSize && (
-            <div className="mt-6">
-              <Pagination
-                currentPage={currentPage}
-                totalItems={totalCurrentTabItems}
-                pageSize={pageSize}
-                onPageChange={setCurrentPage}
-              />
             </div>
           )}
         </>
       )}
 
-      {/* 💳 RECORD PAYMENT MODAL */}
-      {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="relative w-full max-w-4xl lg:max-w-5xl my-4 sm:my-6 rounded-3xl bg-white p-5 sm:p-7 shadow-2xl border border-slate-100 max-h-[92vh] flex flex-col">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
-                  <Wallet className="h-5 w-5" />
+      {/* ============================================================== */}
+      {/* 3. BUTTON 1 MODAL: BANK DRAFT / ADVANCE PAYMENT & PRE-ORDER     */}
+      {/* ============================================================== */}
+      {isBankDraftModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+          <div className="relative w-full max-w-4xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl max-h-[92vh] overflow-y-auto border border-slate-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
+                  <Wallet className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">🏦 কোম্পানিকে ব্যাংক ড্রাফট / অগ্রিম টাকা পরিশোধ ও পণ্যের অর্ডার</h3>
-                  <p className="text-xs text-slate-500">কোম্পানিকে ব্যাংক ড্রাফট বা অগ্রিম টাকা প্রদানের সময় কোন কোন পণ্যের কত কোয়ান্টিটি অর্ডার দিচ্ছেন তা যুক্ত করুন। পরবর্তীতে চালান আসার সময় এই ড্রাফট সিলেক্ট করলেই সব পণ্য স্বয়ংক্রিয়ভাবে লোড হবে।</p>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                    🏦 ব্যাংক ড্রাফট / টাকা পরিশোধ (অগ্রিম অর্ডার)
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    কোম্পানিকে অগ্রিম ব্যাংক ড্রাফট প্রদান এবং পণ্যের প্রি-অর্ডার তালিকা সংরক্ষণ
+                  </p>
                 </div>
               </div>
               <button
-                onClick={() => setIsPaymentModalOpen(false)}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                type="button"
+                onClick={() => setIsBankDraftModalOpen(false)}
+                className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSavePayment} className="mt-5 space-y-4 overflow-y-auto pr-1 flex-1">
-              {/* Company Selection */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  কোম্পানি সিলেক্ট করুন *
-                </label>
-                <select
-                  value={paymentCompanyId ?? ''}
-                  onChange={(e) => {
-                    const id = Number(e.target.value);
-                    setPaymentCompanyId(id);
-                    const match = payableSummary.find((s) => s.companyId === id);
-                    if (match && toNumber(match.totalPayableAmount ?? match.totalPayable) > 0) {
-                      setPaymentAmount(String(toNumber(match.totalPayableAmount ?? match.totalPayable)));
-                    }
-                  }}
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
-                >
-                  <option value="">-- কোম্পানি সিলেক্ট করুন --</option>
-                  {companies.map((c) => {
-                    const match = payableSummary.find((s) => s.companyId === c.id);
-                    const due = toNumber(match?.totalPayableAmount ?? match?.totalPayable);
-                    const adv = toNumber(match?.advanceAmount ?? match?.advanceBalance);
-                    return (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {adv > 0 ? `(💎 অগ্রিম জমা: ৳${adv})` : due > 0 ? `(⚠️ বাকি: ৳${due})` : '(বাকি নেই)'}
-                      </option>
-                    );
-                  })}
-                </select>
-                {(() => {
-                  const compSummary = payableSummary.find((s) => s.companyId === paymentCompanyId);
-                  if (!compSummary) return null;
-                  const due = toNumber(compSummary.totalPayableAmount ?? compSummary.totalPayable);
-                  const adv = toNumber(compSummary.advanceAmount ?? compSummary.advanceBalance);
-                  return (
-                    <div className="mt-2 flex items-center gap-3 text-xs font-semibold">
-                      {due > 0 ? (
-                        <span className="text-rose-600 font-bold bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100">
-                          ⚠️ বর্তমান বকেয়া পাওনা: {formatCurrency(due)}
-                        </span>
-                      ) : adv > 0 ? (
-                        <span className="text-sky-700 font-bold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
-                          💎 আমাদের অগ্রিম জমা: {formatCurrency(adv)}
-                        </span>
-                      ) : (
-                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
-                          ✅ কোনো বাকি বা অগ্রিম নেই
-                        </span>
-                      )}
+            <form onSubmit={handleSubmitBankDraft} className="space-y-6">
+              {/* SECTION A — Supplier Information (🏢 সরবরাহকারী তথ্য) */}
+              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
+                  <Building2 className="h-4 w-4 text-indigo-600" />
+                  <span>SECTION A: 🏢 সরবরাহকারী তথ্য (Supplier Information)</span>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    সরবরাহকারী / কোম্পানি নির্বাচন করুন *
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={supplierSearch}
+                      onChange={(e) => {
+                        setSupplierSearch(e.target.value);
+                        setShowSupplierDropdown(true);
+                      }}
+                      onFocus={() => setShowSupplierDropdown(true)}
+                      placeholder="কোম্পানি বা সরবরাহকারীর নাম লিখে খুঁজুন..."
+                      className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
+                    />
+                  </div>
+
+                  {showSupplierDropdown && (
+                    <div className="absolute left-0 top-full z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl ring-1 ring-black/5">
+                      {companies
+                        .filter((c) => !supplierSearch || c.name.toLowerCase().includes(supplierSearch.toLowerCase()))
+                        .map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => handleSelectSupplier(c)}
+                            className="w-full flex items-center justify-between rounded-xl p-2.5 text-left text-xs sm:text-sm hover:bg-slate-50 transition-colors font-medium text-slate-800"
+                          >
+                            <div>
+                              <div className="font-bold text-slate-900">{c.name}</div>
+                              <div className="text-xs text-slate-400">আইডি: SUP-{c.id} • ফোন: {c.phone || 'N/A'}</div>
+                            </div>
+                            <span className="rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600">
+                              সিলেক্ট
+                            </span>
+                          </button>
+                        ))}
                     </div>
-                  );
-                })()}
+                  )}
+                </div>
+
+                {/* Compact Supplier Summary Card */}
+                {selectedSupplier && (
+                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-indigo-950 text-sm">{selectedSupplier.name}</span>
+                        <span className="rounded-md bg-indigo-200/60 text-indigo-900 px-2 py-0.5 font-mono font-bold text-[11px]">
+                          SUP-{selectedSupplier.id}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-slate-600 flex-wrap">
+                        {selectedSupplier.phone && <span>📞 {selectedSupplier.phone}</span>}
+                        {selectedSupplier.address && <span>📍 {selectedSupplier.address}</span>}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSupplier(null);
+                        setSupplierSearch('');
+                      }}
+                      className="text-indigo-600 hover:text-indigo-800 font-bold self-start sm:self-auto"
+                    >
+                      পরিবর্তন করুন
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* 📦 MULTI-PRODUCT ALLOCATION (PERMANENTLY OPEN & DIRECT) */}
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3 sm:p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-indigo-600" />
-                    <span className="text-xs font-bold text-slate-800">
-                      📦 অর্ডারকৃত পণ্যের তালিকা (Products to Pre-Order):
-                    </span>
+              {/* SECTION B — Payment Information (🏦 পেমেন্ট তথ্য) */}
+              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
+                  <Landmark className="h-4 w-4 text-indigo-600" />
+                  <span>SECTION B: 🏦 পেমেন্ট তথ্য (Payment Information)</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      পেমেন্ট মেথড *
+                    </label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e: any) => setPaymentMethod(e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
+                    >
+                      <option value="BANK">🏦 Bank Draft (Default)</option>
+                      <option value="CHEQUE">📝 Cheque</option>
+                      <option value="TRANSFER">💳 Bank Transfer</option>
+                      <option value="CASH">💵 Cash</option>
+                    </select>
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      ড্রাফট / রেফারেন্স নং *
+                    </label>
+                    <input
+                      type="text"
+                      value={draftRefNo}
+                      onChange={(e) => setDraftRefNo(e.target.value)}
+                      placeholder="যেমন: BD-10025"
+                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none shadow-sm font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      ব্যাংকের নাম
+                    </label>
+                    <input
+                      type="text"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      placeholder="যেমন: Sonali Bank"
+                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      শাখার নাম (Branch)
+                    </label>
+                    <input
+                      type="text"
+                      value={branchName}
+                      onChange={(e) => setBranchName(e.target.value)}
+                      placeholder="যেমন: Gazipur Branch"
+                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      ড্রাফটের তারিখ *
+                    </label>
+                    <input
+                      type="date"
+                      value={draftDate}
+                      onChange={(e) => setDraftDate(e.target.value)}
+                      required
+                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      ড্রাফটের মোট টাকা (Draft Amount ৳) *
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="1"
+                      value={draftAmount}
+                      onChange={(e) => setDraftAmount(e.target.value)}
+                      required
+                      placeholder="যেমন: 100000"
+                      className="w-full rounded-2xl border border-emerald-300 bg-emerald-50/60 p-3 text-sm font-black text-emerald-900 focus:border-emerald-500 focus:bg-white focus:outline-none shadow-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION C — PRE-ORDER PRODUCTS (📦 প্রি-অর্ডার পণ্য) */}
+              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
+                    <Package className="h-4 w-4 text-indigo-600" />
+                    <span>SECTION C: 📦 প্রি-অর্ডার পণ্য (Pre-Order Products)</span>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={handleAddProductRow}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95"
+                    onClick={handleAddPreOrderRow}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-md transition-all hover:scale-105 active:scale-95"
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>+ অর্ডারে প্রোডাক্ট যোগ করুন</span>
+                    <Plus className="h-4 w-4" />
+                    <span>+ পণ্য যোগ করুন</span>
                   </button>
                 </div>
 
-                {/* Column Headers for desktop */}
-                {productPaymentRows.length > 0 && (
-                  <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-3 pb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <div className="sm:col-span-4">প্রোডাক্ট সিলেক্ট / সার্চ</div>
-                    <div className="sm:col-span-2">ক্রয় দর (৳)</div>
-                    <div className="sm:col-span-2">পরিমাণ</div>
-                    <div className="sm:col-span-2 text-emerald-700">মোট টাকা (৳) *</div>
-                    <div className="sm:col-span-2">নোট (ঐচ্ছিক)</div>
-                  </div>
-                )}
-
-                <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
-                  {productPaymentRows.map((row, idx) => (
+                {/* Pre-Order Product Table */}
+                <div className="space-y-3">
+                  {preOrderItems.map((row, idx) => (
                     <div
                       key={idx}
-                      className="flex flex-col sm:grid sm:grid-cols-12 items-stretch sm:items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:border-indigo-200 transition-colors"
+                      className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm items-center"
                     >
-                      {/* Searchable Product Input */}
-                      <div className="relative sm:col-span-4 w-full">
-                        <div className="relative">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            placeholder="প্রোডাক্ট খুঁজুন বা নাম লিখুন..."
-                            value={
-                              row.searchText !== undefined
-                                ? row.searchText
-                                : row.productName
-                                ? `${row.productName}${row.unit ? ` (${row.unit})` : ''}`
-                                : ''
-                            }
-                            onFocus={() => {
-                              handleUpdateProductRow(idx, 'showResults', true);
-                            }}
-                            onBlur={() => {
-                              setTimeout(() => {
-                                setProductPaymentRows((prev) => {
-                                  const updated = [...prev];
-                                  if (updated[idx]) {
-                                    updated[idx] = { ...updated[idx], showResults: false };
-                                  }
-                                  return updated;
-                                });
-                              }, 250);
-                            }}
-                            onChange={(e) => {
-                              handleUpdateProductRow(idx, 'searchText', e.target.value);
-                            }}
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-7 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                          />
-                          {(row.searchText || row.productId || row.productName) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setProductPaymentRows((prev) => {
-                                  const updated = [...prev];
-                                  updated[idx] = {
-                                    ...updated[idx],
-                                    productId: '',
-                                    productName: '',
-                                    unitPrice: '',
-                                    searchText: '',
-                                    showResults: false,
-                                    amount: '',
-                                  };
-                                  return updated;
-                                });
-                              }}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                              title="মুছুন"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
+                      {/* Product Search & Dropdown */}
+                      <div className="relative sm:col-span-4">
+                        <input
+                          type="text"
+                          placeholder="পণ্য সিলেক্ট বা নাম লিখুন..."
+                          value={row.searchText !== undefined ? row.searchText : row.productName}
+                          onFocus={() => handleUpdatePreOrderRow(idx, 'showResults', true)}
+                          onChange={(e) => handleUpdatePreOrderRow(idx, 'searchText', e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                        />
 
-                        {/* Dropdown Options Panel */}
                         {row.showResults && (
-                          <div className="absolute left-0 top-full z-[9999] mt-1 max-h-56 w-full min-w-[280px] sm:min-w-[340px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl ring-1 ring-black/5 animate-fadeIn">
-                            {(() => {
-                              const query = (row.searchText ?? row.productName ?? '').toLowerCase().trim();
-                              const filtered = allProducts.filter((p) => {
-                                if (!query) return true;
-                                const matchName = p.name?.toLowerCase().includes(query);
-                                const matchSku = p.sku?.toLowerCase().includes(query);
-                                const comp = companies.find((c) => c.id === p.companyId);
-                                const matchComp = comp?.name?.toLowerCase().includes(query);
-                                return matchName || matchSku || matchComp;
-                              });
-
-                              if (filtered.length === 0) {
-                                return (
-                                  <div className="p-3 text-center text-xs text-slate-400 font-medium">
-                                    কোনো প্রোডাক্ট খুঁজে পাওয়া যায়নি
+                          <div className="absolute left-0 top-full z-50 mt-1 max-h-52 w-full min-w-[260px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl">
+                            {allProducts
+                              .filter((p) => {
+                                const q = (row.searchText || '').toLowerCase();
+                                return !q || p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q);
+                              })
+                              .map((p) => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleSelectPreOrderProduct(idx, p);
+                                  }}
+                                  className="w-full flex items-center justify-between p-2 text-left text-xs hover:bg-slate-50 rounded-lg"
+                                >
+                                  <div>
+                                    <div className="font-bold text-slate-900">{p.name}</div>
+                                    <div className="text-[10px] text-slate-400">SKU: {p.sku || 'N/A'} • দর: ৳{p.buyPrice || 0}</div>
                                   </div>
-                                );
-                              }
-
-                              return filtered.map((p) => {
-                                const comp = companies.find((c) => c.id === p.companyId);
-                                const isSelected = row.productId === p.id;
-                                return (
-                                  <button
-                                    key={p.id}
-                                    type="button"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      handleSelectProduct(idx, p);
-                                    }}
-                                    className={`w-full flex items-center justify-between gap-2 rounded-lg p-2 text-left text-xs transition-colors ${
-                                      isSelected
-                                        ? 'bg-indigo-50 text-indigo-900 font-bold'
-                                        : 'hover:bg-slate-50 text-slate-700'
-                                    }`}
-                                  >
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-bold text-slate-900 truncate">
-                                        {p.name}
-                                      </div>
-                                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
-                                        {comp && (
-                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold text-[10px]">
-                                            🏢 {comp.name}
-                                          </span>
-                                        )}
-                                        {p.buyPrice ? (
-                                          <span className="text-emerald-700 font-medium">
-                                            ক্রয়: ৳{p.buyPrice}
-                                          </span>
-                                        ) : null}
-                                        {p.currentStock !== undefined && (
-                                          <span className="text-slate-400">
-                                            স্টক: {p.currentStock} {p.unit || 'Pcs'}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                      <span className="inline-block rounded-md bg-indigo-50 hover:bg-indigo-600 hover:text-white px-2 py-1 text-[11px] font-bold text-indigo-700">
-                                        সিলেক্ট
-                                      </span>
-                                    </div>
-                                  </button>
-                                );
-                              });
-                            })()}
+                                  <span className="text-indigo-600 font-bold">সিলেক্ট</span>
+                                </button>
+                              ))}
                           </div>
                         )}
                       </div>
 
-                      {/* Unit Buy Rate (ক্রয় দর ৳) */}
-                      <div className="sm:col-span-2 w-full">
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={row.unitPrice ?? ''}
-                            onChange={(e) => handleUpdateProductRow(idx, 'unitPrice', e.target.value)}
-                            placeholder="দর (৳)"
-                            title="একক ক্রয় দর (প্রতি পিস / ইউনিট)"
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Quantity (পরিমাণ) */}
-                      <div className="sm:col-span-2 w-full">
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={row.quantity || ''}
-                            onChange={(e) => handleUpdateProductRow(idx, 'quantity', e.target.value)}
-                            placeholder="পরিমাণ"
-                            title="পরিমাণ / Quantity"
-                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Total Amount (মোট টাকা ৳) */}
-                      <div className="sm:col-span-2 w-full">
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={row.amount}
-                            onChange={(e) => handleUpdateProductRow(idx, 'amount', e.target.value)}
-                            placeholder="টাকা (BDT) *"
-                            title="মোট টাকা (দর × পরিমাণ)"
-                            className="w-full rounded-lg border border-emerald-300 bg-emerald-50/60 py-1.5 px-2 text-xs font-black text-emerald-800 focus:border-emerald-500 focus:bg-white focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Note & Delete button */}
-                      <div className="sm:col-span-2 flex items-center gap-1.5 w-full">
+                      {/* SKU (Readonly display) */}
+                      <div className="sm:col-span-2">
                         <input
                           type="text"
-                          value={row.note || ''}
-                          onChange={(e) => handleUpdateProductRow(idx, 'note', e.target.value)}
-                          placeholder="নোট (ঐচ্ছিক)"
-                          className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs text-slate-600 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                          readOnly
+                          value={row.sku || '-'}
+                          placeholder="SKU"
+                          className="w-full rounded-xl border border-slate-100 bg-slate-100/60 p-2 text-xs font-mono text-slate-600 text-center"
                         />
+                      </div>
 
+                      {/* Order Quantity */}
+                      <div className="sm:col-span-2">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={row.quantity}
+                          onChange={(e) => handleUpdatePreOrderRow(idx, 'quantity', e.target.value)}
+                          placeholder="পরিমাণ"
+                          title="অর্ডার সংখ্যা"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-800 text-center focus:border-indigo-500 focus:bg-white focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Buy Rate */}
+                      <div className="sm:col-span-2">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={row.unitPrice}
+                          onChange={(e) => handleUpdatePreOrderRow(idx, 'unitPrice', e.target.value)}
+                          placeholder="ক্রয় দর (৳)"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-800 text-right focus:border-indigo-500 focus:bg-white focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Line Total & Remove */}
+                      <div className="sm:col-span-2 flex items-center justify-between gap-2">
+                        <span className="font-black text-emerald-800 text-xs truncate">
+                          {formatCurrency(parseFloat(row.amount) || 0)}
+                        </span>
                         <button
                           type="button"
-                          onClick={() => handleRemoveProductRow(idx)}
-                          className="shrink-0 rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
-                          title="প্রোডাক্ট সারি মুছুন"
+                          onClick={() => handleRemovePreOrderRow(idx)}
+                          className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors shrink-0"
+                          title="সারি মুছুন"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
 
-                  {productPaymentRows.length === 0 && (
-                    <div className="p-3 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-200">
-                      কোনো নির্দিষ্ট প্রোডাক্ট সিলেক্ট করা নেই। প্রোডাক্ট সিলেক্ট করতে উপরে <b className="text-indigo-600">+ প্রোডাক্ট যোগ করুন</b> চাপুন।
-                    </div>
-                  )}
+              {/* SECTION D — PAYMENT SUMMARY (Highlighted Summary Card) */}
+              <div className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-emerald-50 p-5 text-slate-900 shadow-sm">
+                <div className="flex items-center justify-between border-b border-indigo-200/60 pb-3 mb-3">
+                  <span className="text-xs font-black uppercase tracking-wider text-indigo-900">
+                    SECTION D: 💰 পেমেন্ট সামারি (Payment Summary)
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
+                    ● সম্পূর্ণ পরিশোধিত
+                  </span>
                 </div>
 
-                {productPaymentRows.length > 0 && (
-                  <div className="mt-2.5 flex items-center justify-between rounded-xl bg-emerald-50 px-3.5 py-2.5 text-xs font-bold text-emerald-800 border border-emerald-200/60">
-                    <div className="flex items-center gap-3">
-                      <span>
-                        মোট প্রোডাক্ট: <b className="text-sm font-black">{productPaymentRows.filter((r) => r.productId || r.amount || r.searchText).length}</b> টি
-                      </span>
-                      {productPaymentRows.some((r) => r.quantity && parseFloat(r.quantity) > 0) && (
-                        <span className="text-emerald-700">
-                          মোট কোয়ান্টিটি: <b className="text-sm font-black">{productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.quantity || '0') || 0), 0)}</b>
-                        </span>
-                      )}
-                    </div>
-                    <span>
-                      প্রোডাক্টের মোট যোগফল:{' '}
-                      <b className="text-sm font-black text-emerald-900">
-                        {formatCurrency(
-                          productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0),
-                        )}
-                      </b>
-                    </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-500">প্রি-অর্ডার মোট পণ্য:</span>
+                    <p className="text-base font-black text-slate-900 mt-0.5">{preOrderTotalQuantity} Pcs</p>
                   </div>
-                )}
-              </div>
-
-              {/* Amount & Date */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    মোট পরিশোধের পরিমাণ (টাকা) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    required
-                    placeholder="যেমন: 50000"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                  />
-                  {isProductBreakdownMode && (
-                    <p className="mt-1 text-[11px] text-indigo-600 font-medium">
-                      প্রোডাক্টের টাকার যোগফল স্বয়ংক্রিয়ভাবে এখানে হিসাব হচ্ছে।
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    পরিশোধের তারিখ *
-                  </label>
-                  <input
-                    type="date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
-                  />
+                  <div>
+                    <span className="text-slate-500">প্রি-অর্ডার মোট মূল্য:</span>
+                    <p className="text-base font-black text-indigo-950 mt-0.5">{formatCurrency(preOrderTotalAmount)}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">ব্যাংক ড্রাফট টাকা:</span>
+                    <p className="text-base font-black text-emerald-700 mt-0.5">{formatCurrency(effectiveDraftAmountNum)}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">অগ্রিম ব্যালেন্স:</span>
+                    <p className="text-base font-black text-sky-700 mt-0.5">{formatCurrency(draftAdvanceBalance)}</p>
+                  </div>
                 </div>
               </div>
 
-              {/* Method & Ref */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    পেমেন্টের মাধ্যম
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
-                  >
-                    <option value="BANK">🏦 ব্যাংক ড্রাফট / ট্রান্সফার (Bank Draft / Transfer)</option>
-                    <option value="CHEQUE">📝 চেক (Cheque)</option>
-                    <option value="CASH">💵 নগদ ক্যাশ (Cash)</option>
-                    <option value="BKASH">📱 বিকাশ (bKash)</option>
-                    <option value="NAGAD">📱 নগদ (Nagad)</option>
-                    <option value="OTHER">অন্যান্য (Other)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    ড্রাফট / চেক / ট্রানজেকশন নম্বর
-                  </label>
-                  <input
-                    type="text"
-                    value={transactionRef}
-                    onChange={(e) => setTransactionRef(e.target.value)}
-                    placeholder="যেমন: BD-982341 / CHQ-10492"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Note / Description */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  ব্যাংক ড্রাফটের নোট / মন্তব্য
-                </label>
-                <textarea
-                  value={paymentNote}
-                  onChange={(e) => setPaymentNote(e.target.value)}
-                  rows={2}
-                  placeholder="যেমন: ১০ টি পণ্যের অগ্রিম ব্যাংক ড্রাফট বাবদ প্রদান করা হলো..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+              {/* SECTION E — SAVE BUTTONS */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsPaymentModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                  onClick={() => setIsBankDraftModalOpen(false)}
+                  className="rounded-2xl border border-slate-200 px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   বাতিল
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmittingPayment}
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
+                  disabled={isSubmittingDraft}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 px-7 py-3 text-xs sm:text-sm font-black text-white shadow-xl shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                 >
-                  {isSubmittingPayment ? 'সংরক্ষণ হচ্ছে...' : '✅ ব্যাংক ড্রাফট ও প্রি-অর্ডার সংরক্ষণ করুন'}
+                  {isSubmittingDraft ? (
+                    <span>সংরক্ষণ হচ্ছে...</span>
+                  ) : (
+                    <>
+                      <span>💾 অগ্রিম পেমেন্ট ও প্রি-অর্ডার সংরক্ষণ</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 14. SUCCESS DIALOG AFTER SAVING PRE-ORDER / BANK DRAFT         */}
+      {/* ============================================================== */}
+      {savedDraftResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-slate-100 text-center space-y-5">
+            <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle className="h-9 w-9" />
+            </div>
+
+            <div>
+              <h3 className="text-xl font-black text-slate-900">✅ প্রি-অর্ডার সফলভাবে সংরক্ষণ হয়েছে</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                ব্যাংক ড্রাফট এবং প্রি-অর্ডারকৃত পণ্যের তালিকা সিস্টেমে রেকর্ড করা হয়েছে।
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-xs space-y-2 text-left">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Draft:</span>
+                <span className="font-mono font-bold text-slate-900">{savedDraftResult.draftNo}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Supplier:</span>
+                <span className="font-bold text-slate-900">{savedDraftResult.supplierName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Amount:</span>
+                <span className="font-black text-emerald-700 text-sm">{formatCurrency(savedDraftResult.amount)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Products:</span>
+                <span className="font-bold text-indigo-700">{savedDraftResult.productCount} টি</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5 pt-2">
+              <Link
+                href="/purchases/create"
+                onClick={() => setSavedDraftResult(null)}
+                className="w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-3 text-xs sm:text-sm font-black text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02]"
+              >
+                📦 এখন চালান ইন করুন
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSavedDraftResult(null);
+                  setIsBankDraftModalOpen(false);
+                  setActiveTab('challans');
+                }}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-2.5 text-xs font-bold text-slate-700 transition-colors"
+              >
+                📑 সকল চালান দেখুন
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSavedDraftResult(null);
+                  setIsBankDraftModalOpen(false);
+                }}
+                className="text-xs font-semibold text-slate-400 hover:text-slate-600 pt-1"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
           </div>
         </div>
       )}

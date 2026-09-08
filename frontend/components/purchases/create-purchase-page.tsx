@@ -29,12 +29,18 @@ import {
   ArrowRight,
   RefreshCw,
   Printer,
+  X,
+  FileText,
+  Warehouse,
+  UserCheck,
+  HelpCircle,
 } from 'lucide-react';
 
 export type PurchaseRowItem = {
   id: string;
   productId: number | '';
   productName: string;
+  sku?: string;
   orderedQty?: number | string;
   quantity: string;
   unitPrice: string;
@@ -48,6 +54,7 @@ const initialRow = (): PurchaseRowItem => ({
   id: 'row-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
   productId: '',
   productName: '',
+  sku: '',
   quantity: '1',
   unitPrice: '',
   unit: 'Pcs',
@@ -91,7 +98,11 @@ function CreatePurchaseContent() {
   const [invoiceNo, setInvoiceNo] = useState(
     `CHL-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
   );
+  const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('');
   const [supplierName, setSupplierName] = useState('');
+  const [warehouseName, setWarehouseName] = useState('Main Godown (প্রধান গোডাউন)');
+  const [vehicleNo, setVehicleNo] = useState('');
+  const [driverName, setDriverName] = useState('');
   const [note, setNote] = useState('');
   const [confirmStockIn, setConfirmStockIn] = useState(true);
   const [paidAmountInput, setPaidAmountInput] = useState('');
@@ -99,6 +110,7 @@ function CreatePurchaseContent() {
   const [items, setItems] = useState<PurchaseRowItem[]>([initialRow()]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [savedResult, setSavedResult] = useState<Purchase | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
@@ -181,6 +193,11 @@ function CreatePurchaseContent() {
     [companies, companyId],
   );
 
+  const selectedPayment = useMemo(
+    () => companyPayments.find((p) => p.id === selectedPaymentId),
+    [companyPayments, selectedPaymentId],
+  );
+
   // Filter products for the selected company if assigned
   const companyFilteredProducts = useMemo(() => {
     if (!companyId) return allProducts;
@@ -219,7 +236,7 @@ function CreatePurchaseContent() {
     // Fallback: If breakdownList is empty, but payment has note with product info
     if (breakdownList.length === 0 && payment.note && productList.length > 0) {
       const matched = productList.filter((p) =>
-        payment.note.toLowerCase().includes(p.name.toLowerCase()),
+        payment.note!.toLowerCase().includes(p.name.toLowerCase()),
       );
       if (matched.length > 0) {
         breakdownList = matched.map((p) => ({
@@ -249,6 +266,7 @@ function CreatePurchaseContent() {
           id: 'row-' + Date.now() + '-' + idx,
           productId: b.productId ? Number(b.productId) : matchedProd ? matchedProd.id : '',
           productName: b.productName || matchedProd?.name || '',
+          sku: matchedProd?.sku || '',
           orderedQty: qty,
           quantity: String(qty), // default received = ordered qty
           unitPrice: price ? String(price) : '',
@@ -262,7 +280,7 @@ function CreatePurchaseContent() {
       if (newRows.length > 0) {
         setItems(newRows);
         setToastTone('success');
-        setToastMessage(`পেমেন্ট #${payment.id} থেকে ${newRows.length} টি অর্ডারকৃত পণ্য লোড হয়েছে!`);
+        setToastMessage(`ড্রাফট #${payment.id} থেকে ${newRows.length} টি অর্ডারকৃত পণ্য লোড হয়েছে!`);
         return;
       }
     }
@@ -301,6 +319,7 @@ function CreatePurchaseContent() {
         ...next[index],
         productId: product.id,
         productName: product.name,
+        sku: product.sku || '',
         searchText: product.name,
         unit: product.unit || 'Pcs',
         unitPrice: String(product.buyPrice || ''),
@@ -331,6 +350,7 @@ function CreatePurchaseContent() {
           if (matched) {
             next[index].productId = matched.id;
             next[index].productName = matched.name;
+            next[index].sku = matched.sku || '';
             next[index].unit = matched.unit || 'Pcs';
             if (!next[index].unitPrice && matched.buyPrice) {
               next[index].unitPrice = String(matched.buyPrice);
@@ -367,6 +387,22 @@ function CreatePurchaseContent() {
     }, 0);
   }, [items]);
 
+  const totalOrderedQtyCount = useMemo(() => {
+    return items.reduce((sum, row) => {
+      const q = typeof row.orderedQty === 'number' ? row.orderedQty : parseFloat(String(row.orderedQty || '0'));
+      return sum + (!isNaN(q) ? q : 0);
+    }, 0);
+  }, [items]);
+
+  const totalReceivedQtyCount = useMemo(() => {
+    return items.reduce((sum, row) => {
+      const q = parseFloat(row.quantity || '0');
+      return sum + (!isNaN(q) && q > 0 ? q : 0);
+    }, 0);
+  }, [items]);
+
+  const totalShortQtyCount = Math.max(0, totalOrderedQtyCount - totalReceivedQtyCount);
+
   const effectivePaid = useMemo(() => {
     const val = parseFloat(paidAmountInput);
     if (!isNaN(val) && val >= 0) return val;
@@ -379,10 +415,10 @@ function CreatePurchaseContent() {
 
   const remainingDue = Math.max(0, invoiceTotal - effectivePaid);
   const remainingAdvance = Math.max(0, effectivePaid - invoiceTotal);
-  const isBalanced = Math.abs(invoiceTotal - effectivePaid) < 0.01;
+  const isExactMatch = Math.abs(invoiceTotal - effectivePaid) < 0.01;
 
-  // Submit Handler
-  const handleSubmit = async (e: FormEvent) => {
+  // Trigger confirmation dialog
+  const handleInitiateSubmit = (e: FormEvent) => {
     e.preventDefault();
 
     if (!companyId) {
@@ -401,14 +437,29 @@ function CreatePurchaseContent() {
       return;
     }
 
+    setShowConfirmModal(true);
+  };
+
+  // Actual Save Execution
+  const executeSavePurchase = async () => {
+    const validItems = items.filter(
+      (item) => item.productId && parseFloat(item.quantity) > 0 && parseFloat(item.unitPrice) >= 0,
+    );
+
     try {
       setIsSaving(true);
+      setShowConfirmModal(false);
+
       const payload = {
         companyId: Number(companyId),
         purchaseDate: new Date(purchaseDate).toISOString(),
         invoiceNo: invoiceNo.trim() || undefined,
         referenceNo: invoiceNo.trim() || undefined,
         supplierName: supplierName.trim() || undefined,
+        supplierInvoiceNo: supplierInvoiceNo.trim() || undefined,
+        warehouseName: warehouseName.trim() || undefined,
+        vehicleNo: vehicleNo.trim() || undefined,
+        driverName: driverName.trim() || undefined,
         note: note.trim() || undefined,
         paymentId: selectedPaymentId ?? undefined,
         paidAmount: effectivePaid,
@@ -440,8 +491,8 @@ function CreatePurchaseContent() {
   };
 
   return (
-    <div className="space-y-6 pb-20 text-slate-800">
-      {/* 🌟 Top Navigation Header */}
+    <div className="space-y-6 pb-28 text-slate-800">
+      {/* 🌟 1. Top Navigation & Page Header */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 p-6 sm:p-8 text-white shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div>
@@ -450,54 +501,82 @@ function CreatePurchaseContent() {
               className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-indigo-200 backdrop-blur-md mb-3 hover:bg-white/20 transition-all"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>পারচেজ ড্যাশবোর্ডে ফিরে যান</span>
+              <span>সকল চালানে ফিরুন</span>
             </Link>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-3">
-              <Package className="h-8 w-8 text-indigo-400" />
-              <span>নতুন চালান ও গোডাউনে স্টক ইন</span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="rounded-lg bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider">
+                Step 2 • Goods In & Reconciliation
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white">
+              চালান ইন ও স্টক ইন (Challan & Stock Receiving)
             </h1>
-            <p className="mt-1.5 text-sm text-slate-300 max-w-2xl">
-              কোম্পানির অর্ডারের চালান এন্ট্রি করুন। পূর্বের পরিশোধ সিলেক্ট করলে সকল অর্ডারকৃত পণ্য স্বয়ংক্রিয়ভাবে লোড হবে এবং প্রাপ্ত পরিমাণের সাথে মিলিয়ে গোডাউন স্টক ইন হবে।
+            <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+              কোম্পানির পূর্বের ব্যাংক ড্রাফট বা প্রি-অর্ডার সিলেক্ট করুন। অর্ডারকৃত সকল পণ্য স্বয়ংক্রিয়ভাবে লোড হবে এবং বাস্তবে প্রাপ্ত পরিমাণের সাথে মিলিয়ে গোডাউন স্টক ইন ও ব্যালেন্স সমন্বয় সম্পন্ন হবে।
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              href="/purchases"
-              className="rounded-2xl border border-white/20 bg-white/5 hover:bg-white/10 px-5 py-2.5 text-sm font-bold text-white transition-all"
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => router.push('/purchases')}
+              className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-xs font-bold text-white hover:bg-white/20 transition-all"
             >
               বাতিল
-            </Link>
+            </button>
             <button
-              onClick={handleSubmit}
-              disabled={isSaving || isLoading}
-              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 px-6 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              onClick={handleInitiateSubmit}
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 px-6 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
             >
               <FileCheck className="h-4 w-4" />
-              <span>{isSaving ? 'সংরক্ষণ হচ্ছে...' : '✅ চালান ও স্টক ইন সম্পন্ন করুন'}</span>
+              <span>{isSaving ? 'সংরক্ষণ হচ্ছে...' : '💾 চালান সংরক্ষণ ও স্টক ইন'}</span>
             </button>
           </div>
         </div>
       </div>
 
       {isLoading ? (
-        <LoadingBlock
-          label="চালান ও স্টক ইন ফর্ম লোড হচ্ছে..."
-          subLabel="অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন, কোম্পানি ও পণ্য তালিকা লোড হচ্ছে..."
-        />
+        <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
+          <LoadingBlock label="চালান ও ব্যাংক ড্রাফটের তথ্য লোড হচ্ছে..." />
+        </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 🏢 1. Company & Advance Payment Selector Card */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
-            <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
-              <Building2 className="h-5 w-5" />
-              <span>কোম্পানি ও পেমেন্ট সংযোগ (Company & Paid Order Selection)</span>
+        <form onSubmit={handleInitiateSubmit} className="space-y-6">
+          
+          {/* 🏦 CARD 1: SELECT BANK DRAFT / PRE-ORDER */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600">
+                  <Wallet className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    ১. অগ্রিম পেমেন্ট / প্রি-অর্ডার নির্বাচন করুন (Select Bank Draft)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    কোম্পানিকে পূর্বে দেওয়া ব্যাংক ড্রাফট সিলেক্ট করলেই সকল অর্ডারকৃত পণ্য স্বয়ংক্রিয়ভাবে লোড হবে
+                  </p>
+                </div>
+              </div>
+
+              {selectedPaymentId && (
+                <button
+                  type="button"
+                  onClick={handleClearSelectedPayment}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors self-start sm:self-auto"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>পেমেন্ট সংযোগ বাতিল (সরাসরি মোড)</span>
+                </button>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {/* Supplier / Company Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  কোম্পানি নির্বাচন করুন <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  কোম্পানি / সরবরাহকারী নির্বাচন <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={companyId}
@@ -507,76 +586,47 @@ function CreatePurchaseContent() {
                     setPaidAmountInput('');
                     setItems([initialRow()]);
                   }}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                 >
-                  <option value="">কোম্পানি বাছাই করুন</option>
+                  <option value="">-- কোম্পানি সিলেক্ট করুন --</option>
                   {companies.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} {c.code ? `(কোড: ${c.code})` : ''}
                     </option>
                   ))}
                 </select>
-                {selectedCompany && (
-                  <p className="mt-1.5 text-xs text-slate-500 font-medium">
-                    ফোন: {selectedCompany.phone || 'N/A'} {selectedCompany.address ? `• ঠিকানা: ${selectedCompany.address}` : ''}
-                  </p>
-                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  চালান / ইনভয়েস নং <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <Hash className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={invoiceNo}
-                    onChange={(e) => setInvoiceNo(e.target.value)}
-                    placeholder="CHL-2026-..."
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                  />
+              {selectedCompany && (
+                <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 flex flex-col justify-center">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{selectedCompany.name}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        কোড: <b>{selectedCompany.code || 'N/A'}</b> • ফোন: {selectedCompany.phone || 'N/A'}
+                      </p>
+                    </div>
+                    {companyPayments.length > 0 ? (
+                      <span className="rounded-xl bg-indigo-100 text-indigo-800 px-3 py-1 text-xs font-bold">
+                        {companyPayments.length} টি ড্রাফট/পেমেন্ট এন্ট্রি আছে
+                      </span>
+                    ) : (
+                      <span className="rounded-xl bg-amber-100 text-amber-800 px-3 py-1 text-xs font-bold">
+                        কোনো ড্রাফট পাওয়া যায়নি
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  চালানের তারিখ ও সময়
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-                  <input
-                    type="datetime-local"
-                    value={purchaseDate}
-                    onChange={(e) => setPurchaseDate(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* 💳 Available Paid Payments / Advance Orders List for this Company */}
+            {/* Interactive Bank Draft Cards */}
             {companyPayments.length > 0 && (
-              <div className="pt-5 border-t border-slate-100">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="h-4 w-4 text-emerald-600" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      এই কোম্পানির পূর্বের পরিশোধিত পেমেন্ট / অর্ডার তালিকা ({companyPayments.length} টি পাওয়া গেছে)
-                    </span>
-                  </div>
-                  {selectedPaymentId ? (
-                    <button
-                      type="button"
-                      onClick={handleClearSelectedPayment}
-                      className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:underline flex items-center gap-1 self-start sm:self-auto"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      <span>পেমেন্ট সংযোগ বাতিল (সরাসরি চালান মোড)</span>
-                    </button>
-                  ) : null}
-                </div>
-
+              <div className="pt-3">
+                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
+                  উপলব্ধ ব্যাংক ড্রাফট তালিকা (লোড করতে ক্লিক করুন):
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {companyPayments.map((pay) => {
                     const isSelected = selectedPaymentId === pay.id;
@@ -589,12 +639,12 @@ function CreatePurchaseContent() {
                         onClick={() => applyPaymentBreakdown(pay)}
                         className={`group cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${
                           isSelected
-                            ? 'border-indigo-600 bg-indigo-50/90 ring-2 ring-indigo-600/30 shadow-md'
+                            ? 'border-indigo-600 bg-indigo-50/90 ring-2 ring-indigo-600/30 shadow-md scale-[1.01]'
                             : 'border-slate-200 bg-slate-50/70 hover:border-indigo-300 hover:bg-white'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <span
                               className={`rounded-lg px-2.5 py-0.5 text-xs font-black ${
                                 isSelected
@@ -602,7 +652,7 @@ function CreatePurchaseContent() {
                                   : 'bg-emerald-100 text-emerald-800'
                               }`}
                             >
-                              পেমেন্ট #{pay.id}
+                              ড্রাফট #{pay.id}
                             </span>
                             <span className="text-xs font-semibold text-slate-500">
                               {pay.paymentDate ? formatDate(pay.paymentDate) : ''}
@@ -613,24 +663,30 @@ function CreatePurchaseContent() {
                           </span>
                         </div>
 
-                        <p className="mt-2 text-xs text-slate-600 line-clamp-2 font-medium">
+                        {pay.transactionRef && (
+                          <p className="mt-1.5 text-xs font-bold text-indigo-900 font-mono">
+                            Ref: {pay.transactionRef}
+                          </p>
+                        )}
+
+                        <p className="mt-1 text-xs text-slate-600 line-clamp-2 font-medium">
                           {pay.note || `মেথড: ${pay.paymentMethod}`}
                         </p>
 
                         <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
                           <span className="text-[11px] font-bold text-indigo-700">
                             {hasBreakdown
-                              ? `📦 ${breakdown.length} টি পণ্যের অর্ডার`
-                              : '💸 সাধারণ পেমেন্ট'}
+                              ? `📦 ${breakdown.length} টি পণ্যের প্রি-অর্ডার`
+                              : '💸 সাধারণ পরিশোধ'}
                           </span>
                           <span
-                            className={`font-bold flex items-center gap-1 text-xs ${
+                            className={`font-bold text-xs ${
                               isSelected
                                 ? 'text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full'
                                 : 'text-slate-600 group-hover:text-indigo-600'
                             }`}
                           >
-                            {isSelected ? '✓ সিলেক্টেড (মাল লোড হয়েছে)' : '+ অর্ডার লোড করুন'}
+                            {isSelected ? '✓ লোড করা হয়েছে' : '👉 লোড করুন'}
                           </span>
                         </div>
                       </div>
@@ -641,16 +697,180 @@ function CreatePurchaseContent() {
             )}
           </div>
 
-          {/* 📦 2. Reconcile Products (Order Qty vs Actually Received Qty Table) */}
+          {/* 📋 CARD 2: PRE-ORDER SUMMARY CARD (Shown when draft is selected) */}
+          {selectedPayment && (
+            <div className="rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-white to-indigo-50/40 p-5 sm:p-6 shadow-sm">
+              <div className="flex items-center gap-2 text-indigo-900 font-black text-sm uppercase tracking-wider mb-3">
+                <CheckCircle2 className="h-4 w-4 text-indigo-600" />
+                <span>২. ব্যাংক ড্রাফট ও প্রি-অর্ডার সামারি (Pre-Order Summary)</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+                <div className="rounded-xl bg-white p-3 border border-indigo-100">
+                  <span className="text-slate-500 font-medium block">ড্রাফট নং</span>
+                  <b className="text-indigo-950 font-bold font-mono mt-0.5 block text-sm">
+                    {selectedPayment.transactionRef || `#${selectedPayment.id}`}
+                  </b>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 border border-indigo-100">
+                  <span className="text-slate-500 font-medium block">সরবরাহকারী</span>
+                  <b className="text-slate-900 font-bold mt-0.5 block truncate text-sm">
+                    {selectedCompany?.name || 'কোম্পানি'}
+                  </b>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 border border-indigo-100">
+                  <span className="text-slate-500 font-medium block">ড্রাফটে পরিশোধ</span>
+                  <b className="text-emerald-700 font-black mt-0.5 block text-sm">
+                    {formatCurrency(selectedPayment.amount)}
+                  </b>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 border border-indigo-100">
+                  <span className="text-slate-500 font-medium block">অর্ডার মূল্য</span>
+                  <b className="text-indigo-900 font-black mt-0.5 block text-sm">
+                    {formatCurrency(orderedTotal > 0 ? orderedTotal : selectedPayment.amount)}
+                  </b>
+                </div>
+
+                <div className="rounded-xl bg-white p-3 border border-indigo-100">
+                  <span className="text-slate-500 font-medium block">অর্ডার কোয়ান্টিটি</span>
+                  <b className="text-slate-800 font-black mt-0.5 block text-sm">
+                    {totalOrderedQtyCount} টি
+                  </b>
+                </div>
+
+                <div className="rounded-xl bg-emerald-50 p-3 border border-emerald-200">
+                  <span className="text-emerald-700 font-bold block">বর্তমান স্থিতি</span>
+                  <b className="text-emerald-900 font-black mt-0.5 block text-sm">
+                    {remainingAdvance > 0 ? `অগ্রিম: ৳${remainingAdvance}` : 'সমন্বয় প্রস্তুত'}
+                  </b>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 📄 CARD 3: CHALLAN INFORMATION */}
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
+              <FileText className="h-4 w-4" />
+              <span>৩. চালান ও পরিবহন তথ্য (Challan & Logistics Information)</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  চালান / ইনভয়েস নং <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Hash className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={invoiceNo}
+                    onChange={(e) => setInvoiceNo(e.target.value)}
+                    required
+                    placeholder="CHL-2026-..."
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  চালানের তারিখ ও সময় <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <input
+                    type="datetime-local"
+                    value={purchaseDate}
+                    onChange={(e) => setPurchaseDate(e.target.value)}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  কোম্পানির নিজস্ব চালান/মেমো নং
+                </label>
+                <input
+                  type="text"
+                  value={supplierInvoiceNo}
+                  onChange={(e) => setSupplierInvoiceNo(e.target.value)}
+                  placeholder="যেমন: INV-88910"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  গোডাউন / ওয়্যারহাউস
+                </label>
+                <div className="relative">
+                  <Warehouse className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={warehouseName}
+                    onChange={(e) => setWarehouseName(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  গাড়ি / ট্রাক নম্বর (ঐচ্ছিক)
+                </label>
+                <input
+                  type="text"
+                  value={vehicleNo}
+                  onChange={(e) => setVehicleNo(e.target.value)}
+                  placeholder="যেমন: ঢাকা মেট্রো-ট-১২-৩৪৫৬"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  ড্রাইভার / ডেলিভারিম্যান নাম (ঐচ্ছিক)
+                </label>
+                <input
+                  type="text"
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  placeholder="যেমন: মোঃ রফিকুল ইসলাম"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  চালান নোট / অতিরিক্ত বিবরণ
+                </label>
+                <input
+                  type="text"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="চালান সংক্রান্ত মন্তব্য..."
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 📦 CARD 4: ORDERED VS RECEIVED TABLE (MAIN RECONCILIATION TABLE) */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3 border-b border-slate-100">
               <div>
                 <div className="flex items-center gap-2 text-indigo-600 font-bold text-base">
                   <Layers className="h-5 w-5" />
-                  <span>চালানের পণ্যের তালিকা ও গোডাউনে স্টক ইন (Product Reconciliation Table)</span>
+                  <span>৪. পণ্যের তালিকা ও গোডাউন স্টক ইন (Ordered vs Received Table)</span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  কোম্পানিকে অর্ডারকৃত সংখ্যার সাথে বাস্তবের প্রাপ্ত পরিমাণ (Actually Received Qty) মিলিয়ে ইনপুট দিন।
+                  অর্ডারকৃত সংখ্যার সাথে মিলিয়ে বাস্তবে কত পিস পেয়েছেন (Received Qty) তা এডিট করুন। বাকি কোয়ান্টিটি ও মূল্য স্বয়ংক্রিয় হিসাব হবে।
                 </p>
               </div>
 
@@ -660,18 +880,22 @@ function CreatePurchaseContent() {
                 className="inline-flex items-center gap-1.5 rounded-2xl bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-100 transition-all self-start sm:self-auto"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>+ নতুন পণ্য যোগ করুন</span>
+                <span>+ বাড়তি পণ্য যোগ করুন</span>
               </button>
             </div>
 
             {/* Desktop Table Header */}
-            <div className="hidden lg:grid grid-cols-12 gap-3 px-4 py-3 rounded-2xl bg-slate-100/80 text-xs font-black uppercase tracking-wider text-slate-600">
-              <div className="col-span-4">পণ্য নির্বাচন (PRODUCT)</div>
-              <div className="col-span-2 text-center">অর্ডার ছিল (ORDER QTY)</div>
-              <div className="col-span-2 text-center">বাস্তবে প্রাপ্ত পরিমাণ (RECEIVED) *</div>
-              <div className="col-span-2 text-right">ক্রয় দর (RATE ৳) *</div>
-              <div className="col-span-1 text-right">মোট টাকা (৳)</div>
-              <div className="col-span-1 text-center">অ্যাকশন</div>
+            <div className="hidden lg:grid grid-cols-12 gap-3 px-4 py-3 rounded-2xl bg-slate-100/90 text-xs font-black uppercase tracking-wider text-slate-700">
+              <div className="col-span-1 text-center w-8">ক্রম</div>
+              <div className="col-span-3">পণ্য ও SKU (PRODUCT)</div>
+              <div className="col-span-2 text-center">অর্ডার QTY (READ-ONLY)</div>
+              <div className="col-span-2 text-center bg-indigo-100/70 text-indigo-900 rounded-lg py-0.5">
+                প্রাপ্ত QTY (EDITABLE) *
+              </div>
+              <div className="col-span-1 text-center">বাকি / ঘাটতি</div>
+              <div className="col-span-1 text-right">দর (৳) *</div>
+              <div className="col-span-1 text-right">প্রাপ্ত মূল্য (৳)</div>
+              <div className="col-span-1 text-center">স্ট্যাটাস</div>
             </div>
 
             {/* Product Rows */}
@@ -679,7 +903,7 @@ function CreatePurchaseContent() {
               {items.map((row, idx) => {
                 const q = parseFloat(row.quantity || '0');
                 const p = parseFloat(row.unitPrice || '0');
-                const lineTotal = !isNaN(q) && !isNaN(p) ? q * p : 0;
+                const lineTotal = !isNaN(q) && !isNaN(p) && q > 0 && p >= 0 ? q * p : 0;
                 const ordQ =
                   row.orderedQty !== undefined && row.orderedQty !== null && row.orderedQty !== ''
                     ? typeof row.orderedQty === 'number'
@@ -687,20 +911,26 @@ function CreatePurchaseContent() {
                       : parseFloat(String(row.orderedQty))
                     : null;
 
-                const isShort = ordQ !== null && !isNaN(ordQ) && q < ordQ;
-                const isExtra = ordQ !== null && !isNaN(ordQ) && q > ordQ;
-                const isExact = ordQ !== null && !isNaN(ordQ) && q === ordQ;
+                const diff = ordQ !== null ? q - ordQ : 0;
+                const isShort = ordQ !== null && q < ordQ;
+                const isExact = ordQ !== null && q === ordQ;
+                const isExtra = ordQ !== null && q > ordQ;
 
                 return (
                   <div
                     key={row.id}
-                    className="rounded-2xl border border-slate-200/90 bg-slate-50/40 p-4 transition-all hover:bg-white hover:border-slate-300"
+                    className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 transition-all hover:bg-white hover:border-slate-300"
                   >
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+                      {/* Index */}
+                      <div className="hidden lg:block lg:col-span-1 text-center font-mono font-bold text-slate-400">
+                        {idx + 1}
+                      </div>
+
                       {/* Product Selector / Search */}
-                      <div className="lg:col-span-4 relative">
+                      <div className="lg:col-span-3 relative">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          পণ্য নির্বাচন
+                          পণ্য ও SKU
                         </label>
                         <div className="relative">
                           <input
@@ -708,36 +938,36 @@ function CreatePurchaseContent() {
                             value={row.searchText || row.productName}
                             onChange={(e) => handleUpdateRow(idx, 'searchText', e.target.value)}
                             onFocus={() => handleUpdateRow(idx, 'showResults', true)}
-                            placeholder="প্রোডাক্ট নাম বা কোড লিখুন..."
-                            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            placeholder="প্রোডাক্ট নাম বা কোড..."
+                            className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                           />
-                          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
                         </div>
 
                         {row.showResults && (
                           <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
                             {companyFilteredProducts
                               .filter(
-                                (p) =>
+                                (prod) =>
                                   !row.searchText ||
-                                  p.name.toLowerCase().includes(row.searchText.toLowerCase()) ||
-                                  p.sku?.toLowerCase().includes(row.searchText.toLowerCase()),
+                                  prod.name.toLowerCase().includes(row.searchText.toLowerCase()) ||
+                                  prod.sku?.toLowerCase().includes(row.searchText.toLowerCase()),
                               )
-                              .map((p) => (
+                              .map((prod) => (
                                 <button
                                   type="button"
-                                  key={p.id}
-                                  onClick={() => handleSelectProduct(idx, p)}
+                                  key={prod.id}
+                                  onClick={() => handleSelectProduct(idx, prod)}
                                   className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 border-b border-slate-100 flex items-center justify-between"
                                 >
                                   <div>
-                                    <p className="font-bold text-slate-800">{p.name}</p>
+                                    <p className="font-bold text-slate-800">{prod.name}</p>
                                     <p className="text-[10px] text-slate-400">
-                                      কোড: {p.sku || 'N/A'} • ইউনিট: {p.unit || 'Pcs'}
+                                      কোড: {prod.sku || 'N/A'} • {prod.unit || 'Pcs'}
                                     </p>
                                   </div>
                                   <span className="font-bold text-indigo-600">
-                                    ৳{p.buyPrice?.toFixed(2) || '0.00'}
+                                    ৳{prod.buyPrice?.toFixed(2) || '0.00'}
                                   </span>
                                 </button>
                               ))}
@@ -745,22 +975,22 @@ function CreatePurchaseContent() {
                         )}
                       </div>
 
-                      {/* Order Quantity Display */}
-                      <div className="lg:col-span-2 text-center">
+                      {/* Order Quantity Display (READ-ONLY) */}
+                      <div className="lg:col-span-2 text-left lg:text-center">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          অর্ডার পরিমাণ (Order Qty)
+                          অর্ডার ছিল (Order Qty)
                         </label>
                         {ordQ !== null ? (
-                          <div className="inline-flex items-center gap-1 rounded-xl bg-indigo-100/80 px-3 py-1.5 text-xs font-black text-indigo-800 border border-indigo-200">
+                          <div className="inline-flex items-center gap-1 rounded-xl bg-slate-200/80 px-3 py-1.5 text-xs font-black text-slate-800 border border-slate-300">
                             <span>📦 {ordQ}</span>
-                            <span className="text-[11px] font-semibold">{row.unit || 'PCS'}</span>
+                            <span className="text-[11px] font-semibold text-slate-600">{row.unit || 'PCS'}</span>
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-400 font-medium">— (সরাসরি)</span>
+                          <span className="text-xs text-slate-400 font-medium">— (সরাসরি এন্ট্রি)</span>
                         )}
                       </div>
 
-                      {/* Actually Received Quantity (Stock In Qty) */}
+                      {/* Actually Received Quantity (EDITABLE Input) */}
                       <div className="lg:col-span-2">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
                           বাস্তবে প্রাপ্ত পরিমাণ (Received Qty) *
@@ -774,66 +1004,89 @@ function CreatePurchaseContent() {
                             onChange={(e) => handleUpdateRow(idx, 'quantity', e.target.value)}
                             className={`w-full rounded-xl border px-3 py-2 text-center text-xs font-black text-slate-900 focus:outline-none focus:ring-2 transition-all ${
                               isShort
-                                ? 'border-amber-400 bg-amber-50/80 focus:ring-amber-400/20'
+                                ? 'border-amber-400 bg-amber-50/90 focus:ring-amber-400/20'
                                 : isExtra
-                                ? 'border-indigo-400 bg-indigo-50/80 focus:ring-indigo-400/20'
-                                : 'border-emerald-300 bg-emerald-50/30 focus:border-emerald-500 focus:ring-emerald-500/20'
+                                ? 'border-indigo-400 bg-indigo-50/90 focus:ring-indigo-400/20'
+                                : 'border-emerald-400 bg-emerald-50/50 focus:border-emerald-500 focus:ring-emerald-500/20'
                             }`}
                           />
                         </div>
-                        {isExact && (
-                          <p className="mt-1 text-[10px] font-bold text-emerald-600 text-center">
-                            ✓ সম্পূর্ণ প্রাপ্ত
-                          </p>
-                        )}
-                        {isShort && (
-                          <p className="mt-1 text-[10px] font-bold text-amber-600 text-center">
-                            ⚠️ {ordQ! - q} টি কম এসেছে
-                          </p>
-                        )}
-                        {isExtra && (
-                          <p className="mt-1 text-[10px] font-bold text-indigo-600 text-center">
-                            ✨ {q - ordQ!} টি বেশি এসেছে
-                          </p>
+                      </div>
+
+                      {/* Remaining / Short Qty */}
+                      <div className="lg:col-span-1 text-left lg:text-center">
+                        <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
+                          বাকি / শর্ট
+                        </label>
+                        {ordQ !== null ? (
+                          diff === 0 ? (
+                            <span className="text-emerald-700 font-bold text-xs">০ (সম্পূর্ণ)</span>
+                          ) : diff < 0 ? (
+                            <span className="text-rose-600 font-black text-xs">{Math.abs(diff)} কম</span>
+                          ) : (
+                            <span className="text-indigo-600 font-bold text-xs">+{diff} বেশি</span>
+                          )
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
                         )}
                       </div>
 
                       {/* Buy Rate ৳ */}
-                      <div className="lg:col-span-2">
+                      <div className="lg:col-span-1">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          ক্রয় দর (Rate ৳) *
+                          ক্রয় দর (৳) *
                         </label>
-                        <div className="relative">
-                          <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={row.unitPrice}
-                            onChange={(e) => handleUpdateRow(idx, 'unitPrice', e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 bg-white pl-6 pr-3 py-2 text-right text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                            placeholder="0.00"
-                          />
-                        </div>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={row.unitPrice}
+                          onChange={(e) => handleUpdateRow(idx, 'unitPrice', e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-right text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                          placeholder="0.00"
+                        />
                       </div>
 
                       {/* Line Total ৳ */}
-                      <div className="lg:col-span-1 text-right">
+                      <div className="lg:col-span-1 text-left lg:text-right">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          মোট টাকা (৳)
+                          গৃহীত মূল্য (৳)
                         </label>
                         <span className="text-xs font-black text-slate-900">
-                          ৳{lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          {formatCurrency(lineTotal)}
                         </span>
                       </div>
 
-                      {/* Delete Action */}
-                      <div className="lg:col-span-1 text-center">
+                      {/* Status Badge & Delete */}
+                      <div className="lg:col-span-1 flex items-center justify-between lg:justify-center gap-2">
+                        <label className="block text-xs font-bold text-slate-500 lg:hidden">
+                          স্ট্যাটাস:
+                        </label>
+                        {ordQ !== null ? (
+                          q >= ordQ ? (
+                            <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                              🟢 সম্পূর্ণ
+                            </span>
+                          ) : q > 0 ? (
+                            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                              🟡 আংশিক
+                            </span>
+                          ) : (
+                            <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">
+                              🔴 অপেক্ষমান
+                            </span>
+                          )
+                        ) : (
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                            সরাসরি
+                          </span>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => handleRemoveRow(idx)}
-                          className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all"
-                          title="মুছে ফেলুন"
+                          className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all"
+                          title="সারি মুছুন"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -844,7 +1097,7 @@ function CreatePurchaseContent() {
               })}
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+            <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
               <button
                 type="button"
                 onClick={handleAddRow}
@@ -854,143 +1107,31 @@ function CreatePurchaseContent() {
                 <span>+ আরও পণ্য যোগ করুন</span>
               </button>
 
-              <div className="text-right">
-                <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mr-2">
-                  প্রাপ্ত মালের মোট মূল্য:
+              <div className="flex items-center gap-4 text-xs font-bold">
+                <span className="text-slate-600">
+                  মোট অর্ডার: <b className="text-slate-900">{totalOrderedQtyCount}</b> টি
                 </span>
-                <span className="text-xl font-black text-indigo-900">
-                  {formatCurrency(invoiceTotal)}
+                <span className="text-indigo-700">
+                  মোট গ্রহণ: <b className="text-indigo-950 font-black">{totalReceivedQtyCount}</b> টি
                 </span>
+                {totalShortQtyCount > 0 && (
+                  <span className="text-rose-600 font-black bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100">
+                    ঘাটতি: {totalShortQtyCount} টি
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
-          {/* 🌟 3. Live Financial Reconciliation & Calculation Dashboard */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-              <Sparkles className="h-4 w-4 text-indigo-600" />
-              <span>টাকা ও মাল প্রাপ্তির হিসাব সামারি (Financial Comparison & Settlement)</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Card 1: Total Paid */}
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-1">
-                <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">
-                  ১. কোম্পানিকে দেওয়া টাকা / অর্ডারের মূল্য
-                </p>
-                <p className="text-2xl font-black text-indigo-950">
-                  {formatCurrency(effectivePaid)}
-                </p>
-                <p className="text-[11px] text-indigo-600 font-medium">
-                  {selectedPaymentId ? `পেমেন্ট #${selectedPaymentId} এর মাধ্যমে পরিশোধিত` : 'ম্যানুয়াল পরিশোধ/অগ্রিম ইনপুট'}
-                </p>
-              </div>
-
-              {/* Card 2: Total Received Goods Value */}
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-1">
-                <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
-                  ২. বাস্তবে প্রাপ্ত মালের মোট মূল্য
-                </p>
-                <p className="text-2xl font-black text-emerald-950">
-                  {formatCurrency(invoiceTotal)}
-                </p>
-                <p className="text-[11px] text-emerald-600 font-medium">
-                  প্রাপ্ত পরিমাণ × ক্রয় দর অনুযায়ী গোডাউনে স্টক ইন
-                </p>
-              </div>
-
-              {/* Card 3: Reconciliation Balance */}
-              <div
-                className={`rounded-2xl border p-4 space-y-1 ${
-                  isBalanced
-                    ? 'border-emerald-300 bg-emerald-100/70 text-emerald-900'
-                    : remainingDue > 0
-                    ? 'border-rose-300 bg-rose-100/70 text-rose-900'
-                    : 'border-sky-300 bg-sky-100/70 text-sky-900'
-                }`}
-              >
-                <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-                  {isBalanced ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-                  ) : remainingDue > 0 ? (
-                    <AlertCircle className="h-4 w-4 text-rose-700" />
-                  ) : (
-                    <Wallet className="h-4 w-4 text-sky-700" />
-                  )}
-                  <span>৩. হিসাবের ফলাফল ও ব্যালেন্স</span>
-                </p>
-
-                <p className="text-2xl font-black">
-                  {isBalanced
-                    ? 'সম্পূর্ণ সমন্বয় (0.00)'
-                    : remainingDue > 0
-                    ? `কোম্পানি পাবে: ${formatCurrency(remainingDue)}`
-                    : `অগ্রিম রইলো: ${formatCurrency(remainingAdvance)}`}
-                </p>
-
-                <p className="text-[11px] font-semibold opacity-90">
-                  {isBalanced
-                    ? 'টাকা ও মালের হিসাব শতভাগ মিলে গেছে।'
-                    : remainingDue > 0
-                    ? 'মালের মূল্য বেশি এসেছে, অবশিষ্ট টাকা কোম্পানিকে দিতে হবে।'
-                    : 'মাল কম এসেছে, অতিরিক্ত টাকা কোম্পানির কাছে অগ্রিম জমা রইলো।'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 🚚 4. Additional Details & Final Submission */}
+          {/* 💰 CARD 5: LIVE RECONCILIATION PANEL */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-7 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
-                <Truck className="h-4 w-4" />
-                <span>চালানের বিবরণ ও পরিবহন নোট (Invoice Details & Note)</span>
+            <div className="lg:col-span-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <Sparkles className="h-4 w-4 text-indigo-600" />
+                <span>৫. স্টক ইন ও ইনভেন্টরি কনফার্মেশন</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                    সাপ্লায়ার / ড্রাইভার / প্রতিনিধি
-                  </label>
-                  <input
-                    type="text"
-                    value={supplierName}
-                    onChange={(e) => setSupplierName(e.target.value)}
-                    placeholder="নাম / পরিবহন রেফারেন্স..."
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                    সমন্বয়কৃত পরিশোধের পরিমাণ (Paid / Adjusted ৳)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={paidAmountInput}
-                    onChange={(e) => setPaidAmountInput(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  অতিরিক্ত মন্তব্য / চালান নোট
-                </label>
-                <textarea
-                  rows={2}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="চালান সংক্রান্ত প্রয়োজনীয় মন্তব্য লিখুন..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-
-              {/* Stock In Checkbox */}
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 flex items-start gap-3">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 flex items-start gap-3">
                 <input
                   type="checkbox"
                   id="confirmStockIn"
@@ -1000,68 +1141,120 @@ function CreatePurchaseContent() {
                 />
                 <label htmlFor="confirmStockIn" className="cursor-pointer text-xs">
                   <p className="font-black text-emerald-900">
-                    📦 সরাসরি গোডাউনে স্টক ইন করুন (Auto Stock-In to Warehouse)
+                    📦 চালানের পণ্য তাৎক্ষণিক গোডাউনে স্টক ইন করুন (Auto Stock-In)
                   </p>
                   <p className="text-emerald-700 font-medium mt-0.5">
-                    টিক চিহ্ন দেওয়া থাকলে চালান সেভ করার সাথে সাথে প্রাপ্ত প্রতিটি পণ্যের গোডাউন স্টক তাৎক্ষণিক বৃদ্ধি পাবে এবং ক্রয় দর আপডেট হবে।
+                    টিক দেওয়া থাকলে চালান সেভ করার সাথে সাথে প্রাপ্ত প্রতিটি পণ্যের গোডাউন স্টক সরাসরি বৃদ্ধি পাবে এবং ক্রয় দর আপডেট হবে।
                   </p>
                 </label>
               </div>
+
+              <div className="space-y-2 text-xs text-slate-500">
+                <p>• প্রতিটি প্রাপ্ত পণ্য ট্র্যাক করার জন্য স্টক মুভমেন্ট রেকর্ড তৈরি হবে।</p>
+                <p>• একটি ড্রাফটের অধীনে একাধিক চালানে আংশিক মাল আসলে বাকি মাল পরবর্তী চালানে ইন করতে পারবেন।</p>
+              </div>
             </div>
 
-            {/* 📊 Financial Breakdown Card */}
-            <div className="lg:col-span-5 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 to-indigo-950 p-6 text-white shadow-lg space-y-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-indigo-300">
-                আর্থিক সমন্বয় হিসাব (Financial Settlement Summary)
-              </p>
+            {/* Reconciliation Box Panel */}
+            <div className="lg:col-span-6 rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 to-indigo-950 p-6 text-white shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <span className="text-xs font-black uppercase tracking-wider text-indigo-300">
+                  💰 আর্থিক সমন্বয় (Financial Reconciliation)
+                </span>
+                <span className="text-xs font-bold text-slate-300">
+                  {isExactMatch ? '✓ হিসাব সম্পূর্ণ সমতা' : 'চলতি রিকনসিলিয়েশন'}
+                </span>
+              </div>
 
-              <div className="space-y-3 pt-2">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-300">মোট চালানের মূল্য:</span>
-                  <span className="font-bold text-white text-base">{formatCurrency(invoiceTotal)}</span>
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">১. অগ্রিম প্রদান (Advance Paid):</span>
+                  <span className="font-black text-indigo-300 text-sm">{formatCurrency(effectivePaid)}</span>
                 </div>
 
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-300">সমন্বয়কৃত পরিশোধ / অগ্রিম:</span>
-                  <span className="font-bold text-emerald-400 text-base">
-                    - {formatCurrency(effectivePaid)}
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">২. প্রি-অর্ডার মোট মূল্য (Order Value):</span>
+                  <span className="font-bold text-slate-200 text-sm">
+                    {formatCurrency(orderedTotal > 0 ? orderedTotal : effectivePaid)}
                   </span>
+                </div>
+
+                <div className="flex justify-between items-center pt-2 border-t border-white/10">
+                  <span className="text-slate-300">৩. প্রাপ্ত মালামালের মূল্য (Received Goods Value):</span>
+                  <span className="font-black text-emerald-400 text-base">{formatCurrency(invoiceTotal)}</span>
                 </div>
 
                 <div className="pt-3 border-t border-white/10 flex justify-between items-center">
-                  <span className="text-sm font-bold text-white">
-                    {remainingDue > 0
-                      ? 'চালান বাবদ কোম্পানির পাওনা (Due):'
-                      : remainingAdvance > 0
-                      ? 'কোম্পানির কাছে অবশিষ্ট অগ্রিম (Advance):'
-                      : 'ব্যালেন্স স্ট্যাটাস:'}
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    {remainingAdvance > 0
+                      ? '💎 অবশিষ্ট অগ্রিম জমা (Remaining Advance):'
+                      : remainingDue > 0
+                      ? '⚠️ অতিরিক্ত পাওনা বকেয়া (Payable Due):'
+                      : '৪. স্থিতি (Status):'}
                   </span>
                   <span
                     className={`text-xl font-black ${
-                      remainingDue > 0
-                        ? 'text-rose-400'
-                        : remainingAdvance > 0
+                      remainingAdvance > 0
                         ? 'text-sky-300'
+                        : remainingDue > 0
+                        ? 'text-rose-400'
                         : 'text-emerald-300'
                     }`}
                   >
-                    {remainingDue > 0
-                      ? formatCurrency(remainingDue)
-                      : remainingAdvance > 0
+                    {remainingAdvance > 0
                       ? formatCurrency(remainingAdvance)
-                      : 'পরিশোধিত (0.00)'}
+                      : remainingDue > 0
+                      ? formatCurrency(remainingDue)
+                      : 'সম্পূর্ণ পরিশোধিত (০.০০)'}
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <div className="pt-4">
+          {/* ⚓ BOTTOM STICKY ACTION BAR */}
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-3 px-4 sm:px-8 shadow-2xl">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-4 sm:gap-6 text-xs flex-wrap">
+                <div>
+                  <span className="text-slate-500 font-medium block">অগ্রিম ড্রাফট:</span>
+                  <b className="text-slate-900 font-black text-sm">{formatCurrency(effectivePaid)}</b>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block">প্রাপ্ত মালের মূল্য:</span>
+                  <b className="text-indigo-900 font-black text-sm">{formatCurrency(invoiceTotal)}</b>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block">অবশিষ্ট অগ্রিম/বাকি:</span>
+                  <b
+                    className={`font-black text-sm ${
+                      remainingAdvance > 0 ? 'text-emerald-700' : remainingDue > 0 ? 'text-rose-600' : 'text-slate-800'
+                    }`}
+                  >
+                    {remainingAdvance > 0
+                      ? `+${formatCurrency(remainingAdvance)}`
+                      : remainingDue > 0
+                      ? `-${formatCurrency(remainingDue)}`
+                      : '০.০০ (সমন্বিত)'}
+                  </b>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => router.push('/purchases')}
+                  className="rounded-2xl border border-slate-200 hover:bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 transition-colors"
+                >
+                  বাতিল
+                </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="w-full rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 py-3.5 text-sm font-black text-white shadow-xl shadow-emerald-500/30 transition-all hover:scale-[1.02] active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                 >
-                  <FileCheck className="h-5 w-5" />
-                  <span>{isSaving ? 'সংরক্ষণ ও স্টক ইন হচ্ছে...' : 'চালান ও স্টক ইন সাবমিট করুন'}</span>
+                  <FileCheck className="h-4 w-4" />
+                  <span>{isSaving ? 'সংরক্ষণ হচ্ছে...' : '💾 চালান সংরক্ষণ ও স্টক ইন'}</span>
                 </button>
               </div>
             </div>
@@ -1069,7 +1262,65 @@ function CreatePurchaseContent() {
         </form>
       )}
 
-      {/* 🌟 Success Modal Dialog (Shown upon successful challan save) */}
+      {/* ⚠️ CONFIRMATION DIALOG MODAL (Before saving) */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200 animate-scaleUp">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600">
+                <HelpCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  চালান ও স্টক ইন নিশ্চিতকরণ
+                </h3>
+                <p className="text-xs text-slate-500">
+                  আপনি কি এই চালানটি গোডাউন স্টকে যোগ করতে চান?
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 rounded-2xl bg-slate-50 p-4 border border-slate-100 text-xs my-4">
+              <div className="flex justify-between text-slate-600">
+                <span>সরবরাহকারী:</span>
+                <span className="font-bold text-slate-900">{selectedCompany?.name || 'কোম্পানি'}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>প্রাপ্ত পণ্যের কোয়ান্টিটি:</span>
+                <span className="font-black text-indigo-900">{totalReceivedQtyCount} Qty</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>মোট প্রাপ্ত মালের মূল্য:</span>
+                <span className="font-black text-slate-900">{formatCurrency(invoiceTotal)}</span>
+              </div>
+              <div className="pt-2 border-t border-slate-200 flex justify-between font-bold">
+                <span>অগ্রিম অবশিষ্ট ব্যালেন্স:</span>
+                <span className="text-emerald-700 font-black">{formatCurrency(remainingAdvance)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 py-2.5 text-xs font-bold text-slate-700 transition-colors"
+              >
+                ফিরে যান
+              </button>
+              <button
+                type="button"
+                onClick={executeSavePurchase}
+                disabled={isSaving}
+                className="flex-1 rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/20 transition-all disabled:opacity-50"
+              >
+                {isSaving ? 'সংরক্ষণ হচ্ছে...' : 'হ্যাঁ, স্টক ইন করুন'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 SUCCESS MODAL DIALOG (After successful stock in) */}
       {savedResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-slate-200 animate-scaleUp">
@@ -1080,22 +1331,22 @@ function CreatePurchaseContent() {
               </div>
               <h3 className="text-xl font-black text-slate-900">
                 {confirmStockIn
-                  ? 'চালান ও গোডাউনে স্টক ইন সম্পন্ন হয়েছে!'
+                  ? 'চালান সফলভাবে সংরক্ষণ ও স্টক ইন সম্পন্ন হয়েছে!'
                   : 'চালান খসড়া সংরক্ষণ সম্পন্ন হয়েছে!'}
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                ইনভয়েস / চালান নং: <b className="text-indigo-900 font-mono font-bold">#{savedResult.invoiceNo || savedResult.id}</b>
+                চালান নং: <b className="text-indigo-900 font-mono font-bold">#{savedResult.invoiceNo || savedResult.id}</b>
               </p>
             </div>
 
             {/* Summary Breakdown */}
             <div className="my-6 space-y-3 rounded-2xl bg-slate-50 p-4 border border-slate-100 text-xs">
               <div className="flex justify-between items-center text-slate-600">
-                <span>কোম্পানি / সরবরাহকারী:</span>
+                <span>সরবরাহকারী / কোম্পানি:</span>
                 <span className="font-bold text-slate-900">{selectedCompany?.name || 'কোম্পানি'}</span>
               </div>
               <div className="flex justify-between items-center text-slate-600">
-                <span>মোট প্রাপ্ত মালের মূল্য:</span>
+                <span>প্রাপ্ত মালের মূল্য:</span>
                 <span className="font-black text-slate-900 text-sm">{formatCurrency(invoiceTotal)}</span>
               </div>
               <div className="flex justify-between items-center text-slate-600">
@@ -1103,17 +1354,17 @@ function CreatePurchaseContent() {
                 <span className="font-black text-indigo-900 text-sm">{formatCurrency(effectivePaid)}</span>
               </div>
               <div className="pt-2 border-t border-slate-200 flex justify-between items-center font-bold">
-                <span>চূড়ান্ত সমন্বয় স্থিতি:</span>
+                <span>অবশিষ্ট অগ্রিম জমা:</span>
                 {remainingAdvance > 0 ? (
-                  <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md font-black">
-                    💎 অগ্রিম জমা অবশিষ্ট: {formatCurrency(remainingAdvance)}
+                  <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg font-black">
+                    💎 {formatCurrency(remainingAdvance)}
                   </span>
                 ) : remainingDue > 0 ? (
-                  <span className="text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md font-black">
-                    ⚠️ বকেয়া পাওনা: {formatCurrency(remainingDue)}
+                  <span className="text-rose-700 bg-rose-100 px-2.5 py-1 rounded-lg font-black">
+                    ⚠️ বকেয়া: {formatCurrency(remainingDue)}
                   </span>
                 ) : (
-                  <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md font-black">
+                  <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg font-black">
                     ✅ সম্পূর্ণ সমন্বিত (০ বকেয়া)
                   </span>
                 )}
@@ -1128,7 +1379,7 @@ function CreatePurchaseContent() {
                 className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-98"
               >
                 <Printer className="h-4 w-4" />
-                <span>🖨️ চালান ও ব্যাংক ড্রাফট সমন্বয় ভাউচার প্রিন্ট করুন</span>
+                <span>🖨️ চালান ভাউচার প্রিন্ট করুন</span>
               </Link>
 
               <div className="flex items-center gap-2">
@@ -1137,22 +1388,14 @@ function CreatePurchaseContent() {
                   onClick={() => router.push('/purchases')}
                   className="flex-1 rounded-2xl bg-slate-100 hover:bg-slate-200 py-2.5 text-xs font-bold text-slate-700 transition-colors text-center"
                 >
-                  📑 সকল চালান তালিকায় যান
+                  📑 সকল চালান
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setSavedResult(null);
-                    setItems([initialRow()]);
-                    setSelectedPaymentId(null);
-                    setPaidAmountInput('');
-                    setInvoiceNo(
-                      `CHL-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
-                    );
-                  }}
+                  onClick={() => setSavedResult(null)}
                   className="flex-1 rounded-2xl border border-slate-200 hover:bg-slate-50 py-2.5 text-xs font-bold text-slate-600 transition-colors text-center"
                 >
-                  ➕ আরেকটি চালান ইন করুন
+                  বন্ধ করুন
                 </button>
               </div>
             </div>

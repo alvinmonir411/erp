@@ -1194,7 +1194,7 @@ export class DashboardService {
           id: c.id,
           orderId: c.orderId,
           shopName: c.shop?.name || c.order?.shop?.name || 'Direct Sale',
-          srName: c.sr?.name || c.srName,
+          srName: (c as any).sr?.name || c.srName,
           collectedAmount: safeNum(c.collectedAmount),
           collectionDate: c.collectionDate,
           createdAt: c.createdAt,
@@ -1285,7 +1285,7 @@ export class DashboardService {
         limit,
         items: items.map((b) => ({
           id: b.id,
-          batchNumber: b.batchNumber,
+          batchNumber: (b as any).batchNumber || (b as any).batchNo || String(b.id),
           dispatchDate: b.dispatchDate,
           dispatchedAt: b.dispatchedAt,
           deliveryPersonName: b.deliveryPerson?.name,

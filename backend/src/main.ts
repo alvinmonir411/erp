@@ -104,7 +104,7 @@ async function createApp(): Promise<Express> {
 
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (origin: any, callback: any) => {
       // Allow any requesting origin dynamically
       callback(null, true);
     },

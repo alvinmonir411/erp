@@ -33,11 +33,11 @@ export class CompanyPayment {
   company: Company;
 
   @Column({ nullable: true })
-  purchaseId: number;
+  purchaseId?: number | null;
 
   @ManyToOne(() => Purchase, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'purchaseId' })
-  purchase: Purchase;
+  purchase?: Purchase | null;
 
   @Column({
     type: 'decimal',
@@ -59,19 +59,25 @@ export class CompanyPayment {
   paymentMethod: string;
 
   @Column({ type: 'varchar', length: 150, nullable: true })
-  transactionRef: string;
+  transactionRef?: string | null;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  bankName?: string | null;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  branchName?: string | null;
 
   @Column({ type: 'text', nullable: true })
-  note: string;
+  note?: string | null;
 
   @Column({ type: 'jsonb', nullable: true })
-  productBreakdown: any[];
+  productBreakdown?: any;
 
   @Column({ type: 'varchar', length: 100, nullable: true, default: 'Admin' })
-  createdByName: string;
+  createdByName?: string | null;
 
   @Column({ type: 'uuid', nullable: true })
-  createdById: string;
+  createdById?: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

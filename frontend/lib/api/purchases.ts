@@ -50,6 +50,8 @@ export function recordCompanyPayment(
     paymentDate?: string;
     paymentMethod?: string;
     transactionRef?: string;
+    bankName?: string;
+    branchName?: string;
     note?: string;
     purchaseId?: number;
     productBreakdown?: Array<{

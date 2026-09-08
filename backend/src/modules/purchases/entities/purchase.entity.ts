@@ -40,7 +40,7 @@ export class Purchase {
   company: Company;
 
   @Column({ length: 200, nullable: true })
-  supplierName: string;
+  supplierName?: string | null;
 
   @Column({
     type: 'decimal',
@@ -76,8 +76,27 @@ export class Purchase {
   })
   status: PurchaseStatus;
 
+  @Column({ nullable: true })
+  paymentId?: number | null;
+
+  @ManyToOne(() => CompanyPayment, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'paymentId' })
+  payment?: CompanyPayment | null;
+
+  @Column({ length: 150, nullable: true })
+  warehouseName?: string | null;
+
+  @Column({ length: 100, nullable: true })
+  vehicleNo?: string | null;
+
+  @Column({ length: 150, nullable: true })
+  driverName?: string | null;
+
+  @Column({ length: 100, nullable: true })
+  supplierInvoiceNo?: string | null;
+
   @Column({ type: 'text', nullable: true })
-  note: string;
+  note?: string | null;
 
   @OneToMany(() => PurchaseItem, (item) => item.purchase, { cascade: true })
   items: PurchaseItem[];
