@@ -25,7 +25,10 @@ const createTypeOrmOptions = (
 
   return {
     type: 'postgres',
-    url: databaseUrl || process.env.DATABASE_URL,
+    url:
+      databaseUrl ||
+      process.env.DATABASE_URL ||
+      'postgresql://neondb_owner:npg_9ByhcsjYMR7H@ep-square-paper-an5uie01-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require',
     autoLoadEntities: true,
     synchronize: false,
     dropSchema,

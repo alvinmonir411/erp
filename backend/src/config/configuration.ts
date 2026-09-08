@@ -6,7 +6,9 @@ export default () => ({
     jwtSecret: process.env.JWT_SECRET ?? '',
   },
   database: {
-    url: process.env.DATABASE_URL ?? '',
+    url:
+      process.env.DATABASE_URL ||
+      'postgresql://neondb_owner:npg_9ByhcsjYMR7H@ep-square-paper-an5uie01-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require',
     synchronize: (process.env.DB_SYNCHRONIZE ?? 'false') === 'true',
     dropSchema: (process.env.DB_DROP_SCHEMA ?? 'false') === 'true',
   },
