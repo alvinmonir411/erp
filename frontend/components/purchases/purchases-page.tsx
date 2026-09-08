@@ -592,32 +592,32 @@ export function PurchasesPage() {
   return (
     <div className="space-y-6 pb-16 text-slate-800">
       {/* 🌟 Header Section */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white shadow-xl">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 backdrop-blur-md mb-2">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-5 sm:p-7 md:p-8 text-white shadow-xl">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 backdrop-blur-md">
               <Building2 className="h-3.5 w-3.5" />
-              <span>কোম্পানি সাপ্লাইয়ার ও পারচেজ লেজার</span>
+              <span>কোম্পানি সাপ্লাইয়ার ও পারচেজ লেজার</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white">
               কোম্পানির মাল ও টাকা পরিশোধের হিসাব
             </h1>
-            <p className="mt-1 text-sm text-slate-300 max-w-2xl">
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               কোম্পানি কোন কোন প্রোডাক্ট কত টাকার পাঠিয়েছে এবং কোম্পানিকে কত টাকা কোন পণ্যের জন্য দেওয়া হয়েছে তার পূর্ণাঙ্গ খতিয়ান ও ব্যালেন্স শিট।
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 shrink-0">
             <button
               onClick={() => openPaymentModal()}
-              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95"
             >
               <Wallet className="h-4 w-4" />
               <span>💸 কোম্পানিকে টাকা দিন</span>
             </button>
             <Link
               href="/purchases/create"
-              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-95"
             >
               <Plus className="h-4 w-4" />
               <span>+ নতুন চালান / স্টক ইন</span>
@@ -626,103 +626,108 @@ export function PurchasesPage() {
         </div>
       </div>
 
-      {/* 📊 Top 4 KPI Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+      {/* 📊 Top 5 KPI Metrics (Fully Responsive Grid) */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        {/* Card 1: Goods In */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 line-clamp-1">
               মোট প্রাপ্ত মাল (Goods In)
             </span>
-            <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
-              <Package className="h-5 w-5" />
+            <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600 shrink-0">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-black text-slate-900">
+          <p className="mt-2 text-base sm:text-lg md:text-xl xl:text-2xl font-black text-slate-900 truncate" title={formatCurrency(kpiStats.totalPurchases)}>
             {formatCurrency(kpiStats.totalPurchases)}
           </p>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
+          <p className="mt-1 text-[10px] sm:text-xs text-slate-400 font-medium line-clamp-1">
             সকল চালান মিলিয়ে মোট মালের মূল্য
           </p>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        {/* Card 2: Total Paid */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 line-clamp-1">
               মোট পরিশোধিত টাকা (Total Paid)
             </span>
-            <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
-              <CheckCircle className="h-5 w-5" />
+            <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 shrink-0">
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-black text-emerald-600">
+          <p className="mt-2 text-base sm:text-lg md:text-xl xl:text-2xl font-black text-emerald-600 truncate" title={formatCurrency(kpiStats.totalPaid)}>
             {formatCurrency(kpiStats.totalPaid)}
           </p>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
-            কোম্পানিগুলোকে এ পর্যন্ত মোট পরিশোধ
+          <p className="mt-1 text-[10px] sm:text-xs text-slate-400 font-medium line-clamp-1">
+            কোম্পানিগুলোকে মোট পরিশোধ
           </p>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/40 p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
+        {/* Card 3: Payable Due */}
+        <div className="relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/40 p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-rose-700 line-clamp-1">
               কোম্পানির পাওনা (Payable)
             </span>
-            <div className="rounded-xl bg-rose-100 p-2.5 text-rose-600">
-              <TrendingDown className="h-5 w-5" />
+            <div className="rounded-xl bg-rose-100 p-2 text-rose-600 shrink-0">
+              <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-black text-rose-600">
+          <p className="mt-2 text-base sm:text-lg md:text-xl xl:text-2xl font-black text-rose-600 truncate" title={formatCurrency(kpiStats.totalPayable)}>
             {formatCurrency(kpiStats.totalPayable)}
           </p>
-          <p className="mt-1 text-xs text-rose-600/80 font-medium">
+          <p className="mt-1 text-[10px] sm:text-xs text-rose-600/80 font-medium line-clamp-1">
             কোম্পানি আমাদের কাছে এখনো পাবে
           </p>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-sky-200 bg-sky-50/50 p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-sky-700">
+        {/* Card 4: Advance Balance */}
+        <div className="relative overflow-hidden rounded-2xl border border-sky-200 bg-sky-50/50 p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-sky-700 line-clamp-1">
               আমাদের অগ্রিম জমা (Advance)
             </span>
-            <div className="rounded-xl bg-sky-100 p-2.5 text-sky-600">
-              <Wallet className="h-5 w-5" />
+            <div className="rounded-xl bg-sky-100 p-2 text-sky-600 shrink-0">
+              <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-black text-sky-700">
+          <p className="mt-2 text-base sm:text-lg md:text-xl xl:text-2xl font-black text-sky-700 truncate" title={formatCurrency(kpiStats.totalAdvance)}>
             {formatCurrency(kpiStats.totalAdvance)}
           </p>
-          <p className="mt-1 text-xs text-sky-700/80 font-medium">
-            কোম্পানি আমাদের পণ্য/টাকা ফেরত দেবে
+          <p className="mt-1 text-[10px] sm:text-xs text-sky-700/80 font-medium line-clamp-1">
+            কোম্পানি আমাদের মাল/টাকা ফেরত দেবে
           </p>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        {/* Card 5: Invoices & Companies Count */}
+        <div className="col-span-2 sm:col-span-2 md:col-span-1 lg:col-span-1 relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 line-clamp-1">
               মোট চালান ও কোম্পানি
             </span>
-            <div className="rounded-xl bg-amber-50 p-2.5 text-amber-600">
-              <FileText className="h-5 w-5" />
+            <div className="rounded-xl bg-amber-50 p-2 text-amber-600 shrink-0">
+              <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900">{kpiStats.totalInvoices}</span>
-            <span className="text-xs font-semibold text-slate-500">টি চালান</span>
+          <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-base sm:text-lg md:text-xl xl:text-2xl font-black text-slate-900">{kpiStats.totalInvoices}</span>
+            <span className="text-[11px] font-semibold text-slate-500">টি চালান</span>
             <span className="text-slate-300">•</span>
-            <span className="text-lg font-bold text-indigo-600">{kpiStats.totalCompanies}</span>
-            <span className="text-xs font-semibold text-slate-500">টি কোম্পানি</span>
+            <span className="text-sm sm:text-base md:text-lg font-bold text-indigo-600">{kpiStats.totalCompanies}</span>
+            <span className="text-[11px] font-semibold text-slate-500">টি কোম্পানি</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
+          <p className="mt-1 text-[10px] sm:text-xs text-slate-400 font-medium line-clamp-1">
             সর্বমোট এন্ট্রি সংখ্যা
           </p>
         </div>
       </div>
 
       {/* 🔍 Filter Bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
           {/* Search */}
-          <div className="relative">
+          <div className="sm:col-span-2 lg:col-span-4 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
@@ -732,12 +737,12 @@ export function PurchasesPage() {
                 setCurrentPage(1);
               }}
               placeholder="সার্চ (কোম্পানি, প্রোডাক্ট, ইনভয়েস)..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
             />
           </div>
 
           {/* Company Dropdown */}
-          <div className="relative">
+          <div className="sm:col-span-1 lg:col-span-3 relative">
             <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <select
               value={selectedCompanyId ?? ''}
@@ -745,7 +750,7 @@ export function PurchasesPage() {
                 setSelectedCompanyId(e.target.value ? Number(e.target.value) : null);
                 setCurrentPage(1);
               }}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none truncate"
             >
               <option value="">🏢 সকল কোম্পানি (All Companies)</option>
               {companies.map((c) => (
@@ -757,7 +762,7 @@ export function PurchasesPage() {
           </div>
 
           {/* From Date */}
-          <div className="relative">
+          <div className="sm:col-span-1 lg:col-span-2 relative">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="date"
@@ -766,12 +771,12 @@ export function PurchasesPage() {
                 setFromDate(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
             />
           </div>
 
           {/* To Date & Clear */}
-          <div className="flex items-center gap-2">
+          <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
             <div className="relative flex-1">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
@@ -781,7 +786,7 @@ export function PurchasesPage() {
                   setToDate(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
               />
             </div>
             {(selectedCompanyId || fromDate || toDate || searchTerm || companyStatusFilter !== 'all') && (
@@ -794,7 +799,7 @@ export function PurchasesPage() {
                   setCompanyStatusFilter('all');
                   setCurrentPage(1);
                 }}
-                className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-rose-600 hover:bg-rose-100 transition-colors"
+                className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
                 title="ফিল্টার ক্লিয়ার করুন"
               >
                 <FilterX className="h-4 w-4" />
@@ -804,21 +809,21 @@ export function PurchasesPage() {
         </div>
       </div>
 
-      {/* 🧭 Interactive 4 Tabs Navigation */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+      {/* 🧭 Interactive 4 Tabs Navigation (Clean Responsive Grid) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         <button
           onClick={() => {
             setActiveTab('companies');
             setCurrentPage(1);
           }}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+          className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-xs sm:text-sm font-bold transition-all ${
             activeTab === 'companies'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Building2 className="h-4 w-4" />
-          <span>🏢 কোম্পানিভিত্তিক খতিয়ান ও বাকি ({filteredCompanySummaries.length})</span>
+          <Building2 className="h-4 w-4 shrink-0" />
+          <span className="truncate">🏢 কোম্পানি খতিয়ান ({filteredCompanySummaries.length})</span>
         </button>
 
         <button
@@ -826,14 +831,14 @@ export function PurchasesPage() {
             setActiveTab('products');
             setCurrentPage(1);
           }}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+          className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-xs sm:text-sm font-bold transition-all ${
             activeTab === 'products'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Package className="h-4 w-4" />
-          <span>📦 কোন প্রোডাক্ট কত টাকার এসেছে ({filteredProductSupplies.length})</span>
+          <Package className="h-4 w-4 shrink-0" />
+          <span className="truncate">📦 পণ্যভিত্তিক হিসাব ({filteredProductSupplies.length})</span>
         </button>
 
         <button
@@ -841,14 +846,14 @@ export function PurchasesPage() {
             setActiveTab('invoices');
             setCurrentPage(1);
           }}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+          className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-xs sm:text-sm font-bold transition-all ${
             activeTab === 'invoices'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <FileText className="h-4 w-4" />
-          <span>📑 সকল চালানের তালিকা ({filteredPurchases.length})</span>
+          <FileText className="h-4 w-4 shrink-0" />
+          <span className="truncate">📑 সকল চালান ({filteredPurchases.length})</span>
         </button>
 
         <button
@@ -856,14 +861,14 @@ export function PurchasesPage() {
             setActiveTab('payments');
             setCurrentPage(1);
           }}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+          className={`flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-xs sm:text-sm font-bold transition-all ${
             activeTab === 'payments'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Wallet className="h-4 w-4" />
-          <span>💳 কোম্পানিকে দেওয়া টাকার হিসাব ({filteredPayments.length})</span>
+          <Wallet className="h-4 w-4 shrink-0" />
+          <span className="truncate">💳 পরিশোধের হিসাব ({filteredPayments.length})</span>
         </button>
       </div>
 
@@ -877,34 +882,34 @@ export function PurchasesPage() {
           {/* TAB 1: 🏢 COMPANY BALANCES & PAYABLES */}
           {activeTab === 'companies' && (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar">
                 <button
                   onClick={() => { setCompanyStatusFilter('all'); setCurrentPage(1); }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                 >
                   সব কোম্পানি ({payableSummary.length})
                 </button>
                 <button
                   onClick={() => { setCompanyStatusFilter('payable'); setCurrentPage(1); }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'payable' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'}`}
+                  className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'payable' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'}`}
                 >
                   ⚠️ কোম্পানির পাওনা বাকি ({payableSummary.filter((c) => toNumber(c.totalPayableAmount ?? c.totalPayable) > 0).length})
                 </button>
                 <button
                   onClick={() => { setCompanyStatusFilter('advance'); setCurrentPage(1); }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'advance' ? 'bg-sky-600 text-white' : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200'}`}
+                  className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'advance' ? 'bg-sky-600 text-white' : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200'}`}
                 >
                   💎 আমাদের অগ্রিম জমা ({payableSummary.filter((c) => toNumber(c.advanceAmount ?? c.advanceBalance) > 0).length})
                 </button>
                 <button
                   onClick={() => { setCompanyStatusFilter('settled'); setCurrentPage(1); }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'settled' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
+                  className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'settled' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
                 >
                   ✅ সম্পূর্ণ পরিশোধ ({payableSummary.filter((c) => toNumber(c.totalPayableAmount ?? c.totalPayable) <= 0 && toNumber(c.advanceAmount ?? c.advanceBalance) <= 0).length})
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
                 {(paginatedData as CompanyWisePayableSummary[]).map((c) => {
                   const totalPurchases = toNumber(c.totalPurchaseAmount ?? c.totalAmount);
                   const totalPaid = toNumber(c.totalPaidAmount ?? c.totalPaid);
