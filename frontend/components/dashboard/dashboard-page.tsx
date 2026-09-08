@@ -31,6 +31,9 @@ import {
   X,
   Store,
   User as UserIcon,
+  Flame,
+  Trophy,
+  Tag,
 } from 'lucide-react';
 import { SRDuesList } from './sr-dues-list';
 import { useAuth } from '../auth/auth-provider';
@@ -81,6 +84,10 @@ export function DashboardPage() {
 
   // Chart Hover & Active Tooltip State
   const [hoveredChartDay, setHoveredChartDay] = useState<any>(null);
+
+  // Top Products Filter State
+  const [selectedTopProductCompany, setSelectedTopProductCompany] = useState<number | 'all'>('all');
+  const [topProductSearch, setTopProductSearch] = useState('');
 
   // Order Details Modal State
   const [viewingOrder, setViewingOrder] = useState<any>(null);
@@ -1066,9 +1073,196 @@ export function DashboardPage() {
                       <p className="text-sm font-black text-slate-500">#{c.companyId}</p>
                     </div>
                   </div>
+
+                  <button
+                    onClick={() => {
+                      setSelectedTopProductCompany(c.companyId);
+                      const el = document.getElementById('top-products-section');
+                      el?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="w-full py-2 px-3 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-black flex items-center justify-center gap-1.5 hover:bg-indigo-600 hover:text-white transition-all shadow-xs"
+                  >
+                    <Flame className="w-3.5 h-3.5 text-orange-500 group-hover:text-white" />
+                    রানিং প্রোডাক্টস দেখুন
+                  </button>
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* 🏆 6. TOP RUNNING / BEST-SELLING PRODUCTS (BY COMPANY & OVERALL) */}
+      {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER || user?.role === Role.ADMIN || user?.role === Role.SR) && d.topProducts && d.topProducts.length > 0 && (
+        <section id="top-products-section" className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-7 shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold shadow-md shadow-orange-500/20">
+                  <Flame className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900">
+                    কোম্পানি অনুযায়ী সর্বাধিক বিক্রিত পণ্য (Top Running Products)
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    {displayPeriodTitle} — কোন কোম্পানির কোন পণ্য বাজারে সবচেয়ে বেশি চলছে তার র‍্যাংকিং তালিকা
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Product Search Box */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="প্রোডাক্ট বা কোম্পানির নাম খুঁজুন..."
+                value={topProductSearch}
+                onChange={(e) => setTopProductSearch(e.target.value)}
+                className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-slate-50 w-full sm:w-64"
+              />
+            </div>
+          </div>
+
+          {/* Company Filter Tabs */}
+          {d.companySummary && d.companySummary.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+              <button
+                onClick={() => setSelectedTopProductCompany('all')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition-all ${
+                  selectedTopProductCompany === 'all'
+                    ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                সব কোম্পানি ({d.topProducts?.length || 0})
+              </button>
+              {d.companySummary.map((comp: any) => {
+                const count = d.topProducts?.filter((p: any) => p.companyId === comp.companyId).length || 0;
+                return (
+                  <button
+                    key={comp.companyId}
+                    onClick={() => setSelectedTopProductCompany(comp.companyId)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                      selectedTopProductCompany === comp.companyId
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span>{comp.companyName}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-bold ${
+                      selectedTopProductCompany === comp.companyId ? 'bg-white/20 text-white' : 'bg-white text-slate-500'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Top Products Table */}
+          <div className="overflow-x-auto">
+            {(() => {
+              const filteredList = (d.topProducts || []).filter((item: any) => {
+                const matchesCompany = selectedTopProductCompany === 'all' || item.companyId === selectedTopProductCompany;
+                const matchesSearch = !topProductSearch || 
+                  item.productName.toLowerCase().includes(topProductSearch.toLowerCase()) ||
+                  item.companyName.toLowerCase().includes(topProductSearch.toLowerCase());
+                return matchesCompany && matchesSearch;
+              });
+
+              if (filteredList.length === 0) {
+                return (
+                  <div className="py-12 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    এই কোম্পানির জন্য কোনো বিক্রিত পণ্যের তথ্য পাওয়া যায়নি।
+                  </div>
+                );
+              }
+
+              return (
+                <table className="w-full text-left text-xs min-w-[700px]">
+                  <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 text-center">র‍্যাংক</th>
+                      <th className="px-4 py-3">পণ্যের নাম</th>
+                      <th className="px-4 py-3">কোম্পানি</th>
+                      <th className="px-4 py-3 text-right">বিক্রয় দর</th>
+                      <th className="px-4 py-3 text-center">মোট বিক্রি সংখ্যা</th>
+                      <th className="px-4 py-3 text-right">মোট বিক্রি মূল্য</th>
+                      <th className="px-4 py-3 text-center">গুদাম স্টক</th>
+                      <th className="px-4 py-3 text-center">রানিং স্ট্যাটাস</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredList.map((prod: any, idx: number) => {
+                      const isTop1 = idx === 0;
+                      const isTop3 = idx < 3;
+                      return (
+                        <tr key={prod.productId} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3.5 text-center">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black ${
+                              idx === 0 ? 'bg-amber-100 text-amber-800 border border-amber-300 shadow-xs' :
+                              idx === 1 ? 'bg-slate-200 text-slate-800 border border-slate-300' :
+                              idx === 2 ? 'bg-orange-100 text-orange-800 border border-orange-300' :
+                              'text-slate-500 font-bold'
+                            }`}>
+                              {idx + 1}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                              {prod.productName}
+                              {isTop1 && <span className="text-xs">👑</span>}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 font-semibold text-slate-600">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-bold">
+                              {prod.companyName}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-medium text-slate-600">
+                            {formatCurrency(prod.price)}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <span className="font-black text-indigo-700 text-sm">
+                              {formatNumber(prod.soldQuantity)}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-bold ml-1">{prod.unit}</span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-black text-emerald-600">
+                            {formatCurrency(prod.salesValue)}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <span className={`font-bold ${
+                              prod.currentStock > 10 ? 'text-slate-700' : prod.currentStock > 0 ? 'text-amber-600' : 'text-rose-600'
+                            }`}>
+                              {formatNumber(prod.currentStock)} {prod.unit}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            {isTop1 ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 text-[10px] font-black border border-orange-200 animate-pulse">
+                                <Flame className="w-3 h-3 text-orange-500" /> হট রানিং
+                              </span>
+                            ) : isTop3 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-black border border-indigo-200">
+                                ⚡ দ্রুত চলছে
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-50 text-slate-600 text-[10px] font-bold border border-slate-200">
+                                রানিং পণ্য
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              );
+            })()}
           </div>
         </section>
       )}
