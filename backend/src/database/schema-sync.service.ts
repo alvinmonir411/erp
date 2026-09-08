@@ -8,7 +8,13 @@ export class SchemaSyncService implements OnApplicationBootstrap {
   constructor(private readonly dataSource: DataSource) {}
 
   async onApplicationBootstrap() {
-    this.logger.log('--- DEFENSIVE SCHEMA SYNC START ---');
+    if (!this.dataSource || !this.dataSource.isInitialized) {
+      this.logger.warn('DataSource not initialized yet. Skipping schema sync.');
+      return;
+    }
+
+    try {
+      this.logger.log('--- DEFENSIVE SCHEMA SYNC START ---');
 
     // 1. Sync products table
     try {
@@ -530,6 +536,9 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       this.logger.error('Failed to sync purchases/company_payments tables:', e.message);
     }
 
-    this.logger.log('--- DEFENSIVE SCHEMA SYNC COMPLETED ---');
+      this.logger.log('--- DEFENSIVE SCHEMA SYNC COMPLETED ---');
+    } catch (globalErr: any) {
+      this.logger.error('Unexpected error in schema sync:', globalErr?.message);
+    }
   }
 }

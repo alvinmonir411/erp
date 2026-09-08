@@ -18,16 +18,21 @@ const createTypeOrmOptions = (
   const synchronize = configService.get<boolean>('database.synchronize', false);
   const dropSchema = configService.get<boolean>('database.dropSchema', false);
 
+  const isLocal =
+    !databaseUrl ||
+    databaseUrl.includes('localhost') ||
+    databaseUrl.includes('127.0.0.1');
+
   return {
     type: 'postgres',
-    url: databaseUrl,
+    url: databaseUrl || process.env.DATABASE_URL,
     autoLoadEntities: true,
     synchronize: false,
     dropSchema,
     migrationsRun: false,
-    ssl: { rejectUnauthorized: false },
+    ssl: isLocal ? false : { rejectUnauthorized: false },
     extra: {
-      max: 20,
+      max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 30000,
       keepAlive: true,
