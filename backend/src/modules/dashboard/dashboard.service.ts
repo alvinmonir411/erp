@@ -82,6 +82,10 @@ export class DashboardService {
       options.month,
     );
     const {
+      startDateStr,
+      endDateStr,
+      startUtc,
+      endUtc,
       periodStartDateStr,
       periodEndDateStr,
       periodStartUtc,
@@ -667,8 +671,14 @@ export class DashboardService {
 
     // B) Month Daily Breakdown Chart (from Day 1 to totalDays: 28/29/30/31)
     const monthlyTrend = [];
-    if (monthRange) {
-      const { startUtc, endUtc, totalDays, year, month, monthName } = monthRange;
+    const chartMonthRange =
+      dateRange.month && dateRange.year
+        ? getBDMonthRange(dateRange.year, dateRange.month)
+        : getBDMonthRange();
+
+    if (chartMonthRange) {
+      const { startUtc, endUtc, totalDays, year, month, monthName } =
+        chartMonthRange;
       const monthChartQb = this.ordersRepository.createQueryBuilder('order');
       if (companyId) {
         monthChartQb
@@ -687,9 +697,14 @@ export class DashboardService {
             )`,
             'daySales',
           )
-          .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
+          .where('order.status IN (:...statuses)', {
+            statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE],
+          })
           .andWhere('product.companyId = :companyId', { companyId })
-          .andWhere('order.settledAt >= :startUtc AND order.settledAt <= :endUtc', { startUtc, endUtc })
+          .andWhere(
+            'order.settledAt >= :startUtc AND order.settledAt <= :endUtc',
+            { startUtc, endUtc },
+          )
           .groupBy(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`);
       } else {
         monthChartQb
@@ -698,8 +713,13 @@ export class DashboardService {
             'dayDate',
           )
           .addSelect('SUM(COALESCE(order.actualSoldAmount, 0))', 'daySales')
-          .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
-          .andWhere('order.settledAt >= :startUtc AND order.settledAt <= :endUtc', { startUtc, endUtc })
+          .where('order.status IN (:...statuses)', {
+            statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE],
+          })
+          .andWhere(
+            'order.settledAt >= :startUtc AND order.settledAt <= :endUtc',
+            { startUtc, endUtc },
+          )
           .groupBy(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`);
       }
 
@@ -1022,6 +1042,10 @@ export class DashboardService {
       options.month,
     );
     const {
+      startDateStr,
+      endDateStr,
+      startUtc,
+      endUtc,
       periodStartDateStr,
       periodEndDateStr,
       periodStartUtc,

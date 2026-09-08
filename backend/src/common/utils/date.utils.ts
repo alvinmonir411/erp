@@ -125,6 +125,10 @@ export interface BDPeriodRange {
   endUtc: Date | null;
   startDateStr: string | null;
   endDateStr: string | null;
+  periodStartUtc: Date | null;
+  periodEndUtc: Date | null;
+  periodStartDateStr: string | null;
+  periodEndDateStr: string | null;
   periodLabel: string;
   isAllTime: boolean;
   month?: number;
@@ -151,10 +155,15 @@ export function getBDDateRangeForPeriod(
       endUtc,
       startDateStr: bdToday,
       endDateStr: bdToday,
+      periodStartUtc: startUtc,
+      periodEndUtc: endUtc,
+      periodStartDateStr: bdToday,
+      periodEndDateStr: bdToday,
       periodLabel: 'আজকের হিসাব (Today)',
       isAllTime: false,
       year: currentYear,
       month: currentMonth,
+      totalDays: 1,
     };
   }
 
@@ -174,10 +183,15 @@ export function getBDDateRangeForPeriod(
       endUtc,
       startDateStr: sevenDaysAgoStr,
       endDateStr: bdToday,
+      periodStartUtc: startUtc,
+      periodEndUtc: endUtc,
+      periodStartDateStr: sevenDaysAgoStr,
+      periodEndDateStr: bdToday,
       periodLabel: 'বিগত ৭ দিন (Last 7 Days)',
       isAllTime: false,
       year: currentYear,
       month: currentMonth,
+      totalDays: 7,
     };
   }
 
@@ -194,6 +208,10 @@ export function getBDDateRangeForPeriod(
       endUtc: monthRange.endUtc,
       startDateStr: monthRange.startDateStr,
       endDateStr: monthRange.endDateStr,
+      periodStartUtc: monthRange.startUtc,
+      periodEndUtc: monthRange.endUtc,
+      periodStartDateStr: monthRange.startDateStr,
+      periodEndDateStr: monthRange.endDateStr,
       periodLabel: `${monthRange.monthName} ${monthRange.year}`,
       isAllTime: false,
       month: monthRange.month,
@@ -206,11 +224,17 @@ export function getBDDateRangeForPeriod(
   if (period === 'this_year') {
     const startUtc = new Date(Date.UTC(currentYear, 0, 1, 0, 0, 0) - 6 * 60 * 60 * 1000);
     const endUtc = new Date(Date.UTC(currentYear, 11, 31, 23, 59, 59, 999) - 6 * 60 * 60 * 1000);
+    const startDateStr = `${currentYear}-01-01`;
+    const endDateStr = `${currentYear}-12-31`;
     return {
       startUtc,
       endUtc,
-      startDateStr: `${currentYear}-01-01`,
-      endDateStr: `${currentYear}-12-31`,
+      startDateStr,
+      endDateStr,
+      periodStartUtc: startUtc,
+      periodEndUtc: endUtc,
+      periodStartDateStr: startDateStr,
+      periodEndDateStr: endDateStr,
       periodLabel: `${currentYear} সাল (This Year)`,
       isAllTime: false,
       year: currentYear,
@@ -224,6 +248,10 @@ export function getBDDateRangeForPeriod(
       endUtc: monthRange.endUtc,
       startDateStr: monthRange.startDateStr,
       endDateStr: monthRange.endDateStr,
+      periodStartUtc: monthRange.startUtc,
+      periodEndUtc: monthRange.endUtc,
+      periodStartDateStr: monthRange.startDateStr,
+      periodEndDateStr: monthRange.endDateStr,
       periodLabel: `${monthRange.monthName} ${monthRange.year}`,
       isAllTime: false,
       month: monthRange.month,
@@ -239,6 +267,10 @@ export function getBDDateRangeForPeriod(
       endUtc: null,
       startDateStr: null,
       endDateStr: null,
+      periodStartUtc: null,
+      periodEndUtc: null,
+      periodStartDateStr: null,
+      periodEndDateStr: null,
       periodLabel: 'সকল ইতিহাস (All Time)',
       isAllTime: true,
     };
@@ -251,6 +283,10 @@ export function getBDDateRangeForPeriod(
     endUtc: monthRange.endUtc,
     startDateStr: monthRange.startDateStr,
     endDateStr: monthRange.endDateStr,
+    periodStartUtc: monthRange.startUtc,
+    periodEndUtc: monthRange.endUtc,
+    periodStartDateStr: monthRange.startDateStr,
+    periodEndDateStr: monthRange.endDateStr,
     periodLabel: `${monthRange.monthName} ${monthRange.year}`,
     isAllTime: false,
     month: monthRange.month,
