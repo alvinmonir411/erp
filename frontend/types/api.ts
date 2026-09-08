@@ -278,14 +278,20 @@ export type PurchaseQuery = {
 export type CreatePurchasePayload = {
   companyId: number;
   purchaseDate: string;
-  note?: string;
+  invoiceNo?: string;
   referenceNo?: string;
+  supplierName?: string;
+  note?: string;
+  paymentId?: number;
+  paidAmount?: number;
+  status?: 'DRAFT' | 'CONFIRMED';
+  confirmStockIn?: boolean;
   items: {
     productId: number;
     quantity: number;
-    unitPrice: number;
+    unitPrice?: number;
+    unitCost?: number;
   }[];
-  paidAmount?: number;
 };
 
 export type ReceivePurchasePaymentPayload = {
@@ -507,6 +513,15 @@ export type PurchasePayment = {
   paymentMethod?: string;
   transactionRef?: string | null;
   note?: string | null;
+  productBreakdown?: Array<{
+    productId?: number;
+    productName?: string;
+    unitPrice?: number | string;
+    unit?: string;
+    quantity?: number | string;
+    amount?: number | string;
+    note?: string;
+  }> | null;
   createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -573,6 +588,15 @@ export type CompanyPayableHistoryEntry = {
   purchasePaidAmount?: number | string;
   purchasePayableAmount?: number | string;
   note?: string | null;
+  productBreakdown?: Array<{
+    productId?: number;
+    productName?: string;
+    unitPrice?: number | string;
+    unit?: string;
+    quantity?: number | string;
+    amount?: number | string;
+    note?: string;
+  }> | null;
   createdByName?: string;
   createdAt?: string;
 };

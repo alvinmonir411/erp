@@ -64,6 +64,9 @@ export class CompanyPayment {
   @Column({ type: 'text', nullable: true })
   note: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  productBreakdown: any[];
+
   @Column({ type: 'varchar', length: 100, nullable: true, default: 'Admin' })
   createdByName: string;
 

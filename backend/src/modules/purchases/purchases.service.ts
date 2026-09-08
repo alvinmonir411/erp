@@ -86,8 +86,26 @@ export class PurchasesService {
   }
 
   async create(dto: any, user?: any) {
-    return this.dataSource.transaction(async (manager) => {
-      const paidAmount = this.safeNum(dto.paidAmount);
+    let createdId: number;
+
+    await this.dataSource.transaction(async (manager) => {
+      let paidAmount = this.safeNum(dto.paidAmount);
+      const paymentId = dto.paymentId ? Number(dto.paymentId) : null;
+      let linkedPayment: CompanyPayment | null = null;
+
+      if (paymentId) {
+        linkedPayment = await manager.findOne(CompanyPayment, {
+          where: { id: paymentId },
+        });
+        if (linkedPayment) {
+          if (dto.paidAmount === undefined || dto.paidAmount === null || dto.paidAmount === '') {
+            paidAmount = this.safeNum(linkedPayment.amount);
+          }
+        }
+      }
+
+      const isConfirmed =
+        dto.status === PurchaseStatus.CONFIRMED || dto.confirmStockIn === true;
 
       const purchase = manager.create(Purchase, {
         purchaseDate: dto.purchaseDate ? new Date(dto.purchaseDate) : new Date(),
@@ -98,7 +116,7 @@ export class PurchasesService {
         companyId: Number(dto.companyId),
         supplierName: dto.supplierName || null,
         note: dto.note || null,
-        status: dto.status === PurchaseStatus.CONFIRMED ? PurchaseStatus.CONFIRMED : PurchaseStatus.DRAFT,
+        status: isConfirmed ? PurchaseStatus.CONFIRMED : PurchaseStatus.DRAFT,
         paidAmount,
       });
 
@@ -107,7 +125,9 @@ export class PurchasesService {
 
       for (const itemDto of dto.items || []) {
         const qty = this.safeNum(itemDto.quantity);
-        const cost = this.safeNum(itemDto.unitCost ?? itemDto.cost ?? itemDto.buyPrice);
+        const cost = this.safeNum(
+          itemDto.unitCost ?? itemDto.cost ?? itemDto.buyPrice ?? itemDto.unitPrice,
+        );
         const lineTotal = qty * cost;
         totalAmount += lineTotal;
         items.push(
@@ -129,8 +149,12 @@ export class PurchasesService {
       }
       await manager.save(items);
 
-      // If initial payment was made during creation, record CompanyPayment entry
-      if (paidAmount > 0) {
+      // Link payment if provided
+      if (linkedPayment) {
+        await manager.update(CompanyPayment, linkedPayment.id, {
+          purchaseId: savedPurchase.id,
+        });
+      } else if (paidAmount > 0) {
         const payment = manager.create(CompanyPayment, {
           companyId: savedPurchase.companyId,
           purchaseId: savedPurchase.id,
@@ -138,20 +162,44 @@ export class PurchasesService {
           paymentDate: savedPurchase.purchaseDate,
           paymentMethod: dto.paymentMethod || PaymentMethod.CASH,
           transactionRef: dto.transactionRef || `INV-${savedPurchase.invoiceNo}`,
-          note: dto.paymentNote || `Initial settlement for Invoice #${savedPurchase.invoiceNo}`,
-          createdByName: user?.name || 'Admin',
+          note:
+            dto.paymentNote || `Initial settlement for Invoice #${savedPurchase.invoiceNo}`,
+          createdByName: user?.name || user?.username || 'Admin',
           createdById: user?.id || null,
         });
         await manager.save(payment);
       }
 
       // If CONFIRMED, update inventory and buyPrice immediately
-      if (dto.status === PurchaseStatus.CONFIRMED) {
-        await this.confirmPurchase(savedPurchase.id, manager);
+      if (isConfirmed) {
+        for (const item of items) {
+          // Stock In
+          await this.stockService.create(
+            {
+              productId: item.productId,
+              companyId: savedPurchase.companyId,
+              type: StockMovementType.STOCK_IN,
+              quantity: Number(item.quantity),
+              reference: `PUR-${savedPurchase.invoiceNo}`,
+              note: `Purchase confirmed: Invoice #${savedPurchase.invoiceNo}`,
+            },
+            user?.name || user?.username || 'Admin',
+            manager,
+          );
+
+          // Update Product Buy Price with latest purchase cost
+          if (Number(item.unitCost) > 0) {
+            await manager.update(Product, item.productId, {
+              buyPrice: Number(item.unitCost),
+            });
+          }
+        }
       }
 
-      return this.findOne(savedPurchase.id);
+      createdId = savedPurchase.id;
     });
+
+    return this.findOne(createdId!);
   }
 
   async confirmPurchase(id: number, manager?: any) {
@@ -560,6 +608,7 @@ export class PurchasesService {
         paymentMethod: pay.paymentMethod,
         transactionRef: pay.transactionRef,
         note: pay.note,
+        productBreakdown: pay.productBreakdown || null,
         purchaseId: pay.purchaseId,
         purchaseInvoiceNo: pay.purchase?.invoiceNo || null,
         createdByName: pay.createdByName,
@@ -593,25 +642,26 @@ export class PurchasesService {
 
       // Format note with product breakdown if provided
       let finalNote = dto.note || '';
-      if (Array.isArray(dto.productBreakdown) && dto.productBreakdown.length > 0) {
-        const validBreakdown = dto.productBreakdown.filter(
-          (b: any) => b && (b.productName || b.productId || b.amount),
-        );
-        if (validBreakdown.length > 0) {
-          const breakdownParts = validBreakdown.map((b: any, idx: number) => {
-            const name = b.productName || `Product #${b.productId}`;
-            const rate = b.unitPrice ? ` @ ৳${b.unitPrice}` : '';
-            const qty = b.quantity ? ` (${b.quantity} ${b.unit || 'টি'}${rate})` : '';
-            const amt = b.amount ? ` - ৳${b.amount}` : '';
-            const itemNote = b.note ? ` [${b.note}]` : '';
-            return `${idx + 1}. ${name}${qty}${amt}${itemNote}`;
-          });
-          const breakdownSummary = breakdownParts.join(' | ');
-          if (finalNote) {
-            finalNote = `${finalNote} [পণ্যসমূহ: ${breakdownSummary}]`;
-          } else {
-            finalNote = `পণ্য বাবদ পরিশোধ: ${breakdownSummary}`;
-          }
+      const breakdownList = Array.isArray(dto.productBreakdown)
+        ? dto.productBreakdown.filter(
+            (b: any) => b && (b.productName || b.productId || b.amount),
+          )
+        : [];
+
+      if (breakdownList.length > 0) {
+        const breakdownParts = breakdownList.map((b: any, idx: number) => {
+          const name = b.productName || `Product #${b.productId}`;
+          const rate = b.unitPrice ? ` @ ৳${b.unitPrice}` : '';
+          const qty = b.quantity ? ` (${b.quantity} ${b.unit || 'টি'}${rate})` : '';
+          const amt = b.amount ? ` - ৳${b.amount}` : '';
+          const itemNote = b.note ? ` [${b.note}]` : '';
+          return `${idx + 1}. ${name}${qty}${amt}${itemNote}`;
+        });
+        const breakdownSummary = breakdownParts.join(' | ');
+        if (finalNote) {
+          finalNote = `${finalNote} [পণ্যসমূহ: ${breakdownSummary}]`;
+        } else {
+          finalNote = `পণ্য বাবদ পরিশোধ: ${breakdownSummary}`;
         }
       }
 
@@ -630,6 +680,7 @@ export class PurchasesService {
         paymentMethod: dto.paymentMethod || PaymentMethod.CASH,
         transactionRef: dto.transactionRef || null,
         note: finalNote,
+        productBreakdown: breakdownList.length > 0 ? breakdownList : null,
         createdByName: user?.name || user?.username || 'Admin',
         createdById: user?.id || null,
       });

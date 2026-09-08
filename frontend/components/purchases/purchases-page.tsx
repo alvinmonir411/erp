@@ -1300,13 +1300,23 @@ export function PurchasesPage() {
                             {pay.createdByName || 'Admin'}
                           </td>
                           <td className="px-5 py-3.5 text-center">
-                            <button
-                              onClick={() => handleDeletePayment(pay.id)}
-                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
-                              title="পেমেন্ট হিস্ট্রি মুছুন"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <Link
+                                href={`/purchases/create?companyId=${pay.companyId}&paymentId=${pay.id}`}
+                                className="inline-flex items-center gap-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 text-xs font-bold transition-all"
+                                title="এই পেমেন্টের মাল রিসিভ ও চালান স্টক ইন করুন"
+                              >
+                                <Package className="h-3.5 w-3.5" />
+                                <span>চালান ইন</span>
+                              </Link>
+                              <button
+                                onClick={() => handleDeletePayment(pay.id)}
+                                className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                                title="পেমেন্ট হিস্ট্রি মুছুন"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}

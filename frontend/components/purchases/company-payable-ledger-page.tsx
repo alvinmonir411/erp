@@ -783,6 +783,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                     <th className="px-5 py-3.5 text-left">চেক / স্লিপ রেফারেন্স</th>
                     <th className="px-5 py-3.5 text-left">নোট / বিবরণ</th>
                     <th className="px-5 py-3.5 text-center">এন্ট্রি কারী</th>
+                    <th className="px-5 py-3.5 text-center">অ্যাকশন</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -807,6 +808,16 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                       </td>
                       <td className="px-5 py-3.5 text-center text-xs text-slate-500">
                         {pay.createdByName || 'Admin'}
+                      </td>
+                      <td className="px-5 py-3.5 text-center">
+                        <Link
+                          href={`/purchases/create?companyId=${companyId}&paymentId=${pay.id}`}
+                          className="inline-flex items-center gap-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 text-xs font-bold transition-all"
+                          title="এই পেমেন্টের মাল রিসিভ ও চালান স্টক ইন করুন"
+                        >
+                          <Package className="h-3.5 w-3.5" />
+                          <span>চালান ইন</span>
+                        </Link>
                       </td>
                     </tr>
                   ))}

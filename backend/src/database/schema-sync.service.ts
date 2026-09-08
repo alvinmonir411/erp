@@ -511,6 +511,9 @@ export class SchemaSyncService implements OnApplicationBootstrap {
           "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        ALTER TABLE "company_payments" ADD COLUMN IF NOT EXISTS "productBreakdown" JSONB;
+        ALTER TABLE "purchases" ADD COLUMN IF NOT EXISTS "paymentId" INTEGER;
+
         CREATE INDEX IF NOT EXISTS "idx_purchases_company_date" ON "purchases" ("companyId", "purchaseDate" DESC);
         CREATE INDEX IF NOT EXISTS "idx_purchase_items_purchase" ON "purchase_items" ("purchaseId");
         CREATE INDEX IF NOT EXISTS "idx_purchase_items_product" ON "purchase_items" ("productId");
