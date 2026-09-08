@@ -153,8 +153,8 @@ async function createApp(): Promise<Express> {
 }
 
 // ── Local development bootstrap ────────────────────────────────────────────────
-// Only called locally (nest start / ts-node). Skipped entirely on Vercel.
-if (process.env['VERCEL'] !== '1' && process.env['NODE_ENV'] !== 'production') {
+// Only called locally (nest start / ts-node / node). Skipped entirely on Vercel.
+if (!process.env['VERCEL']) {
   void (async () => {
     const expressInstance = await createApp();
     const port = Number(process.env['PORT']) || 3001;

@@ -39,7 +39,7 @@ export class Purchase {
   @JoinColumn({ name: 'companyId' })
   company: Company;
 
-  @Column({ length: 200, nullable: true })
+  @Column({ type: 'varchar', length: 200, nullable: true })
   supplierName?: string | null;
 
   @Column({
@@ -76,23 +76,23 @@ export class Purchase {
   })
   status: PurchaseStatus;
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   paymentId?: number | null;
 
   @ManyToOne(() => CompanyPayment, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'paymentId' })
   payment?: CompanyPayment | null;
 
-  @Column({ length: 150, nullable: true })
+  @Column({ type: 'varchar', length: 150, nullable: true })
   warehouseName?: string | null;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   vehicleNo?: string | null;
 
-  @Column({ length: 150, nullable: true })
+  @Column({ type: 'varchar', length: 150, nullable: true })
   driverName?: string | null;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   supplierInvoiceNo?: string | null;
 
   @Column({ type: 'text', nullable: true })

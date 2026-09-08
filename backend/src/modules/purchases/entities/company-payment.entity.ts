@@ -32,7 +32,7 @@ export class CompanyPayment {
   @JoinColumn({ name: 'companyId' })
   company: Company;
 
-  @Column({ nullable: true })
+  @Column({ type: 'int', nullable: true })
   purchaseId?: number | null;
 
   @ManyToOne(() => Purchase, { nullable: true, onDelete: 'SET NULL' })
