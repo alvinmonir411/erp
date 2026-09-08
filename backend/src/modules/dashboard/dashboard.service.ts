@@ -912,7 +912,7 @@ export class DashboardService {
           companyId: p.companyId || (p.company?.id ? Number(p.company.id) : 0),
           companyName: p.company?.name || 'Unknown',
           unit: p.unit || 'Pcs',
-          price: safeNum(p.price),
+          price: safeNum(p.salePrice ?? (p as any).price),
           currentStock: safeNum(p.currentStock),
           soldQuantity: stats.soldQuantity,
           salesValue: stats.salesValue,
@@ -1461,15 +1461,13 @@ export class DashboardService {
         .addSelect('product.name', 'productName')
         .addSelect('product.currentStock', 'currentStock')
         .addSelect('product.unit', 'unit')
-        .addSelect('product.price', 'price')
+        .addSelect('product.salePrice', 'price')
         .addSelect('company.id', 'companyId')
         .addSelect('company.name', 'companyName')
         .addSelect('SUM(COALESCE(item.deliveredPaidQuantity, item.quantity, 0))', 'soldQuantity')
         .addSelect('SUM(COALESCE(item.lineTotal, 0))', 'salesValue')
         .addSelect('COUNT(DISTINCT order.id)', 'orderCount')
-        .where('order.status IN (:...statuses)', {
-          statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE, OrderStatus.DELIVERED, OrderStatus.APPROVED],
-        });
+        .where("order.status NOT IN ('CANCELLED', 'DRAFT')");
 
       if (!isAllTime && periodStartDateStr && periodEndDateStr) {
         qb.andWhere(
