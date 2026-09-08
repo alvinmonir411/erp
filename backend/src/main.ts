@@ -183,6 +183,11 @@ export default async function handler(req: any, res: any) {
     return res.status(204).end();
   }
 
+  // Fast diagnostic ping route that responds before NestJS boot
+  if (req.url === '/api/ping' || req.url === '/ping') {
+    return res.status(200).json({ status: 'ok', time: new Date().toISOString() });
+  }
+
   try {
     const app = await createApp();
     return new Promise<void>((resolve, reject) => {
