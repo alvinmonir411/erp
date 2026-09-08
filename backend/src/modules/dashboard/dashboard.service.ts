@@ -1117,7 +1117,6 @@ export class DashboardService {
         .leftJoinAndSelect('order.shop', 'shop')
         .leftJoinAndSelect('order.company', 'company')
         .leftJoinAndSelect('order.route', 'route')
-        .leftJoinAndSelect('order.createdBy', 'createdBy')
         .where("order.status <> 'CANCELLED'");
 
       if (!isAllTime && periodStartDateStr && periodEndDateStr) {
@@ -1150,7 +1149,7 @@ export class DashboardService {
           shopPhone: o.shop?.phone,
           routeName: o.route?.name,
           companyName: o.company?.name,
-          srName: o.createdBy?.name,
+          srName: o.createdBy,
           status: o.status,
           grandTotal: safeNum(o.grandTotal),
           soldAmount: safeNum(o.actualSoldAmount),
@@ -1307,7 +1306,6 @@ export class DashboardService {
         .leftJoinAndSelect('order.shop', 'shop')
         .leftJoinAndSelect('order.route', 'route')
         .leftJoinAndSelect('order.company', 'company')
-        .leftJoinAndSelect('order.createdBy', 'createdBy')
         .where('order.status = :cancelledStatus', {
           cancelledStatus: OrderStatus.CANCELLED,
         });
@@ -1344,7 +1342,7 @@ export class DashboardService {
           shopPhone: o.shop?.phone,
           routeName: o.route?.name,
           companyName: o.company?.name,
-          srName: o.createdBy?.name,
+          srName: o.createdBy,
           status: o.status,
           grandTotal: safeNum(o.grandTotal),
         })),
@@ -1362,7 +1360,7 @@ export class DashboardService {
         .addSelect('product.name', 'productName')
         .addSelect('company.name', 'companyName')
         .addSelect('product.buyPrice', 'buyPrice')
-        .addSelect('product.price', 'sellPrice')
+        .addSelect('product.salePrice', 'sellPrice')
         .addSelect('SUM(COALESCE(item.deliveredPaidQuantity, 0))', 'totalDeliveredQty')
         .addSelect(
           `SUM(
@@ -1399,7 +1397,7 @@ export class DashboardService {
         .addGroupBy('product.name')
         .addGroupBy('company.name')
         .addGroupBy('product.buyPrice')
-        .addGroupBy('product.price')
+        .addGroupBy('product.salePrice')
         .orderBy('totalProfit', 'DESC');
 
       const rawItems = await qb.getRawMany();
@@ -1454,7 +1452,7 @@ export class DashboardService {
         .addGroupBy('product.name')
         .addGroupBy('product.currentStock')
         .addGroupBy('product.unit')
-        .addGroupBy('product.price')
+        .addGroupBy('product.salePrice')
         .addGroupBy('company.id')
         .addGroupBy('company.name')
         .orderBy('SUM(COALESCE(item.deliveredPaidQuantity, item.quantity, 0))', 'DESC');
