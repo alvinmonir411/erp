@@ -18,3 +18,24 @@ export async function getDashboardMetrics(params: DashboardFilterParams = {}) {
     },
   });
 }
+
+export interface DashboardDrilldownParams extends DashboardFilterParams {
+  type: 'sales' | 'orders' | 'collections' | 'dues' | 'dispatches' | 'profit';
+  page?: number;
+  limit?: number;
+}
+
+export async function getDashboardDrilldown(params: DashboardDrilldownParams) {
+  return apiRequest<any>('/dashboard/drilldown', {
+    method: 'GET',
+    query: {
+      type: params.type,
+      companyId: params.companyId,
+      period: params.period,
+      month: params.month,
+      year: params.year,
+      page: params.page,
+      limit: params.limit,
+    },
+  });
+}

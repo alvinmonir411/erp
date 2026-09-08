@@ -960,4 +960,376 @@ export class DashboardService {
       })),
     };
   }
+
+  async getDrilldownData(
+    type: string,
+    companyId?: number,
+    user?: any,
+    options: DashboardQueryOptions = {},
+    page = 1,
+    limit = 50,
+  ) {
+    const isSR = user?.role === Role.SR;
+    const userId = user?.id || user?.sub;
+
+    const period = options.period || 'this_month';
+    const bdToday = getBDTodayString();
+    const [currentYear, currentMonth] = bdToday.split('-').map(Number);
+
+    let monthRange: BDMonthRange | null = null;
+    let periodStartDateStr: string | null = null;
+    let periodEndDateStr: string | null = null;
+    let periodStartUtc: Date | null = null;
+    let periodEndUtc: Date | null = null;
+    let isAllTime = false;
+
+    if (period === 'last_month') {
+      let targetMonth = currentMonth - 1;
+      let targetYear = currentYear;
+      if (targetMonth < 1) {
+        targetMonth = 12;
+        targetYear -= 1;
+      }
+      monthRange = getBDMonthRange(targetYear, targetMonth);
+      periodStartDateStr = monthRange.startDateStr;
+      periodEndDateStr = monthRange.endDateStr;
+      periodStartUtc = monthRange.startUtc;
+      periodEndUtc = monthRange.endUtc;
+    } else if (period === 'custom' && options.month && options.year) {
+      monthRange = getBDMonthRange(options.year, options.month);
+      periodStartDateStr = monthRange.startDateStr;
+      periodEndDateStr = monthRange.endDateStr;
+      periodStartUtc = monthRange.startUtc;
+      periodEndUtc = monthRange.endUtc;
+    } else if (period === 'all_time') {
+      isAllTime = true;
+    } else {
+      monthRange = getBDMonthRange(currentYear, currentMonth);
+      periodStartDateStr = monthRange.startDateStr;
+      periodEndDateStr = monthRange.endDateStr;
+      periodStartUtc = monthRange.startUtc;
+      periodEndUtc = monthRange.endUtc;
+    }
+
+    const safeNum = (val: any) => {
+      const n = Number(val);
+      return isFinite(n) ? n : 0;
+    };
+
+    // 1. SALES (SETTLED / DELIVERED ORDERS)
+    if (type === 'sales') {
+      const qb = this.ordersRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.shop', 'shop')
+        .leftJoinAndSelect('order.company', 'company')
+        .leftJoinAndSelect('order.route', 'route')
+        .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
+        .where('order.status IN (:...statuses)', {
+          statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE],
+        });
+
+      if (!isAllTime && periodStartDateStr && periodEndDateStr) {
+        qb.andWhere(
+          '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (order.settledAt >= :periodStartUtc AND order.settledAt <= :periodEndUtc))',
+          { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
+        );
+      }
+      if (companyId) qb.andWhere('order.companyId = :companyId', { companyId });
+      if (isSR) qb.andWhere('order.createdById = :userId', { userId });
+
+      qb.orderBy('order.orderDate', 'DESC').addOrderBy('order.createdAt', 'DESC');
+
+      const [items, total] = await qb
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return {
+        type: 'sales',
+        total,
+        page,
+        limit,
+        items: items.map((o) => ({
+          id: o.id,
+          orderDate: o.orderDate,
+          settledAt: o.settledAt,
+          shopName: o.shop?.name || 'Direct Sale',
+          shopOwner: o.shop?.ownerName,
+          shopPhone: o.shop?.phone,
+          routeName: o.route?.name,
+          companyName: o.company?.name,
+          deliveryManName: o.deliveryPerson?.name,
+          status: o.status,
+          grandTotal: safeNum(o.grandTotal),
+          soldAmount: safeNum(o.actualSoldAmount || o.grandTotal),
+          dueAmount: safeNum(o.dueAmount),
+          collectedAmount: safeNum(o.collectedAmount),
+        })),
+      };
+    }
+
+    // 2. ORDERS (ALL ORDERS IN PERIOD)
+    if (type === 'orders') {
+      const qb = this.ordersRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.shop', 'shop')
+        .leftJoinAndSelect('order.company', 'company')
+        .leftJoinAndSelect('order.route', 'route')
+        .leftJoinAndSelect('order.createdBy', 'createdBy')
+        .where("order.status <> 'CANCELLED'");
+
+      if (!isAllTime && periodStartDateStr && periodEndDateStr) {
+        qb.andWhere(
+          'order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr',
+          { periodStartDateStr, periodEndDateStr },
+        );
+      }
+      if (companyId) qb.andWhere('order.companyId = :companyId', { companyId });
+      if (isSR) qb.andWhere('order.createdById = :userId', { userId });
+
+      qb.orderBy('order.orderDate', 'DESC').addOrderBy('order.createdAt', 'DESC');
+
+      const [items, total] = await qb
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return {
+        type: 'orders',
+        total,
+        page,
+        limit,
+        items: items.map((o) => ({
+          id: o.id,
+          orderDate: o.orderDate,
+          createdAt: o.createdAt,
+          shopName: o.shop?.name || 'Direct Sale',
+          shopOwner: o.shop?.ownerName,
+          shopPhone: o.shop?.phone,
+          routeName: o.route?.name,
+          companyName: o.company?.name,
+          srName: o.createdBy?.name,
+          status: o.status,
+          grandTotal: safeNum(o.grandTotal),
+          soldAmount: safeNum(o.actualSoldAmount),
+        })),
+      };
+    }
+
+    // 3. COLLECTIONS
+    if (type === 'collections') {
+      const qb = this.collectionsRepository
+        .createQueryBuilder('coll')
+        .leftJoinAndSelect('coll.order', 'order')
+        .leftJoinAndSelect('coll.shop', 'shop')
+        .leftJoinAndSelect('coll.sr', 'sr');
+
+      if (!isAllTime && periodStartUtc && periodEndUtc) {
+        qb.where(
+          'coll.createdAt >= :periodStartUtc AND coll.createdAt <= :periodEndUtc',
+          { periodStartUtc, periodEndUtc },
+        );
+      }
+      if (companyId) {
+        qb.innerJoin('order.items', 'item')
+          .innerJoin('item.product', 'product')
+          .andWhere('product.companyId = :companyId', { companyId });
+      }
+      if (isSR) qb.andWhere('coll.srId = :userId', { userId });
+
+      qb.orderBy('coll.collectionDate', 'DESC').addOrderBy('coll.createdAt', 'DESC');
+
+      const [items, total] = await qb
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return {
+        type: 'collections',
+        total,
+        page,
+        limit,
+        items: items.map((c) => ({
+          id: c.id,
+          orderId: c.orderId,
+          shopName: c.shop?.name || c.order?.shop?.name || 'Direct Sale',
+          srName: c.sr?.name || c.srName,
+          collectedAmount: safeNum(c.collectedAmount),
+          collectionDate: c.collectionDate,
+          createdAt: c.createdAt,
+          status: c.status,
+          note: c.note,
+        })),
+      };
+    }
+
+    // 4. DUES
+    if (type === 'dues') {
+      const qb = this.duesRepository
+        .createQueryBuilder('due')
+        .leftJoinAndSelect('due.order', 'order')
+        .leftJoinAndSelect('due.shop', 'shop')
+        .leftJoinAndSelect('due.route', 'route');
+
+      if (!isAllTime && periodStartDateStr && periodEndDateStr) {
+        qb.where(
+          'order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr',
+          { periodStartDateStr, periodEndDateStr },
+        );
+      }
+      if (companyId) {
+        qb.innerJoin('order.items', 'item')
+          .innerJoin('item.product', 'product')
+          .andWhere('product.companyId = :companyId', { companyId });
+      }
+      if (isSR) qb.andWhere('due.srId = :userId', { userId });
+
+      qb.orderBy('order.orderDate', 'DESC');
+
+      const [items, total] = await qb
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return {
+        type: 'dues',
+        total,
+        page,
+        limit,
+        items: items.map((d) => ({
+          id: d.id,
+          orderId: d.orderId,
+          shopName: d.shop?.name || d.order?.shop?.name || 'Direct Sale',
+          routeName: d.route?.name,
+          srName: d.srName,
+          dueAmount: safeNum(d.dueAmount),
+          paidAmount: safeNum(d.paidAmount),
+          remainingDue: safeNum(d.remainingDue),
+          status: d.status,
+          orderDate: d.order?.orderDate,
+        })),
+      };
+    }
+
+    // 5. DISPATCHES (BATCHES)
+    if (type === 'dispatches') {
+      const batchRepo = this.dataSource.getRepository(DispatchBatch);
+      const qb = batchRepo
+        .createQueryBuilder('batch')
+        .leftJoinAndSelect('batch.deliveryPerson', 'deliveryPerson')
+        .leftJoinAndSelect('batch.orders', 'batchOrders')
+        .leftJoinAndSelect('batchOrders.order', 'order')
+        .where("batch.status <> 'CANCELLED'");
+
+      if (!isAllTime && periodStartUtc && periodEndUtc) {
+        qb.andWhere(
+          'batch.dispatchedAt >= :periodStartUtc AND batch.dispatchedAt <= :periodEndUtc',
+          { periodStartUtc, periodEndUtc },
+        );
+      }
+      if (companyId) qb.andWhere('batch.companyId = :companyId', { companyId });
+      if (isSR) qb.andWhere('order.createdById = :userId', { userId });
+
+      qb.orderBy('batch.dispatchDate', 'DESC').addOrderBy('batch.createdAt', 'DESC');
+
+      const [items, total] = await qb
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return {
+        type: 'dispatches',
+        total,
+        page,
+        limit,
+        items: items.map((b) => ({
+          id: b.id,
+          batchNumber: b.batchNumber,
+          dispatchDate: b.dispatchDate,
+          dispatchedAt: b.dispatchedAt,
+          deliveryPersonName: b.deliveryPerson?.name,
+          status: b.status,
+          totalOrders: b.orders?.length || 0,
+          totalAmount: b.orders?.reduce(
+            (sum: number, bo: any) => sum + safeNum(bo.order?.grandTotal),
+            0,
+          ) || 0,
+        })),
+      };
+    }
+
+    // 6. PROFIT (PRODUCT-WISE PROFIT BREAKDOWN)
+    if (type === 'profit') {
+      const qb = this.orderItemsRepository
+        .createQueryBuilder('item')
+        .leftJoin('item.order', 'order')
+        .leftJoin('item.product', 'product')
+        .leftJoin('product.company', 'company')
+        .select('product.id', 'productId')
+        .addSelect('product.name', 'productName')
+        .addSelect('company.name', 'companyName')
+        .addSelect('product.buyPrice', 'buyPrice')
+        .addSelect('product.price', 'sellPrice')
+        .addSelect('SUM(COALESCE(item.deliveredPaidQuantity, 0))', 'totalDeliveredQty')
+        .addSelect(
+          `SUM(
+            COALESCE(item.deliveredPaidQuantity, 0) * (
+              CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+              ELSE COALESCE(item.unitPrice, 0) END
+            )
+          )`,
+          'totalSales',
+        )
+        .addSelect(
+          `SUM(
+            COALESCE(item.deliveredPaidQuantity, 0) * (
+              CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+              ELSE COALESCE(item.unitPrice, 0) END - COALESCE(product.buyPrice, 0)
+            )
+          )`,
+          'totalProfit',
+        )
+        .where('order.status IN (:...statuses)', {
+          statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE],
+        });
+
+      if (!isAllTime && periodStartDateStr && periodEndDateStr) {
+        qb.andWhere(
+          '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (order.settledAt >= :periodStartUtc AND order.settledAt <= :periodEndUtc))',
+          { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
+        );
+      }
+      if (companyId) qb.andWhere('product.companyId = :companyId', { companyId });
+      if (isSR) qb.andWhere('order.createdById = :userId', { userId });
+
+      qb.groupBy('product.id')
+        .addGroupBy('product.name')
+        .addGroupBy('company.name')
+        .addGroupBy('product.buyPrice')
+        .addGroupBy('product.price')
+        .orderBy('totalProfit', 'DESC');
+
+      const rawItems = await qb.getRawMany();
+
+      return {
+        type: 'profit',
+        total: rawItems.length,
+        page: 1,
+        limit: rawItems.length,
+        items: rawItems.map((r) => ({
+          productId: r.productId,
+          productName: r.productName,
+          companyName: r.companyName,
+          buyPrice: safeNum(r.buyPrice),
+          sellPrice: safeNum(r.sellPrice),
+          deliveredQty: safeNum(r.totalDeliveredQty),
+          totalSales: safeNum(r.totalSales),
+          totalProfit: safeNum(r.totalProfit),
+        })),
+      };
+    }
+
+    return { type, items: [], total: 0 };
+  }
 }
+

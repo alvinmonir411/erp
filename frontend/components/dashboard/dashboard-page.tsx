@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getDashboardMetrics, DashboardFilterParams } from '@/lib/api/dashboard';
+import { getDashboardMetrics, getDashboardDrilldown, DashboardFilterParams } from '@/lib/api/dashboard';
 import { formatCurrency, formatNumber } from '@/lib/utils/format';
 import { StatCard } from '@/components/ui/stat-card';
 import {
@@ -25,10 +25,19 @@ import {
   Sparkles,
   RotateCcw,
   BarChart3,
+  Search,
+  Eye,
+  Loader2,
+  X,
+  Store,
+  User as UserIcon,
 } from 'lucide-react';
 import { SRDuesList } from './sr-dues-list';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
+import { OrderModal } from '@/components/orders/order-modal';
+import { getOrder } from '@/lib/api/orders';
+import { useToast } from '@/components/ui/toast-provider';
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-xl bg-slate-200/80 ${className ?? ''}`} />;
@@ -49,8 +58,11 @@ const MONTH_NAMES_BN = [
   { en: 'December', bn: 'ডিসেম্বর' },
 ];
 
+type DrilldownType = 'sales' | 'orders' | 'collections' | 'dues' | 'dispatches' | 'profit' | null;
+
 export function DashboardPage() {
   const { user } = useAuth();
+  const { error: showErrorToast } = useToast();
   
   // Current date
   const now = new Date();
@@ -63,6 +75,14 @@ export function DashboardPage() {
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
 
+  // Drilldown filter state (which card is clicked)
+  const [activeDrilldown, setActiveDrilldown] = useState<DrilldownType>(null);
+  const [drilldownSearch, setDrilldownSearch] = useState('');
+
+  // Order Details Modal State
+  const [viewingOrder, setViewingOrder] = useState<any>(null);
+  const [isViewingOrderLoading, setIsViewingOrderLoading] = useState(false);
+
   const queryParams: DashboardFilterParams = {
     period,
     month: period === 'custom' ? selectedMonth : undefined,
@@ -74,6 +94,34 @@ export function DashboardPage() {
     queryFn: () => getDashboardMetrics(queryParams),
     refetchInterval: 30000,
   });
+
+  // Fetch Drilldown data when a card is clicked
+  const { data: drilldownData, isLoading: isDrilldownLoading } = useQuery({
+    queryKey: ['dashboard', 'drilldown', { ...queryParams, type: activeDrilldown }],
+    queryFn: () => getDashboardDrilldown({ ...queryParams, type: activeDrilldown! }),
+    enabled: !!activeDrilldown,
+  });
+
+  const handleViewOrder = async (orderId: number) => {
+    try {
+      setIsViewingOrderLoading(true);
+      const orderData = await getOrder(orderId);
+      setViewingOrder(orderData);
+    } catch (err: any) {
+      showErrorToast(err.message || 'অর্ডারের বিস্তারিত তথ্য লোড হতে সমস্যা হয়েছে');
+    } finally {
+      setIsViewingOrderLoading(false);
+    }
+  };
+
+  const toggleDrilldown = (type: DrilldownType) => {
+    if (activeDrilldown === type) {
+      setActiveDrilldown(null);
+    } else {
+      setActiveDrilldown(type);
+      setDrilldownSearch('');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -119,11 +167,24 @@ export function DashboardPage() {
 
   const isCurrentMonthActive = period === 'this_month';
 
-  // Get Bangla Month label
   const activeMonthBn = periodInfo.month ? MONTH_NAMES_BN[periodInfo.month - 1]?.bn : '';
   const displayPeriodTitle = period === 'all_time' 
     ? 'শুরু থেকে আজ পর্যন্ত (সকল ইতিহাস)' 
     : `${activeMonthBn || periodInfo.monthName || ''} ${periodInfo.year || ''}`;
+
+  // Filter Drilldown items with search term
+  const drilldownItems = (drilldownData?.items || []).filter((item: any) => {
+    if (!drilldownSearch.trim()) return true;
+    const q = drilldownSearch.toLowerCase();
+    return (
+      item.id?.toString().includes(q) ||
+      item.batchNumber?.toLowerCase().includes(q) ||
+      item.shopName?.toLowerCase().includes(q) ||
+      item.productName?.toLowerCase().includes(q) ||
+      item.srName?.toLowerCase().includes(q) ||
+      item.deliveryManName?.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-8 pb-20 p-2 sm:p-4 md:p-6">
@@ -159,6 +220,7 @@ export function DashboardPage() {
               onClick={() => {
                 setPeriod('this_month');
                 setIsMonthPickerOpen(false);
+                setActiveDrilldown(null);
               }}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all ${
                 period === 'this_month'
@@ -174,6 +236,7 @@ export function DashboardPage() {
               onClick={() => {
                 setPeriod('last_month');
                 setIsMonthPickerOpen(false);
+                setActiveDrilldown(null);
               }}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all ${
                 period === 'last_month'
@@ -189,6 +252,7 @@ export function DashboardPage() {
               onClick={() => {
                 setPeriod('all_time');
                 setIsMonthPickerOpen(false);
+                setActiveDrilldown(null);
               }}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all ${
                 period === 'all_time'
@@ -245,6 +309,7 @@ export function DashboardPage() {
                           setSelectedMonth(mNum);
                           setPeriod('custom');
                           setIsMonthPickerOpen(false);
+                          setActiveDrilldown(null);
                         }}
                         className={`px-2 py-2 text-[11px] font-bold rounded-lg transition-colors text-center ${
                           isSelected
@@ -330,9 +395,9 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* 📊 2. MONTHLY PERFORMANCE (1st to 28/30/31) */}
-      <section className="rounded-3xl border border-slate-200/90 bg-slate-50/70 p-4 sm:p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+      {/* 📊 2. MONTHLY PERFORMANCE CARDS (INTERACTIVE & CLICKABLE) */}
+      <section className="rounded-3xl border border-slate-200/90 bg-slate-50/70 p-4 sm:p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-500/20">
               <TrendingUp className="h-4 w-4" />
@@ -342,7 +407,7 @@ export function DashboardPage() {
                 {displayPeriodTitle} — মোট হিসাব-নিকাশ
               </h2>
               <p className="text-[11px] font-semibold text-slate-500">
-                ১ তারিখ থেকে {periodInfo.totalDays || 30} তারিখের মোট বিক্রি, কালেকশন, বাকি ও লাভ (মাসের ১ তারিখে ০ থেকে শুরু হয়)
+                👉 নিচের যেকোনো কার্ডে ক্লিক করে সেই হিসাবের সম্পূর্ণ তালিকা ফিল্টার করে দেখুন
               </p>
             </div>
           </div>
@@ -351,50 +416,117 @@ export function DashboardPage() {
           </span>
         </div>
 
+        {/* 6 Clickable Interactive Cards */}
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <StatCard
-            label="মাসের মোট বিক্রি"
-            value={formatCurrency(periodMetrics?.netSales ?? money?.totalFinalSold)}
-            description="ডেলিভারিকৃত প্রকৃত বিক্রি"
-            icon={CheckCircle}
-            colorTheme="emerald"
-          />
-          <StatCard
-            label="মোট অর্ডার বুকিং মূল্য"
-            value={formatCurrency(periodMetrics?.orderValue ?? orders?.totalOrderValue)}
-            description={`অর্ডার সংখ্যা: ${formatNumber(periodMetrics?.ordersCount ?? orders?.totalOrders)}টি`}
-            icon={DollarSign}
-            colorTheme="indigo"
-          />
-          <StatCard
-            label="মাসের মোট ক্যাশ আদায়"
-            value={formatCurrency(periodMetrics?.dueCollection ?? money?.periodDueCollection ?? 0)}
-            description="মাসে মোট কালেকশন"
-            icon={Wallet}
-            colorTheme="cyan"
-          />
-          <StatCard
-            label="মাসের নতুন বাকি"
-            value={formatCurrency(periodMetrics?.newDue ?? money?.periodDue ?? 0)}
-            description="চলতি মাসে দেওয়া বাকি"
-            icon={AlertCircle}
-            colorTheme="amber"
-          />
-          <StatCard
-            label="মোট ডেলিভারি চালান"
-            value={formatNumber(periodMetrics?.dispatchCount ?? delivery?.totalDispatch)}
-            description={`ডেলিভারি সম্পন্ন: ${formatNumber(periodMetrics?.deliveredCount ?? delivery?.delivered)}টি (${deliveryRate})`}
-            icon={Truck}
-            colorTheme="primary"
-          />
-          {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? (
+          
+          {/* Card 1: Sales */}
+          <div 
+            onClick={() => toggleDrilldown('sales')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeDrilldown === 'sales'
+                ? 'ring-4 ring-emerald-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
             <StatCard
-              label="মাসের মোট লাভ (মুনাফা)"
-              value={formatCurrency(periodMetrics?.profit ?? money?.totalProfit ?? 0)}
-              description="চলতি মাসের নিট প্রফিট"
-              icon={TrendingUp}
-              colorTheme="violet"
+              label="মাসের মোট বিক্রি 👆"
+              value={formatCurrency(periodMetrics?.netSales ?? money?.totalFinalSold)}
+              description={activeDrilldown === 'sales' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'ক্লিক করে তালিকা দেখুন'}
+              icon={CheckCircle}
+              colorTheme="emerald"
             />
+          </div>
+
+          {/* Card 2: Orders Value */}
+          <div 
+            onClick={() => toggleDrilldown('orders')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeDrilldown === 'orders'
+                ? 'ring-4 ring-indigo-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="মোট অর্ডার বুকিং মূল্য 👆"
+              value={formatCurrency(periodMetrics?.orderValue ?? orders?.totalOrderValue)}
+              description={activeDrilldown === 'orders' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : `অর্ডার সংখ্যা: ${formatNumber(periodMetrics?.ordersCount ?? orders?.totalOrders)}টি`}
+              icon={DollarSign}
+              colorTheme="indigo"
+            />
+          </div>
+
+          {/* Card 3: Collections */}
+          <div 
+            onClick={() => toggleDrilldown('collections')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeDrilldown === 'collections'
+                ? 'ring-4 ring-cyan-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="মাসের মোট ক্যাশ আদায় 👆"
+              value={formatCurrency(periodMetrics?.dueCollection ?? money?.periodDueCollection ?? 0)}
+              description={activeDrilldown === 'collections' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'ক্লিক করে আদায় তালিকা দেখুন'}
+              icon={Wallet}
+              colorTheme="cyan"
+            />
+          </div>
+
+          {/* Card 4: New Due */}
+          <div 
+            onClick={() => toggleDrilldown('dues')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeDrilldown === 'dues'
+                ? 'ring-4 ring-amber-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="মাসের নতুন বাকি 👆"
+              value={formatCurrency(periodMetrics?.newDue ?? money?.periodDue ?? 0)}
+              description={activeDrilldown === 'dues' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'ক্লিক করে বাকির তালিকা দেখুন'}
+              icon={AlertCircle}
+              colorTheme="amber"
+            />
+          </div>
+
+          {/* Card 5: Dispatched */}
+          <div 
+            onClick={() => toggleDrilldown('dispatches')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeDrilldown === 'dispatches'
+                ? 'ring-4 ring-blue-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="মোট ডেলিভারি চালান 👆"
+              value={formatNumber(periodMetrics?.dispatchCount ?? delivery?.totalDispatch)}
+              description={activeDrilldown === 'dispatches' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : `ডেলিভারি সম্পন্ন: ${formatNumber(periodMetrics?.deliveredCount ?? delivery?.delivered)}টি`}
+              icon={Truck}
+              colorTheme="primary"
+            />
+          </div>
+
+          {/* Card 6: Profit or Cancelled */}
+          {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? (
+            <div 
+              onClick={() => toggleDrilldown('profit')}
+              className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+                activeDrilldown === 'profit'
+                  ? 'ring-4 ring-purple-500 ring-offset-2 scale-[1.03] shadow-xl'
+                  : 'hover:scale-[1.02]'
+              }`}
+            >
+              <StatCard
+                label="মাসের মোট লাভ (মুনাফা) 👆"
+                value={formatCurrency(periodMetrics?.profit ?? money?.totalProfit ?? 0)}
+                description={activeDrilldown === 'profit' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'পণ্যভিত্তিক লাভ দেখতে ক্লিক করুন'}
+                icon={TrendingUp}
+                colorTheme="violet"
+              />
+            </div>
           ) : (
             <StatCard
               label="মাসের বাতিল অর্ডার"
@@ -405,6 +537,254 @@ export function DashboardPage() {
             />
           )}
         </div>
+
+        {/* 📋 DYNAMIC DRILLDOWN FILTERED DATA LIST (SHOWS ON CARD CLICK) */}
+        {activeDrilldown && (
+          <div className="bg-white rounded-2xl border border-indigo-200 p-4 sm:p-6 shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-indigo-600 animate-ping" />
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    {activeDrilldown === 'sales' && `মাসের মোট বিক্রির তালিকা (${drilldownItems.length}টি মেমো)`}
+                    {activeDrilldown === 'orders' && `মাসের মোট অর্ডার বুকিং তালিকা (${drilldownItems.length}টি অর্ডার)`}
+                    {activeDrilldown === 'collections' && `মাসের ক্যাশ আদায় তালিকা (${drilldownItems.length}টি কালেকশন)`}
+                    {activeDrilldown === 'dues' && `মাসের নতুন বাকির তালিকা (${drilldownItems.length}টি বকেয়া)`}
+                    {activeDrilldown === 'dispatches' && `মাসের ডেলিভারি চালান তালিকা (${drilldownItems.length}টি চালান)`}
+                    {activeDrilldown === 'profit' && `পণ্যভিত্তিক বিক্রয় লাভ ও মার্জিন (${drilldownItems.length}টি প্রোডাক্ট)`}
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  সময়কাল: <span className="font-bold text-indigo-700">{displayPeriodTitle}</span> • যেকোনো অর্ডারের উপর ক্লিক করে মেমো দেখুন
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="এই তালিকায় খুঁজুন..."
+                    value={drilldownSearch}
+                    onChange={(e) => setDrilldownSearch(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-slate-50"
+                  />
+                </div>
+                <button
+                  onClick={() => setActiveDrilldown(null)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-rose-500" />
+                  তালিকা বন্ধ করুন
+                </button>
+              </div>
+            </div>
+
+            {/* Drilldown Table Content */}
+            <div className="mt-4 overflow-x-auto">
+              {isDrilldownLoading ? (
+                <div className="py-12 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+                  <p className="mt-2 text-xs font-bold text-slate-400">ডাটা লোড হচ্ছে...</p>
+                </div>
+              ) : drilldownItems.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs font-bold">
+                  কোনো তথ্য পাওয়া যায়নি।
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs min-w-[650px]">
+                  <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b border-slate-200">
+                    {activeDrilldown === 'sales' && (
+                      <tr>
+                        <th className="px-4 py-3">অর্ডার #</th>
+                        <th className="px-4 py-3">দোকানের নাম</th>
+                        <th className="px-4 py-3">রুট</th>
+                        <th className="px-4 py-3">ডেলিভারিম্যান</th>
+                        <th className="px-4 py-3">তারিখ</th>
+                        <th className="px-4 py-3 text-right">বিক্রি (Settled)</th>
+                        <th className="px-4 py-3 text-right">বাকি</th>
+                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
+                      </tr>
+                    )}
+                    {activeDrilldown === 'orders' && (
+                      <tr>
+                        <th className="px-4 py-3">অর্ডার #</th>
+                        <th className="px-4 py-3">দোকানের নাম</th>
+                        <th className="px-4 py-3">রুট</th>
+                        <th className="px-4 py-3">এসআর (SR)</th>
+                        <th className="px-4 py-3">তারিখ</th>
+                        <th className="px-4 py-3 text-right">অর্ডার মোট মূল্য</th>
+                        <th className="px-4 py-3 text-center">অবস্থা</th>
+                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
+                      </tr>
+                    )}
+                    {activeDrilldown === 'collections' && (
+                      <tr>
+                        <th className="px-4 py-3">অর্ডার #</th>
+                        <th className="px-4 py-3">দোকানের নাম</th>
+                        <th className="px-4 py-3">আদায়কারী (SR)</th>
+                        <th className="px-4 py-3">তারিখ</th>
+                        <th className="px-4 py-3 text-right">আদায়কৃত টাকা</th>
+                        <th className="px-4 py-3 text-center">অবস্থা</th>
+                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
+                      </tr>
+                    )}
+                    {activeDrilldown === 'dues' && (
+                      <tr>
+                        <th className="px-4 py-3">অর্ডার #</th>
+                        <th className="px-4 py-3">দোকানের নাম</th>
+                        <th className="px-4 py-3">রুট</th>
+                        <th className="px-4 py-3">এসআর (SR)</th>
+                        <th className="px-4 py-3 text-right">মূল বাকি</th>
+                        <th className="px-4 py-3 text-right">পরিশোধিত</th>
+                        <th className="px-4 py-3 text-right">অবশিষ্ট বাকি</th>
+                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
+                      </tr>
+                    )}
+                    {activeDrilldown === 'dispatches' && (
+                      <tr>
+                        <th className="px-4 py-3">চালান / ব্যাচ #</th>
+                        <th className="px-4 py-3">ডেলিভারি ম্যান</th>
+                        <th className="px-4 py-3">চালান তারিখ</th>
+                        <th className="px-4 py-3 text-center">মোট অর্ডার সংখ্যা</th>
+                        <th className="px-4 py-3 text-right">মোট মাল মূল্য</th>
+                        <th className="px-4 py-3 text-center">অবস্থা</th>
+                      </tr>
+                    )}
+                    {activeDrilldown === 'profit' && (
+                      <tr>
+                        <th className="px-4 py-3">পণ্যের নাম</th>
+                        <th className="px-4 py-3">কোম্পানি</th>
+                        <th className="px-4 py-3 text-right">কেনা দাম</th>
+                        <th className="px-4 py-3 text-right">বিক্রি রেট</th>
+                        <th className="px-4 py-3 text-center">বিক্রিকৃত সংখ্যা</th>
+                        <th className="px-4 py-3 text-right">মোট বিক্রি</th>
+                        <th className="px-4 py-3 text-right">মোট লাভ (মুনাফা)</th>
+                      </tr>
+                    )}
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {drilldownItems.map((item: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                        {activeDrilldown === 'sales' && (
+                          <>
+                            <td className="px-4 py-3 font-black text-indigo-600">#{item.id}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
+                            <td className="px-4 py-3 text-slate-500">{item.routeName || '—'}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-700">{item.deliveryManName || '—'}</td>
+                            <td className="px-4 py-3 text-slate-500">{item.orderDate}</td>
+                            <td className="px-4 py-3 text-right font-black text-emerald-600">{formatCurrency(item.soldAmount)}</td>
+                            <td className="px-4 py-3 text-right font-bold text-rose-600">{formatCurrency(item.dueAmount)}</td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => handleViewOrder(item.id)}
+                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> মেমো দেখুন
+                              </button>
+                            </td>
+                          </>
+                        )}
+                        {activeDrilldown === 'orders' && (
+                          <>
+                            <td className="px-4 py-3 font-black text-indigo-600">#{item.id}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
+                            <td className="px-4 py-3 text-slate-500">{item.routeName || '—'}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-700">{item.srName || '—'}</td>
+                            <td className="px-4 py-3 text-slate-500">{item.orderDate}</td>
+                            <td className="px-4 py-3 text-right font-black text-slate-900">{formatCurrency(item.grandTotal)}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-black">
+                                {item.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => handleViewOrder(item.id)}
+                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> মেমো দেখুন
+                              </button>
+                            </td>
+                          </>
+                        )}
+                        {activeDrilldown === 'collections' && (
+                          <>
+                            <td className="px-4 py-3 font-black text-indigo-600">#{item.orderId}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-700">{item.srName || '—'}</td>
+                            <td className="px-4 py-3 text-slate-500">{new Date(item.collectionDate).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-right font-black text-emerald-600">{formatCurrency(item.collectedAmount)}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-md text-[9px] font-black border ${
+                                item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                item.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+                              }`}>
+                                {item.status === 'APPROVED' ? 'অনুমোদিত' : item.status === 'PENDING' ? 'পেন্ডিং' : 'বাতিল'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => handleViewOrder(item.orderId)}
+                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> মেমো
+                              </button>
+                            </td>
+                          </>
+                        )}
+                        {activeDrilldown === 'dues' && (
+                          <>
+                            <td className="px-4 py-3 font-black text-indigo-600">#{item.orderId}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
+                            <td className="px-4 py-3 text-slate-500">{item.routeName || '—'}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-700">{item.srName || '—'}</td>
+                            <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(item.dueAmount)}</td>
+                            <td className="px-4 py-3 text-right font-bold text-emerald-600">{formatCurrency(item.paidAmount)}</td>
+                            <td className="px-4 py-3 text-right font-black text-rose-600">{formatCurrency(item.remainingDue)}</td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => handleViewOrder(item.orderId)}
+                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> মেমো
+                              </button>
+                            </td>
+                          </>
+                        )}
+                        {activeDrilldown === 'dispatches' && (
+                          <>
+                            <td className="px-4 py-3 font-black text-indigo-600">#{item.batchNumber}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{item.deliveryPersonName || '—'}</td>
+                            <td className="px-4 py-3 text-slate-500">{item.dispatchDate}</td>
+                            <td className="px-4 py-3 text-center font-bold text-slate-800">{item.totalOrders} টি</td>
+                            <td className="px-4 py-3 text-right font-black text-slate-900">{formatCurrency(item.totalAmount)}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">
+                                {item.status}
+                              </span>
+                            </td>
+                          </>
+                        )}
+                        {activeDrilldown === 'profit' && (
+                          <>
+                            <td className="px-4 py-3 font-bold text-slate-900">{item.productName}</td>
+                            <td className="px-4 py-3 text-slate-500 font-medium">{item.companyName}</td>
+                            <td className="px-4 py-3 text-right text-slate-500">{formatCurrency(item.buyPrice)}</td>
+                            <td className="px-4 py-3 text-right text-slate-700 font-bold">{formatCurrency(item.sellPrice)}</td>
+                            <td className="px-4 py-3 text-center font-black text-slate-800">{item.deliveredQty} টি</td>
+                            <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(item.totalSales)}</td>
+                            <td className="px-4 py-3 text-right font-black text-purple-600 text-sm">{formatCurrency(item.totalProfit)}</td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* 🏦 3. LIVE BUSINESS HEALTH & INVENTORY (Cumulative Live Snapshot) */}
@@ -559,7 +939,6 @@ export function DashboardPage() {
             </div>
           </div>
         ) : (
-          /* Fallback to Last 7 Days if no month array */
           <div className="flex h-56 sm:h-64 items-end gap-2 px-2 overflow-x-auto pb-4">
             {d.charts.last7Days.map((day: any) => {
               const max = Math.max(...d.charts.last7Days.map((x: any) => x.amount), 1);
@@ -649,6 +1028,23 @@ export function DashboardPage() {
           </div>
           <SRDuesList />
         </section>
+      )}
+
+      {/* Order Modal */}
+      {isViewingOrderLoading && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/30 backdrop-blur-xs">
+          <div className="bg-white p-6 rounded-2xl shadow-xl flex items-center gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+            <span className="text-sm font-bold text-slate-700">মেমোর বিস্তারিত তথ্য লোড হচ্ছে...</span>
+          </div>
+        </div>
+      )}
+
+      {viewingOrder && (
+        <OrderModal
+          order={viewingOrder}
+          onClose={() => setViewingOrder(null)}
+        />
       )}
     </div>
   );

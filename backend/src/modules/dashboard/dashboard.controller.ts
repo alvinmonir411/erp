@@ -35,5 +35,36 @@ export class DashboardController {
       },
     );
   }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Get('drilldown')
+  @Header(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate',
+  )
+  async getDrilldown(
+    @Query('type') type: string | undefined,
+    @Query('companyId') companyId: string | undefined,
+    @Query('period') period: string | undefined,
+    @Query('month') month: string | undefined,
+    @Query('year') year: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @CurrentUser() user: any,
+  ) {
+    return this.dashboardService.getDrilldownData(
+      type || 'sales',
+      companyId ? parseInt(companyId, 10) : undefined,
+      user,
+      {
+        period: period || 'this_month',
+        month: month ? parseInt(month, 10) : undefined,
+        year: year ? parseInt(year, 10) : undefined,
+      },
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50,
+    );
+  }
 }
+
 
