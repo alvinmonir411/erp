@@ -23,6 +23,8 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 
+import { PurchasesModule } from './modules/purchases/purchases.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -53,6 +55,7 @@ import { CacheModule } from '@nestjs/cache-manager';
     AuthModule,
     OrdersModule,
     StockModule,
+    PurchasesModule,
     DeliverySummariesModule,
     DeliveryOpsModule,
     DashboardModule,

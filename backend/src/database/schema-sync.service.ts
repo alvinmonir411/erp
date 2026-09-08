@@ -468,24 +468,56 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       this.logger.error('Failed to create performance indexes:', e.message);
     }
 
-    // 14. Sync damage_records table constraints and columns
+    // 15. Sync purchases, purchase_items, and company_payments tables
     try {
-      this.logger.log('Ensuring damage_records columns are nullable and exist...');
+      this.logger.log('Ensuring purchases, purchase_items, and company_payments tables exist...');
       await this.dataSource.query(`
-        ALTER TABLE "damage_records" ALTER COLUMN "batchId" DROP NOT NULL;
-        ALTER TABLE "damage_records" ALTER COLUMN "orderId" DROP NOT NULL;
-        ALTER TABLE "damage_records" ADD COLUMN IF NOT EXISTS "companyId" INTEGER;
-        ALTER TABLE "damage_records" ADD COLUMN IF NOT EXISTS "routeId" INTEGER;
-        ALTER TABLE "damage_records" ADD COLUMN IF NOT EXISTS "shopId" INTEGER;
-        ALTER TABLE "damage_records" ADD COLUMN IF NOT EXISTS "assignedDeliveryManId" UUID;
+        CREATE TABLE IF NOT EXISTS "purchases" (
+          "id" SERIAL PRIMARY KEY,
+          "purchaseDate" DATE NOT NULL DEFAULT CURRENT_DATE,
+          "invoiceNo" VARCHAR(50) NOT NULL,
+          "companyId" INTEGER NOT NULL,
+          "supplierName" VARCHAR(200),
+          "totalAmount" DECIMAL(12,2) DEFAULT 0,
+          "paidAmount" DECIMAL(12,2) DEFAULT 0,
+          "dueAmount" DECIMAL(12,2) DEFAULT 0,
+          "status" VARCHAR(50) DEFAULT 'DRAFT',
+          "note" TEXT,
+          "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS "purchase_items" (
+          "id" SERIAL PRIMARY KEY,
+          "purchaseId" INTEGER NOT NULL,
+          "productId" INTEGER NOT NULL,
+          "quantity" DECIMAL(12,2) NOT NULL DEFAULT 0,
+          "unitCost" DECIMAL(12,2) NOT NULL DEFAULT 0,
+          "lineTotal" DECIMAL(12,2) NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS "company_payments" (
+          "id" SERIAL PRIMARY KEY,
+          "companyId" INTEGER NOT NULL,
+          "purchaseId" INTEGER,
+          "amount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+          "paymentDate" DATE NOT NULL DEFAULT CURRENT_DATE,
+          "paymentMethod" VARCHAR(50) DEFAULT 'CASH',
+          "transactionRef" VARCHAR(150),
+          "note" TEXT,
+          "createdByName" VARCHAR(100) DEFAULT 'Admin',
+          "createdById" UUID,
+          "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS "idx_purchases_company_date" ON "purchases" ("companyId", "purchaseDate" DESC);
+        CREATE INDEX IF NOT EXISTS "idx_purchase_items_purchase" ON "purchase_items" ("purchaseId");
+        CREATE INDEX IF NOT EXISTS "idx_purchase_items_product" ON "purchase_items" ("productId");
+        CREATE INDEX IF NOT EXISTS "idx_company_payments_company" ON "company_payments" ("companyId", "paymentDate" DESC);
       `);
     } catch (e) {
-      if (!e.message.includes('does not exist')) {
-        this.logger.error(
-          'Failed to sync columns/constraints on damage_records table:',
-          e.message,
-        );
-      }
+      this.logger.error('Failed to sync purchases/company_payments tables:', e.message);
     }
 
     this.logger.log('--- DEFENSIVE SCHEMA SYNC COMPLETED ---');

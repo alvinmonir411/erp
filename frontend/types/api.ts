@@ -467,15 +467,19 @@ export type DeliverySummaryItem = {
 
 export type Purchase = {
   id: number;
+  invoiceNo?: string;
   referenceNo?: string | null;
   companyId: number;
   purchaseDate: string;
+  supplierName?: string | null;
   totalAmount: number | string;
   paidAmount: number | string;
-  payableAmount: number | string;
+  dueAmount?: number | string;
+  payableAmount?: number | string;
+  status?: 'DRAFT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
   note?: string | null;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   company?: Company;
   items?: PurchaseItem[];
   payments?: PurchasePayment[];
@@ -483,63 +487,105 @@ export type Purchase = {
 
 export type PurchaseItem = {
   id: number;
-  purchaseId: number;
+  purchaseId?: number;
   productId: number;
+  productName?: string;
   quantity: number | string;
-  unitPrice: number | string;
+  unitCost?: number | string;
+  unitPrice?: number | string;
   lineTotal: number | string;
+  unit?: string;
   product?: Product;
 };
 
 export type PurchasePayment = {
   id: number;
-  purchaseId: number;
+  companyId?: number;
+  purchaseId?: number | null;
   amount: number | string;
   paymentDate: string;
+  paymentMethod?: string;
+  transactionRef?: string | null;
   note?: string | null;
+  createdByName?: string;
   createdAt?: string;
   updatedAt?: string;
+  company?: Company;
+  purchase?: Purchase;
 };
 
 export type CompanyWisePayableSummary = {
   companyId: number;
   companyName: string;
-  companyCode?: string;
+  companyCode?: string | null;
+  phone?: string | null;
   purchaseCount: number;
-  payablePurchaseCount: number;
-  totalAmount: number | string;
-  totalPaid: number | string;
-  totalPayable: number | string;
+  payablePurchaseCount?: number;
+  totalPurchaseAmount?: number | string;
+  totalAmount?: number | string;
+  totalPaidAmount?: number | string;
+  totalPaid?: number | string;
+  totalPayableAmount?: number | string;
+  totalPayable?: number | string;
   lastPurchaseDate?: string | null;
+  lastPaymentDate?: string | null;
 };
-
-// Purchase types defined above
 
 export type CompanyPayableLedger = {
   company: {
     id: number;
     name: string;
-    code: string;
+    code?: string | null;
+    phone?: string | null;
+    address?: string | null;
   };
   summary: {
+    totalPurchases?: number | string;
+    totalPaid?: number | string;
+    currentPayable?: number | string;
+    totalPayable?: number | string;
     purchaseCount: number;
-    totalPaid: number | string;
-    totalPayable: number | string;
+    paymentCount?: number;
+    totalProductsSupplied?: number;
   };
   payablePurchases: Purchase[];
   paymentHistory: CompanyPayableHistoryEntry[];
+  productSummary?: ProductSupplySummary[];
 };
 
 export type CompanyPayableHistoryEntry = {
   id: number;
   paymentDate: string;
-  purchaseId: number;
+  purchaseId?: number | null;
+  purchaseInvoiceNo?: string | null;
   referenceNo?: string | null;
+  transactionRef?: string | null;
+  paymentMethod?: string;
   amount: number | string;
-  purchaseTotalAmount: number | string;
-  purchasePaidAmount: number | string;
-  purchasePayableAmount: number | string;
+  purchaseTotalAmount?: number | string;
+  purchasePaidAmount?: number | string;
+  purchasePayableAmount?: number | string;
   note?: string | null;
+  createdByName?: string;
+  createdAt?: string;
+};
+
+export type ProductSupplySummary = {
+  rank?: number;
+  productId: number;
+  productName: string;
+  companyId?: number;
+  companyName?: string;
+  unit?: string;
+  currentStock?: number;
+  latestBuyPrice?: number;
+  totalQuantityReceived?: number;
+  totalQuantity?: number;
+  totalCostValue?: number;
+  totalCost?: number;
+  avgUnitCost?: number;
+  purchaseCount: number;
+  lastPurchaseDate?: string | null;
 };
 
 export type StockMovementType =

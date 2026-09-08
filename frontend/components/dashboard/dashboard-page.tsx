@@ -1138,16 +1138,26 @@ export function DashboardPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setViewingCompanyProducts({ companyId: c.companyId, companyName: c.companyName });
-                      setModalProductSearch('');
-                    }}
-                    className="w-full py-2 px-3 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-black flex items-center justify-center gap-1.5 hover:bg-indigo-600 hover:text-white transition-all shadow-xs active:scale-95 cursor-pointer"
-                  >
-                    <Flame className="w-3.5 h-3.5 text-orange-500 group-hover:text-white" />
-                    রানিং প্রোডাক্টস দেখুন
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setViewingCompanyProducts({ companyId: c.companyId, companyName: c.companyName });
+                        setModalProductSearch('');
+                      }}
+                      className="flex-1 py-2 px-2.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-black flex items-center justify-center gap-1 hover:bg-indigo-600 hover:text-white transition-all shadow-xs active:scale-95 cursor-pointer"
+                    >
+                      <Flame className="w-3.5 h-3.5 text-orange-500" />
+                      রানিং পণ্য
+                    </button>
+                    <Link
+                      href={`/purchases/companies/${c.companyId}`}
+                      className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                      title="কোম্পানির মালের হিসাব ও পেমেন্ট লেজার"
+                    >
+                      <span>খতিয়ান</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-slate-400" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1491,13 +1501,22 @@ export function DashboardPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setViewingCompanyProducts(null)}
-                className="h-9 w-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center hover:bg-slate-100 transition-colors shadow-xs cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/purchases/companies/${viewingCompanyProducts.companyId}`}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 text-xs font-bold transition-colors"
+                  >
+                    <span>📄 মালের হিসাব ও লেজার</span>
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setViewingCompanyProducts(null)}
+                    className="h-9 w-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center hover:bg-slate-100 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
             </div>
 
             {/* Modal Search, Filter & Count */}

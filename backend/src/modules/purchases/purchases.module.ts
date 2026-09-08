@@ -4,6 +4,7 @@ import { Company } from '../companies/entities/company.entity';
 import { Product } from '../products/entities/product.entity';
 import { StockMovement } from '../stock/entities/stock-movement.entity';
 import { Purchase, PurchaseItem } from './entities/purchase.entity';
+import { CompanyPayment } from './entities/company-payment.entity';
 import { PurchasesController } from './purchases.controller';
 import { PurchasesService } from './purchases.service';
 import { StockModule } from '../stock/stock.module';
@@ -13,6 +14,7 @@ import { StockModule } from '../stock/stock.module';
     TypeOrmModule.forFeature([
       Purchase,
       PurchaseItem,
+      CompanyPayment,
       Company,
       Product,
       StockMovement,

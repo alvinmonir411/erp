@@ -6,17 +6,23 @@ import { getCompanies } from '@/lib/api/companies';
 import {
   getCompanyWisePayableSummary,
   getPurchases,
+  getProductSupplySummary,
+  getCompanyPayments,
+  recordCompanyPayment,
+  confirmPurchase,
 } from '@/lib/api/purchases';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { PageCard } from '@/components/ui/page-card';
 import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
-import { formatCurrency, formatDate, toNumber } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatDateTime, toNumber } from '@/lib/utils/format';
 import type {
   Company,
   CompanyWisePayableSummary,
+  ProductSupplySummary,
   Purchase,
+  PurchasePayment,
 } from '@/types/api';
 import {
   Plus,
@@ -31,626 +37,1125 @@ import {
   CheckCircle,
   ChevronRight,
   TrendingDown,
-  ArrowUpRight
+  ArrowUpRight,
+  Package,
+  Layers,
+  CreditCard,
+  X,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
-const purchasesPageSize = 10;
-const payableSummaryPageSize = 8;
+const pageSize = 12;
 
 function formatDateInput(value: Date) {
   const year = value.getFullYear();
   const month = `${value.getMonth() + 1}`.padStart(2, '0');
   const day = `${value.getDate()}`.padStart(2, '0');
-
   return `${year}-${month}-${day}`;
 }
 
-function getFilterDateTime(value: string, boundary: 'start' | 'end') {
-  const time = boundary === 'start' ? 'T00:00:00.000' : 'T23:59:59.999';
-
-  return new Date(`${value}${time}`).toISOString();
-}
-
-function getPurchaseReference(purchase: Purchase) {
-  return purchase.referenceNo || `Purchase #${purchase.id}`;
-}
-
 export function PurchasesPage() {
-  const summarySectionRef = useRef<HTMLDivElement | null>(null);
+  const [activeTab, setActiveTab] = useState<'companies' | 'products' | 'invoices' | 'payments'>('companies');
   const [companies, setCompanies] = useState<Company[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [payableSummary, setPayableSummary] = useState<
-    CompanyWisePayableSummary[]
-  >([]);
+  const [payableSummary, setPayableSummary] = useState<CompanyWisePayableSummary[]>([]);
+  const [productSupplies, setProductSupplies] = useState<ProductSupplySummary[]>([]);
+  const [payments, setPayments] = useState<PurchasePayment[]>([]);
+
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [purchasePage, setPurchasePage] = useState(1);
-  const [payablePage, setPayablePage] = useState(1);
-  const [isFilterLoading, setIsFilterLoading] = useState(true);
-  const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const latestRequestRef = useRef(0);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
+
+  // Payment Modal State
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentCompanyId, setPaymentCompanyId] = useState<number | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(formatDateInput(new Date()));
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [transactionRef, setTransactionRef] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+
+  // Expanded Invoice Row state
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<number | null>(null);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
   useToastNotification({
-    message: error,
-    title: 'Could not load purchases',
-    tone: 'error',
+    message: toastMessage,
+    title: toastTone === 'success' ? 'সফল হয়েছে' : 'ত্রুটি',
+    tone: toastTone,
   });
 
-  const purchaseQuery = useMemo(
-    () => ({
-      companyId: selectedCompanyId ?? undefined,
-      fromDate: fromDate ? getFilterDateTime(fromDate, 'start') : undefined,
-      toDate: toDate ? getFilterDateTime(toDate, 'end') : undefined,
-      search: searchTerm.trim() || undefined,
-    }),
-    [fromDate, searchTerm, selectedCompanyId, toDate],
-  );
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const [compList, purchaseList, summaryList, prodList, payList] = await Promise.all([
+        getCompanies().catch(() => []),
+        getPurchases({
+          companyId: selectedCompanyId ?? undefined,
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
+          search: searchTerm.trim() || undefined,
+        }).catch(() => []),
+        getCompanyWisePayableSummary({
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
+        }).catch(() => []),
+        getProductSupplySummary(selectedCompanyId ?? undefined).catch(() => []),
+        getCompanyPayments({
+          companyId: selectedCompanyId ?? undefined,
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
+        }).catch(() => []),
+      ]);
+
+      setCompanies(compList);
+      setPurchases(purchaseList);
+      setPayableSummary(summaryList);
+      setProductSupplies(prodList);
+      setPayments(payList);
+    } catch (err: any) {
+      setError(err.message || 'ডেটা লোড করতে সমস্যা হয়েছে');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadFilters() {
-      try {
-        setIsFilterLoading(true);
-        setError(null);
-        const companyData = await getCompanies();
-        setCompanies(companyData);
-      } catch (loadError) {
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : 'Failed to load purchase filters.',
-        );
-      } finally {
-        setIsFilterLoading(false);
-      }
-    }
+    loadData();
+  }, [selectedCompanyId, fromDate, toDate, searchTerm]);
 
-    void loadFilters();
-  }, []);
-
-  useEffect(() => {
-    async function loadWorkspace() {
-      const requestId = latestRequestRef.current + 1;
-      latestRequestRef.current = requestId;
-
-      try {
-        setIsWorkspaceLoading(true);
-        setError(null);
-
-        const [purchaseData, payableData] = await Promise.all([
-          getPurchases(purchaseQuery),
-          getCompanyWisePayableSummary(purchaseQuery),
-        ]);
-
-        if (requestId !== latestRequestRef.current) {
-          return;
-        }
-
-        setPurchases(purchaseData);
-        setPayableSummary(payableData);
-      } catch (loadError) {
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : 'Failed to load purchases workspace.',
-        );
-      } finally {
-        if (requestId === latestRequestRef.current) {
-          setIsWorkspaceLoading(false);
-        }
-      }
-    }
-
-    void loadWorkspace();
-  }, [purchaseQuery]);
-
-  const purchaseStats = useMemo(
-    () => ({
-      purchaseCount: purchases.length,
-      totalAmount: purchases.reduce(
-        (sum, purchase) => sum + toNumber(purchase.totalAmount),
-        0,
-      ),
-      totalPaid: purchases.reduce(
-        (sum, purchase) => sum + toNumber(purchase.paidAmount),
-        0,
-      ),
-      totalPayable: purchases.reduce(
-        (sum, purchase) => sum + toNumber(purchase.payableAmount),
-        0,
-      ),
-    }),
-    [purchases],
-  );
-
-  const paginatedPurchases = useMemo(() => {
-    const startIndex = (purchasePage - 1) * purchasesPageSize;
-    return purchases.slice(startIndex, startIndex + purchasesPageSize);
-  }, [purchasePage, purchases]);
-
-  const paginatedPayableSummary = useMemo(() => {
-    const startIndex = (payablePage - 1) * payableSummaryPageSize;
-    return payableSummary.slice(startIndex, startIndex + payableSummaryPageSize);
-  }, [payablePage, payableSummary]);
-
-  function resetPages() {
-    setPurchasePage(1);
-    setPayablePage(1);
-  }
-
-  function applyTodayFilter() {
-    const today = formatDateInput(new Date());
-    setFromDate(today);
-    setToDate(today);
-    resetPages();
-  }
-
-  function applyThisMonthFilter() {
-    const today = new Date();
-    const firstDay = formatDateInput(
-      new Date(today.getFullYear(), today.getMonth(), 1),
+  // Overall Aggregate KPI Stats
+  const kpiStats = useMemo(() => {
+    const totalPurchases = payableSummary.reduce(
+      (sum, c) => sum + toNumber(c.totalPurchaseAmount ?? c.totalAmount),
+      0,
     );
-    const lastDay = formatDateInput(
-      new Date(today.getFullYear(), today.getMonth() + 1, 0),
+    const totalPaid = payableSummary.reduce(
+      (sum, c) => sum + toNumber(c.totalPaidAmount ?? c.totalPaid),
+      0,
     );
+    const totalPayable = payableSummary.reduce(
+      (sum, c) => sum + toNumber(c.totalPayableAmount ?? c.totalPayable),
+      0,
+    );
+    const totalInvoices = purchases.length;
 
-    setFromDate(firstDay);
-    setToDate(lastDay);
-    resetPages();
-  }
+    return {
+      totalPurchases,
+      totalPaid,
+      totalPayable,
+      totalInvoices,
+      totalCompanies: payableSummary.length,
+    };
+  }, [payableSummary, purchases]);
 
-  function clearFilters() {
-    setSelectedCompanyId(null);
-    setFromDate('');
-    setToDate('');
-    setSearchTerm('');
-    resetPages();
-  }
-
-  function scrollToPayableSummary() {
-    summarySectionRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
+  // Filtered Company Summaries
+  const filteredCompanySummaries = useMemo(() => {
+    return payableSummary.filter((c) => {
+      if (selectedCompanyId && c.companyId !== selectedCompanyId) return false;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        return (
+          c.companyName?.toLowerCase().includes(term) ||
+          c.companyCode?.toLowerCase().includes(term)
+        );
+      }
+      return true;
     });
-  }
+  }, [payableSummary, selectedCompanyId, searchTerm]);
+
+  // Filtered Product Supplies
+  const filteredProductSupplies = useMemo(() => {
+    return productSupplies.filter((p) => {
+      if (selectedCompanyId && p.companyId !== selectedCompanyId) return false;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        return (
+          p.productName?.toLowerCase().includes(term) ||
+          p.companyName?.toLowerCase().includes(term)
+        );
+      }
+      return true;
+    });
+  }, [productSupplies, selectedCompanyId, searchTerm]);
+
+  // Filtered Invoices
+  const filteredPurchases = useMemo(() => {
+    return purchases.filter((p) => {
+      if (selectedCompanyId && p.companyId !== selectedCompanyId) return false;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        return (
+          p.invoiceNo?.toLowerCase().includes(term) ||
+          p.referenceNo?.toLowerCase().includes(term) ||
+          p.supplierName?.toLowerCase().includes(term) ||
+          p.company?.name?.toLowerCase().includes(term)
+        );
+      }
+      return true;
+    });
+  }, [purchases, selectedCompanyId, searchTerm]);
+
+  // Filtered Payments
+  const filteredPayments = useMemo(() => {
+    return payments.filter((pay) => {
+      if (selectedCompanyId && pay.companyId !== selectedCompanyId) return false;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        return (
+          pay.company?.name?.toLowerCase().includes(term) ||
+          pay.transactionRef?.toLowerCase().includes(term) ||
+          pay.note?.toLowerCase().includes(term)
+        );
+      }
+      return true;
+    });
+  }, [payments, selectedCompanyId, searchTerm]);
+
+  // Pagination Helper
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    if (activeTab === 'companies') return filteredCompanySummaries.slice(start, start + pageSize);
+    if (activeTab === 'products') return filteredProductSupplies.slice(start, start + pageSize);
+    if (activeTab === 'invoices') return filteredPurchases.slice(start, start + pageSize);
+    return filteredPayments.slice(start, start + pageSize);
+  }, [
+    activeTab,
+    currentPage,
+    filteredCompanySummaries,
+    filteredProductSupplies,
+    filteredPurchases,
+    filteredPayments,
+  ]);
+
+  const totalCurrentTabItems = useMemo(() => {
+    if (activeTab === 'companies') return filteredCompanySummaries.length;
+    if (activeTab === 'products') return filteredProductSupplies.length;
+    if (activeTab === 'invoices') return filteredPurchases.length;
+    return filteredPayments.length;
+  }, [
+    activeTab,
+    filteredCompanySummaries,
+    filteredProductSupplies,
+    filteredPurchases,
+    filteredPayments,
+  ]);
+
+  const openPaymentModal = (companyId?: number) => {
+    const cId = companyId || selectedCompanyId || companies[0]?.id || null;
+    setPaymentCompanyId(cId);
+
+    // If company selected, auto suggest its payable due
+    if (cId) {
+      const match = payableSummary.find((s) => s.companyId === cId);
+      if (match && toNumber(match.totalPayableAmount ?? match.totalPayable) > 0) {
+        setPaymentAmount(String(toNumber(match.totalPayableAmount ?? match.totalPayable)));
+      } else {
+        setPaymentAmount('');
+      }
+    } else {
+      setPaymentAmount('');
+    }
+
+    setPaymentDate(formatDateInput(new Date()));
+    setPaymentMethod('CASH');
+    setTransactionRef('');
+    setPaymentNote('');
+    setIsPaymentModalOpen(true);
+  };
+
+  const handleSavePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentCompanyId) {
+      setToastTone('error');
+      setToastMessage('অনুগ্রহ করে কোম্পানি সিলেক্ট করুন');
+      return;
+    }
+    const amt = parseFloat(paymentAmount);
+    if (!amt || amt <= 0) {
+      setToastTone('error');
+      setToastMessage('সঠিক টাকার অংক লিখুন');
+      return;
+    }
+
+    try {
+      setIsSubmittingPayment(true);
+      await recordCompanyPayment(paymentCompanyId, {
+        amount: amt,
+        paymentDate,
+        paymentMethod,
+        transactionRef: transactionRef.trim() || undefined,
+        note: paymentNote.trim() || undefined,
+      });
+
+      setToastTone('success');
+      setToastMessage('কোম্পানিকে টাকা পরিশোধের হিসাব সফলভাবে সংরক্ষণ করা হয়েছে!');
+      setIsPaymentModalOpen(false);
+      await loadData();
+    } catch (err: any) {
+      setToastTone('error');
+      setToastMessage(err.message || 'পেমেন্ট সংরক্ষণ করতে সমস্যা হয়েছে');
+    } finally {
+      setIsSubmittingPayment(false);
+    }
+  };
+
+  const handleConfirmPurchase = async (id: number) => {
+    try {
+      setConfirmingId(id);
+      await confirmPurchase(id);
+      setToastTone('success');
+      setToastMessage('চালানটি সফলভাবে নিশ্চিত ও গোডাউনে স্টক ইন করা হয়েছে!');
+      await loadData();
+    } catch (err: any) {
+      setToastTone('error');
+      setToastMessage(err.message || 'চালান নিশ্চিত করতে সমস্যা হয়েছে');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
+  const selectedCompanyObj = companies.find((c) => c.id === paymentCompanyId);
+  const selectedCompanySummary = payableSummary.find((s) => s.companyId === paymentCompanyId);
 
   return (
-    <div className="space-y-6 pb-12 text-slate-800">
-      <PageCard
-        title="Purchases Workspace"
-        description="Filter and find specific purchases, track stock-in from supplier buying, and monitor company payable metrics."
-        action={
-          <Link
-            href="/purchases/create"
-            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Create Purchase</span>
-          </Link>
-        }
-      >
-        <div className="border border-slate-200 rounded-xl bg-slate-50 p-4">
-          <div className="flex flex-col gap-1 mb-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Filter Records By
-            </span>
+    <div className="space-y-6 pb-16 text-slate-800">
+      {/* 🌟 Header Section */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white shadow-xl">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 backdrop-blur-md mb-2">
+              <Building2 className="h-3.5 w-3.5" />
+              <span>কোম্পানি সাপ্লাইয়ার ও পারচেজ লেজার</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              কোম্পানির মাল ও টাকা পরিশোধের হিসাব
+            </h1>
+            <p className="mt-1 text-sm text-slate-300 max-w-2xl">
+              কোম্পানি কোন কোন প্রোডাক্ট কত টাকার পাঠিয়েছে এবং কোম্পানিকে কত টাকা কোন পণ্যের জন্য দেওয়া হয়েছে তার পূর্ণাঙ্গ খতিয়ান ও ব্যালেন্স শিট।
+            </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                value={searchTerm}
-                onChange={(event) => {
-                  resetPages();
-                  setSearchTerm(event.target.value);
-                }}
-                placeholder="Reference or Note..."
-                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => openPaymentModal()}
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
+            >
+              <Wallet className="h-4 w-4" />
+              <span>💸 কোম্পানিকে টাকা দিন</span>
+            </button>
+            <Link
+              href="/purchases/create"
+              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95"
+            >
+              <Plus className="h-4 w-4" />
+              <span>+ নতুন চালান / স্টক ইন</span>
+            </Link>
+          </div>
+        </div>
+      </div>
 
-            {/* Company Select */}
-            <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <select
-                value={selectedCompanyId ?? ''}
-                onChange={(event) => {
-                  resetPages();
-                  setSelectedCompanyId(
-                    event.target.value ? Number(event.target.value) : null,
-                  );
-                }}
-                className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="">All Companies</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
+      {/* 📊 Top 4 KPI Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              মোট প্রাপ্ত মাল (Goods In)
+            </span>
+            <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
+              <Package className="h-5 w-5" />
             </div>
+          </div>
+          <p className="mt-3 text-2xl font-black text-slate-900">
+            {formatCurrency(kpiStats.totalPurchases)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500 font-medium">
+            সকল চালান মিলিয়ে মোট মালের মূল্য
+          </p>
+        </div>
 
-            {/* Date Range Start */}
-            <div className="relative">
-              <span className="absolute -top-2.5 left-2 bg-white px-1 text-[10px] font-medium text-slate-500 border border-slate-200 rounded">
-                From Date
-              </span>
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(event) => {
-                  resetPages();
-                  setFromDate(event.target.value);
-                }}
-                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              মোট পরিশোধিত টাকা (Total Paid)
+            </span>
+            <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
+              <CheckCircle className="h-5 w-5" />
             </div>
+          </div>
+          <p className="mt-3 text-2xl font-black text-emerald-600">
+            {formatCurrency(kpiStats.totalPaid)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500 font-medium">
+            কোম্পানিগুলোকে এ পর্যন্ত মোট পরিশোধ
+          </p>
+        </div>
 
-            {/* Date Range End */}
-            <div className="relative">
-              <span className="absolute -top-2.5 left-2 bg-white px-1 text-[10px] font-medium text-slate-500 border border-slate-200 rounded">
-                To Date
-              </span>
+        <div className="relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/40 p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
+              কোম্পানির বর্তমান পাওনা (Payable)
+            </span>
+            <div className="rounded-xl bg-rose-100 p-2.5 text-rose-600">
+              <TrendingDown className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-black text-rose-600">
+            {formatCurrency(kpiStats.totalPayable)}
+          </p>
+          <p className="mt-1 text-xs text-rose-600/80 font-medium">
+            কোম্পানি আমাদের কাছে এখনো পাবে
+          </p>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              মোট চালান ও কোম্পানি
+            </span>
+            <div className="rounded-xl bg-amber-50 p-2.5 text-amber-600">
+              <FileText className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-slate-900">{kpiStats.totalInvoices}</span>
+            <span className="text-xs font-semibold text-slate-500">টি চালান</span>
+            <span className="text-slate-300">•</span>
+            <span className="text-lg font-bold text-indigo-600">{kpiStats.totalCompanies}</span>
+            <span className="text-xs font-semibold text-slate-500">টি কোম্পানি</span>
+          </div>
+          <p className="mt-1 text-xs text-slate-500 font-medium">
+            সর্বমোট এন্ট্রি সংখ্যা
+          </p>
+        </div>
+      </div>
+
+      {/* 🔍 Filter Bar */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="সার্চ (কোম্পানি, প্রোডাক্ট, ইনভয়েস)..."
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          {/* Company Dropdown */}
+          <div className="relative">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <select
+              value={selectedCompanyId ?? ''}
+              onChange={(e) => {
+                setSelectedCompanyId(e.target.value ? Number(e.target.value) : null);
+                setCurrentPage(1);
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+            >
+              <option value="">🏢 সকল কোম্পানি (All Companies)</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* From Date */}
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          {/* To Date & Clear */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="date"
                 value={toDate}
-                onChange={(event) => {
-                  resetPages();
-                  setToDate(event.target.value);
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setCurrentPage(1);
                 }}
-                className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
               />
             </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={applyTodayFilter}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={applyThisMonthFilter}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              This month
-            </button>
-            <div className="ml-auto">
+            {(selectedCompanyId || fromDate || toDate || searchTerm) && (
               <button
-                type="button"
-                onClick={clearFilters}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-transparent px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                title="Clear filters"
+                onClick={() => {
+                  setSelectedCompanyId(null);
+                  setFromDate('');
+                  setToDate('');
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+                className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-rose-600 hover:bg-rose-100 transition-colors"
+                title="ফিল্টার ক্লিয়ার করুন"
               >
-                <FilterX className="h-3.5 w-3.5" />
-                <span>Clear Filters</span>
+                <FilterX className="h-4 w-4" />
               </button>
-            </div>
+            )}
           </div>
         </div>
+      </div>
 
-        {isFilterLoading || isWorkspaceLoading ? (
-          <div className="mt-6">
-            <LoadingBlock label="Syncing data..." />
-          </div>
-        ) : null}
-      </PageCard>
-
-      {!isWorkspaceLoading && !error ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryMetric
-            title="Matching Purchases"
-            value={String(purchaseStats.purchaseCount)}
-            note="Filtered results"
-            icon={<FileText className="h-5 w-5" />}
-            colorClass="text-indigo-600 bg-indigo-50"
-          />
-          <SummaryMetric
-            title="Purchased Amount"
-            value={formatCurrency(purchaseStats.totalAmount)}
-            note="Total order value"
-            icon={<DollarSign className="h-5 w-5" />}
-            colorClass="text-blue-600 bg-blue-50"
-          />
-          <SummaryMetric
-            title="Settled Amount"
-            value={formatCurrency(purchaseStats.totalPaid)}
-            note="Paid to suppliers"
-            icon={<Wallet className="h-5 w-5" />}
-            colorClass="text-emerald-600 bg-emerald-50"
-          />
-          <button
-            type="button"
-            onClick={scrollToPayableSummary}
-            className="group flex flex-col justify-between rounded-2xl border border-rose-200 bg-white p-5 shadow-sm transition-all hover:border-rose-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-500"
-          >
-            <div className="flex w-full items-center justify-between">
-              <p className="text-sm font-medium text-slate-600">Outstanding Payable</p>
-              <div className="rounded-lg bg-rose-50 p-2 text-rose-600">
-                <TrendingDown className="h-5 w-5" />
-              </div>
-            </div>
-            <div className="mt-2 text-left">
-              <p className="text-2xl font-bold text-slate-900">
-                {formatCurrency(purchaseStats.totalPayable)}
-              </p>
-              <div className="mt-1 flex items-center gap-1 text-xs font-medium text-rose-600">
-                <span>View payable summary</span>
-                <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-              </div>
-            </div>
-          </button>
-        </div>
-      ) : null}
-
-      <PageCard
-        title="Purchase List"
-        description="Detailed list of purchases and their current settlement status."
-      >
-        {isWorkspaceLoading ? <LoadingBlock label="Loading purchase list..." /> : null}
-        {!isWorkspaceLoading && !error ? (
-          <>
-            <div className="mt-2 overflow-hidden rounded-xl border border-slate-200">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead className="bg-slate-50">
-                    <tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      <th className="px-6 py-3">Reference / ID</th>
-                      <th className="px-6 py-3">Supplier Company</th>
-                      <th className="px-6 py-3">Purchase Date</th>
-                      <th className="px-6 py-3 text-right">Total Amount</th>
-                      <th className="px-6 py-3 text-right">Paid</th>
-                      <th className="px-6 py-3 text-center">Status</th>
-                      <th className="px-6 py-3 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {paginatedPurchases.map((purchase) => {
-                      const isPayable = toNumber(purchase.payableAmount) > 0;
-                      return (
-                        <tr
-                          key={purchase.id}
-                          className="transition-colors hover:bg-slate-50/50"
-                        >
-                          <td className="px-6 py-4">
-                            <div className="font-medium text-slate-900">
-                              {getPurchaseReference(purchase)}
-                            </div>
-                            <div className="mt-0.5 text-xs text-slate-500">
-                              #{purchase.id}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="font-medium text-slate-900">
-                              {purchase.company?.name ?? `Unknown`}
-                            </div>
-                            <div className="mt-0.5 text-xs text-slate-500">
-                              {purchase.company?.code ?? '-'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-slate-600">
-                            {formatDate(purchase.purchaseDate)}
-                          </td>
-                          <td className="px-6 py-4 text-right font-medium text-slate-900">
-                            {formatCurrency(purchase.totalAmount)}
-                          </td>
-                          <td className="px-6 py-4 text-right text-slate-600">
-                            {formatCurrency(purchase.paidAmount)}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            {isPayable ? (
-                              <div className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 ring-1 ring-inset ring-rose-600/20">
-                                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                                {formatCurrency(purchase.payableAmount)} due
-                              </div>
-                            ) : (
-                              <div className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                Settled
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <Link
-                                href={`/purchases/${purchase.id}`}
-                                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                              >
-                                {isPayable ? 'Settle' : 'View'}
-                              </Link>
-                              <Link
-                                href={`/purchases/companies/${purchase.companyId}`}
-                                className="inline-flex text-slate-400 hover:text-indigo-600 transition-colors"
-                                title="Open Company Ledger"
-                              >
-                                <ArrowUpRight className="h-4 w-4" />
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {purchases.length === 0 ? (
-              <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <StateMessage
-                  title="No purchases found"
-                  description="Adjust your search, company, or date filters to find matching purchases."
-                />
-              </div>
-            ) : null}
-
-            <div className="mt-4">
-              <Pagination
-                currentPage={purchasePage}
-                totalItems={purchases.length}
-                pageSize={purchasesPageSize}
-                onPageChange={setPurchasePage}
-              />
-            </div>
-          </>
-        ) : null}
-      </PageCard>
-
-      <div ref={summarySectionRef} className="scroll-mt-6">
-        <PageCard
-          title="Company By Payable Summary"
-          description="A consolidated view of companies carrying outstanding balances."
+      {/* 🧭 Interactive 4 Tabs Navigation */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          onClick={() => {
+            setActiveTab('companies');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+            activeTab === 'companies'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
         >
-          {isWorkspaceLoading ? <LoadingBlock label="Loading playable summary..." /> : null}
-          {!isWorkspaceLoading && !error ? (
-            <>
-              {payableSummary.length > 0 ? (
-                <div className="mt-2 overflow-hidden rounded-xl border border-slate-200">
-                  <PayableSummaryTable rows={paginatedPayableSummary} />
-                </div>
-              ) : null}
-              
-              {payableSummary.length === 0 ? (
-                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+          <Building2 className="h-4 w-4" />
+          <span>🏢 কোম্পানিভিত্তিক খতিয়ান ও বাকি ({filteredCompanySummaries.length})</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('products');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+            activeTab === 'products'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Package className="h-4 w-4" />
+          <span>📦 কোন প্রোডাক্ট কত টাকার এসেছে ({filteredProductSupplies.length})</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('invoices');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+            activeTab === 'invoices'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <FileText className="h-4 w-4" />
+          <span>📑 সকল চালানের তালিকা ({filteredPurchases.length})</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('payments');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+            activeTab === 'payments'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Wallet className="h-4 w-4" />
+          <span>💳 কোম্পানিকে দেওয়া টাকার হিসাব ({filteredPayments.length})</span>
+        </button>
+      </div>
+
+      {isLoading ? (
+        <LoadingBlock label="কোম্পানি ও সাপ্লাই ডেটা লোড হচ্ছে..." />
+      ) : (
+        <>
+          {/* TAB 1: 🏢 COMPANY BALANCES & PAYABLES */}
+          {activeTab === 'companies' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {(paginatedData as CompanyWisePayableSummary[]).map((c) => {
+                  const totalPurchases = toNumber(c.totalPurchaseAmount ?? c.totalAmount);
+                  const totalPaid = toNumber(c.totalPaidAmount ?? c.totalPaid);
+                  const payable = toNumber(c.totalPayableAmount ?? c.totalPayable);
+                  const hasDue = payable > 0;
+
+                  return (
+                    <div
+                      key={c.companyId}
+                      className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                              {c.companyName}
+                            </h3>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {c.phone || c.companyCode || 'সাপ্লাইয়ার কোম্পানি'}
+                            </p>
+                          </div>
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                              hasDue
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            }`}
+                          >
+                            {hasDue ? '⚠️ পাওনা বাকি আছে' : '✅ সম্পূর্ণ পরিশোধ'}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-3 text-center">
+                          <div>
+                            <span className="text-[11px] font-medium text-slate-500">মোট মাল</span>
+                            <p className="text-xs font-bold text-slate-900 mt-0.5">
+                              {formatCurrency(totalPurchases)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-[11px] font-medium text-emerald-600">পরিশোধ</span>
+                            <p className="text-xs font-bold text-emerald-600 mt-0.5">
+                              {formatCurrency(totalPaid)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-[11px] font-medium text-rose-600">বর্তমান বাকি</span>
+                            <p className="text-xs font-bold text-rose-600 mt-0.5">
+                              {formatCurrency(payable)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                          <span>মোট চালান: <b>{c.purchaseCount} টি</b></span>
+                          {c.lastPurchaseDate && (
+                            <span>শেষ চালান: {formatDate(c.lastPurchaseDate)}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+                        <button
+                          onClick={() => openPaymentModal(c.companyId)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-2 text-xs font-bold transition-colors"
+                        >
+                          <Wallet className="h-3.5 w-3.5" />
+                          <span>টাকা দিন</span>
+                        </button>
+                        <Link
+                          href={`/purchases/companies/${c.companyId}`}
+                          className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 text-xs font-bold transition-colors"
+                        >
+                          <span>খতিয়ান দেখুন</span>
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {filteredCompanySummaries.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
                   <StateMessage
-                    title="No Outstanding Payables"
-                    description="Awesome! There are no companies with outstanding purchase payables matching your filters."
-                  />
-                </div>
-              ) : null}
-              
-              {payableSummary.length > 0 && (
-                <div className="mt-4">
-                  <Pagination
-                    currentPage={payablePage}
-                    totalItems={payableSummary.length}
-                    pageSize={payableSummaryPageSize}
-                    onPageChange={setPayablePage}
+                    title="কোন কোম্পানি পাওয়া যায়নি"
+                    description="সার্চ ফিল্টারের সাথে মিল রেখে কোনো রেকর্ড পাওয়া যায়নি।"
                   />
                 </div>
               )}
-            </>
-          ) : null}
-        </PageCard>
-      </div>
-    </div>
-  );
-}
+            </div>
+          )}
 
-function SummaryMetric({
-  title,
-  value,
-  note,
-  icon,
-  colorClass,
-}: {
-  title: string;
-  value: string;
-  note: string;
-  icon: React.ReactNode;
-  colorClass: string;
-}) {
-  return (
-    <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-slate-600">{title}</p>
-        <div className={`rounded-lg p-2 ${colorClass}`}>
-          {icon}
-        </div>
-      </div>
-      <div className="mt-2">
-        <p className="text-2xl font-bold text-slate-900">{value}</p>
-        <p className="mt-1 text-xs text-slate-500">{note}</p>
-      </div>
-    </div>
-  );
-}
-
-function PayableSummaryTable({
-  rows,
-}: {
-  rows: CompanyWisePayableSummary[];
-}) {
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50">
-          <tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-            <th className="px-6 py-3">Company Name</th>
-            <th className="px-6 py-3 text-center">Total Orders</th>
-            <th className="px-6 py-3 text-center">Unsettled Orders</th>
-            <th className="px-6 py-3 text-right">Total Value</th>
-            <th className="px-6 py-3 text-right">Amount Paid</th>
-            <th className="px-6 py-3 text-right">Outstanding</th>
-            <th className="px-6 py-3">Last Purchase</th>
-            <th className="px-6 py-3 text-center">Action</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 bg-white">
-          {rows.map((row) => (
-            <tr key={row.companyId} className="transition-colors hover:bg-slate-50/50">
-              <td className="px-6 py-4">
-                <div className="font-medium text-slate-900">{row.companyName}</div>
-                <div className="mt-0.5 text-xs text-slate-500">{row.companyCode}</div>
-              </td>
-              <td className="px-6 py-4 text-center text-slate-600">
-                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-medium">
-                  {row.purchaseCount}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-center">
-                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-50 px-2 text-xs font-medium text-rose-700">
-                  {row.payablePurchaseCount}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-right text-slate-600">
-                {formatCurrency(row.totalAmount)}
-              </td>
-              <td className="px-6 py-4 text-right text-slate-600">
-                {formatCurrency(row.totalPaid)}
-              </td>
-              <td className="px-6 py-4 text-right">
-                <div className="font-medium text-rose-600">
-                  {formatCurrency(row.totalPayable)}
+          {/* TAB 2: 📦 PRODUCT-WISE SUPPLIES BREAKDOWN */}
+          {activeTab === 'products' && (
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-600">
+                      <tr>
+                        <th className="px-5 py-3.5 text-left">প্রোডাক্টের নাম</th>
+                        <th className="px-5 py-3.5 text-left">কোম্পানি</th>
+                        <th className="px-5 py-3.5 text-right">মোট প্রাপ্ত সংখ্যা</th>
+                        <th className="px-5 py-3.5 text-right">মোট মালের মূল্য (টাকা)</th>
+                        <th className="px-5 py-3.5 text-right">গড় ক্রয় রেট</th>
+                        <th className="px-5 py-3.5 text-right">বর্তমান স্টক</th>
+                        <th className="px-5 py-3.5 text-center">চালান সংখ্যা</th>
+                        <th className="px-5 py-3.5 text-center">শেষ আসার তারিখ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {(paginatedData as ProductSupplySummary[]).map((p) => (
+                        <tr key={p.productId} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-5 py-3.5">
+                            <div className="font-bold text-slate-900">{p.productName}</div>
+                            <div className="text-xs text-slate-500">#{p.productId} • ইউনিট: {p.unit}</div>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                              <Building2 className="h-3 w-3" />
+                              {p.companyName}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-black text-slate-900">
+                            {p.totalQuantityReceived ?? p.totalQuantity} {p.unit}
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-black text-indigo-700">
+                            {formatCurrency(p.totalCostValue ?? p.totalCost ?? 0)}
+                          </td>
+                          <td className="px-5 py-3.5 text-right text-slate-600 font-medium">
+                            ৳{p.avgUnitCost || p.latestBuyPrice || 0}
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-bold text-emerald-600">
+                            {p.currentStock || 0} {p.unit}
+                          </td>
+                          <td className="px-5 py-3.5 text-center">
+                            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-bold text-slate-700">
+                              {p.purchaseCount} বার
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-center text-xs text-slate-500">
+                            {p.lastPurchaseDate ? formatDate(p.lastPurchaseDate) : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </td>
-              <td className="px-6 py-4 text-slate-600">
-                {row.lastPurchaseDate ? (
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                    <span>{formatDate(row.lastPurchaseDate)}</span>
-                  </div>
-                ) : (
-                  <span className="text-slate-400">No purchase</span>
-                )}
-              </td>
-              <td className="px-6 py-4 text-center">
-                <Link
-                  href={`/purchases/companies/${row.companyId}`}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              </div>
+
+              {filteredProductSupplies.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+                  <StateMessage
+                    title="কোন প্রোডাক্টের সাপ্লাই রেকর্ড নেই"
+                    description="কোম্পানি থেকে চালানের মাধ্যমে মাল স্টক ইন করলে এখানে প্রোডাক্টভিত্তিক তালিকা দেখতে পাবেন।"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: 📑 ALL PURCHASE INVOICES */}
+          {activeTab === 'invoices' && (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {(paginatedData as Purchase[]).map((purchase) => {
+                  const isPayable = toNumber(purchase.payableAmount ?? purchase.dueAmount) > 0;
+                  const isExpanded = expandedInvoiceId === purchase.id;
+                  const isConfirmed = purchase.status === 'CONFIRMED';
+
+                  return (
+                    <div
+                      key={purchase.id}
+                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all"
+                    >
+                      <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                          <button
+                            onClick={() => setExpandedInvoiceId(isExpanded ? null : purchase.id)}
+                            className="mt-1 rounded-lg bg-slate-100 p-2 text-slate-600 hover:bg-slate-200 transition-colors"
+                          >
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </button>
+
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-black text-slate-900 text-base">
+                                #{purchase.invoiceNo || purchase.referenceNo || `PUR-${purchase.id}`}
+                              </span>
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                                  isConfirmed
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}
+                              >
+                                {isConfirmed ? '✅ স্টক ইন সম্পন্ন' : '⏳ ড্রাফট (Draft)'}
+                              </span>
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                  isPayable
+                                    ? 'bg-rose-50 text-rose-700'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}
+                              >
+                                {isPayable ? `বাকি: ${formatCurrency(purchase.payableAmount ?? purchase.dueAmount)}` : 'পরিশোধিত'}
+                              </span>
+                            </div>
+
+                            <p className="mt-1 text-xs text-slate-500">
+                              কোম্পানি: <b className="text-slate-800">{purchase.company?.name || 'Unknown'}</b> • তারিখ:{' '}
+                              {formatDate(purchase.purchaseDate)}
+                              {purchase.supplierName ? ` • সরবরাহকারী: ${purchase.supplierName}` : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-4 lg:justify-end">
+                          <div className="text-left lg:text-right">
+                            <span className="text-xs text-slate-500 font-medium">মোট চালানের মূল্য</span>
+                            <p className="text-base font-black text-slate-900">
+                              {formatCurrency(purchase.totalAmount)}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {!isConfirmed && (
+                              <button
+                                onClick={() => handleConfirmPurchase(purchase.id)}
+                                disabled={confirmingId === purchase.id}
+                                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-50"
+                              >
+                                {confirmingId === purchase.id ? 'স্টক ইন হচ্ছে...' : 'স্টক ইন নিশ্চিত করুন'}
+                              </button>
+                            )}
+
+                            {isPayable && (
+                              <button
+                                onClick={() => {
+                                  setPaymentCompanyId(purchase.companyId);
+                                  setPaymentAmount(String(toNumber(purchase.payableAmount ?? purchase.dueAmount)));
+                                  setPaymentNote(`Payment for Invoice #${purchase.invoiceNo}`);
+                                  setIsPaymentModalOpen(true);
+                                }}
+                                className="rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3.5 py-2 text-xs font-bold transition-all"
+                              >
+                                টাকা দিন
+                              </button>
+                            )}
+
+                            <Link
+                              href={`/purchases/companies/${purchase.companyId}`}
+                              className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 p-2 text-xs font-bold transition-colors"
+                              title="কোম্পানি লেজার দেখুন"
+                            >
+                              <ArrowUpRight className="h-4 w-4" />
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expandable Items Table */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-100 bg-slate-50/50 p-4">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                            চালানে থাকা প্রোডাক্টের তালিকা:
+                          </h4>
+                          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                            <table className="min-w-full divide-y divide-slate-100 text-xs">
+                              <thead className="bg-slate-50 text-slate-600 font-semibold">
+                                <tr>
+                                  <th className="px-4 py-2 text-left">প্রোডাক্ট</th>
+                                  <th className="px-4 py-2 text-right">পরিমাণ</th>
+                                  <th className="px-4 py-2 text-right">ক্রয় রেট</th>
+                                  <th className="px-4 py-2 text-right">মোট টাকা</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {(purchase.items || []).map((item, idx) => (
+                                  <tr key={idx}>
+                                    <td className="px-4 py-2 font-medium text-slate-900">
+                                      {item.product?.name || item.productName || `Product #${item.productId}`}
+                                    </td>
+                                    <td className="px-4 py-2 text-right font-bold text-slate-800">
+                                      {item.quantity} {item.unit || item.product?.unit || 'Pcs'}
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-slate-600">
+                                      {formatCurrency(item.unitCost ?? item.unitPrice)}
+                                    </td>
+                                    <td className="px-4 py-2 text-right font-black text-indigo-600">
+                                      {formatCurrency(item.lineTotal)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {purchase.note && (
+                            <p className="mt-2 text-xs text-slate-500 italic">
+                              নোট: {purchase.note}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {filteredPurchases.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+                  <StateMessage
+                    title="কোন চালান পাওয়া যায়নি"
+                    description="নতুন মাল পৌঁছালে উপরের '+ নতুন চালান' বাটনে ক্লিক করে এন্ট্রি দিন।"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: 💳 PAYMENT HISTORY */}
+          {activeTab === 'payments' && (
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50/80 text-xs font-bold uppercase tracking-wider text-slate-600">
+                      <tr>
+                        <th className="px-5 py-3.5 text-left">পরিশোধের তারিখ</th>
+                        <th className="px-5 py-3.5 text-left">কোম্পানির নাম</th>
+                        <th className="px-5 py-3.5 text-right">পরিশোধিত টাকা</th>
+                        <th className="px-5 py-3.5 text-center">মেথড</th>
+                        <th className="px-5 py-3.5 text-left">রেফারেন্স / স্লিপ</th>
+                        <th className="px-5 py-3.5 text-left">নোট / পণ্যের বিবরণ</th>
+                        <th className="px-5 py-3.5 text-center">এন্ট্রি কারী</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {(paginatedData as PurchasePayment[]).map((pay) => (
+                        <tr key={pay.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-5 py-3.5 font-medium text-slate-900">
+                            {formatDate(pay.paymentDate)}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <div className="font-bold text-slate-900">
+                              {pay.company?.name || `Company #${pay.companyId}`}
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-black text-emerald-600">
+                            {formatCurrency(pay.amount)}
+                          </td>
+                          <td className="px-5 py-3.5 text-center">
+                            <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                              {pay.paymentMethod || 'CASH'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-slate-600 text-xs font-mono">
+                            {pay.transactionRef || '-'}
+                          </td>
+                          <td className="px-5 py-3.5 text-slate-700 text-xs max-w-xs">
+                            {pay.note || '-'}
+                          </td>
+                          <td className="px-5 py-3.5 text-center text-xs text-slate-500">
+                            {pay.createdByName || 'Admin'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {filteredPayments.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+                  <StateMessage
+                    title="কোন পেমেন্টের হিসাব নেই"
+                    description="কোম্পানিকে টাকা দেওয়ার পর 'কোম্পানিকে টাকা দিন' বাটনে চাপ দিয়ে হিসাব সেভ করুন।"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 📄 Pagination */}
+          {totalCurrentTabItems > pageSize && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalItems={totalCurrentTabItems}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 💳 RECORD PAYMENT MODAL */}
+      {isPaymentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-slate-100">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600">
+                  <Wallet className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">কোম্পানিকে টাকা পরিশোধ</h3>
+                  <p className="text-xs text-slate-500">টাকা দেওয়ার হিসাব সেভ করুন</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPaymentModalOpen(false)}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePayment} className="mt-5 space-y-4">
+              {/* Company Selection */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  কোম্পানি সিলেক্ট করুন *
+                </label>
+                <select
+                  value={paymentCompanyId ?? ''}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    setPaymentCompanyId(id);
+                    const match = payableSummary.find((s) => s.companyId === id);
+                    if (match && toNumber(match.totalPayableAmount ?? match.totalPayable) > 0) {
+                      setPaymentAmount(String(toNumber(match.totalPayableAmount ?? match.totalPayable)));
+                    }
+                  }}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
                 >
-                  <span>Ledger</span>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                  <option value="">-- কোম্পানি সিলেক্ট করুন --</option>
+                  {companies.map((c) => {
+                    const match = payableSummary.find((s) => s.companyId === c.id);
+                    const due = toNumber(match?.totalPayableAmount ?? match?.totalPayable);
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {due > 0 ? `(বাকি: ৳${due})` : '(বাকি নেই)'}
+                      </option>
+                    );
+                  })}
+                </select>
+                {selectedCompanySummary && (
+                  <p className="mt-1 text-xs text-rose-600 font-semibold">
+                    বর্তমান মোট বাকি: {formatCurrency(toNumber(selectedCompanySummary.totalPayableAmount ?? selectedCompanySummary.totalPayable))}
+                  </p>
+                )}
+              </div>
+
+              {/* Amount & Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    পরিশোধের পরিমাণ (টাকা) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    required
+                    placeholder="যেমন: 50000"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    পরিশোধের তারিখ *
+                  </label>
+                  <input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Method & Ref */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    পেমেন্ট মেথড
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+                  >
+                    <option value="CASH">নগদ (Cash)</option>
+                    <option value="BANK">ব্যাংক ট্রান্সফার (Bank)</option>
+                    <option value="BKASH">বিকাশ (bKash)</option>
+                    <option value="NAGAD">নগদ (Nagad)</option>
+                    <option value="CHEQUE">চেক (Cheque)</option>
+                    <option value="OTHER">অন্যান্য (Other)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    চেক বা স্লিপ নম্বর
+                  </label>
+                  <input
+                    type="text"
+                    value={transactionRef}
+                    onChange={(e) => setTransactionRef(e.target.value)}
+                    placeholder="যেমন: CHQ-9981 / TrxID"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Note / Description */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  নোট / কোন প্রোডাক্ট বা চালানের জন্য দেওয়া হলো
+                </label>
+                <textarea
+                  value={paymentNote}
+                  onChange={(e) => setPaymentNote(e.target.value)}
+                  rows={2}
+                  placeholder="যেমন: সানলাইট কয়েল ৫০০ পিসের চালান বাবদ ক্যাশ পরিশোধ..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPaymentModalOpen(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  বাতিল
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingPayment}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
+                >
+                  {isSubmittingPayment ? 'সংরক্ষণ হচ্ছে...' : 'পেমেন্ট নিশ্চিত করুন'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

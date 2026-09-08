@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -10,20 +11,35 @@ import {
   PurchaseItem,
   PurchaseStatus,
 } from './entities/purchase.entity';
+import { CompanyPayment, PaymentMethod } from './entities/company-payment.entity';
+import { Company } from '../companies/entities/company.entity';
+import { Product } from '../products/entities/product.entity';
 import { StockService } from '../stock/stock.service';
 import { StockMovementType } from '../stock/stock.constants';
-import { Product } from '../products/entities/product.entity';
 
 @Injectable()
 export class PurchasesService {
+  private readonly logger = new Logger(PurchasesService.name);
+
   constructor(
     @InjectRepository(Purchase)
     private readonly purchaseRepository: Repository<Purchase>,
     @InjectRepository(PurchaseItem)
     private readonly purchaseItemRepository: Repository<PurchaseItem>,
+    @InjectRepository(CompanyPayment)
+    private readonly paymentRepository: Repository<CompanyPayment>,
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
     private readonly stockService: StockService,
     private readonly dataSource: DataSource,
   ) {}
+
+  private safeNum(val: any): number {
+    const n = Number(val);
+    return isFinite(n) ? n : 0;
+  }
 
   async findAll(query: any = {}) {
     const qb = this.purchaseRepository
@@ -35,15 +51,29 @@ export class PurchasesService {
       .addOrderBy('p.createdAt', 'DESC');
 
     if (query.companyId) {
-      qb.andWhere('p.companyId = :companyId', { companyId: query.companyId });
+      qb.andWhere('p.companyId = :companyId', { companyId: Number(query.companyId) });
     }
 
     if (query.status) {
       qb.andWhere('p.status = :status', { status: query.status });
     }
 
-    const [items, totalItems] = await qb.getManyAndCount();
-    return { items, totalItems };
+    if (query.search) {
+      qb.andWhere('(p.invoiceNo ILIKE :search OR p.supplierName ILIKE :search OR company.name ILIKE :search)', {
+        search: `%${query.search}%`,
+      });
+    }
+
+    if (query.fromDate) {
+      qb.andWhere('p.purchaseDate >= :fromDate', { fromDate: query.fromDate });
+    }
+
+    if (query.toDate) {
+      qb.andWhere('p.purchaseDate <= :toDate', { toDate: query.toDate });
+    }
+
+    const items = await qb.getMany();
+    return items;
   }
 
   async findOne(id: number) {
@@ -51,43 +81,47 @@ export class PurchasesService {
       where: { id },
       relations: ['company', 'items', 'items.product'],
     });
-    if (!purchase) throw new NotFoundException('Purchase not found');
+    if (!purchase) throw new NotFoundException('Purchase invoice not found');
     return purchase;
   }
 
-  async create(dto: any) {
+  async create(dto: any, user?: any) {
     return this.dataSource.transaction(async (manager) => {
+      const paidAmount = this.safeNum(dto.paidAmount);
+
       const purchase = manager.create(Purchase, {
-        purchaseDate: new Date(dto.purchaseDate),
-        invoiceNo: dto.invoiceNo,
-        companyId: dto.companyId,
-        supplierName: dto.supplierName,
-        note: dto.note,
-        status: PurchaseStatus.DRAFT,
-        paidAmount: dto.paidAmount || 0,
+        purchaseDate: dto.purchaseDate ? new Date(dto.purchaseDate) : new Date(),
+        invoiceNo:
+          dto.invoiceNo?.trim() ||
+          dto.referenceNo?.trim() ||
+          `INV-${Date.now().toString().slice(-6)}`,
+        companyId: Number(dto.companyId),
+        supplierName: dto.supplierName || null,
+        note: dto.note || null,
+        status: dto.status === PurchaseStatus.CONFIRMED ? PurchaseStatus.CONFIRMED : PurchaseStatus.DRAFT,
+        paidAmount,
       });
 
       let totalAmount = 0;
       const items: PurchaseItem[] = [];
 
-      for (const itemDto of dto.items) {
-        const lineTotal = Number(itemDto.quantity) * Number(itemDto.unitCost);
+      for (const itemDto of dto.items || []) {
+        const qty = this.safeNum(itemDto.quantity);
+        const cost = this.safeNum(itemDto.unitCost ?? itemDto.cost ?? itemDto.buyPrice);
+        const lineTotal = qty * cost;
         totalAmount += lineTotal;
         items.push(
           manager.create(PurchaseItem, {
-            productId: itemDto.productId,
-            quantity: itemDto.quantity,
-            unitCost: itemDto.unitCost,
+            productId: Number(itemDto.productId),
+            quantity: qty,
+            unitCost: cost,
             lineTotal,
           }),
         );
       }
 
       purchase.totalAmount = totalAmount;
-      purchase.dueAmount = Math.max(
-        0,
-        totalAmount - Number(purchase.paidAmount),
-      );
+      purchase.dueAmount = Math.max(0, totalAmount - paidAmount);
 
       const savedPurchase = await manager.save(purchase);
       for (const item of items) {
@@ -95,6 +129,23 @@ export class PurchasesService {
       }
       await manager.save(items);
 
+      // If initial payment was made during creation, record CompanyPayment entry
+      if (paidAmount > 0) {
+        const payment = manager.create(CompanyPayment, {
+          companyId: savedPurchase.companyId,
+          purchaseId: savedPurchase.id,
+          amount: paidAmount,
+          paymentDate: savedPurchase.purchaseDate,
+          paymentMethod: dto.paymentMethod || PaymentMethod.CASH,
+          transactionRef: dto.transactionRef || `INV-${savedPurchase.invoiceNo}`,
+          note: dto.paymentNote || `Initial settlement for Invoice #${savedPurchase.invoiceNo}`,
+          createdByName: user?.name || 'Admin',
+          createdById: user?.id || null,
+        });
+        await manager.save(payment);
+      }
+
+      // If CONFIRMED, update inventory and buyPrice immediately
       if (dto.status === PurchaseStatus.CONFIRMED) {
         await this.confirmPurchase(savedPurchase.id, manager);
       }
@@ -107,16 +158,16 @@ export class PurchasesService {
     const exec = async (m: any) => {
       const purchase = await m.findOne(Purchase, {
         where: { id },
-        relations: ['items'],
+        relations: ['items', 'items.product', 'company'],
       });
 
-      if (!purchase) throw new NotFoundException('Purchase not found');
-      if (purchase.status !== PurchaseStatus.DRAFT) {
-        throw new BadRequestException('Only DRAFT purchases can be confirmed');
+      if (!purchase) throw new NotFoundException('Purchase invoice not found');
+      if (purchase.status === PurchaseStatus.CONFIRMED) {
+        return purchase;
       }
 
-      for (const item of purchase.items) {
-        // Update Stock
+      for (const item of purchase.items || []) {
+        // Stock In
         await this.stockService.create(
           {
             productId: item.productId,
@@ -124,19 +175,25 @@ export class PurchasesService {
             type: StockMovementType.STOCK_IN,
             quantity: Number(item.quantity),
             reference: `PUR-${purchase.invoiceNo}`,
-            note: `Purchase confirmed: ${purchase.invoiceNo}`,
+            note: `Purchase confirmed: Invoice #${purchase.invoiceNo}`,
           },
           'Admin',
           m,
         );
 
-        // Update Product Buy Price (Latest Cost)
-        await m.update(Product, item.productId, {
-          buyPrice: item.unitCost,
-        });
+        // Update Product Buy Price with latest purchase cost
+        if (Number(item.unitCost) > 0) {
+          await m.update(Product, item.productId, {
+            buyPrice: Number(item.unitCost),
+          });
+        }
       }
 
       await m.update(Purchase, id, { status: PurchaseStatus.CONFIRMED });
+      return m.findOne(Purchase, {
+        where: { id },
+        relations: ['items', 'items.product', 'company'],
+      });
     };
 
     if (manager) return exec(manager);
@@ -145,8 +202,8 @@ export class PurchasesService {
 
   async update(id: number, dto: any) {
     const existing = await this.findOne(id);
-    if (existing.status !== PurchaseStatus.DRAFT) {
-      throw new BadRequestException('Cannot update a confirmed purchase');
+    if (existing.status === PurchaseStatus.CONFIRMED) {
+      throw new BadRequestException('Cannot modify an already confirmed purchase invoice');
     }
 
     return this.dataSource.transaction(async (manager) => {
@@ -155,29 +212,32 @@ export class PurchasesService {
       let totalAmount = 0;
       const items: PurchaseItem[] = [];
 
-      for (const itemDto of dto.items) {
-        const lineTotal = Number(itemDto.quantity) * Number(itemDto.unitCost);
+      for (const itemDto of dto.items || []) {
+        const qty = this.safeNum(itemDto.quantity);
+        const cost = this.safeNum(itemDto.unitCost ?? itemDto.cost ?? itemDto.buyPrice);
+        const lineTotal = qty * cost;
         totalAmount += lineTotal;
         items.push(
           manager.create(PurchaseItem, {
             purchaseId: id,
-            productId: itemDto.productId,
-            quantity: itemDto.quantity,
-            unitCost: itemDto.unitCost,
+            productId: Number(itemDto.productId),
+            quantity: qty,
+            unitCost: cost,
             lineTotal,
           }),
         );
       }
 
+      const paidAmount = this.safeNum(dto.paidAmount ?? existing.paidAmount);
       await manager.update(Purchase, id, {
-        purchaseDate: new Date(dto.purchaseDate),
-        invoiceNo: dto.invoiceNo,
-        companyId: dto.companyId,
-        supplierName: dto.supplierName,
-        note: dto.note,
+        purchaseDate: dto.purchaseDate ? new Date(dto.purchaseDate) : existing.purchaseDate,
+        invoiceNo: dto.invoiceNo?.trim() || existing.invoiceNo,
+        companyId: dto.companyId ? Number(dto.companyId) : existing.companyId,
+        supplierName: dto.supplierName ?? existing.supplierName,
+        note: dto.note ?? existing.note,
         totalAmount,
-        paidAmount: dto.paidAmount || 0,
-        dueAmount: Math.max(0, totalAmount - Number(dto.paidAmount || 0)),
+        paidAmount,
+        dueAmount: Math.max(0, totalAmount - paidAmount),
       });
 
       await manager.save(items);
@@ -187,9 +247,403 @@ export class PurchasesService {
 
   async delete(id: number) {
     const purchase = await this.findOne(id);
-    if (purchase.status !== PurchaseStatus.DRAFT) {
-      throw new BadRequestException('Cannot delete a confirmed purchase');
+    if (purchase.status === PurchaseStatus.CONFIRMED) {
+      throw new BadRequestException('Cannot delete a confirmed purchase invoice');
     }
     return this.purchaseRepository.delete(id);
+  }
+
+  /**
+   * 📊 Company-Wise Payable & Purchases Summary
+   * Returns total goods received (purchases), total paid, and current payable due per company
+   */
+  async getCompanyWisePayableSummary(query: any = {}) {
+    // 1. Fetch all companies
+    const companies = await this.companyRepository.find({
+      order: { name: 'ASC' },
+    });
+
+    // 2. Aggregate purchases by company
+    const purchaseQb = this.purchaseRepository
+      .createQueryBuilder('p')
+      .select('p.companyId', 'companyId')
+      .addSelect('COUNT(p.id)', 'purchaseCount')
+      .addSelect('SUM(COALESCE(p.totalAmount, 0))', 'totalPurchaseAmount')
+      .addSelect('SUM(COALESCE(p.paidAmount, 0))', 'totalPaidAmount')
+      .addSelect('SUM(COALESCE(p.dueAmount, 0))', 'totalPayableAmount')
+      .addSelect('MAX(p.purchaseDate)', 'lastPurchaseDate')
+      .where("p.status <> 'CANCELLED'");
+
+    if (query.fromDate) {
+      purchaseQb.andWhere('p.purchaseDate >= :fromDate', { fromDate: query.fromDate });
+    }
+    if (query.toDate) {
+      purchaseQb.andWhere('p.purchaseDate <= :toDate', { toDate: query.toDate });
+    }
+
+    purchaseQb.groupBy('p.companyId');
+    const purchaseAggs = await purchaseQb.getRawMany();
+
+    // 3. Aggregate payments by company
+    const paymentQb = this.paymentRepository
+      .createQueryBuilder('pay')
+      .select('pay.companyId', 'companyId')
+      .addSelect('COUNT(pay.id)', 'paymentCount')
+      .addSelect('SUM(COALESCE(pay.amount, 0))', 'totalPayments')
+      .addSelect('MAX(pay.paymentDate)', 'lastPaymentDate');
+
+    if (query.fromDate) {
+      paymentQb.andWhere('pay.paymentDate >= :fromDate', { fromDate: query.fromDate });
+    }
+    if (query.toDate) {
+      paymentQb.andWhere('pay.paymentDate <= :toDate', { toDate: query.toDate });
+    }
+
+    paymentQb.groupBy('pay.companyId');
+    const paymentAggs = await paymentQb.getRawMany();
+
+    // 4. Map summaries
+    const purchaseMap = new Map<number, any>();
+    for (const p of purchaseAggs) {
+      purchaseMap.set(Number(p.companyId), {
+        purchaseCount: this.safeNum(p.purchaseCount),
+        totalPurchaseAmount: this.safeNum(p.totalPurchaseAmount),
+        totalPaidAmount: this.safeNum(p.totalPaidAmount),
+        totalPayableAmount: this.safeNum(p.totalPayableAmount),
+        lastPurchaseDate: p.lastPurchaseDate,
+      });
+    }
+
+    const paymentMap = new Map<number, any>();
+    for (const pay of paymentAggs) {
+      paymentMap.set(Number(pay.companyId), {
+        paymentCount: this.safeNum(pay.paymentCount),
+        totalPayments: this.safeNum(pay.totalPayments),
+        lastPaymentDate: pay.lastPaymentDate,
+      });
+    }
+
+    return companies.map((c) => {
+      const pStats = purchaseMap.get(c.id) || {
+        purchaseCount: 0,
+        totalPurchaseAmount: 0,
+        totalPaidAmount: 0,
+        totalPayableAmount: 0,
+        lastPurchaseDate: null,
+      };
+      const payStats = paymentMap.get(c.id) || {
+        paymentCount: 0,
+        totalPayments: 0,
+        lastPaymentDate: null,
+      };
+
+      // Total paid is highest of recorded direct payments or invoice paid amounts
+      const actualTotalPaid = Math.max(pStats.totalPaidAmount, payStats.totalPayments);
+      const actualPayable = Math.max(0, pStats.totalPurchaseAmount - actualTotalPaid);
+
+      return {
+        companyId: c.id,
+        companyName: c.name,
+        companyCode: (c as any).code || null,
+        phone: (c as any).phone || null,
+        purchaseCount: pStats.purchaseCount,
+        totalPurchaseAmount: pStats.totalPurchaseAmount,
+        totalPaidAmount: actualTotalPaid,
+        totalPayableAmount: actualPayable,
+        lastPurchaseDate: pStats.lastPurchaseDate,
+        lastPaymentDate: payStats.lastPaymentDate,
+      };
+    });
+  }
+
+  /**
+   * 🏢 Detailed Company Payable Ledger (কোম্পানির খতিয়ান ও পেমেন্ট হিস্ট্রি)
+   */
+  async getCompanyPayableLedger(companyId: number) {
+    const company = await this.companyRepository.findOne({
+      where: { id: companyId },
+    });
+    if (!company) throw new NotFoundException('Company not found');
+
+    // 1. Fetch all purchases for this company
+    const purchases = await this.purchaseRepository.find({
+      where: { companyId },
+      relations: ['items', 'items.product'],
+      order: { purchaseDate: 'DESC', createdAt: 'DESC' },
+    });
+
+    // 2. Fetch all payments made to this company
+    const payments = await this.paymentRepository.find({
+      where: { companyId },
+      relations: ['purchase'],
+      order: { paymentDate: 'DESC', createdAt: 'DESC' },
+    });
+
+    // 3. Product-Wise Summary for this Company
+    const productSupplyQb = this.purchaseItemRepository
+      .createQueryBuilder('item')
+      .innerJoin('item.purchase', 'p')
+      .innerJoin('item.product', 'prod')
+      .select('prod.id', 'productId')
+      .addSelect('prod.name', 'productName')
+      .addSelect('prod.unit', 'unit')
+      .addSelect('prod.currentStock', 'currentStock')
+      .addSelect('prod.buyPrice', 'latestBuyPrice')
+      .addSelect('SUM(COALESCE(item.quantity, 0))', 'totalQuantity')
+      .addSelect('SUM(COALESCE(item.lineTotal, 0))', 'totalCost')
+      .addSelect('COUNT(DISTINCT p.id)', 'purchaseCount')
+      .addSelect('MAX(p.purchaseDate)', 'lastPurchaseDate')
+      .where('p.companyId = :companyId', { companyId })
+      .andWhere("p.status <> 'CANCELLED'")
+      .groupBy('prod.id')
+      .addGroupBy('prod.name')
+      .addGroupBy('prod.unit')
+      .addGroupBy('prod.currentStock')
+      .addGroupBy('prod.buyPrice')
+      .orderBy('SUM(COALESCE(item.lineTotal, 0))', 'DESC');
+
+    const productSupplyData = await productSupplyQb.getRawMany();
+
+    const productSummary = productSupplyData.map((p) => {
+      const totalQty = this.safeNum(p.totalQuantity);
+      const totalCost = this.safeNum(p.totalCost);
+      const avgUnitCost = totalQty > 0 ? totalCost / totalQty : this.safeNum(p.latestBuyPrice);
+      return {
+        productId: Number(p.productId),
+        productName: p.productName,
+        unit: p.unit || 'Pcs',
+        currentStock: this.safeNum(p.currentStock),
+        latestBuyPrice: this.safeNum(p.latestBuyPrice),
+        totalQuantity: totalQty,
+        totalCost: totalCost,
+        avgUnitCost: Number(avgUnitCost.toFixed(2)),
+        purchaseCount: this.safeNum(p.purchaseCount),
+        lastPurchaseDate: p.lastPurchaseDate,
+      };
+    });
+
+    // 4. Calculate Ledger Totals
+    const totalPurchases = purchases
+      .filter((p) => p.status !== PurchaseStatus.CANCELLED)
+      .reduce((sum, p) => sum + this.safeNum(p.totalAmount), 0);
+
+    const totalInvoicePaid = purchases
+      .filter((p) => p.status !== PurchaseStatus.CANCELLED)
+      .reduce((sum, p) => sum + this.safeNum(p.paidAmount), 0);
+
+    const totalDirectPayments = payments.reduce((sum, pay) => sum + this.safeNum(pay.amount), 0);
+    const totalPaid = Math.max(totalInvoicePaid, totalDirectPayments);
+    const currentPayable = Math.max(0, totalPurchases - totalPaid);
+
+    return {
+      company: {
+        id: company.id,
+        name: company.name,
+        code: (company as any).code || null,
+        phone: (company as any).phone || null,
+        address: (company as any).address || null,
+      },
+      summary: {
+        totalPurchases,
+        totalPaid,
+        currentPayable,
+        purchaseCount: purchases.length,
+        paymentCount: payments.length,
+        totalProductsSupplied: productSummary.length,
+      },
+      payablePurchases: purchases.map((p) => ({
+        id: p.id,
+        invoiceNo: p.invoiceNo,
+        purchaseDate: p.purchaseDate,
+        totalAmount: this.safeNum(p.totalAmount),
+        paidAmount: this.safeNum(p.paidAmount),
+        payableAmount: Math.max(0, this.safeNum(p.totalAmount) - this.safeNum(p.paidAmount)),
+        status: p.status,
+        supplierName: p.supplierName,
+        note: p.note,
+        createdAt: p.createdAt,
+        items: (p.items || []).map((item) => ({
+          id: item.id,
+          productId: item.productId,
+          productName: item.product?.name || `Product #${item.productId}`,
+          quantity: this.safeNum(item.quantity),
+          unitCost: this.safeNum(item.unitCost),
+          lineTotal: this.safeNum(item.lineTotal),
+          unit: item.product?.unit || 'Pcs',
+        })),
+      })),
+      paymentHistory: payments.map((pay) => ({
+        id: pay.id,
+        amount: this.safeNum(pay.amount),
+        paymentDate: pay.paymentDate,
+        paymentMethod: pay.paymentMethod,
+        transactionRef: pay.transactionRef,
+        note: pay.note,
+        purchaseId: pay.purchaseId,
+        purchaseInvoiceNo: pay.purchase?.invoiceNo || null,
+        createdByName: pay.createdByName,
+        createdAt: pay.createdAt,
+      })),
+      productSummary,
+    };
+  }
+
+  /**
+   * 💳 Record Payment to Company (কোম্পানিকে টাকা পরিশোধ এন্ট্রি)
+   */
+  async recordCompanyPayment(companyId: number, dto: any, user?: any) {
+    const amount = this.safeNum(dto.amount);
+    if (amount <= 0) {
+      throw new BadRequestException('Payment amount must be greater than zero');
+    }
+
+    const company = await this.companyRepository.findOne({
+      where: { id: companyId },
+    });
+    if (!company) throw new NotFoundException('Company not found');
+
+    return this.dataSource.transaction(async (manager) => {
+      let linkedPurchase: Purchase | null = null;
+      if (dto.purchaseId) {
+        linkedPurchase = await manager.findOne(Purchase, {
+          where: { id: Number(dto.purchaseId), companyId },
+        });
+      }
+
+      // 1. Create Payment Record
+      const payment = manager.create(CompanyPayment, {
+        companyId,
+        purchaseId: linkedPurchase ? linkedPurchase.id : null,
+        amount,
+        paymentDate: dto.paymentDate ? new Date(dto.paymentDate) : new Date(),
+        paymentMethod: dto.paymentMethod || PaymentMethod.CASH,
+        transactionRef: dto.transactionRef || null,
+        note: dto.note || (linkedPurchase ? `Payment for Invoice #${linkedPurchase.invoiceNo}` : `Payment to ${company.name}`),
+        createdByName: user?.name || user?.username || 'Admin',
+        createdById: user?.id || null,
+      });
+
+      const savedPayment = await manager.save(payment);
+
+      // 2. Adjust Purchase invoice(s) due balance
+      if (linkedPurchase) {
+        const newPaid = this.safeNum(linkedPurchase.paidAmount) + amount;
+        const newDue = Math.max(0, this.safeNum(linkedPurchase.totalAmount) - newPaid);
+        await manager.update(Purchase, linkedPurchase.id, {
+          paidAmount: newPaid,
+          dueAmount: newDue,
+        });
+      } else {
+        // Automatically allocate payment to oldest outstanding purchases for this company
+        let remainingToAllocate = amount;
+        const unpaidPurchases = await manager.find(Purchase, {
+          where: { companyId },
+          order: { purchaseDate: 'ASC', createdAt: 'ASC' },
+        });
+
+        for (const p of unpaidPurchases) {
+          if (remainingToAllocate <= 0) break;
+          const currentDue = Math.max(0, this.safeNum(p.totalAmount) - this.safeNum(p.paidAmount));
+          if (currentDue > 0) {
+            const allocation = Math.min(currentDue, remainingToAllocate);
+            const newPaid = this.safeNum(p.paidAmount) + allocation;
+            const newDue = Math.max(0, this.safeNum(p.totalAmount) - newPaid);
+            await manager.update(Purchase, p.id, {
+              paidAmount: newPaid,
+              dueAmount: newDue,
+            });
+            remainingToAllocate -= allocation;
+          }
+        }
+      }
+
+      return savedPayment;
+    });
+  }
+
+  /**
+   * 📦 Product Supply Summary (সব পণ্য বা নির্দিষ্ট কোম্পানির কোন কোন প্রোডাক্ট কত টাকার এসেছে)
+   */
+  async getProductSupplySummary(companyId?: number) {
+    const qb = this.purchaseItemRepository
+      .createQueryBuilder('item')
+      .innerJoin('item.purchase', 'p')
+      .innerJoin('item.product', 'prod')
+      .leftJoin('prod.company', 'comp')
+      .select('prod.id', 'productId')
+      .addSelect('prod.name', 'productName')
+      .addSelect('prod.unit', 'unit')
+      .addSelect('prod.currentStock', 'currentStock')
+      .addSelect('prod.buyPrice', 'latestBuyPrice')
+      .addSelect('comp.id', 'companyId')
+      .addSelect('comp.name', 'companyName')
+      .addSelect('SUM(COALESCE(item.quantity, 0))', 'totalQuantityReceived')
+      .addSelect('SUM(COALESCE(item.lineTotal, 0))', 'totalCostValue')
+      .addSelect('COUNT(DISTINCT p.id)', 'purchaseCount')
+      .addSelect('MAX(p.purchaseDate)', 'lastPurchaseDate')
+      .where("p.status <> 'CANCELLED'");
+
+    if (companyId) {
+      qb.andWhere('p.companyId = :companyId', { companyId: Number(companyId) });
+    }
+
+    qb.groupBy('prod.id')
+      .addGroupBy('prod.name')
+      .addGroupBy('prod.unit')
+      .addGroupBy('prod.currentStock')
+      .addGroupBy('prod.buyPrice')
+      .addGroupBy('comp.id')
+      .addGroupBy('comp.name')
+      .orderBy('SUM(COALESCE(item.lineTotal, 0))', 'DESC');
+
+    const data = await qb.getRawMany();
+
+    return data.map((row, idx) => {
+      const totalQty = this.safeNum(row.totalQuantityReceived);
+      const totalCost = this.safeNum(row.totalCostValue);
+      const avgUnitCost = totalQty > 0 ? totalCost / totalQty : this.safeNum(row.latestBuyPrice);
+
+      return {
+        rank: idx + 1,
+        productId: Number(row.productId),
+        productName: row.productName,
+        companyId: Number(row.companyId),
+        companyName: row.companyName || 'Unknown',
+        unit: row.unit || 'Pcs',
+        currentStock: this.safeNum(row.currentStock),
+        latestBuyPrice: this.safeNum(row.latestBuyPrice),
+        totalQuantityReceived: totalQty,
+        totalCostValue: totalCost,
+        avgUnitCost: Number(avgUnitCost.toFixed(2)),
+        purchaseCount: this.safeNum(row.purchaseCount),
+        lastPurchaseDate: row.lastPurchaseDate,
+      };
+    });
+  }
+
+  /**
+   * 📜 Payment History (কোম্পানিকে দেওয়া সমস্ত পেমেন্টের খতিয়ান)
+   */
+  async getPaymentHistory(query: any = {}) {
+    const qb = this.paymentRepository
+      .createQueryBuilder('pay')
+      .leftJoinAndSelect('pay.company', 'company')
+      .leftJoinAndSelect('pay.purchase', 'purchase')
+      .orderBy('pay.paymentDate', 'DESC')
+      .addOrderBy('pay.createdAt', 'DESC');
+
+    if (query.companyId) {
+      qb.andWhere('pay.companyId = :companyId', { companyId: Number(query.companyId) });
+    }
+
+    if (query.fromDate) {
+      qb.andWhere('pay.paymentDate >= :fromDate', { fromDate: query.fromDate });
+    }
+
+    if (query.toDate) {
+      qb.andWhere('pay.paymentDate <= :toDate', { toDate: query.toDate });
+    }
+
+    return qb.getMany();
   }
 }
