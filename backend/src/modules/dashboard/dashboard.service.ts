@@ -4,7 +4,9 @@ import {
   isTodayBDDate,
   getBDTodayString,
   getBDMonthRange,
+  getBDDateRangeForPeriod,
   BDMonthRange,
+  BDPeriodRange,
 } from '../../common/utils/date.utils';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, Not, Repository, DataSource } from 'typeorm';
@@ -24,7 +26,7 @@ import { ProductsService } from '../products/products.service';
 import { DispatchBatch } from '../delivery-ops/entities/dispatch-batch.entity';
 
 export interface DashboardQueryOptions {
-  period?: string; // 'this_month' | 'last_month' | 'custom' | 'all_time'
+  period?: string; // 'today' | 'last_7_days' | 'this_month' | 'last_month' | 'this_year' | 'custom' | 'all_time'
   month?: number;  // 1-12
   year?: number;   // e.g. 2026
 }
@@ -72,51 +74,21 @@ export class DashboardService {
       where.createdById = userId;
     }
 
-    // 0. Parse Period and Month Range
+    // 0. Parse Period and Date Range using standardized BD timezone helper
     const period = options.period || 'this_month';
-    const bdToday = getBDTodayString();
-    const [currentYear, currentMonth] = bdToday.split('-').map(Number);
-
-    let monthRange: BDMonthRange | null = null;
-    let periodStartDateStr: string | null = null;
-    let periodEndDateStr: string | null = null;
-    let periodStartUtc: Date | null = null;
-    let periodEndUtc: Date | null = null;
-    let periodLabel = 'This Month';
-    let isAllTime = false;
-
-    if (period === 'last_month') {
-      let targetMonth = currentMonth - 1;
-      let targetYear = currentYear;
-      if (targetMonth < 1) {
-        targetMonth = 12;
-        targetYear -= 1;
-      }
-      monthRange = getBDMonthRange(targetYear, targetMonth);
-      periodStartDateStr = monthRange.startDateStr;
-      periodEndDateStr = monthRange.endDateStr;
-      periodStartUtc = monthRange.startUtc;
-      periodEndUtc = monthRange.endUtc;
-      periodLabel = `${monthRange.monthName} ${monthRange.year}`;
-    } else if (period === 'custom' && options.month && options.year) {
-      monthRange = getBDMonthRange(options.year, options.month);
-      periodStartDateStr = monthRange.startDateStr;
-      periodEndDateStr = monthRange.endDateStr;
-      periodStartUtc = monthRange.startUtc;
-      periodEndUtc = monthRange.endUtc;
-      periodLabel = `${monthRange.monthName} ${monthRange.year}`;
-    } else if (period === 'all_time') {
-      isAllTime = true;
-      periodLabel = 'All Time (Full History)';
-    } else {
-      // Default: this_month (1st of current month to end of current month: 28/29/30/31)
-      monthRange = getBDMonthRange(currentYear, currentMonth);
-      periodStartDateStr = monthRange.startDateStr;
-      periodEndDateStr = monthRange.endDateStr;
-      periodStartUtc = monthRange.startUtc;
-      periodEndUtc = monthRange.endUtc;
-      periodLabel = `${monthRange.monthName} ${monthRange.year}`;
-    }
+    const dateRange = getBDDateRangeForPeriod(
+      period,
+      options.year,
+      options.month,
+    );
+    const {
+      periodStartDateStr,
+      periodEndDateStr,
+      periodStartUtc,
+      periodEndUtc,
+      periodLabel,
+      isAllTime,
+    } = dateRange;
 
     // 1. Conditional SQL Aggregations for Orders (All-Time, Period, & Today)
     let aggResult: any;
@@ -935,12 +907,12 @@ export class DashboardService {
         key: period,
         label: periodLabel,
         isAllTime,
-        month: monthRange?.month,
-        year: monthRange?.year,
-        monthName: monthRange?.monthName,
+        month: dateRange.month,
+        year: dateRange.year,
+        monthName: dateRange.monthName,
         startDateStr: periodStartDateStr,
         endDateStr: periodEndDateStr,
-        totalDays: monthRange?.totalDays || 0,
+        totalDays: dateRange.totalDays || 0,
       },
       uiMetrics: {
         // Today metrics (Always Today in BD Time)
@@ -1042,44 +1014,20 @@ export class DashboardService {
     const isSR = user?.role === Role.SR;
     const userId = user?.id || user?.sub;
 
+    // 0. Parse Period and Date Range using standardized BD timezone helper
     const period = options.period || 'this_month';
-    const bdToday = getBDTodayString();
-    const [currentYear, currentMonth] = bdToday.split('-').map(Number);
-
-    let monthRange: BDMonthRange | null = null;
-    let periodStartDateStr: string | null = null;
-    let periodEndDateStr: string | null = null;
-    let periodStartUtc: Date | null = null;
-    let periodEndUtc: Date | null = null;
-    let isAllTime = false;
-
-    if (period === 'last_month') {
-      let targetMonth = currentMonth - 1;
-      let targetYear = currentYear;
-      if (targetMonth < 1) {
-        targetMonth = 12;
-        targetYear -= 1;
-      }
-      monthRange = getBDMonthRange(targetYear, targetMonth);
-      periodStartDateStr = monthRange.startDateStr;
-      periodEndDateStr = monthRange.endDateStr;
-      periodStartUtc = monthRange.startUtc;
-      periodEndUtc = monthRange.endUtc;
-    } else if (period === 'custom' && options.month && options.year) {
-      monthRange = getBDMonthRange(options.year, options.month);
-      periodStartDateStr = monthRange.startDateStr;
-      periodEndDateStr = monthRange.endDateStr;
-      periodStartUtc = monthRange.startUtc;
-      periodEndUtc = monthRange.endUtc;
-    } else if (period === 'all_time') {
-      isAllTime = true;
-    } else {
-      monthRange = getBDMonthRange(currentYear, currentMonth);
-      periodStartDateStr = monthRange.startDateStr;
-      periodEndDateStr = monthRange.endDateStr;
-      periodStartUtc = monthRange.startUtc;
-      periodEndUtc = monthRange.endUtc;
-    }
+    const dateRange = getBDDateRangeForPeriod(
+      period,
+      options.year,
+      options.month,
+    );
+    const {
+      periodStartDateStr,
+      periodEndDateStr,
+      periodStartUtc,
+      periodEndUtc,
+      isAllTime,
+    } = dateRange;
 
     const safeNum = (val: any) => {
       const n = Number(val);

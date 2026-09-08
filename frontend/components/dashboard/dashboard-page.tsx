@@ -34,6 +34,10 @@ import {
   Flame,
   Trophy,
   Tag,
+  Filter,
+  ArrowUpDown,
+  SlidersHorizontal,
+  Zap,
 } from 'lucide-react';
 import { SRDuesList } from './sr-dues-list';
 import { useAuth } from '../auth/auth-provider';
@@ -73,7 +77,7 @@ export function DashboardPage() {
   const currentMonth = now.getMonth() + 1; // 1-indexed
 
   // Filter States
-  const [period, setPeriod] = useState<'this_month' | 'last_month' | 'all_time' | 'custom'>('this_month');
+  const [period, setPeriod] = useState<'today' | 'last_7_days' | 'this_month' | 'last_month' | 'this_year' | 'all_time' | 'custom'>('this_month');
   const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
@@ -89,11 +93,15 @@ export function DashboardPage() {
   const [selectedTopProductCompany, setSelectedTopProductCompany] = useState<number | 'all'>('all');
   const [topProductSearch, setTopProductSearch] = useState('');
   const [showOnlySoldProducts, setShowOnlySoldProducts] = useState(true);
+  const [topProductStockFilter, setTopProductStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [topProductSort, setTopProductSort] = useState<'sold_qty_desc' | 'sold_val_desc' | 'stock_desc' | 'stock_asc' | 'name_asc'>('sold_qty_desc');
 
   // Modal for Viewing Single Company Top Products (Direct from Company Card)
   const [viewingCompanyProducts, setViewingCompanyProducts] = useState<{ companyId: number; companyName: string } | null>(null);
   const [modalProductSearch, setModalProductSearch] = useState('');
   const [modalShowOnlySold, setModalShowOnlySold] = useState(true);
+  const [modalProductStockFilter, setModalProductStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [modalProductSort, setModalProductSort] = useState<'sold_qty_desc' | 'sold_val_desc' | 'stock_desc' | 'name_asc'>('sold_qty_desc');
 
   // Order Details Modal State
   const [viewingOrder, setViewingOrder] = useState<any>(null);
@@ -184,9 +192,12 @@ export function DashboardPage() {
   const isCurrentMonthActive = period === 'this_month';
 
   const activeMonthBn = periodInfo.month ? MONTH_NAMES_BN[periodInfo.month - 1]?.bn : '';
-  const displayPeriodTitle = period === 'all_time' 
-    ? 'শুরু থেকে আজ পর্যন্ত (সকল ইতিহাস)' 
-    : `${activeMonthBn || periodInfo.monthName || ''} ${periodInfo.year || ''}`;
+  const displayPeriodTitle = 
+    period === 'today' ? 'আজকের লাইভ হিসাব' :
+    period === 'last_7_days' ? 'বিগত ৭ দিনের হিসাব' :
+    period === 'this_year' ? `${currentYear} সালের মোট হিসাব` :
+    period === 'all_time' ? 'শুরু থেকে আজ পর্যন্ত (সকল ইতিহাস)' :
+    `${activeMonthBn || periodInfo.monthName || ''} ${periodInfo.year || ''}`;
 
   // Filter Drilldown items with search term
   const drilldownItems = (drilldownData?.items || []).filter((item: any) => {
@@ -231,14 +242,46 @@ export function DashboardPage() {
 
         {/* Period Selector Tabs in Simple Bangla */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold">
+          <div className="inline-flex flex-wrap rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold gap-0.5">
+            <button
+              onClick={() => {
+                setPeriod('today');
+                setIsMonthPickerOpen(false);
+                setActiveDrilldown(null);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                period === 'today'
+                  ? 'bg-white text-indigo-700 shadow-sm font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Zap className="h-3.5 w-3.5 text-amber-500" />
+              আজকে
+            </button>
+
+            <button
+              onClick={() => {
+                setPeriod('last_7_days');
+                setIsMonthPickerOpen(false);
+                setActiveDrilldown(null);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                period === 'last_7_days'
+                  ? 'bg-white text-indigo-700 shadow-sm font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Activity className="h-3.5 w-3.5 text-indigo-500" />
+              ৭ দিন
+            </button>
+
             <button
               onClick={() => {
                 setPeriod('this_month');
                 setIsMonthPickerOpen(false);
                 setActiveDrilldown(null);
               }}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
                 period === 'this_month'
                   ? 'bg-white text-indigo-700 shadow-sm font-black'
                   : 'text-slate-600 hover:text-slate-900'
@@ -254,7 +297,7 @@ export function DashboardPage() {
                 setIsMonthPickerOpen(false);
                 setActiveDrilldown(null);
               }}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
                 period === 'last_month'
                   ? 'bg-white text-indigo-700 shadow-sm font-black'
                   : 'text-slate-600 hover:text-slate-900'
@@ -266,11 +309,26 @@ export function DashboardPage() {
 
             <button
               onClick={() => {
+                setPeriod('this_year');
+                setIsMonthPickerOpen(false);
+                setActiveDrilldown(null);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                period === 'this_year'
+                  ? 'bg-white text-indigo-700 shadow-sm font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              চলতি বছর
+            </button>
+
+            <button
+              onClick={() => {
                 setPeriod('all_time');
                 setIsMonthPickerOpen(false);
                 setActiveDrilldown(null);
               }}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
                 period === 'all_time'
                   ? 'bg-white text-indigo-700 shadow-sm font-black'
                   : 'text-slate-600 hover:text-slate-900'
@@ -1117,40 +1175,87 @@ export function DashboardPage() {
               </div>
             </div>
 
-            {/* Search and Sold Toggle */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                <button
-                  onClick={() => setShowOnlySoldProducts(true)}
-                  className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
-                    showOnlySoldProducts
-                      ? 'bg-orange-500 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🔥 শুধু রানিং বিক্রিত পণ্য ({(d.topProducts || []).filter((p: any) => p.soldQuantity > 0).length}টি)
-                </button>
-                <button
-                  onClick={() => setShowOnlySoldProducts(false)}
-                  className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
-                    !showOnlySoldProducts
-                      ? 'bg-slate-900 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  সব পণ্য ({(d.topProducts || []).length}টি)
-                </button>
+            {/* Search, Filter and Sort Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+              {/* Sold toggle & Stock Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs">
+                  <button
+                    onClick={() => setShowOnlySoldProducts(true)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      showOnlySoldProducts
+                        ? 'bg-orange-500 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    🔥 শুধু রানিং বিক্রিত ({(d.topProducts || []).filter((p: any) => p.soldQuantity > 0).length}টি)
+                  </button>
+                  <button
+                    onClick={() => setShowOnlySoldProducts(false)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      !showOnlySoldProducts
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    সব পণ্য ({(d.topProducts || []).length}টি)
+                  </button>
+                </div>
+
+                {/* Stock Filter Pills */}
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs text-xs font-bold">
+                  <span className="text-[10px] text-slate-400 font-bold px-1 hidden sm:inline">স্টক:</span>
+                  {[
+                    { id: 'all', label: 'সব' },
+                    { id: 'in_stock', label: '🟢 ইন-স্টক' },
+                    { id: 'low_stock', label: '🟡 কম স্টক' },
+                    { id: 'out_of_stock', label: '🔴 স্টক শেষ' },
+                  ].map((st) => (
+                    <button
+                      key={st.id}
+                      onClick={() => setTopProductStockFilter(st.id as any)}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        topProductStockFilter === st.id
+                          ? 'bg-indigo-600 text-white font-black'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="প্রোডাক্ট বা কোম্পানি খুঁজুন..."
-                  value={topProductSearch}
-                  onChange={(e) => setTopProductSearch(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-slate-50 w-full sm:w-56"
-                />
+              {/* Sort & Search */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Sort Dropdown */}
+                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-xs">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-[11px] font-bold text-slate-500">ক্রমানুসার:</span>
+                  <select
+                    value={topProductSort}
+                    onChange={(e) => setTopProductSort(e.target.value as any)}
+                    className="text-xs font-black text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+                  >
+                    <option value="sold_qty_desc">🔥 বিক্রি সংখ্যা (বেশি থেকে কম)</option>
+                    <option value="sold_val_desc">💰 বিক্রি মূল্য (বেশি থেকে কম)</option>
+                    <option value="stock_desc">📦 মজুদ স্টক (বেশি থেকে কম)</option>
+                    <option value="stock_asc">⚠️ কম স্টক আগে (রিঅর্ডার)</option>
+                    <option value="name_asc">🔤 পণ্যের নাম (A-Z)</option>
+                  </select>
+                </div>
+
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="প্রোডাক্ট বা কোম্পানি খুঁজুন..."
+                    value={topProductSearch}
+                    onChange={(e) => setTopProductSearch(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white w-full sm:w-52 shadow-xs"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1199,20 +1304,34 @@ export function DashboardPage() {
           {/* Top Products Table */}
           <div className="overflow-x-auto">
             {(() => {
-              const filteredList = (d.topProducts || []).filter((item: any) => {
-                const matchesCompany = selectedTopProductCompany === 'all' || item.companyId === selectedTopProductCompany;
-                const matchesSold = !showOnlySoldProducts || item.soldQuantity > 0;
-                const matchesSearch = !topProductSearch || 
-                  item.productName.toLowerCase().includes(topProductSearch.toLowerCase()) ||
-                  item.companyName.toLowerCase().includes(topProductSearch.toLowerCase());
-                return matchesCompany && matchesSold && matchesSearch;
-              });
+              const filteredList = (d.topProducts || [])
+                .filter((item: any) => {
+                  const matchesCompany = selectedTopProductCompany === 'all' || item.companyId === selectedTopProductCompany;
+                  const matchesSold = !showOnlySoldProducts || item.soldQuantity > 0;
+                  const matchesStock = 
+                    topProductStockFilter === 'all' ? true :
+                    topProductStockFilter === 'in_stock' ? item.currentStock > 0 :
+                    topProductStockFilter === 'low_stock' ? (item.currentStock > 0 && item.currentStock <= 10) :
+                    item.currentStock <= 0;
+                  const matchesSearch = !topProductSearch || 
+                    item.productName.toLowerCase().includes(topProductSearch.toLowerCase()) ||
+                    item.companyName.toLowerCase().includes(topProductSearch.toLowerCase());
+                  return matchesCompany && matchesSold && matchesStock && matchesSearch;
+                })
+                .sort((a: any, b: any) => {
+                  if (topProductSort === 'sold_qty_desc') return b.soldQuantity - a.soldQuantity || b.salesValue - a.salesValue;
+                  if (topProductSort === 'sold_val_desc') return b.salesValue - a.salesValue || b.soldQuantity - a.soldQuantity;
+                  if (topProductSort === 'stock_desc') return b.currentStock - a.currentStock;
+                  if (topProductSort === 'stock_asc') return a.currentStock - b.currentStock;
+                  if (topProductSort === 'name_asc') return a.productName.localeCompare(b.productName);
+                  return 0;
+                });
 
               if (filteredList.length === 0) {
                 return (
                   <div className="py-12 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                     {showOnlySoldProducts 
-                      ? 'এই কোম্পানির কোনো পণ্য এখনও বিক্রি হয়নি (সব পণ্য দেখতে "সব পণ্য" বাটনে চাপুন)।'
+                      ? 'এই ফিল্টারে কোনো পণ্য এখনও বিক্রি হয়নি (সব পণ্য দেখতে "সব পণ্য" বাটনে চাপুন)।'
                       : 'কোনো পণ্য পাওয়া যায়নি।'}
                   </div>
                 );
@@ -1324,8 +1443,8 @@ export function DashboardPage() {
 
       {/* 🏢 Company Top Products Popup Modal (Direct Click on Company Card) */}
       {viewingCompanyProducts && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
               <div className="flex items-center gap-3">
@@ -1363,7 +1482,8 @@ export function DashboardPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 self-end sm:self-center">
+              <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                {/* Sold Toggle */}
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                   <button
                     onClick={() => setModalShowOnlySold(true)}
@@ -1386,6 +1506,39 @@ export function DashboardPage() {
                     সব ({(d.topProducts || []).filter((p: any) => p.companyId === viewingCompanyProducts.companyId).length}টি)
                   </button>
                 </div>
+
+                {/* Stock Filter Pills */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                  {[
+                    { id: 'all', label: 'সব স্টক' },
+                    { id: 'in_stock', label: '🟢 ইন-স্টক' },
+                    { id: 'out_of_stock', label: '🔴 স্টক শেষ' },
+                  ].map((st) => (
+                    <button
+                      key={st.id}
+                      onClick={() => setModalProductStockFilter(st.id as any)}
+                      className={`px-2 py-1 rounded-lg transition-all ${
+                        modalProductStockFilter === st.id
+                          ? 'bg-indigo-600 text-white font-black'
+                          : 'text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Sort Dropdown */}
+                <select
+                  value={modalProductSort}
+                  onChange={(e) => setModalProductSort(e.target.value as any)}
+                  className="text-xs font-black text-slate-800 bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
+                >
+                  <option value="sold_qty_desc">🔥 বিক্রি সংখ্যা</option>
+                  <option value="sold_val_desc">💰 বিক্রি মূল্য</option>
+                  <option value="stock_desc">📦 মজুদ স্টক</option>
+                  <option value="name_asc">🔤 নাম (A-Z)</option>
+                </select>
               </div>
             </div>
 
@@ -1395,9 +1548,22 @@ export function DashboardPage() {
                 const companyProducts = (d.topProducts || [])
                   .filter((p: any) => p.companyId === viewingCompanyProducts.companyId)
                   .filter((p: any) => !modalShowOnlySold || p.soldQuantity > 0)
+                  .filter((p: any) => {
+                    if (modalProductStockFilter === 'all') return true;
+                    if (modalProductStockFilter === 'in_stock') return p.currentStock > 0;
+                    if (modalProductStockFilter === 'low_stock') return p.currentStock > 0 && p.currentStock <= 10;
+                    return p.currentStock <= 0;
+                  })
                   .filter((p: any) => 
                     !modalProductSearch || p.productName.toLowerCase().includes(modalProductSearch.toLowerCase())
-                  );
+                  )
+                  .sort((a: any, b: any) => {
+                    if (modalProductSort === 'sold_qty_desc') return b.soldQuantity - a.soldQuantity || b.salesValue - a.salesValue;
+                    if (modalProductSort === 'sold_val_desc') return b.salesValue - a.salesValue || b.soldQuantity - a.soldQuantity;
+                    if (modalProductSort === 'stock_desc') return b.currentStock - a.currentStock;
+                    if (modalProductSort === 'name_asc') return a.productName.localeCompare(b.productName);
+                    return 0;
+                  });
 
                 if (companyProducts.length === 0) {
                   return (

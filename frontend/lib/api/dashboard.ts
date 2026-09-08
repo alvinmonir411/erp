@@ -2,7 +2,7 @@ import { apiRequest } from './client';
 
 export interface DashboardFilterParams {
   companyId?: number;
-  period?: 'this_month' | 'last_month' | 'all_time' | 'custom';
+  period?: 'today' | 'last_7_days' | 'this_month' | 'last_month' | 'this_year' | 'all_time' | 'custom';
   month?: number;
   year?: number;
 }

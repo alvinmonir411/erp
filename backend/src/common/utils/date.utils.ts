@@ -120,3 +120,144 @@ export function getBDMonthRange(targetYear?: number, targetMonth?: number): BDMo
   };
 }
 
+export interface BDPeriodRange {
+  startUtc: Date | null;
+  endUtc: Date | null;
+  startDateStr: string | null;
+  endDateStr: string | null;
+  periodLabel: string;
+  isAllTime: boolean;
+  month?: number;
+  year?: number;
+  monthName?: string;
+  totalDays?: number;
+}
+
+/**
+ * Returns date range and metadata for a given period in Bangladesh Standard Time.
+ */
+export function getBDDateRangeForPeriod(
+  period: string = 'this_month',
+  customYear?: number,
+  customMonth?: number,
+): BDPeriodRange {
+  const bdToday = getBDTodayString();
+  const [currentYear, currentMonth] = bdToday.split('-').map(Number);
+
+  if (period === 'today') {
+    const { startUtc, endUtc } = getBDDayRange();
+    return {
+      startUtc,
+      endUtc,
+      startDateStr: bdToday,
+      endDateStr: bdToday,
+      periodLabel: 'আজকের হিসাব (Today)',
+      isAllTime: false,
+      year: currentYear,
+      month: currentMonth,
+    };
+  }
+
+  if (period === 'last_7_days') {
+    const { endUtc } = getBDDayRange();
+    const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgoStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Dhaka',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(sevenDaysAgo);
+    const [sYear, sMonth, sDay] = sevenDaysAgoStr.split('-').map(Number);
+    const startUtc = new Date(Date.UTC(sYear, sMonth - 1, sDay, 0, 0, 0) - 6 * 60 * 60 * 1000);
+    return {
+      startUtc,
+      endUtc,
+      startDateStr: sevenDaysAgoStr,
+      endDateStr: bdToday,
+      periodLabel: 'বিগত ৭ দিন (Last 7 Days)',
+      isAllTime: false,
+      year: currentYear,
+      month: currentMonth,
+    };
+  }
+
+  if (period === 'last_month') {
+    let targetMonth = currentMonth - 1;
+    let targetYear = currentYear;
+    if (targetMonth < 1) {
+      targetMonth = 12;
+      targetYear -= 1;
+    }
+    const monthRange = getBDMonthRange(targetYear, targetMonth);
+    return {
+      startUtc: monthRange.startUtc,
+      endUtc: monthRange.endUtc,
+      startDateStr: monthRange.startDateStr,
+      endDateStr: monthRange.endDateStr,
+      periodLabel: `${monthRange.monthName} ${monthRange.year}`,
+      isAllTime: false,
+      month: monthRange.month,
+      year: monthRange.year,
+      monthName: monthRange.monthName,
+      totalDays: monthRange.totalDays,
+    };
+  }
+
+  if (period === 'this_year') {
+    const startUtc = new Date(Date.UTC(currentYear, 0, 1, 0, 0, 0) - 6 * 60 * 60 * 1000);
+    const endUtc = new Date(Date.UTC(currentYear, 11, 31, 23, 59, 59, 999) - 6 * 60 * 60 * 1000);
+    return {
+      startUtc,
+      endUtc,
+      startDateStr: `${currentYear}-01-01`,
+      endDateStr: `${currentYear}-12-31`,
+      periodLabel: `${currentYear} সাল (This Year)`,
+      isAllTime: false,
+      year: currentYear,
+    };
+  }
+
+  if (period === 'custom' && customYear && customMonth) {
+    const monthRange = getBDMonthRange(customYear, customMonth);
+    return {
+      startUtc: monthRange.startUtc,
+      endUtc: monthRange.endUtc,
+      startDateStr: monthRange.startDateStr,
+      endDateStr: monthRange.endDateStr,
+      periodLabel: `${monthRange.monthName} ${monthRange.year}`,
+      isAllTime: false,
+      month: monthRange.month,
+      year: monthRange.year,
+      monthName: monthRange.monthName,
+      totalDays: monthRange.totalDays,
+    };
+  }
+
+  if (period === 'all_time') {
+    return {
+      startUtc: null,
+      endUtc: null,
+      startDateStr: null,
+      endDateStr: null,
+      periodLabel: 'সকল ইতিহাস (All Time)',
+      isAllTime: true,
+    };
+  }
+
+  // Default: this_month
+  const monthRange = getBDMonthRange(currentYear, currentMonth);
+  return {
+    startUtc: monthRange.startUtc,
+    endUtc: monthRange.endUtc,
+    startDateStr: monthRange.startDateStr,
+    endDateStr: monthRange.endDateStr,
+    periodLabel: `${monthRange.monthName} ${monthRange.year}`,
+    isAllTime: false,
+    month: monthRange.month,
+    year: monthRange.year,
+    monthName: monthRange.monthName,
+    totalDays: monthRange.totalDays,
+  };
+}
+
+
