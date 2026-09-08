@@ -54,10 +54,11 @@ const navigation = [
     ]
   },
   {
-    title: 'Finance',
+    title: 'Finance & Company Ledger',
     roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR],
     items: [
-      { href: '/dues', label: 'Due', icon: DollarSign },
+      { href: '/dues', label: 'Market Due', icon: DollarSign },
+      { href: '/purchases', label: 'Company Ledger & Purchases', icon: Receipt, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
     ]
   },
 
@@ -65,6 +66,7 @@ const navigation = [
     title: 'Inventory',
     roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
+      { href: '/purchases', label: 'Goods In & Purchases', icon: Package },
       { href: '/products', label: 'Products', icon: Box },
       { href: '/stock', label: 'Stock', icon: BarChart3 },
     ]
