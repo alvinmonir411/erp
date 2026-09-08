@@ -51,6 +51,7 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
+  User,
 } from 'lucide-react';
 
 const pageSize = 12;
@@ -1278,12 +1279,22 @@ export function PurchasesPage() {
                       {(paginatedData as PurchasePayment[]).map((pay) => (
                         <tr key={pay.id} className="hover:bg-slate-50/70 transition-colors">
                           <td className="px-5 py-3.5 font-medium text-slate-900">
-                            {formatDate(pay.paymentDate)}
+                            <div>{formatDate(pay.paymentDate)}</div>
+                            {pay.createdAt && (
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                {new Date(pay.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            )}
                           </td>
                           <td className="px-5 py-3.5">
                             <div className="font-bold text-slate-900">
                               {pay.company?.name || `Company #${pay.companyId}`}
                             </div>
+                            {pay.company?.code && (
+                              <div className="text-[11px] text-slate-400 font-mono">
+                                কোড: {pay.company.code}
+                              </div>
+                            )}
                           </td>
                           <td className="px-5 py-3.5 text-right font-black text-emerald-600">
                             {formatCurrency(pay.amount)}
@@ -1299,8 +1310,11 @@ export function PurchasesPage() {
                           <td className="px-5 py-3.5 text-slate-700 text-xs max-w-xs">
                             {pay.note || '-'}
                           </td>
-                          <td className="px-5 py-3.5 text-center text-xs text-slate-500">
-                            {pay.createdByName || 'Admin'}
+                          <td className="px-5 py-3.5 text-center">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                              <User className="h-3 w-3 text-slate-400" />
+                              <span>{pay.createdByName || 'Admin'}</span>
+                            </span>
                           </td>
                           <td className="px-5 py-3.5 text-center">
                             <div className="flex items-center justify-center gap-2">
