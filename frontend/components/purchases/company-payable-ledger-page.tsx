@@ -25,6 +25,7 @@ import {
   Plus,
   ArrowLeft,
   X,
+  Search,
   ChevronDown,
   ChevronUp,
   CreditCard,
@@ -45,6 +46,8 @@ export type ProductPaymentRow = {
   quantity?: string;
   amount: string;
   note?: string;
+  searchText?: string;
+  showResults?: boolean;
 };
 
 export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
@@ -84,7 +87,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
         setError(null);
         const [nextDetails, prods] = await Promise.all([
           getCompanyPayableLedger(companyId),
-          getProducts({ companyId }).catch(() => getProducts().catch(() => [])),
+          getProducts().catch(() => getProducts({ companyId }).catch(() => [])),
         ]);
         setDetails(nextDetails);
         setAllProducts(Array.isArray(prods) ? prods : prods?.data || []);
@@ -119,7 +122,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     setPaymentNote(purchaseId ? `Invoice #${purchaseId} settlement` : '');
     setIsProductBreakdownMode(true);
     setProductPaymentRows([
-      { productId: '', quantity: '', amount: '', note: '' }
+      { productId: '', quantity: '1', amount: '', note: '', searchText: '', showResults: false }
     ]);
     setIsPaymentModalOpen(true);
   };
@@ -128,8 +131,40 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     setIsProductBreakdownMode(true);
     setProductPaymentRows((prev) => [
       ...prev,
-      { productId: '', quantity: '', amount: '', note: '' },
+      { productId: '', quantity: '1', amount: '', note: '', searchText: '', showResults: false },
     ]);
+  };
+
+  const handleSelectProduct = (index: number, product: Product) => {
+    setProductPaymentRows((prev) => {
+      const updated = [...prev];
+      const target = { ...updated[index] };
+      target.productId = product.id;
+      target.productName = product.name;
+      target.unit = product.unit || 'Pcs';
+      target.searchText = product.name;
+      target.showResults = false;
+
+      const qty = Number(target.quantity) || 1;
+      if (!target.quantity) {
+        target.quantity = '1';
+      }
+      if (product.buyPrice) {
+        target.amount = String(toNumber(product.buyPrice) * qty);
+      }
+
+      updated[index] = target;
+
+      const totalRowAmount = updated.reduce(
+        (sum, row) => sum + (parseFloat(row.amount) || 0),
+        0,
+      );
+      if (totalRowAmount > 0) {
+        setPaymentAmount(String(totalRowAmount));
+      }
+
+      return updated;
+    });
   };
 
   const handleUpdateProductRow = (
@@ -140,22 +175,15 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     setProductPaymentRows((prev) => {
       const updated = [...prev];
       const target = { ...updated[index], [field]: value };
-      if (field === 'productId') {
-        const prod = allProducts.find((p) => p.id === Number(value));
-        if (prod) {
-          target.productName = prod.name;
-          target.unit = prod.unit || 'Pcs';
-          if (!target.amount && prod.buyPrice) {
-            target.amount = String(toNumber(prod.buyPrice) * (Number(target.quantity) || 1));
-          }
-        }
-      }
+      
       if (field === 'quantity' && target.productId) {
         const prod = allProducts.find((p) => p.id === Number(target.productId));
-        if (prod && prod.buyPrice && !target.amount) {
-          target.amount = String(toNumber(prod.buyPrice) * (Number(value) || 1));
+        const qty = Number(value) || 0;
+        if (prod && prod.buyPrice && qty > 0) {
+          target.amount = String(toNumber(prod.buyPrice) * qty);
         }
       }
+
       updated[index] = target;
 
       const totalRowAmount = updated.reduce(
@@ -804,23 +832,139 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                       key={idx}
                       className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm"
                     >
-                      <div className="flex-1 w-full sm:w-auto">
-                        <select
-                          value={row.productId}
-                          onChange={(e) =>
-                            handleUpdateProductRow(idx, 'productId', e.target.value ? Number(e.target.value) : '')
-                          }
-                          className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
-                        >
-                          <option value="">-- প্রোডাক্ট সিলেক্ট করুন --</option>
-                          {allProducts
-                            .filter((p) => !p.companyId || p.companyId === companyId)
-                            .map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} {p.buyPrice ? `(ক্রয়: ৳${p.buyPrice})` : ''} {p.currentStock !== undefined ? `[স্টক: ${p.currentStock}]` : ''}
-                              </option>
-                            ))}
-                        </select>
+                      {/* Searchable Product Input */}
+                      <div className="relative flex-1 w-full sm:w-auto">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            placeholder="প্রোডাক্টের নাম লিখুন বা সার্চ করুন..."
+                            value={
+                              row.searchText !== undefined
+                                ? row.searchText
+                                : row.productName
+                                ? `${row.productName}${row.unit ? ` (${row.unit})` : ''}`
+                                : ''
+                            }
+                            onFocus={() => {
+                              handleUpdateProductRow(idx, 'showResults', true);
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                setProductPaymentRows((prev) => {
+                                  const updated = [...prev];
+                                  if (updated[idx]) {
+                                    updated[idx] = { ...updated[idx], showResults: false };
+                                  }
+                                  return updated;
+                                });
+                              }, 250);
+                            }}
+                            onChange={(e) => {
+                              const text = e.target.value;
+                              setProductPaymentRows((prev) => {
+                                const updated = [...prev];
+                                updated[idx] = {
+                                  ...updated[idx],
+                                  searchText: text,
+                                  showResults: true,
+                                  productId: text ? updated[idx].productId : '',
+                                };
+                                return updated;
+                              });
+                            }}
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-7 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                          />
+                          {(row.searchText || row.productId || row.productName) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProductPaymentRows((prev) => {
+                                  const updated = [...prev];
+                                  updated[idx] = {
+                                    ...updated[idx],
+                                    productId: '',
+                                    productName: '',
+                                    searchText: '',
+                                    showResults: false,
+                                    amount: '',
+                                  };
+                                  return updated;
+                                });
+                              }}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                              title="মুছুন"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Dropdown Options Panel */}
+                        {row.showResults && (
+                          <div className="absolute left-0 top-full z-[9999] mt-1 max-h-56 w-full min-w-[280px] sm:min-w-[340px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl ring-1 ring-black/5 animate-fadeIn">
+                            {(() => {
+                              const query = (row.searchText ?? row.productName ?? '').toLowerCase().trim();
+                              const filtered = allProducts.filter((p) => {
+                                if (p.companyId && p.companyId !== companyId) return false;
+                                if (!query) return true;
+                                const matchName = p.name?.toLowerCase().includes(query);
+                                const matchSku = p.sku?.toLowerCase().includes(query);
+                                return matchName || matchSku;
+                              });
+
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="p-3 text-center text-xs text-slate-400 font-medium">
+                                    কোনো প্রোডাক্ট খুঁজে পাওয়া যায়নি
+                                  </div>
+                                );
+                              }
+
+                              return filtered.map((p) => {
+                                const isSelected = row.productId === p.id;
+                                return (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      handleSelectProduct(idx, p);
+                                    }}
+                                    className={`w-full flex items-center justify-between gap-2 rounded-lg p-2 text-left text-xs transition-colors ${
+                                      isSelected
+                                        ? 'bg-indigo-50 text-indigo-900 font-bold'
+                                        : 'hover:bg-slate-50 text-slate-700'
+                                    }`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-bold text-slate-900 truncate">
+                                        {p.name}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
+                                        {p.buyPrice ? (
+                                          <span className="text-emerald-700 font-medium">
+                                            ক্রয়: ৳{p.buyPrice}
+                                          </span>
+                                        ) : null}
+                                        {p.currentStock !== undefined && (
+                                          <span className="text-slate-400">
+                                            স্টক: {p.currentStock} {p.unit || 'Pcs'}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <span className="inline-block rounded-md bg-indigo-50 hover:bg-indigo-600 hover:text-white px-2 py-1 text-[11px] font-bold text-indigo-700">
+                                        সিলেক্ট
+                                      </span>
+                                    </div>
+                                  </button>
+                                );
+                              });
+                            })()}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2 w-full sm:w-auto">
