@@ -1258,7 +1258,58 @@ export class DashboardService {
       };
     }
 
-    // 6. PROFIT (PRODUCT-WISE PROFIT BREAKDOWN)
+    // 6. CANCELLED ORDERS
+    if (type === 'cancelled') {
+      const qb = this.ordersRepository
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.shop', 'shop')
+        .leftJoinAndSelect('order.route', 'route')
+        .leftJoinAndSelect('order.company', 'company')
+        .leftJoinAndSelect('order.createdBy', 'createdBy')
+        .where('order.status = :cancelledStatus', {
+          cancelledStatus: OrderStatus.CANCELLED,
+        });
+
+      if (!isAllTime && periodStartDateStr && periodEndDateStr) {
+        qb.andWhere(
+          'order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr',
+          { periodStartDateStr, periodEndDateStr },
+        );
+      }
+      if (companyId) {
+        qb.andWhere('order.companyId = :companyId', { companyId });
+      }
+      if (isSR) qb.andWhere('order.createdById = :userId', { userId });
+
+      qb.orderBy('order.orderDate', 'DESC').addOrderBy('order.createdAt', 'DESC');
+
+      const [items, total] = await qb
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return {
+        type: 'cancelled',
+        total,
+        page,
+        limit,
+        items: items.map((o) => ({
+          id: o.id,
+          orderDate: o.orderDate,
+          createdAt: o.createdAt,
+          shopName: o.shop?.name || 'Direct Sale',
+          shopOwner: o.shop?.ownerName,
+          shopPhone: o.shop?.phone,
+          routeName: o.route?.name,
+          companyName: o.company?.name,
+          srName: o.createdBy?.name,
+          status: o.status,
+          grandTotal: safeNum(o.grandTotal),
+        })),
+      };
+    }
+
+    // 7. PROFIT (PRODUCT-WISE PROFIT BREAKDOWN - STRICTLY FOR ANALYTICS / REPORTS)
     if (type === 'profit') {
       const qb = this.orderItemsRepository
         .createQueryBuilder('item')

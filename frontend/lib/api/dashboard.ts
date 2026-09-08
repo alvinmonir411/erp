@@ -20,7 +20,7 @@ export async function getDashboardMetrics(params: DashboardFilterParams = {}) {
 }
 
 export interface DashboardDrilldownParams extends DashboardFilterParams {
-  type: 'sales' | 'orders' | 'collections' | 'dues' | 'dispatches' | 'profit';
+  type: 'sales' | 'orders' | 'collections' | 'dues' | 'dispatches' | 'cancelled' | 'profit';
   page?: number;
   limit?: number;
 }

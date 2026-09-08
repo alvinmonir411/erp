@@ -58,7 +58,7 @@ const MONTH_NAMES_BN = [
   { en: 'December', bn: 'ডিসেম্বর' },
 ];
 
-type DrilldownType = 'sales' | 'orders' | 'collections' | 'dues' | 'dispatches' | 'profit' | null;
+type DrilldownType = 'sales' | 'orders' | 'collections' | 'dues' | 'dispatches' | 'cancelled' | null;
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -509,33 +509,23 @@ export function DashboardPage() {
             />
           </div>
 
-          {/* Card 6: Profit or Cancelled */}
-          {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? (
-            <div 
-              onClick={() => toggleDrilldown('profit')}
-              className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
-                activeDrilldown === 'profit'
-                  ? 'ring-4 ring-purple-500 ring-offset-2 scale-[1.03] shadow-xl'
-                  : 'hover:scale-[1.02]'
-              }`}
-            >
-              <StatCard
-                label="মাসের মোট লাভ (মুনাফা) 👆"
-                value={formatCurrency(periodMetrics?.profit ?? money?.totalProfit ?? 0)}
-                description={activeDrilldown === 'profit' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'পণ্যভিত্তিক লাভ দেখতে ক্লিক করুন'}
-                icon={TrendingUp}
-                colorTheme="violet"
-              />
-            </div>
-          ) : (
+          {/* Card 6: Cancelled Orders */}
+          <div 
+            onClick={() => toggleDrilldown('cancelled')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeDrilldown === 'cancelled'
+                ? 'ring-4 ring-rose-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
             <StatCard
-              label="মাসের বাতিল অর্ডার"
-              value={formatNumber(periodMetrics?.cancelledOrders ?? orders?.cancelledOrders)}
-              description="বাতিলকৃত অর্ডার সংখ্যা"
+              label="মাসের বাতিল অর্ডার 👆"
+              value={formatNumber(periodMetrics?.cancelledOrders ?? orders?.cancelledOrders ?? 0)}
+              description={activeDrilldown === 'cancelled' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'ক্লিক করে বাতিল তালিকা দেখুন'}
               icon={XCircle}
               colorTheme="rose"
             />
-          )}
+          </div>
         </div>
 
         {/* 📋 DYNAMIC DRILLDOWN FILTERED DATA LIST (SHOWS ON CARD CLICK) */}
@@ -551,7 +541,7 @@ export function DashboardPage() {
                     {activeDrilldown === 'collections' && `মাসের ক্যাশ আদায় তালিকা (${drilldownItems.length}টি কালেকশন)`}
                     {activeDrilldown === 'dues' && `মাসের নতুন বাকির তালিকা (${drilldownItems.length}টি বকেয়া)`}
                     {activeDrilldown === 'dispatches' && `মাসের ডেলিভারি চালান তালিকা (${drilldownItems.length}টি চালান)`}
-                    {activeDrilldown === 'profit' && `পণ্যভিত্তিক বিক্রয় লাভ ও মার্জিন (${drilldownItems.length}টি প্রোডাক্ট)`}
+                    {activeDrilldown === 'cancelled' && `মাসের বাতিলকৃত অর্ডারের তালিকা (${drilldownItems.length}টি বাতিল অর্ডার)`}
                   </h3>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -651,15 +641,16 @@ export function DashboardPage() {
                         <th className="px-4 py-3 text-center">অবস্থা</th>
                       </tr>
                     )}
-                    {activeDrilldown === 'profit' && (
+                    {activeDrilldown === 'cancelled' && (
                       <tr>
-                        <th className="px-4 py-3">পণ্যের নাম</th>
-                        <th className="px-4 py-3">কোম্পানি</th>
-                        <th className="px-4 py-3 text-right">কেনা দাম</th>
-                        <th className="px-4 py-3 text-right">বিক্রি রেট</th>
-                        <th className="px-4 py-3 text-center">বিক্রিকৃত সংখ্যা</th>
-                        <th className="px-4 py-3 text-right">মোট বিক্রি</th>
-                        <th className="px-4 py-3 text-right">মোট লাভ (মুনাফা)</th>
+                        <th className="px-4 py-3">অর্ডার #</th>
+                        <th className="px-4 py-3">দোকানের নাম</th>
+                        <th className="px-4 py-3">রুট</th>
+                        <th className="px-4 py-3">এসআর (SR)</th>
+                        <th className="px-4 py-3">তারিখ</th>
+                        <th className="px-4 py-3 text-right">অর্ডার মোট মূল্য</th>
+                        <th className="px-4 py-3 text-center">অবস্থা</th>
+                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
                       </tr>
                     )}
                   </thead>
@@ -766,15 +757,27 @@ export function DashboardPage() {
                             </td>
                           </>
                         )}
-                        {activeDrilldown === 'profit' && (
+                        {activeDrilldown === 'cancelled' && (
                           <>
-                            <td className="px-4 py-3 font-bold text-slate-900">{item.productName}</td>
-                            <td className="px-4 py-3 text-slate-500 font-medium">{item.companyName}</td>
-                            <td className="px-4 py-3 text-right text-slate-500">{formatCurrency(item.buyPrice)}</td>
-                            <td className="px-4 py-3 text-right text-slate-700 font-bold">{formatCurrency(item.sellPrice)}</td>
-                            <td className="px-4 py-3 text-center font-black text-slate-800">{item.deliveredQty} টি</td>
-                            <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(item.totalSales)}</td>
-                            <td className="px-4 py-3 text-right font-black text-purple-600 text-sm">{formatCurrency(item.totalProfit)}</td>
+                            <td className="px-4 py-3 font-black text-rose-600">#{item.id}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
+                            <td className="px-4 py-3 text-slate-500">{item.routeName || '—'}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-700">{item.srName || '—'}</td>
+                            <td className="px-4 py-3 text-slate-500">{item.orderDate}</td>
+                            <td className="px-4 py-3 text-right font-black text-slate-900">{formatCurrency(item.grandTotal)}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-black border border-rose-200">
+                                {item.status || 'CANCELLED'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => handleViewOrder(item.id)}
+                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> মেমো দেখুন
+                              </button>
+                            </td>
                           </>
                         )}
                       </tr>
@@ -969,9 +972,9 @@ export function DashboardPage() {
             <Building2 className="h-5 w-5 text-indigo-600" />
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-                কোম্পানি অনুযায়ী বিক্রি ও লাভ ({displayPeriodTitle})
+                কোম্পানি অনুযায়ী মোট বিক্রি ({displayPeriodTitle})
               </h2>
-              <p className="text-[11px] font-semibold text-slate-400">নির্বাচিত সময়ে কোম্পানি বা সাপ্লায়ারভিত্তিক মোট পারফরম্যান্স</p>
+              <p className="text-[11px] font-semibold text-slate-400">নির্বাচিত সময়ে কোম্পানি বা সাপ্লায়ারভিত্তিক মোট বিক্রয় পারফরম্যান্স</p>
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -998,17 +1001,10 @@ export function DashboardPage() {
                       <p className="text-[10px] font-black uppercase text-slate-400">মোট বিক্রি</p>
                       <p className="text-sm font-black text-emerald-600">{formatCurrency(c.sales)}</p>
                     </div>
-                    {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? (
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-slate-400">মোট লাভ</p>
-                        <p className="text-sm font-black text-violet-600">{formatCurrency(c.profit)}</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-slate-400">কোম্পানি আইডি</p>
-                        <p className="text-sm font-black text-slate-500">#{c.companyId}</p>
-                      </div>
-                    )}
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-slate-400">কোম্পানি আইডি</p>
+                      <p className="text-sm font-black text-slate-500">#{c.companyId}</p>
+                    </div>
                   </div>
                 </div>
               </div>
