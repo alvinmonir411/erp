@@ -7,6 +7,7 @@ import { useSalesList } from '@/hooks/use-sales-queries';
 import { PageCard } from '@/components/ui/page-card';
 import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useToast } from '@/components/ui/toast-provider';
 import { deleteSale } from '@/lib/api/sales';
 import { formatCurrency, formatDate, toNumber } from '@/lib/utils/format';
@@ -73,19 +74,21 @@ export function OrdersListPage() {
   const sales = data?.items ?? [];
   const totalItems = data?.totalItems ?? 0;
 
-  const [isDeleting, setIsDeleting] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this order? This will reverse stock and payments.')) return;
-    setIsDeleting(id);
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      await deleteSale(id);
-      showSuccessToast('Order deleted successfully');
+      await deleteSale(deleteTarget.id);
+      showSuccessToast('অর্ডার সফলভাবে মুছে ফেলা হয়েছে');
+      setDeleteTarget(null);
       refetch();
     } catch (e) {
       showErrorToast(e instanceof Error ? e.message : 'Failed to delete order');
     } finally {
-      setIsDeleting(null);
+      setIsDeleting(false);
     }
   };
 
@@ -350,16 +353,11 @@ export function OrdersListPage() {
                           <Edit3 className="h-4 w-4" />
                         </Link>
                         <button
-                          onClick={() => handleDelete(sale.id)}
-                          disabled={isDeleting === sale.id}
-                          className="rounded-xl bg-rose-50 p-2.5 text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-50"
+                          onClick={() => setDeleteTarget(sale)}
+                          className="rounded-xl bg-rose-50 p-2.5 text-rose-600 transition-all hover:bg-rose-100"
                           title="Delete Order"
                         >
-                          {isDeleting === sale.id ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-rose-600 border-t-transparent" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
+                          <Trash2 className="h-4 w-4" />
                         </button>
                         <Link
                           href={`/sales/${sale.id}`}
@@ -386,6 +384,24 @@ export function OrdersListPage() {
           />
         </div>
       </PageCard>
+
+      {/* Confirmation Modal for Delete Order */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title="অর্ডারটি মুছে ফেলতে চান?"
+        description="এই অর্ডারটি মুছে ফেললে পণ্যের স্টক ও লেনদেনের ব্যালেন্স পূর্বাবস্থায় ফিরে যাবে।"
+        confirmText="হ্যাঁ, মুছে ফেলুন"
+        cancelText="বাতিল"
+        variant="danger"
+        isLoading={isDeleting}
+        details={deleteTarget ? [
+          { label: 'ইনভয়েস নং', value: deleteTarget.invoiceNo },
+          { label: 'দোকান / কাস্টমার', value: deleteTarget.shop?.name ?? 'Direct Sale' },
+          { label: 'অর্ডার মূল্য', value: formatCurrency(deleteTarget.totalAmount) },
+        ] : []}
+      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { LoadingBlock } from '@/components/ui/loading-block';
 import { PageCard } from '@/components/ui/page-card';
 import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useToastNotification } from '@/components/ui/toast-provider';
 import { formatCurrency, formatDate, formatDateTime, formatNumber, toNumber } from '@/lib/utils/format';
 import type {
@@ -538,37 +539,72 @@ export function PurchasesPage() {
     });
   }, [payments, selectedCompanyId, searchTerm]);
 
-  // Handle Delete Purchase
-  const handleDeletePurchase = async (id: number) => {
-    if (!window.confirm('আপনি কি নিশ্চিত যে এই চালানটি মুছে ফেলতে চান?')) return;
-    try {
-      setIsLoading(true);
-      await deletePurchase(id);
-      setToastTone('success');
-      setToastMessage('চালানটি সফলভাবে মুছে ফেলা হয়েছে');
-      await loadData();
-    } catch (err: any) {
-      setToastTone('error');
-      setToastMessage(err.message || 'চালান মুছতে সমস্যা হয়েছে');
-    } finally {
-      setIsLoading(false);
-    }
+  // Delete Confirmation Modal State
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    type: 'purchase' | 'payment';
+    id: number;
+    title: string;
+    description: string;
+    details: Array<{ label: string; value: React.ReactNode }>;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Trigger Delete Purchase Modal
+  const promptDeletePurchase = (p: Purchase) => {
+    setDeleteModal({
+      isOpen: true,
+      type: 'purchase',
+      id: p.id,
+      title: 'চালানটি কি নিশ্চিতভাবে মুছে ফেলতে চান?',
+      description: 'এই চালানটি মুছে ফেললে সিস্টেমের ক্রয় তালিকা ও স্টক খতিয়ান থেকে এটি স্থায়ীভাবে সরানো হবে।',
+      details: [
+        { label: 'চালান নং / আইডি', value: `#${p.invoiceNo || p.referenceNo || p.id}` },
+        { label: 'কোম্পানি / সরবরাহকারী', value: p.company?.name || p.supplierName || 'N/A' },
+        { label: 'চালানের তারিখ', value: formatDate(p.purchaseDate) },
+        { label: 'মোট মূল্য', value: formatCurrency(p.totalAmount) },
+      ],
+    });
   };
 
-  // Handle Delete Payment
-  const handleDeletePayment = async (paymentId: number) => {
-    if (!window.confirm('আপনি কি নিশ্চিত যে এই পেমেন্ট/ড্রাফট রেকর্ডটি মুছে ফেলতে চান?')) return;
+  // Trigger Delete Payment Modal
+  const promptDeletePayment = (pay: PurchasePayment) => {
+    setDeleteModal({
+      isOpen: true,
+      type: 'payment',
+      id: pay.id,
+      title: 'অগ্রিম পেমেন্ট / ড্রাফট রেকর্ড মুছে ফেলতে চান?',
+      description: 'এই ব্যাংক ড্রাফট বা অগ্রিম পেমেন্টের রেকর্ডটি স্থায়ীভাবে মুছে ফেলা হবে।',
+      details: [
+        { label: 'ড্রাফট / ট্রানজেকশন নং', value: pay.transactionRef || `BD-${pay.id}` },
+        { label: 'কোম্পানি', value: pay.company?.name || 'N/A' },
+        { label: 'তারিখ', value: formatDate(pay.paymentDate) },
+        { label: 'পেমেন্ট পরিমাণ', value: formatCurrency(pay.amount) },
+      ],
+    });
+  };
+
+  // Execute Deletion
+  const handleConfirmDelete = async () => {
+    if (!deleteModal) return;
     try {
-      setIsLoading(true);
-      await deleteCompanyPayment(paymentId);
-      setToastTone('success');
-      setToastMessage('ড্রাফট রেকর্ডটি সফলভাবে মুছে ফেলা হয়েছে');
+      setIsDeleting(true);
+      if (deleteModal.type === 'purchase') {
+        await deletePurchase(deleteModal.id);
+        setToastTone('success');
+        setToastMessage('চালানটি সফলভাবে মুছে ফেলা হয়েছে');
+      } else {
+        await deleteCompanyPayment(deleteModal.id);
+        setToastTone('success');
+        setToastMessage('ড্রাফট রেকর্ডটি সফলভাবে মুছে ফেলা হয়েছে');
+      }
+      setDeleteModal(null);
       await loadData();
     } catch (err: any) {
       setToastTone('error');
-      setToastMessage(err.message || 'পেমেন্ট মুছতে সমস্যা হয়েছে');
+      setToastMessage(err.message || 'রেকর্ড মুছতে সমস্যা হয়েছে');
     } finally {
-      setIsLoading(false);
+      setIsDeleting(false);
     }
   };
 
@@ -1053,7 +1089,7 @@ export function PurchasesPage() {
 
                                 <button
                                   type="button"
-                                  onClick={() => handleDeletePurchase(p.id)}
+                                  onClick={() => promptDeletePurchase(p)}
                                   className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
                                   title="চালান মুছুন"
                                 >
@@ -1153,7 +1189,7 @@ export function PurchasesPage() {
 
                                 <button
                                   type="button"
-                                  onClick={() => handleDeletePayment(pay.id)}
+                                  onClick={() => promptDeletePayment(pay)}
                                   className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
                                   title="ড্রাফট মুছুন"
                                 >
@@ -1773,6 +1809,21 @@ export function PurchasesPage() {
           </div>
         </div>
       )}
+
+      {/* Modern Confirmation Modal for Delete */}
+      <ConfirmModal
+        isOpen={Boolean(deleteModal?.isOpen)}
+        onClose={() => setDeleteModal(null)}
+        onConfirm={handleConfirmDelete}
+        title={deleteModal?.title || 'মুছে ফেলতে চান?'}
+        description={deleteModal?.description}
+        confirmText="হ্যাঁ, মুছে ফেলুন"
+        cancelText="বাতিল করুন"
+        variant="danger"
+        isLoading={isDeleting}
+        details={deleteModal?.details || []}
+        warningNote="সতর্কতা: এটি মুছে ফেললে সম্পর্কিত খতিয়ান আপডেট হবে এবং তথ্য আর পুনরুদ্ধার করা যাবে না।"
+      />
     </div>
   );
 }

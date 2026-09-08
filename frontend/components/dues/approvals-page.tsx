@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
 import { useToast } from '@/components/ui/toast-provider';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 export function ApprovalsPage() {
   const queryClient = useQueryClient();
@@ -27,6 +28,7 @@ export function ApprovalsPage() {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [approveTarget, setApproveTarget] = useState<any | null>(null);
 
   const { success: showSuccessToast, error: showErrorToast } = useToast();
 
@@ -188,11 +190,7 @@ export function ApprovalsPage() {
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => {
-                            if (window.confirm('এই পেমেন্টটি অনুমোদন করবেন?')) {
-                              approveMutation.mutate(c.id);
-                            }
-                          }}
+                          onClick={() => setApproveTarget(c)}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 text-xs font-bold hover:bg-emerald-100 transition-colors"
                           title="অনুমোদন করুন"
                         >
@@ -264,11 +262,7 @@ export function ApprovalsPage() {
                     বাতিল
                   </button>
                   <button
-                    onClick={() => {
-                      if (window.confirm('এই পেমেন্টটি অনুমোদন করবেন?')) {
-                        approveMutation.mutate(c.id);
-                      }
-                    }}
+                    onClick={() => setApproveTarget(c)}
                     className="flex-[2] inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
                   >
                     <CheckCircle className="w-4 h-4" />
@@ -316,6 +310,29 @@ export function ApprovalsPage() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal for Approval */}
+      <ConfirmModal
+        isOpen={Boolean(approveTarget)}
+        onClose={() => setApproveTarget(null)}
+        onConfirm={async () => {
+          if (approveTarget) {
+            await approveMutation.mutateAsync(approveTarget.id);
+            setApproveTarget(null);
+          }
+        }}
+        title="কালেকশন অনুমোদন করতে চান?"
+        description="অনুমোদন করার সাথে সাথে সংশ্লিষ্ট দোকানের বাকি হিসাব স্বয়ংক্রিয়ভাবে কমে যাবে।"
+        confirmText="অনুমোদন নিশ্চিত করুন"
+        cancelText="বাতিল"
+        variant="success"
+        isLoading={approveMutation.isPending}
+        details={approveTarget ? [
+          { label: 'দোকানের নাম', value: approveTarget.shop?.name || 'N/A' },
+          { label: 'এসআর (SR)', value: approveTarget.srName || 'N/A' },
+          { label: 'জমার পরিমাণ', value: formatCurrency(approveTarget.collectedAmount) },
+        ] : []}
+      />
     </div>
   );
 }

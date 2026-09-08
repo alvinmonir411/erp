@@ -24,6 +24,7 @@ import { getUsers, createUser, updateUser, deleteUser } from '@/lib/api/users';
 import { User, Role, UserStatus } from '@/types/api';
 import { useAuth } from '../auth/auth-provider';
 import { useToast } from '@/components/ui/toast-provider';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 export function UsersPage() {
   const queryClient = useQueryClient();
@@ -75,10 +76,13 @@ export function UsersPage() {
     }
   });
 
-  const handleDeleteUser = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      deleteMutation.mutate(id);
-    }
+  const [deleteUserTarget, setDeleteUserTarget] = useState<User | null>(null);
+
+  const handleConfirmDeleteUser = async () => {
+    if (!deleteUserTarget) return;
+    deleteMutation.mutate(deleteUserTarget.id, {
+      onSettled: () => setDeleteUserTarget(null),
+    });
   };
 
   const handleToggleStatus = async (user: User) => {
@@ -269,7 +273,7 @@ export function UsersPage() {
                         </button>
                         {currentUser?.role === Role.SUPER_ADMIN && (
                           <button
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => setDeleteUserTarget(user)}
                             className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                             title="Delete User"
                           >
@@ -427,6 +431,24 @@ export function UsersPage() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal for Delete User */}
+      <ConfirmModal
+        isOpen={Boolean(deleteUserTarget)}
+        onClose={() => setDeleteUserTarget(null)}
+        onConfirm={handleConfirmDeleteUser}
+        title="ইউজার মুছে ফেলতে চান?"
+        description="এই ইউজারকে মুছে ফেললে তিনি আর সিস্টেমে লগইন করতে পারবেন না।"
+        confirmText="হ্যাঁ, মুছে ফেলুন"
+        cancelText="বাতিল"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+        details={deleteUserTarget ? [
+          { label: 'নাম', value: deleteUserTarget.name },
+          { label: 'ইউজারনেম', value: deleteUserTarget.username },
+          { label: 'রোল', value: deleteUserTarget.role },
+        ] : []}
+      />
     </div>
   );
 }

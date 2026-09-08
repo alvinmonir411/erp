@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { PageCard } from '@/components/ui/page-card';
 import { useToast } from '@/components/ui/toast-provider';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Pagination } from '@/components/ui/pagination';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { getDeliverySummaries, deleteDeliverySummary, syncDeliverySummary } from '@/lib/api/delivery-summaries';
@@ -78,14 +79,21 @@ export function DeliverySummariesListPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Delete this summary?')) return;
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      await deleteDeliverySummary(id);
-      showSuccessToast('Summary deleted');
+      await deleteDeliverySummary(deleteTarget.id);
+      showSuccessToast('ডেলিভারি সামারি সফলভাবে মুছে ফেলা হয়েছে');
+      setDeleteTarget(null);
       fetchSummaries();
     } catch (e) {
       showErrorToast('Failed to delete');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -228,7 +236,7 @@ export function DeliverySummariesListPage() {
                           <Eye className="h-4 w-4" />
                         </Link>
                         <button
-                          onClick={() => handleDelete(s.id)}
+                          onClick={() => setDeleteTarget(s)}
                           className="rounded-xl bg-rose-50 p-2 text-rose-600 hover:bg-rose-100 transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -250,6 +258,25 @@ export function DeliverySummariesListPage() {
           />
         </div>
       </PageCard>
+
+      {/* Confirmation Modal for Delete Delivery Summary */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title="ডেলিভারি সামারি মুছে ফেলতে চান?"
+        description="এই সামারিটি তালিকা থেকে মুছে ফেলা হবে।"
+        confirmText="হ্যাঁ, মুছে ফেলুন"
+        cancelText="বাতিল"
+        variant="danger"
+        isLoading={isDeleting}
+        details={deleteTarget ? [
+          { label: 'তারিখ', value: formatDate(deleteTarget.summaryDate) },
+          { label: 'কোম্পানি', value: deleteTarget.company?.name || 'All' },
+          { label: 'রুট', value: deleteTarget.route?.name || 'All' },
+          { label: 'মোট পরিমাণ', value: formatCurrency(deleteTarget.totalAmount) },
+        ] : []}
+      />
     </div>
   );
 }
