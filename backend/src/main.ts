@@ -74,6 +74,26 @@ async function createApp(): Promise<Express> {
   // express() is callable only when using the default import, not namespace import
   const expressInstance: Express = express();
 
+  // Handle CORS and preflight OPTIONS explicitly for all origins (e.g. mskorimraders.vercel.app, mskorimtraders.vercel.app, localhost)
+  expressInstance.use((req, res, next) => {
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader(
+      'Access-Control-Allow-Methods',
+      'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    );
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization',
+    );
+
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    next();
+  });
+
   const app = await NestFactory.create(
     AppModule,
     new ExpressAdapter(expressInstance),
@@ -84,8 +104,24 @@ async function createApp(): Promise<Express> {
 
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: configService.get<string>('app.corsOrigin') ?? true,
+    origin: (origin, callback) => {
+      // Allow any requesting origin dynamically
+      callback(null, true);
+    },
     credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'X-CSRF-Token',
+      'X-Requested-With',
+      'Accept',
+      'Accept-Version',
+      'Content-Length',
+      'Content-MD5',
+      'Content-Type',
+      'Date',
+      'X-Api-Version',
+      'Authorization',
+    ],
   });
 
   app.useGlobalFilters(new AllExceptionsFilter());
