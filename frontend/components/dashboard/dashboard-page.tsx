@@ -25,7 +25,6 @@ import {
   Sparkles,
   RotateCcw,
   BarChart3,
-  ArrowUpRight,
 } from 'lucide-react';
 import { SRDuesList } from './sr-dues-list';
 import { useAuth } from '../auth/auth-provider';
@@ -35,15 +34,25 @@ function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-xl bg-slate-200/80 ${className ?? ''}`} />;
 }
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+const MONTH_NAMES_BN = [
+  { en: 'January', bn: 'জানুয়ারি' },
+  { en: 'February', bn: 'ফেব্রুয়ারি' },
+  { en: 'March', bn: 'মার্চ' },
+  { en: 'April', bn: 'এপ্রিল' },
+  { en: 'May', bn: 'মে' },
+  { en: 'June', bn: 'জুন' },
+  { en: 'July', bn: 'জুলাই' },
+  { en: 'August', bn: 'আগস্ট' },
+  { en: 'September', bn: 'সেপ্টেম্বর' },
+  { en: 'October', bn: 'অক্টোবর' },
+  { en: 'November', bn: 'নভেম্বর' },
+  { en: 'December', bn: 'ডিসেম্বর' },
 ];
 
 export function DashboardPage() {
   const { user } = useAuth();
   
-  // Current date for default picker values
+  // Current date
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1; // 1-indexed
@@ -68,16 +77,16 @@ export function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-8 p-4 md:p-6">
+      <div className="space-y-8 p-3 md:p-6">
         <div className="flex flex-col md:flex-row justify-between gap-4">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-10 w-72" />
+          <Skeleton className="h-12 w-64 rounded-2xl" />
+          <Skeleton className="h-12 w-80 rounded-2xl" />
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-28" />)}
+          {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-28 rounded-2xl" />)}
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28" />)}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28 rounded-2xl" />)}
         </div>
       </div>
     );
@@ -110,34 +119,40 @@ export function DashboardPage() {
 
   const isCurrentMonthActive = period === 'this_month';
 
+  // Get Bangla Month label
+  const activeMonthBn = periodInfo.month ? MONTH_NAMES_BN[periodInfo.month - 1]?.bn : '';
+  const displayPeriodTitle = period === 'all_time' 
+    ? 'শুরু থেকে আজ পর্যন্ত (সকল ইতিহাস)' 
+    : `${activeMonthBn || periodInfo.monthName || ''} ${periodInfo.year || ''}`;
+
   return (
     <div className="space-y-8 pb-20 p-2 sm:p-4 md:p-6">
       
       {/* 🧭 Top Filter & Period Control Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm backdrop-blur-md">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-              <BarChart3 className="h-4 w-4" />
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+              <BarChart3 className="h-5 w-5" />
             </div>
             <div>
               <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
-                {user?.role === Role.SR ? 'ফিল্ড সেলস ড্যাশবোর্ড' : 'বিজনেস এনালিটিক্স ড্যাশবোর্ড'}
+                {user?.role === Role.SR ? 'ফিল্ড সেলস ড্যাশবোর্ড' : 'ব্যবসার সামগ্রিক হিসাব ও ড্যাশবোর্ড'}
               </h1>
-              <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                <span>📅 সাইকেল: </span>
-                <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                  {periodInfo.label || 'চলতি মাস'}
+              <p className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 mt-0.5">
+                <span>📅 সময়কাল: </span>
+                <span className="font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                  {displayPeriodTitle}
                 </span>
                 {periodInfo.totalDays ? (
-                  <span className="text-slate-400">({periodInfo.totalDays} দিনের মাস)</span>
+                  <span className="text-slate-500">({periodInfo.totalDays} দিনের মাস)</span>
                 ) : null}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Period Selector Tabs */}
+        {/* Period Selector Tabs in Simple Bangla */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold">
             <button
@@ -145,14 +160,14 @@ export function DashboardPage() {
                 setPeriod('this_month');
                 setIsMonthPickerOpen(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all ${
                 period === 'this_month'
-                  ? 'bg-white text-indigo-600 shadow-sm font-black'
+                  ? 'bg-white text-indigo-700 shadow-sm font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              চলতি মাস (This Month)
+              চলতি মাস
             </button>
 
             <button
@@ -160,14 +175,14 @@ export function DashboardPage() {
                 setPeriod('last_month');
                 setIsMonthPickerOpen(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all ${
                 period === 'last_month'
-                  ? 'bg-white text-indigo-600 shadow-sm font-black'
+                  ? 'bg-white text-indigo-700 shadow-sm font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              গত মাস (Last Month)
+              গত মাস
             </button>
 
             <button
@@ -175,13 +190,13 @@ export function DashboardPage() {
                 setPeriod('all_time');
                 setIsMonthPickerOpen(false);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all ${
                 period === 'all_time'
-                  ? 'bg-white text-indigo-600 shadow-sm font-black'
+                  ? 'bg-white text-indigo-700 shadow-sm font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              সব ইতিহাস (All Time)
+              সকল ইতিহাস
             </button>
           </div>
 
@@ -189,7 +204,7 @@ export function DashboardPage() {
           <div className="relative">
             <button
               onClick={() => setIsMonthPickerOpen(!isMonthPickerOpen)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all ${
                 period === 'custom'
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20'
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
@@ -198,46 +213,46 @@ export function DashboardPage() {
               <Calendar className="h-3.5 w-3.5" />
               <span>
                 {period === 'custom'
-                  ? `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`
-                  : 'নির্দিষ্ট মাস...'}
+                  ? `${MONTH_NAMES_BN[selectedMonth - 1]?.bn} ${selectedYear}`
+                  : 'অন্য মাস দেখুন...'}
               </span>
               <ChevronDown className="h-3 w-3 opacity-70" />
             </button>
 
             {isMonthPickerOpen && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl p-3 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-                  <span className="text-xs font-black text-slate-800">মাস ও বছর নির্বাচন</span>
+                  <span className="text-xs font-black text-slate-800">মাস ও সাল বাছাই করুন</span>
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="text-xs font-black bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 text-slate-700"
+                    className="text-xs font-black bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800"
                   >
                     {[currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map((y) => (
-                      <option key={y} value={y}>{y}</option>
+                      <option key={y} value={y}>{y} সাল</option>
                     ))}
                   </select>
                 </div>
 
                 <div className="grid grid-cols-3 gap-1.5">
-                  {MONTH_NAMES.map((name, idx) => {
+                  {MONTH_NAMES_BN.map((mObj, idx) => {
                     const mNum = idx + 1;
                     const isSelected = period === 'custom' && selectedMonth === mNum && selectedYear === selectedYear;
                     return (
                       <button
-                        key={name}
+                        key={mObj.en}
                         onClick={() => {
                           setSelectedMonth(mNum);
                           setPeriod('custom');
                           setIsMonthPickerOpen(false);
                         }}
-                        className={`px-2 py-1.5 text-[11px] font-bold rounded-lg transition-colors text-center ${
+                        className={`px-2 py-2 text-[11px] font-bold rounded-lg transition-colors text-center ${
                           isSelected
                             ? 'bg-indigo-600 text-white font-black'
                             : 'hover:bg-slate-100 text-slate-700'
                         }`}
                       >
-                        {name.slice(0, 3)}
+                        {mObj.bn}
                       </button>
                     );
                   })}
@@ -251,165 +266,165 @@ export function DashboardPage() {
             onClick={() => refetch()}
             disabled={isFetching}
             title="রিফ্রেশ করুন"
-            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-indigo-600 hover:bg-slate-50 transition-all disabled:opacity-50"
+            className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-indigo-600 hover:bg-slate-50 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin text-indigo-600' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* 🟢 Info Banner for Month Cycle */}
-      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 via-blue-50/50 to-white p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold">
-            1
+      {/* 🟢 Info Notice Banner in Bangla */}
+      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/90 via-blue-50/40 to-white p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white font-black text-xs">
+            ১
           </div>
           <div>
-            <p className="font-black text-indigo-950">
-              {isCurrentMonthActive ? 'মাসের ১ তারিখ থেকে অটো-রিসেট সাইকেল চালু আছে' : `দেখছেন: ${periodInfo.label}`}
+            <p className="font-black text-indigo-950 text-xs sm:text-sm">
+              {isCurrentMonthActive ? 'মাসের ১ তারিখের অটো-হিসাব সাইকেল চালু আছে' : `দেখছেন: ${displayPeriodTitle}`}
             </p>
-            <p className="text-indigo-700/80 text-[11px]">
+            <p className="text-indigo-800/80 text-[11px] mt-0.5">
               {isCurrentMonthActive 
-                ? `প্রতি মাসের ১ তারিখে মাসিক মেট্রিকগুলো স্বয়ংক্রিয়ভাবে ০ থেকে শুরু হয় (১ থেকে ${periodInfo.totalDays || 30} তারিখ)। সব ইতিহাস সংরক্ষিত আছে।`
-                : `${periodInfo.label} মাসের সম্পূর্ণ হিসাব প্রদর্শিত হচ্ছে।`}
+                ? `প্রতি মাসের ১ তারিখে চলতি মাসের বিক্রি, কালেকশন ও লাভের হিসাব স্বয়ংক্রিয়ভাবে ০ থেকে শুরু হয় (১ থেকে ${periodInfo.totalDays || 30} তারিখ)। সব পুরোনো হিসাব ডাটাবেজে অক্ষত আছে।`
+                : `${displayPeriodTitle} মাসের সম্পূর্ণ লেনদেন ও লাভ-ক্ষতির হিসাব দেখানো হচ্ছে।`}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping" />
-            লাইভ ডাটা
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+          <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-900 text-[11px] font-black px-3 py-1 rounded-full border border-emerald-200">
+            <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+            লাইভ রিয়েল-টাইম
           </span>
         </div>
       </div>
 
       {/* ⚡ 1. TODAY'S REAL-TIME PULSE */}
       <section>
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-3">
           <Activity className="h-5 w-5 text-rose-500 animate-pulse" />
           <div>
             <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-              {user?.role === Role.SR ? "আজকের তৎপরতা (Today's Pulse)" : "আজকের তাৎক্ষণিক হিসাব (Today's Pulse)"}
+              {user?.role === Role.SR ? "আজকের তৎপরতা ও বিক্রি" : "আজকের তাৎক্ষণিক হিসাব"}
             </h2>
-            <p className="text-[10px] font-bold text-slate-400">আজকের রিয়েল-টাইম অর্ডার, ডেলিভারি ও কালেকশন</p>
+            <p className="text-[11px] font-semibold text-slate-400">আজকের লাইভ অর্ডার বুকিং, ডেলিভারি ও ক্যাশ কালেকশন</p>
           </div>
         </div>
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard
-            label="Today Orders"
+            label="আজকের অর্ডার"
             value={formatNumber(today?.ordersCount ?? orders?.todayOrdersCount)}
-            description={`Value: ${formatCurrency(today?.orderValue ?? orders?.todayOrderValue)}`}
+            description={`মূল্য: ${formatCurrency(today?.orderValue ?? orders?.todayOrderValue)}`}
             icon={ShoppingCart}
             colorTheme="cyan"
           />
           <StatCard
-            label="Today Dispatch"
+            label="আজকের ডেলিভারি চালান"
             value={formatNumber(today?.dispatchCount ?? delivery?.todayDispatch)}
-            description={(today?.dispatchAmount ?? delivery?.todayDispatchAmount) > 0 ? `Value: ${formatCurrency(today?.dispatchAmount ?? delivery?.todayDispatchAmount)}` : undefined}
+            description={(today?.dispatchAmount ?? delivery?.todayDispatchAmount) > 0 ? `মূল্য: ${formatCurrency(today?.dispatchAmount ?? delivery?.todayDispatchAmount)}` : undefined}
             icon={Truck}
             colorTheme="amber"
           />
           <StatCard
-            label="Today Final Sold"
+            label="আজকের নগদ বিক্রি"
             value={formatCurrency(today?.settledValue ?? money?.todayFinalSold ?? 0)}
             description="ডেলিভারিকৃত প্রকৃত বিক্রি"
             icon={DollarSign}
             colorTheme="indigo"
           />
           <StatCard
-            label="Today New Due"
+            label="আজকের নতুন বাকি"
             value={formatCurrency(today?.dueAmount ?? money?.todayDue ?? 0)}
-            description="আজকের নতুন বাকি"
+            description="আজকের নতুন বকেয়া"
             icon={AlertCircle}
             colorTheme="rose"
           />
           <StatCard
-            label="Today Collection"
+            label="আজকের ক্যাশ আদায়"
             value={formatCurrency(today?.dueCollection ?? money?.todayDueCollection ?? 0)}
-            description="আজকের নগদ রিকভারি"
+            description="আজকের নগদ কালেকশন"
             icon={CheckCircle}
             colorTheme="emerald"
           />
           <StatCard
-            label="Today Cancelled"
+            label="আজকের বাতিল অর্ডার"
             value={formatNumber(today?.cancelledOrders ?? orders?.todayCancelled ?? 0)}
-            description="বাতিলকৃত অর্ডার"
+            description="বাতিলকৃত অর্ডার সংখ্যা"
             icon={XCircle}
             colorTheme="slate"
           />
         </div>
       </section>
 
-      {/* 📊 2. MONTHLY / PERIOD PERFORMANCE (Resets on 1st of Month) */}
-      <section className="rounded-3xl border border-slate-200/80 bg-slate-50/60 p-4 sm:p-6 shadow-sm">
+      {/* 📊 2. MONTHLY PERFORMANCE (1st to 28/30/31) */}
+      <section className="rounded-3xl border border-slate-200/90 bg-slate-50/70 p-4 sm:p-6 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-500/20">
               <TrendingUp className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-black uppercase tracking-wider text-slate-900">
-                {periodInfo.label} — মাসিক কর্মক্ষমতা (Performance)
+              <h2 className="text-sm sm:text-base font-black text-slate-900">
+                {displayPeriodTitle} — মোট হিসাব-নিকাশ
               </h2>
-              <p className="text-[11px] font-medium text-slate-500">
-                ১ তারিখ থেকে {periodInfo.totalDays || 30} তারিখের হিসাব (মাসের শুরুতে এটি ০ থেকে গণনা শুরু করে)
+              <p className="text-[11px] font-semibold text-slate-500">
+                ১ তারিখ থেকে {periodInfo.totalDays || 30} তারিখের মোট বিক্রি, কালেকশন, বাকি ও লাভ (মাসের ১ তারিখে ০ থেকে শুরু হয়)
               </p>
             </div>
           </div>
-          <span className="text-[11px] font-black text-indigo-600 bg-indigo-50 border border-indigo-200/60 px-3 py-1 rounded-full self-start sm:self-auto">
-            {period === 'this_month' ? 'চলতি মাস (Active Cycle)' : periodInfo.label}
+          <span className="text-xs font-black text-indigo-700 bg-white border border-indigo-200 px-3.5 py-1.5 rounded-xl shadow-xs self-start sm:self-auto">
+            {isCurrentMonthActive ? `চলতি মাস (১ থেকে ${periodInfo.totalDays || 30} তারিখ)` : displayPeriodTitle}
           </span>
         </div>
 
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard
-            label="Period Final Sold"
+            label="মাসের মোট বিক্রি"
             value={formatCurrency(periodMetrics?.netSales ?? money?.totalFinalSold)}
-            description="প্রকৃত মোট বিক্রি (Settled)"
+            description="ডেলিভারিকৃত প্রকৃত বিক্রি"
             icon={CheckCircle}
             colorTheme="emerald"
           />
           <StatCard
-            label="Period Orders Value"
+            label="মোট অর্ডার বুকিং মূল্য"
             value={formatCurrency(periodMetrics?.orderValue ?? orders?.totalOrderValue)}
-            description={`Orders: ${formatNumber(periodMetrics?.ordersCount ?? orders?.totalOrders)}`}
+            description={`অর্ডার সংখ্যা: ${formatNumber(periodMetrics?.ordersCount ?? orders?.totalOrders)}টি`}
             icon={DollarSign}
             colorTheme="indigo"
           />
           <StatCard
-            label="Period Collections"
+            label="মাসের মোট ক্যাশ আদায়"
             value={formatCurrency(periodMetrics?.dueCollection ?? money?.periodDueCollection ?? 0)}
-            description="মাসে মোট আদায়কৃত টাকা"
+            description="মাসে মোট কালেকশন"
             icon={Wallet}
             colorTheme="cyan"
           />
           <StatCard
-            label="Period New Due"
+            label="মাসের নতুন বাকি"
             value={formatCurrency(periodMetrics?.newDue ?? money?.periodDue ?? 0)}
-            description="মাসে মোট নতুন বাকি"
+            description="চলতি মাসে দেওয়া বাকি"
             icon={AlertCircle}
             colorTheme="amber"
           />
           <StatCard
-            label="Period Dispatched"
+            label="মোট ডেলিভারি চালান"
             value={formatNumber(periodMetrics?.dispatchCount ?? delivery?.totalDispatch)}
-            description={`Delivered: ${formatNumber(periodMetrics?.deliveredCount ?? delivery?.delivered)} (${deliveryRate})`}
+            description={`ডেলিভারি সম্পন্ন: ${formatNumber(periodMetrics?.deliveredCount ?? delivery?.delivered)}টি (${deliveryRate})`}
             icon={Truck}
             colorTheme="primary"
           />
           {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? (
             <StatCard
-              label="Period Net Profit"
+              label="মাসের মোট লাভ (মুনাফা)"
               value={formatCurrency(periodMetrics?.profit ?? money?.totalProfit ?? 0)}
-              description="মাসের মোট মুনাফা"
+              description="চলতি মাসের নিট প্রফিট"
               icon={TrendingUp}
               colorTheme="violet"
             />
           ) : (
             <StatCard
-              label="Period Cancelled"
+              label="মাসের বাতিল অর্ডার"
               value={formatNumber(periodMetrics?.cancelledOrders ?? orders?.cancelledOrders)}
-              description="বাতিলকৃত অর্ডার"
+              description="বাতিলকৃত অর্ডার সংখ্যা"
               icon={XCircle}
               colorTheme="rose"
             />
@@ -417,53 +432,53 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* 🏦 3. LIVE BUSINESS HEALTH & INVENTORY (Never Resets - Cumulative Live Snapshot) */}
+      {/* 🏦 3. LIVE BUSINESS HEALTH & INVENTORY (Cumulative Live Snapshot) */}
       <section>
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-3">
           <Wallet className="h-5 w-5 text-emerald-600" />
           <div>
             <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-              সার্বিক চলমান লাইভ হিসাব (Live Cumulative Health)
+              সার্বিক মোট বকেয়া ও গুদাম স্টক (Live Status)
             </h2>
-            <p className="text-[10px] font-bold text-slate-400">মার্কেটের মোট পাওনা বাকি এবং বর্তমান ইনভেন্টরি স্থিতি</p>
+            <p className="text-[11px] font-semibold text-slate-400">মার্কেটে মোট পাওনা বাকি ও গুদামে থাকা পণ্যের বর্তমান স্থিতি</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label="Total Market Due"
+            label="মার্কেটে মোট বাকি পাওনা"
             value={formatCurrency(money?.totalDue ?? 0)}
-            description="গ্রাহকদের কাছে বর্তমান মোট পাওনা"
+            description="গ্রাহকদের কাছে বর্তমান মোট বাকি"
             icon={AlertCircle}
             colorTheme="rose"
           />
           <StatCard
-            label="Pending Approval Due"
+            label="অনুমোদনের অপেক্ষায় আদায়"
             value={formatCurrency(money?.pendingCollected ?? 0)}
-            description="অনুমোদনের অপেক্ষায় কালেকশন"
+            description="কালেকশন জমা (পেন্ডিং)"
             icon={Clock}
             colorTheme="amber"
           />
           <StatCard
-            label="Approved Collections"
+            label="সর্বমোট অনুমোদিত আদায়"
             value={formatCurrency(money?.approvedCollected ?? 0)}
-            description="আজীবন মোট অনুমোদিত কালেকশন"
+            description="আজীবন মোট কালেকশন"
             icon={CheckCircle}
             colorTheme="emerald"
           />
           {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER || user?.role === Role.ADMIN) ? (
             <StatCard
-              label="Total Stock Value"
+              label="গুদামে মোট মালের দাম (স্টক)"
               value={formatCurrency(stock?.stockValue ?? 0)}
-              description={`Active Products: ${formatNumber(stock?.activeProducts ?? 0)}`}
+              description={`মোট পণ্য সংখ্যা: ${formatNumber(stock?.activeProducts ?? 0)}টি`}
               icon={Layers}
               colorTheme="violet"
             />
           ) : (
             <StatCard
-              label="Rejected Collection"
+              label="বাতিলকৃত কালেকশন"
               value={formatCurrency(money?.rejectedCollected ?? 0)}
-              description="বাতিলকৃত কালেকশন"
+              description="অস্বীকৃত কালেকশন"
               icon={XCircle}
               colorTheme="slate"
             />
@@ -475,32 +490,32 @@ export function DashboardPage() {
       {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER || user?.role === Role.ADMIN) && (
         <section>
           <div className="flex items-center gap-2 mb-3">
-            <Package className="h-5 w-5 text-cyan-500" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-500">গুদাম স্টক স্থিতি (Warehouse Stock)</h2>
+            <Package className="h-5 w-5 text-cyan-600" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-600">গুদাম স্টক স্থিতি (ইনভেন্টরি রিপোর্ট)</h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">Total Products</p>
-              <p className="text-lg font-black text-slate-900">{formatNumber(stock.totalProducts)}</p>
+            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
+              <p className="text-[10px] font-black uppercase text-slate-400">মোট পণ্য</p>
+              <p className="text-lg font-black text-slate-900">{formatNumber(stock.totalProducts)} টি</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">Active</p>
-              <p className="text-lg font-black text-emerald-600">{formatNumber(stock.activeProducts)}</p>
+            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
+              <p className="text-[10px] font-black uppercase text-slate-400">চালু পণ্য</p>
+              <p className="text-lg font-black text-emerald-600">{formatNumber(stock.activeProducts)} টি</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">In Stock</p>
-              <p className="text-lg font-black text-blue-600">{formatNumber(stock.inStockProducts)}</p>
+            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
+              <p className="text-[10px] font-black uppercase text-slate-400">মজুদ আছে</p>
+              <p className="text-lg font-black text-blue-600">{formatNumber(stock.inStockProducts)} টি</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">Low Stock Alert</p>
-              <p className="text-lg font-black text-amber-600">{formatNumber(stock.lowStockProducts)}</p>
+            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
+              <p className="text-[10px] font-black uppercase text-slate-400">কম স্টক (সতর্কতা)</p>
+              <p className="text-lg font-black text-amber-600">{formatNumber(stock.lowStockProducts)} টি</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">Out of Stock</p>
-              <p className="text-lg font-black text-rose-600">{formatNumber(stock.outOfStockProducts)}</p>
+            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
+              <p className="text-[10px] font-black uppercase text-slate-400">স্টক শেষ</p>
+              <p className="text-lg font-black text-rose-600">{formatNumber(stock.outOfStockProducts)} টি</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">Stock Value</p>
+            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
+              <p className="text-[10px] font-black uppercase text-slate-400">মোট স্টক মূল্য</p>
               <p className="text-lg font-black text-violet-600">{formatCurrency(stock.stockValue)}</p>
             </div>
           </div>
@@ -508,23 +523,23 @@ export function DashboardPage() {
       )}
 
       {/* 📈 4. MONTHLY PROGRESSION & DAILY SALES TREND CHART */}
-      <section className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-7 shadow-sm">
+      <section className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-sm">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-indigo-600" />
               <h3 className="text-base sm:text-lg font-black text-slate-900">
-                {periodInfo.label} — দিনভিত্তিক সেলস গ্রাফ (Daily Sales Trend)
+                {displayPeriodTitle} — দিনভিত্তিক বিক্রয় গ্রাফ (Daily Sales Trend)
               </h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              ১ তারিখ থেকে {periodInfo.totalDays || 30} তারিখ পর্যন্ত প্রতিদিনের সেটেল্ড বিক্রয় অগ্রগতি
+              ১ তারিখ থেকে {periodInfo.totalDays || 30} তারিখ পর্যন্ত প্রতিদিন কত টাকার মাল ডেলিভারি/বিক্রি হয়েছে
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-xl">
+            <span className="flex items-center gap-1.5 text-xs font-black text-indigo-700 bg-indigo-50 px-3.5 py-1.5 rounded-xl border border-indigo-100">
               <span className="h-2.5 w-2.5 rounded-full bg-indigo-600" />
-              সেটেল্ড সেলস
+              সেটেল্ড নগদ বিক্রি
             </span>
           </div>
         </div>
@@ -540,8 +555,8 @@ export function DashboardPage() {
 
                 return (
                   <div key={dayItem.day} className="group relative flex flex-1 h-full flex-col items-center min-w-[22px] sm:min-w-[26px]">
-                    <div className="invisible group-hover:visible absolute -top-10 z-20 rounded-lg bg-slate-900 text-white px-2 py-1 text-[10px] font-bold shadow-xl whitespace-nowrap">
-                      {dayItem.label}: {formatCurrency(dayItem.amount)}
+                    <div className="invisible group-hover:visible absolute -top-10 z-20 rounded-lg bg-slate-900 text-white px-2.5 py-1 text-[10px] font-black shadow-xl whitespace-nowrap">
+                      {dayItem.day} {activeMonthBn || ''}: {formatCurrency(dayItem.amount)}
                     </div>
                     <div className="flex-1 w-full flex items-end justify-center mb-2">
                       <div
@@ -549,20 +564,20 @@ export function DashboardPage() {
                           dayItem.amount > 0
                             ? isTodayDate
                               ? 'bg-gradient-to-t from-indigo-600 to-violet-500 shadow-md shadow-indigo-500/20'
-                              : 'bg-indigo-500/80 group-hover:bg-indigo-600'
+                              : 'bg-indigo-500/85 group-hover:bg-indigo-600'
                             : 'bg-slate-100 group-hover:bg-slate-200'
                         }`}
                         style={{ height: `${Math.max(6, height)}%` }}
                       />
                     </div>
-                    <span className={`text-[9px] font-black ${isTodayDate ? 'text-indigo-600 underline' : 'text-slate-400'}`}>
+                    <span className={`text-[9px] font-black ${isTodayDate ? 'text-indigo-700 font-black underline' : 'text-slate-400'}`}>
                       {dayItem.day}
                     </span>
                   </div>
                 );
               })}
             </div>
-            <div className="flex justify-between text-[10px] font-bold text-slate-400 px-2">
+            <div className="flex justify-between text-[11px] font-black text-slate-400 px-2 pt-2 border-t border-slate-100">
               <span>১ তারিখ</span>
               <span>১৫ তারিখ</span>
               <span>{periodInfo.totalDays || 30} তারিখ (মাসের শেষ দিন)</span>
@@ -597,12 +612,12 @@ export function DashboardPage() {
       {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER || user?.role === Role.ADMIN) && d.companySummary && d.companySummary.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-4">
-            <Building2 className="h-5 w-5 text-indigo-500" />
+            <Building2 className="h-5 w-5 text-indigo-600" />
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-                কোম্পানি অনুযায়ী সেলস ও মুনাফা ({periodInfo.label})
+                কোম্পানি অনুযায়ী বিক্রি ও লাভ ({displayPeriodTitle})
               </h2>
-              <p className="text-[10px] font-bold text-slate-400">নির্বাচিত মাসের কোম্পানিভিত্তিক মোট পারফরম্যান্স</p>
+              <p className="text-[11px] font-semibold text-slate-400">নির্বাচিত সময়ে কোম্পানি বা সাপ্লায়ারভিত্তিক মোট পারফরম্যান্স</p>
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -619,24 +634,24 @@ export function DashboardPage() {
                       </div>
                       <div>
                         <h4 className="text-sm font-black text-slate-900 line-clamp-1">{c.companyName}</h4>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Company Wise Summary</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">কোম্পানি সামারি</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
                     <div>
-                      <p className="text-[9px] font-black uppercase text-slate-400">Total Sales</p>
+                      <p className="text-[10px] font-black uppercase text-slate-400">মোট বিক্রি</p>
                       <p className="text-sm font-black text-emerald-600">{formatCurrency(c.sales)}</p>
                     </div>
                     {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER) ? (
                       <div>
-                        <p className="text-[9px] font-black uppercase text-slate-400">Total Profit</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400">মোট লাভ</p>
                         <p className="text-sm font-black text-violet-600">{formatCurrency(c.profit)}</p>
                       </div>
                     ) : (
                       <div>
-                        <p className="text-[9px] font-black uppercase text-slate-400">Company ID</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400">কোম্পানি আইডি</p>
                         <p className="text-sm font-black text-slate-500">#{c.companyId}</p>
                       </div>
                     )}
