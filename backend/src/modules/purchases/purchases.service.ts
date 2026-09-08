@@ -339,7 +339,10 @@ export class PurchasesService {
 
       // Total paid is highest of recorded direct payments or invoice paid amounts
       const actualTotalPaid = Math.max(pStats.totalPaidAmount, payStats.totalPayments);
-      const actualPayable = Math.max(0, pStats.totalPurchaseAmount - actualTotalPaid);
+      const balance = pStats.totalPurchaseAmount - actualTotalPaid;
+      const payableDue = balance > 0 ? balance : 0;
+      const advancePaid = balance < 0 ? Math.abs(balance) : 0;
+      const balanceType = balance > 0 ? 'PAYABLE' : balance < 0 ? 'ADVANCE' : 'SETTLED';
 
       return {
         companyId: c.id,
@@ -349,7 +352,9 @@ export class PurchasesService {
         purchaseCount: pStats.purchaseCount,
         totalPurchaseAmount: pStats.totalPurchaseAmount,
         totalPaidAmount: actualTotalPaid,
-        totalPayableAmount: actualPayable,
+        totalPayableAmount: payableDue,
+        advanceAmount: advancePaid,
+        balanceType,
         lastPurchaseDate: pStats.lastPurchaseDate,
         lastPaymentDate: payStats.lastPaymentDate,
       };
@@ -433,7 +438,10 @@ export class PurchasesService {
 
     const totalDirectPayments = payments.reduce((sum, pay) => sum + this.safeNum(pay.amount), 0);
     const totalPaid = Math.max(totalInvoicePaid, totalDirectPayments);
-    const currentPayable = Math.max(0, totalPurchases - totalPaid);
+    const balance = totalPurchases - totalPaid;
+    const currentPayable = balance > 0 ? balance : 0;
+    const advanceBalance = balance < 0 ? Math.abs(balance) : 0;
+    const status = balance > 0 ? 'DUE_TO_COMPANY' : balance < 0 ? 'ADVANCE_TO_COMPANY' : 'SETTLED';
 
     return {
       company: {
@@ -447,6 +455,8 @@ export class PurchasesService {
         totalPurchases,
         totalPaid,
         currentPayable,
+        advanceBalance,
+        status,
         purchaseCount: purchases.length,
         paymentCount: payments.length,
         totalProductsSupplied: productSummary.length,

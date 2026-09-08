@@ -527,6 +527,9 @@ export type CompanyWisePayableSummary = {
   totalPaid?: number | string;
   totalPayableAmount?: number | string;
   totalPayable?: number | string;
+  advanceAmount?: number | string;
+  advanceBalance?: number | string;
+  balanceType?: 'PAYABLE' | 'ADVANCE' | 'SETTLED' | string;
   lastPurchaseDate?: string | null;
   lastPaymentDate?: string | null;
 };
@@ -544,6 +547,10 @@ export type CompanyPayableLedger = {
     totalPaid?: number | string;
     currentPayable?: number | string;
     totalPayable?: number | string;
+    advanceBalance?: number | string;
+    advanceAmount?: number | string;
+    balanceType?: 'PAYABLE' | 'ADVANCE' | 'SETTLED' | string;
+    status?: 'DUE_TO_COMPANY' | 'ADVANCE_TO_COMPANY' | 'SETTLED' | string;
     purchaseCount: number;
     paymentCount?: number;
     totalProductsSupplied?: number;

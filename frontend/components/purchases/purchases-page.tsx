@@ -150,12 +150,17 @@ export function PurchasesPage() {
       (sum, c) => sum + toNumber(c.totalPayableAmount ?? c.totalPayable),
       0,
     );
+    const totalAdvance = payableSummary.reduce(
+      (sum, c) => sum + toNumber(c.advanceAmount ?? c.advanceBalance),
+      0,
+    );
     const totalInvoices = purchases.length;
 
     return {
       totalPurchases,
       totalPaid,
       totalPayable,
+      totalAdvance,
       totalInvoices,
       totalCompanies: payableSummary.length,
     };
@@ -165,6 +170,13 @@ export function PurchasesPage() {
   const filteredCompanySummaries = useMemo(() => {
     return payableSummary.filter((c) => {
       if (selectedCompanyId && c.companyId !== selectedCompanyId) return false;
+      const payable = toNumber(c.totalPayableAmount ?? c.totalPayable);
+      const advance = toNumber(c.advanceAmount ?? c.advanceBalance);
+
+      if (companyStatusFilter === 'payable' && payable <= 0) return false;
+      if (companyStatusFilter === 'advance' && advance <= 0) return false;
+      if (companyStatusFilter === 'settled' && (payable > 0 || advance > 0)) return false;
+
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         return (
@@ -174,7 +186,7 @@ export function PurchasesPage() {
       }
       return true;
     });
-  }, [payableSummary, selectedCompanyId, searchTerm]);
+  }, [payableSummary, selectedCompanyId, searchTerm, companyStatusFilter]);
 
   // Filtered Product Supplies
   const filteredProductSupplies = useMemo(() => {
@@ -368,7 +380,7 @@ export function PurchasesPage() {
       </div>
 
       {/* 📊 Top 4 KPI Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -406,7 +418,7 @@ export function PurchasesPage() {
         <div className="relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/40 p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
-              কোম্পানির বর্তমান পাওনা (Payable)
+              কোম্পানির পাওনা (Payable)
             </span>
             <div className="rounded-xl bg-rose-100 p-2.5 text-rose-600">
               <TrendingDown className="h-5 w-5" />
@@ -417,6 +429,23 @@ export function PurchasesPage() {
           </p>
           <p className="mt-1 text-xs text-rose-600/80 font-medium">
             কোম্পানি আমাদের কাছে এখনো পাবে
+          </p>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-sky-200 bg-sky-50/50 p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-700">
+              আমাদের অগ্রিম জমা (Advance)
+            </span>
+            <div className="rounded-xl bg-sky-100 p-2.5 text-sky-600">
+              <Wallet className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-black text-sky-700">
+            {formatCurrency(kpiStats.totalAdvance)}
+          </p>
+          <p className="mt-1 text-xs text-sky-700/80 font-medium">
+            কোম্পানি আমাদের পণ্য/টাকা ফেরত দেবে
           </p>
         </div>
 
@@ -508,13 +537,14 @@ export function PurchasesPage() {
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
               />
             </div>
-            {(selectedCompanyId || fromDate || toDate || searchTerm) && (
+            {(selectedCompanyId || fromDate || toDate || searchTerm || companyStatusFilter !== 'all') && (
               <button
                 onClick={() => {
                   setSelectedCompanyId(null);
                   setFromDate('');
                   setToDate('');
                   setSearchTerm('');
+                  setCompanyStatusFilter('all');
                   setCurrentPage(1);
                 }}
                 className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-rose-600 hover:bg-rose-100 transition-colors"
@@ -597,17 +627,46 @@ export function PurchasesPage() {
           {/* TAB 1: 🏢 COMPANY BALANCES & PAYABLES */}
           {activeTab === 'companies' && (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => { setCompanyStatusFilter('all'); setCurrentPage(1); }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  সব কোম্পানি ({payableSummary.length})
+                </button>
+                <button
+                  onClick={() => { setCompanyStatusFilter('payable'); setCurrentPage(1); }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'payable' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'}`}
+                >
+                  ⚠️ কোম্পানির পাওনা বাকি ({payableSummary.filter((c) => toNumber(c.totalPayableAmount ?? c.totalPayable) > 0).length})
+                </button>
+                <button
+                  onClick={() => { setCompanyStatusFilter('advance'); setCurrentPage(1); }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'advance' ? 'bg-sky-600 text-white' : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200'}`}
+                >
+                  💎 আমাদের অগ্রিম জমা ({payableSummary.filter((c) => toNumber(c.advanceAmount ?? c.advanceBalance) > 0).length})
+                </button>
+                <button
+                  onClick={() => { setCompanyStatusFilter('settled'); setCurrentPage(1); }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${companyStatusFilter === 'settled' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
+                >
+                  ✅ সম্পূর্ণ পরিশোধ ({payableSummary.filter((c) => toNumber(c.totalPayableAmount ?? c.totalPayable) <= 0 && toNumber(c.advanceAmount ?? c.advanceBalance) <= 0).length})
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {(paginatedData as CompanyWisePayableSummary[]).map((c) => {
                   const totalPurchases = toNumber(c.totalPurchaseAmount ?? c.totalAmount);
                   const totalPaid = toNumber(c.totalPaidAmount ?? c.totalPaid);
                   const payable = toNumber(c.totalPayableAmount ?? c.totalPayable);
+                  const advance = toNumber(c.advanceAmount ?? c.advanceBalance);
+                  const isAdvance = advance > 0;
                   const hasDue = payable > 0;
 
                   return (
                     <div
                       key={c.companyId}
-                      className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all"
+                      className={`group flex flex-col justify-between rounded-2xl border bg-white p-5 shadow-sm transition-all hover:shadow-md ${isAdvance ? 'border-sky-200 hover:border-sky-400' : hasDue ? 'border-rose-200 hover:border-rose-400' : 'border-slate-200 hover:border-emerald-300'}`}
                     >
                       <div>
                         <div className="flex items-start justify-between gap-2">
@@ -619,15 +678,19 @@ export function PurchasesPage() {
                               {c.phone || c.companyCode || 'সাপ্লাইয়ার কোম্পানি'}
                             </p>
                           </div>
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                              hasDue
-                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            }`}
-                          >
-                            {hasDue ? '⚠️ পাওনা বাকি আছে' : '✅ সম্পূর্ণ পরিশোধ'}
-                          </span>
+                          {isAdvance ? (
+                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold bg-sky-100 text-sky-800 border border-sky-300">
+                              💎 অগ্রিম জমা আছে
+                            </span>
+                          ) : hasDue ? (
+                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              ⚠️ পাওনা বাকি আছে
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              ✅ সম্পূর্ণ পরিশোধ
+                            </span>
+                          )}
                         </div>
 
                         <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-3 text-center">
@@ -644,12 +707,29 @@ export function PurchasesPage() {
                             </p>
                           </div>
                           <div>
-                            <span className="text-[11px] font-medium text-rose-600">বর্তমান বাকি</span>
-                            <p className="text-xs font-bold text-rose-600 mt-0.5">
-                              {formatCurrency(payable)}
-                            </p>
+                            {isAdvance ? (
+                              <>
+                                <span className="text-[11px] font-bold text-sky-700">আমরা পাব</span>
+                                <p className="text-xs font-black text-sky-700 mt-0.5">
+                                  {formatCurrency(advance)}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[11px] font-medium text-rose-600">কোম্পানি পাবে</span>
+                                <p className="text-xs font-bold text-rose-600 mt-0.5">
+                                  {formatCurrency(payable)}
+                                </p>
+                              </>
+                            )}
                           </div>
                         </div>
+
+                        {isAdvance && (
+                          <div className="mt-2.5 rounded-lg bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700 text-center">
+                            কোম্পানি আমাদের <b>{formatCurrency(advance)}</b> টাকার মাল বা টাকা দেবে
+                          </div>
+                        )}
 
                         <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
                           <span>মোট চালান: <b>{c.purchaseCount} টি</b></span>

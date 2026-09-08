@@ -179,6 +179,9 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
   const totalPurchases = toNumber(summary.totalPurchases);
   const totalPaid = toNumber(summary.totalPaid);
   const currentPayable = toNumber(summary.currentPayable ?? summary.totalPayable);
+  const advanceBalance = toNumber(summary.advanceBalance ?? summary.advanceAmount);
+  const isAdvance = advanceBalance > 0;
+  const hasDue = currentPayable > 0;
 
   return (
     <div className="space-y-6 pb-16 text-slate-800">
@@ -265,22 +268,58 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
-              কোম্পানির বর্তমান পাওনা (Due)
-            </span>
-            <div className="rounded-xl bg-rose-100 p-2.5 text-rose-600">
-              <TrendingDown className="h-5 w-5" />
+        {isAdvance ? (
+          <div className="rounded-2xl border border-sky-300 bg-sky-50/70 p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-sky-800">
+                💎 আমাদের অগ্রিম জমা (আমরা পাব)
+              </span>
+              <div className="rounded-xl bg-sky-100 p-2.5 text-sky-700">
+                <Wallet className="h-5 w-5" />
+              </div>
             </div>
+            <p className="mt-3 text-2xl font-black text-sky-700">
+              {formatCurrency(advanceBalance)}
+            </p>
+            <p className="mt-1 text-xs text-sky-700 font-medium">
+              কোম্পানি আমাদের <b>{formatCurrency(advanceBalance)}</b> টাকার মাল দিবে বা টাকা ফেরত দিবে
+            </p>
           </div>
-          <p className="mt-3 text-2xl font-black text-rose-600">
-            {formatCurrency(currentPayable)}
-          </p>
-          <p className="mt-1 text-xs text-rose-600/80 font-medium">
-            {currentPayable > 0 ? 'কোম্পানি এখনো টাকা পাবে' : 'সম্পূর্ণ পরিশোধিত'}
-          </p>
-        </div>
+        ) : hasDue ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
+                ⚠️ কোম্পানির পাওনা (আমাদের দিতে হবে)
+              </span>
+              <div className="rounded-xl bg-rose-100 p-2.5 text-rose-600">
+                <TrendingDown className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-2xl font-black text-rose-600">
+              {formatCurrency(currentPayable)}
+            </p>
+            <p className="mt-1 text-xs text-rose-600/80 font-medium">
+              কোম্পানি আমাদের কাছে বকেয়া বাবদ এখনো টাকা পাবে
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                ✅ হিসাব সম্পূর্ণ পরিশোধ
+              </span>
+              <div className="rounded-xl bg-emerald-100 p-2.5 text-emerald-600">
+                <CheckCircle className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-2xl font-black text-emerald-700">
+              ৳০
+            </p>
+            <p className="mt-1 text-xs text-emerald-600 font-medium">
+              কোনো বকেয়া পাওনা বা অগ্রিম নেই
+            </p>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
