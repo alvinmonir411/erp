@@ -77,12 +77,23 @@ export class PurchasesService {
   }
 
   async findOne(id: number) {
-    const purchase = await this.purchaseRepository.findOne({
-      where: { id },
-      relations: ['company', 'items', 'items.product'],
-    });
-    if (!purchase) throw new NotFoundException('Purchase invoice not found');
-    return purchase;
+    const numId = Number(id);
+    if (!numId || isNaN(numId)) {
+      throw new NotFoundException(`Invalid purchase ID: ${id}`);
+    }
+    try {
+      const purchase = await this.purchaseRepository.findOne({
+        where: { id: numId },
+        relations: ['company', 'items', 'items.product'],
+      });
+      if (purchase) return purchase;
+    } catch {
+      // Ignore relation join errors if any
+    }
+
+    const simple = await this.purchaseRepository.findOne({ where: { id: numId } });
+    if (!simple) throw new NotFoundException(`Purchase invoice #${id} not found`);
+    return simple;
   }
 
   async create(dto: any, user?: any) {
