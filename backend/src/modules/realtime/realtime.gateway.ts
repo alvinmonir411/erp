@@ -23,7 +23,7 @@ export class RealtimeGateway
   server: Server;
 
   afterInit(server: Server) {
-    this.logger.log('Websocket Gateway Initialized on port 5003');
+    this.logger.log('Websocket Gateway Initialized');
   }
 
   onModuleDestroy() {
