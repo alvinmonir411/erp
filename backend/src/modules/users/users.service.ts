@@ -24,16 +24,17 @@ export class UsersService implements OnApplicationBootstrap {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  async onApplicationBootstrap() {
-    this.logger.log('--- STARTING USER SEEDING ---');
-    // Wait a brief moment for SchemaSyncService to ensure columns exist
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+  onApplicationBootstrap() {
+    // Run asynchronously in the background so serverless cold start is instantaneous
+    void this.seedInitialUsersSafely();
+  }
 
-    const adminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@erp.com';
-    const adminUsername = process.env.SUPER_ADMIN_USERNAME || 'admin';
-    const adminPassword = process.env.SUPER_ADMIN_PASSWORD || 'password123';
-
+  private async seedInitialUsersSafely() {
     try {
+      const adminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@erp.com';
+      const adminUsername = process.env.SUPER_ADMIN_USERNAME || 'admin';
+      const adminPassword = process.env.SUPER_ADMIN_PASSWORD || 'password123';
+
       await this.createSuperAdmin({
         email: adminEmail,
         username: adminUsername,
@@ -66,14 +67,8 @@ export class UsersService implements OnApplicationBootstrap {
       } else {
         this.logger.log(`Found ${deliveryMen.length} delivery men in database.`);
       }
-
-      const allUsers = await this.userRepository.find();
-      fs.writeFileSync(
-        path.join(process.cwd(), 'all_users.txt'),
-        JSON.stringify(allUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role, status: u.status })), null, 2),
-      );
     } catch (err) {
-      this.logger.error('Failed to seed delivery man or dump users:', err);
+      this.logger.error('Failed to seed delivery man:', err);
     }
   }
 

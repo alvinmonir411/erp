@@ -189,14 +189,43 @@ export default async function handler(req: any, res: any) {
       res.on('finish', () => resolve());
       res.on('close', () => resolve());
       res.on('error', (err: any) => reject(err));
-      app(req, res);
+      app(req, res, (err: any) => {
+        if (err) {
+          console.error('[Express Handler Error]:', err);
+          if (!res.headersSent) {
+            res.status(500).json({
+              statusCode: 500,
+              message: err?.message || 'Express handler error',
+            });
+          }
+          resolve();
+        } else if (!res.headersSent) {
+          res.status(404).json({
+            statusCode: 404,
+            message: `Cannot ${req.method} ${req.url}`,
+          });
+          resolve();
+        }
+      });
     });
   } catch (err: any) {
     console.error('Serverless bootstrap error:', err);
     if (!res.headersSent) {
+      const origin = req.headers?.origin || '*';
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader(
+        'Access-Control-Allow-Methods',
+        'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+      );
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization',
+      );
       return res.status(500).json({
         statusCode: 500,
         message: err?.message || 'Server initialization error',
+        stack: err?.stack,
       });
     }
   }
