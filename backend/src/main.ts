@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 process.env.TZ = 'Asia/Dhaka';
 
 import {
