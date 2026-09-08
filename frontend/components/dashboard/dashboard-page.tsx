@@ -92,14 +92,14 @@ export function DashboardPage() {
   // Top Products Filter State
   const [selectedTopProductCompany, setSelectedTopProductCompany] = useState<number | 'all'>('all');
   const [topProductSearch, setTopProductSearch] = useState('');
-  const [showOnlySoldProducts, setShowOnlySoldProducts] = useState(true);
+  const [productSalesFilter, setProductSalesFilter] = useState<'sold' | 'unsold' | 'all'>('sold');
   const [topProductStockFilter, setTopProductStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
   const [topProductSort, setTopProductSort] = useState<'sold_qty_desc' | 'sold_val_desc' | 'stock_desc' | 'stock_asc' | 'name_asc'>('sold_qty_desc');
 
   // Modal for Viewing Single Company Top Products (Direct from Company Card)
   const [viewingCompanyProducts, setViewingCompanyProducts] = useState<{ companyId: number; companyName: string } | null>(null);
   const [modalProductSearch, setModalProductSearch] = useState('');
-  const [modalShowOnlySold, setModalShowOnlySold] = useState(true);
+  const [modalSalesFilter, setModalSalesFilter] = useState<'sold' | 'unsold' | 'all'>('sold');
   const [modalProductStockFilter, setModalProductStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
   const [modalProductSort, setModalProductSort] = useState<'sold_qty_desc' | 'sold_val_desc' | 'stock_desc' | 'name_asc'>('sold_qty_desc');
 
@@ -1177,13 +1177,13 @@ export function DashboardPage() {
 
             {/* Search, Filter and Sort Controls */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-              {/* Sold toggle & Stock Filters */}
+              {/* Sold toggle (Sold, Unsold, All) & Stock Filters */}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs">
                   <button
-                    onClick={() => setShowOnlySoldProducts(true)}
+                    onClick={() => setProductSalesFilter('sold')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                      showOnlySoldProducts
+                      productSalesFilter === 'sold'
                         ? 'bg-orange-500 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
@@ -1191,9 +1191,19 @@ export function DashboardPage() {
                     🔥 শুধু রানিং বিক্রিত ({(d.topProducts || []).filter((p: any) => p.soldQuantity > 0).length}টি)
                   </button>
                   <button
-                    onClick={() => setShowOnlySoldProducts(false)}
+                    onClick={() => setProductSalesFilter('unsold')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                      !showOnlySoldProducts
+                      productSalesFilter === 'unsold'
+                        ? 'bg-slate-700 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    ⚪ কোনো বিক্রি নেই ({(d.topProducts || []).filter((p: any) => p.soldQuantity === 0).length}টি)
+                  </button>
+                  <button
+                    onClick={() => setProductSalesFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      productSalesFilter === 'all'
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
@@ -1271,14 +1281,22 @@ export function DashboardPage() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                সব কোম্পানি ({showOnlySoldProducts 
-                  ? (d.topProducts || []).filter((p: any) => p.soldQuantity > 0).length 
-                  : (d.topProducts || []).length})
+                সব কোম্পানি ({
+                  (d.topProducts || []).filter((p: any) => {
+                    if (productSalesFilter === 'sold') return p.soldQuantity > 0;
+                    if (productSalesFilter === 'unsold') return p.soldQuantity === 0;
+                    return true;
+                  }).length
+                })
               </button>
               {d.companySummary.map((comp: any) => {
                 const count = (d.topProducts || [])
                   .filter((p: any) => p.companyId === comp.companyId)
-                  .filter((p: any) => !showOnlySoldProducts || p.soldQuantity > 0).length;
+                  .filter((p: any) => {
+                    if (productSalesFilter === 'sold') return p.soldQuantity > 0;
+                    if (productSalesFilter === 'unsold') return p.soldQuantity === 0;
+                    return true;
+                  }).length;
                 return (
                   <button
                     key={comp.companyId}
@@ -1307,7 +1325,10 @@ export function DashboardPage() {
               const filteredList = (d.topProducts || [])
                 .filter((item: any) => {
                   const matchesCompany = selectedTopProductCompany === 'all' || item.companyId === selectedTopProductCompany;
-                  const matchesSold = !showOnlySoldProducts || item.soldQuantity > 0;
+                  const matchesSold = 
+                    productSalesFilter === 'sold' ? item.soldQuantity > 0 :
+                    productSalesFilter === 'unsold' ? item.soldQuantity === 0 :
+                    true;
                   const matchesStock = 
                     topProductStockFilter === 'all' ? true :
                     topProductStockFilter === 'in_stock' ? item.currentStock > 0 :
@@ -1330,8 +1351,10 @@ export function DashboardPage() {
               if (filteredList.length === 0) {
                 return (
                   <div className="py-12 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                    {showOnlySoldProducts 
+                    {productSalesFilter === 'sold'
                       ? 'এই ফিল্টারে কোনো পণ্য এখনও বিক্রি হয়নি (সব পণ্য দেখতে "সব পণ্য" বাটনে চাপুন)।'
+                      : productSalesFilter === 'unsold'
+                      ? 'এই ফিল্টারে ০ বিক্রির কোনো পণ্য পাওয়া যায়নি।'
                       : 'কোনো পণ্য পাওয়া যায়নি।'}
                   </div>
                 );
@@ -1443,7 +1466,14 @@ export function DashboardPage() {
 
       {/* 🏢 Company Top Products Popup Modal (Direct Click on Company Card) */}
       {viewingCompanyProducts && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-6 animate-in fade-in duration-200">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setViewingCompanyProducts(null);
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-6 animate-in fade-in duration-200"
+        >
           <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
@@ -1462,6 +1492,7 @@ export function DashboardPage() {
               </div>
 
               <button
+                type="button"
                 onClick={() => setViewingCompanyProducts(null)}
                 className="h-9 w-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center hover:bg-slate-100 transition-colors shadow-xs cursor-pointer"
               >
@@ -1483,12 +1514,12 @@ export function DashboardPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
-                {/* Sold Toggle */}
+                {/* Sold / Unsold / All Toggle */}
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                   <button
-                    onClick={() => setModalShowOnlySold(true)}
+                    onClick={() => setModalSalesFilter('sold')}
                     className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
-                      modalShowOnlySold
+                      modalSalesFilter === 'sold'
                         ? 'bg-orange-500 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
@@ -1496,9 +1527,19 @@ export function DashboardPage() {
                     🔥 শুধু বিক্রিত ({(d.topProducts || []).filter((p: any) => p.companyId === viewingCompanyProducts.companyId && p.soldQuantity > 0).length}টি)
                   </button>
                   <button
-                    onClick={() => setModalShowOnlySold(false)}
+                    onClick={() => setModalSalesFilter('unsold')}
                     className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
-                      !modalShowOnlySold
+                      modalSalesFilter === 'unsold'
+                        ? 'bg-slate-700 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    ⚪ কোনো বিক্রি নেই ({(d.topProducts || []).filter((p: any) => p.companyId === viewingCompanyProducts.companyId && p.soldQuantity === 0).length}টি)
+                  </button>
+                  <button
+                    onClick={() => setModalSalesFilter('all')}
+                    className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
+                      modalSalesFilter === 'all'
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
@@ -1547,7 +1588,11 @@ export function DashboardPage() {
               {(() => {
                 const companyProducts = (d.topProducts || [])
                   .filter((p: any) => p.companyId === viewingCompanyProducts.companyId)
-                  .filter((p: any) => !modalShowOnlySold || p.soldQuantity > 0)
+                  .filter((p: any) => {
+                    if (modalSalesFilter === 'sold') return p.soldQuantity > 0;
+                    if (modalSalesFilter === 'unsold') return p.soldQuantity === 0;
+                    return true;
+                  })
                   .filter((p: any) => {
                     if (modalProductStockFilter === 'all') return true;
                     if (modalProductStockFilter === 'in_stock') return p.currentStock > 0;
@@ -1568,8 +1613,10 @@ export function DashboardPage() {
                 if (companyProducts.length === 0) {
                   return (
                     <div className="py-16 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                      {modalShowOnlySold 
+                      {modalSalesFilter === 'sold'
                         ? 'এই কোম্পানির কোনো পণ্য এখনও বিক্রি হয়নি (সব পণ্য দেখতে "সব" বাটনে চাপুন)।'
+                        : modalSalesFilter === 'unsold'
+                        ? 'এই কোম্পানিতে ০ বিক্রির কোনো পণ্য নেই।'
                         : 'এই কোম্পানির জন্য কোনো পণ্য পাওয়া যায়নি।'}
                     </div>
                   );
