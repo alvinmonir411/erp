@@ -867,7 +867,10 @@ export function PurchasesPage() {
       </div>
 
       {isLoading ? (
-        <LoadingBlock label="কোম্পানি ও সাপ্লাই ডেটা লোড হচ্ছে..." />
+        <LoadingBlock
+          label="কোম্পানি ও সাপ্লাই ডেটা লোড হচ্ছে..."
+          subLabel="অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন, সকল খতিয়ান ও চালানের হিসাব প্রস্তুত করা হচ্ছে..."
+        />
       ) : (
         <>
           {/* TAB 1: 🏢 COMPANY BALANCES & PAYABLES */}

@@ -399,7 +399,10 @@ function CreatePurchaseContent() {
       </div>
 
       {isLoading ? (
-        <LoadingBlock label="ফর্ম ডেটা লোড হচ্ছে..." />
+        <LoadingBlock
+          label="চালান ও স্টক ইন ফর্ম লোড হচ্ছে..."
+          subLabel="অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন, কোম্পানি ও পণ্য তালিকা লোড হচ্ছে..."
+        />
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* 🏢 1. Company & Advance Payment Selector Card */}

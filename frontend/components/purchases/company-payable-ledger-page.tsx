@@ -338,7 +338,10 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
   if (isLoading) {
     return (
       <div className="p-6">
-        <LoadingBlock label="কোম্পানি খতিয়ান লোড হচ্ছে..." />
+        <LoadingBlock
+          label="কোম্পানি খতিয়ান লোড হচ্ছে..."
+          subLabel="অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন, লেনদেন ও পেমেন্ট হিস্ট্রি প্রস্তুত করা হচ্ছে..."
+        />
       </div>
     );
   }
