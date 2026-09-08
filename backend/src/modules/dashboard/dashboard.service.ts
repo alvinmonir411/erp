@@ -861,70 +861,70 @@ export class DashboardService {
 
     const companySummary = Array.from(companyMap.values());
 
-    // 🏆 Top Running / Best-Selling Products Query
+    // 🏆 Top Running / Best-Selling Products Query (All Products Ranked by Total Sold Count)
     let topProducts: any[] = [];
     try {
-      const topProdQb = this.orderItemsRepository
+      // 1. Fetch all active products
+      const prodQb = this.productsRepository
+        .createQueryBuilder('p')
+        .leftJoinAndSelect('p.company', 'comp')
+        .where('p.isActive = true');
+      if (companyId) prodQb.andWhere('p.companyId = :companyId', { companyId });
+      const allProducts = await prodQb.orderBy('p.name', 'ASC').getMany();
+
+      // 2. Query sold quantities and sales values across non-cancelled orders
+      const salesQb = this.orderItemsRepository
         .createQueryBuilder('item')
         .leftJoin('item.order', 'order')
-        .leftJoin('item.product', 'product')
-        .leftJoin('product.company', 'company')
-        .select('product.id', 'productId')
-        .addSelect('product.name', 'productName')
-        .addSelect('product.currentStock', 'currentStock')
-        .addSelect('product.unit', 'unit')
-        .addSelect('product.price', 'price')
-        .addSelect('company.id', 'companyId')
-        .addSelect('company.name', 'companyName')
+        .select('item.productId', 'productId')
         .addSelect('SUM(COALESCE(item.deliveredPaidQuantity, item.quantity, 0))', 'soldQuantity')
         .addSelect('SUM(COALESCE(item.lineTotal, 0))', 'salesValue')
         .addSelect('COUNT(DISTINCT order.id)', 'orderCount')
-        .where('order.status IN (:...statuses)', {
-          statuses: [
-            OrderStatus.SETTLED,
-            OrderStatus.PARTIAL_DUE,
-            OrderStatus.DELIVERED,
-            OrderStatus.APPROVED,
-          ],
-        });
+        .where("order.status NOT IN ('CANCELLED', 'DRAFT')");
 
       if (!isAllTime && periodStartDateStr && periodEndDateStr) {
-        topProdQb.andWhere(
+        salesQb.andWhere(
           '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (order.settledAt >= :periodStartUtc AND order.settledAt <= :periodEndUtc))',
           { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
         );
       }
-      if (companyId) {
-        topProdQb.andWhere('product.companyId = :companyId', { companyId });
-      }
       if (isSR) {
-        topProdQb.andWhere('order.createdById = :userId', { userId });
+        salesQb.andWhere('order.createdById = :userId', { userId });
       }
 
-      const rawTopProducts = await topProdQb
-        .groupBy('product.id')
-        .addGroupBy('product.name')
-        .addGroupBy('product.currentStock')
-        .addGroupBy('product.unit')
-        .addGroupBy('product.price')
-        .addGroupBy('company.id')
-        .addGroupBy('company.name')
-        .orderBy('SUM(COALESCE(item.deliveredPaidQuantity, item.quantity, 0))', 'DESC')
-        .limit(100)
-        .getRawMany();
+      salesQb.groupBy('item.productId');
+      const salesData = await salesQb.getRawMany();
+      const salesMap = new Map<number, { soldQuantity: number; salesValue: number; orderCount: number }>();
+      for (const row of salesData) {
+        salesMap.set(Number(row.productId), {
+          soldQuantity: safeNum(row.soldQuantity),
+          salesValue: safeNum(row.salesValue),
+          orderCount: safeNum(row.orderCount),
+        });
+      }
 
-      topProducts = rawTopProducts.map((p, idx) => ({
+      // 3. Map all products and sort by soldQuantity DESC
+      const combined = allProducts.map((p) => {
+        const stats = salesMap.get(p.id) || { soldQuantity: 0, salesValue: 0, orderCount: 0 };
+        return {
+          productId: p.id,
+          productName: p.name,
+          companyId: p.companyId || (p.company?.id ? Number(p.company.id) : 0),
+          companyName: p.company?.name || 'Unknown',
+          unit: p.unit || 'Pcs',
+          price: safeNum(p.price),
+          currentStock: safeNum(p.currentStock),
+          soldQuantity: stats.soldQuantity,
+          salesValue: stats.salesValue,
+          orderCount: stats.orderCount,
+        };
+      });
+
+      combined.sort((a, b) => b.soldQuantity - a.soldQuantity || b.salesValue - a.salesValue);
+
+      topProducts = combined.map((item, idx) => ({
+        ...item,
         rank: idx + 1,
-        productId: Number(p.productId),
-        productName: p.productName,
-        companyId: Number(p.companyId),
-        companyName: p.companyName || 'Unknown',
-        unit: p.unit || 'Pcs',
-        price: safeNum(p.price),
-        currentStock: safeNum(p.currentStock),
-        soldQuantity: safeNum(p.soldQuantity),
-        salesValue: safeNum(p.salesValue),
-        orderCount: safeNum(p.orderCount),
       }));
     } catch (err) {
       this.logger.error('Error calculating top selling products for dashboard:', err.message);
