@@ -153,7 +153,7 @@ async function createApp(): Promise<Express> {
 
 // ── Local development bootstrap ────────────────────────────────────────────────
 // Only called locally (nest start / ts-node). Skipped entirely on Vercel.
-if (process.env['VERCEL'] !== '1') {
+if (process.env['VERCEL'] !== '1' && process.env['NODE_ENV'] !== 'production') {
   void (async () => {
     const expressInstance = await createApp();
     const port = Number(process.env['PORT']) || 3001;
@@ -184,12 +184,19 @@ export default async function handler(req: any, res: any) {
 
   try {
     const app = await createApp();
-    app(req, res);
+    return new Promise<void>((resolve, reject) => {
+      res.on('finish', () => resolve());
+      res.on('close', () => resolve());
+      res.on('error', (err: any) => reject(err));
+      app(req, res);
+    });
   } catch (err: any) {
     console.error('Serverless bootstrap error:', err);
-    return res.status(500).json({
-      statusCode: 500,
-      message: err.message || 'Server initialization error',
-    });
+    if (!res.headersSent) {
+      return res.status(500).json({
+        statusCode: 500,
+        message: err?.message || 'Server initialization error',
+      });
+    }
   }
 }

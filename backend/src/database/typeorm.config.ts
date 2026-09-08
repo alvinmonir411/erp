@@ -32,11 +32,11 @@ const createTypeOrmOptions = (
     migrationsRun: false,
     ssl: isLocal ? false : { rejectUnauthorized: false },
     extra: {
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 30000,
+      max: process.env.VERCEL ? 3 : 10,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 10000,
       keepAlive: true,
-      keepAliveInitialDelayMillis: 10000,
+      keepAliveInitialDelayMillis: 5000,
     },
   };
 };
