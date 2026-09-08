@@ -66,7 +66,6 @@ const navigation = [
     title: 'Inventory',
     roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
-      { href: '/purchases', label: 'Goods In & Purchases', icon: Package },
       { href: '/products', label: 'Products', icon: Box },
       { href: '/stock', label: 'Stock', icon: BarChart3 },
     ]
