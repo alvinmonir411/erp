@@ -11,6 +11,9 @@ import {
   getCompanyPayments,
   recordCompanyPayment,
   confirmPurchase,
+  deletePurchase,
+  deleteCompanyPayment,
+  resetPurchasesDemoData,
 } from '@/lib/api/purchases';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { PageCard } from '@/components/ui/page-card';
@@ -470,6 +473,55 @@ export function PurchasesPage() {
     }
   };
 
+  const handleDeletePurchase = async (id: number) => {
+    if (!window.confirm('আপনি কি নিশ্চিত যে এই চালানটি মুছে ফেলতে চান?')) return;
+    try {
+      setIsLoading(true);
+      await deletePurchase(id);
+      setToastTone('success');
+      setToastMessage('চালানটি সফলভাবে মুছে ফেলা হয়েছে');
+      await loadData();
+    } catch (err: any) {
+      setToastTone('error');
+      setToastMessage(err.message || 'চালান মুছতে সমস্যা হয়েছে');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: number) => {
+    if (!window.confirm('আপনি কি নিশ্চিত যে এই পেমেন্ট রেকর্ডটি মুছে ফেলতে চান?')) return;
+    try {
+      setIsLoading(true);
+      await deleteCompanyPayment(paymentId);
+      setToastTone('success');
+      setToastMessage('পেমেন্ট রেকর্ডটি সফলভাবে মুছে ফেলা হয়েছে');
+      await loadData();
+    } catch (err: any) {
+      setToastTone('error');
+      setToastMessage(err.message || 'পেমেন্ট মুছতে সমস্যা হয়েছে');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetDemoData = async () => {
+    const ok = window.confirm('⚠️ সতর্কতা: আপনি কি নিশ্চিত যে সমস্ত টেস্ট/ডেমো চালান ও কোম্পানির পেমেন্ট মুছে সব ব্যালেন্স ০ করতে চান?');
+    if (!ok) return;
+    try {
+      setIsLoading(true);
+      await resetPurchasesDemoData();
+      setToastTone('success');
+      setToastMessage('সমস্ত ডেমো চালান ও পেমেন্ট সফলভাবে মুছে ফেলা হয়েছে! সব কোম্পানির ব্যালেন্স এখন ফ্রেশ ও ০।');
+      await loadData();
+    } catch (err: any) {
+      setToastTone('error');
+      setToastMessage(err.message || 'ডেমো ডেটা মুছতে সমস্যা হয়েছে');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const selectedCompanyObj = companies.find((c) => c.id === paymentCompanyId);
   const selectedCompanySummary = payableSummary.find((s) => s.companyId === paymentCompanyId);
 
@@ -492,6 +544,15 @@ export function PurchasesPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleResetDemoData}
+              className="inline-flex items-center gap-2 rounded-2xl border border-rose-400/30 bg-rose-500/20 hover:bg-rose-500/30 px-4 py-3 text-xs font-bold text-rose-200 backdrop-blur-md transition-all hover:scale-105 active:scale-95"
+              title="টেস্ট চালান ও পেমেন্ট মুছে ফ্রেশ শুরু করুন"
+            >
+              <Trash2 className="h-4 w-4 text-rose-300" />
+              <span>ডেমো ডেটা মুছুন</span>
+            </button>
+
             <button
               onClick={() => openPaymentModal()}
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
@@ -1067,6 +1128,14 @@ export function PurchasesPage() {
                             >
                               <ArrowUpRight className="h-4 w-4" />
                             </Link>
+
+                            <button
+                              onClick={() => handleDeletePurchase(purchase.id)}
+                              className="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 p-2 text-xs font-bold transition-colors"
+                              title="চালানটি মুছুন"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1145,6 +1214,7 @@ export function PurchasesPage() {
                         <th className="px-5 py-3.5 text-left">রেফারেন্স / স্লিপ</th>
                         <th className="px-5 py-3.5 text-left">নোট / পণ্যের বিবরণ</th>
                         <th className="px-5 py-3.5 text-center">এন্ট্রি কারী</th>
+                        <th className="px-5 py-3.5 text-center">অ্যাকশন</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -1174,6 +1244,15 @@ export function PurchasesPage() {
                           </td>
                           <td className="px-5 py-3.5 text-center text-xs text-slate-500">
                             {pay.createdByName || 'Admin'}
+                          </td>
+                          <td className="px-5 py-3.5 text-center">
+                            <button
+                              onClick={() => handleDeletePayment(pay.id)}
+                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                              title="পেমেন্ট হিস্ট্রি মুছুন"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}

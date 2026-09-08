@@ -102,7 +102,19 @@ export class PurchasesController {
     return this.purchasesService.confirmPurchase(+id);
   }
 
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Delete('reset-demo-data')
+  resetDemoData() {
+    return this.purchasesService.resetDemoData();
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Delete('payments/:paymentId')
+  removePayment(@Param('paymentId') paymentId: string) {
+    return this.purchasesService.deletePayment(+paymentId);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.purchasesService.delete(+id);

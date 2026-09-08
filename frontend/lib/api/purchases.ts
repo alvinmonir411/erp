@@ -94,3 +94,21 @@ export function getCompanyPayments(query: PurchaseQuery = {}) {
     query,
   });
 }
+
+export function deletePurchase(id: number) {
+  return apiRequest<{ success: boolean; message: string }>(`purchases/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export function deleteCompanyPayment(paymentId: number) {
+  return apiRequest<{ success: boolean; message: string }>(`purchases/payments/${paymentId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function resetPurchasesDemoData() {
+  return apiRequest<{ success: boolean; message: string }>('purchases/reset-demo-data', {
+    method: 'DELETE',
+  });
+}

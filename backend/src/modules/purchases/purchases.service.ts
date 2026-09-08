@@ -247,10 +247,75 @@ export class PurchasesService {
 
   async delete(id: number) {
     const purchase = await this.findOne(id);
-    if (purchase.status === PurchaseStatus.CONFIRMED) {
-      throw new BadRequestException('Cannot delete a confirmed purchase invoice');
+    if (!purchase) {
+      throw new NotFoundException(`Purchase with ID ${id} not found`);
     }
-    return this.purchaseRepository.delete(id);
+
+    return this.dataSource.transaction(async (manager) => {
+      // If confirmed, adjust stock back safely
+      if (purchase.status === PurchaseStatus.CONFIRMED && purchase.items?.length) {
+        for (const item of purchase.items) {
+          const product = await manager.findOne(Product, {
+            where: { id: item.productId },
+          });
+          if (product) {
+            const currentStock = this.safeNum(product.currentStock);
+            const qty = this.safeNum(item.quantity);
+            await manager.update(Product, product.id, {
+              currentStock: Math.max(0, currentStock - qty),
+            });
+          }
+        }
+      }
+
+      // Delete payments tied to this purchase
+      await manager.delete(CompanyPayment, { purchaseId: id });
+
+      // Delete items
+      await manager.delete(PurchaseItem, { purchaseId: id });
+
+      // Delete purchase
+      await manager.delete(Purchase, id);
+
+      return { success: true, message: `Purchase invoice #${purchase.invoiceNo || id} deleted successfully` };
+    });
+  }
+
+  async deletePayment(paymentId: number) {
+    const payment = await this.paymentRepository.findOne({
+      where: { id: paymentId },
+    });
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${paymentId} not found`);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      if (payment.purchaseId) {
+        const purchase = await manager.findOne(Purchase, {
+          where: { id: payment.purchaseId },
+        });
+        if (purchase) {
+          const paid = Math.max(0, this.safeNum(purchase.paidAmount) - this.safeNum(payment.amount));
+          const due = Math.max(0, this.safeNum(purchase.totalAmount) - paid);
+          await manager.update(Purchase, purchase.id, {
+            paidAmount: paid,
+            dueAmount: due,
+          });
+        }
+      }
+
+      await manager.delete(CompanyPayment, paymentId);
+      return { success: true, message: `Payment of ${payment.amount} deleted successfully` };
+    });
+  }
+
+  async resetDemoData() {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.delete(CompanyPayment, {});
+      await manager.delete(PurchaseItem, {});
+      await manager.delete(Purchase, {});
+      return { success: true, message: 'All purchases and company payments have been reset to 0' };
+    });
   }
 
   /**
