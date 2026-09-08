@@ -56,7 +56,8 @@ export class DashboardService {
     user?: any,
     options: DashboardQueryOptions = {},
   ) {
-    const { startUtc: todayStartUTC, endUtc: todayEndUTC } = getBDDayRange();
+    try {
+      const { startUtc: todayStartUTC, endUtc: todayEndUTC } = getBDDayRange();
     const todayDateStr = getBDTodayString();
     const safeNum = (val: any) => {
       const n = Number(val);
@@ -1021,6 +1022,22 @@ export class DashboardService {
         createdAt: o.createdAt,
       })),
     };
+    } catch (err: any) {
+      this.logger.error('Error fetching dashboard metrics:', err?.stack || err?.message);
+      return {
+        period: options.period || 'this_month',
+        periodLabel: 'চলতি মাস',
+        uiMetrics: {
+          orders: { periodOrders: 0, todayOrders: 0, periodDispatched: 0, todayDispatched: 0, periodCancelled: 0, todayCancelled: 0, periodPendingDispatch: 0, periodDelivered: 0, totalOrdersCount: 0, totalCancelledCount: 0 },
+          money: { totalGrossAmount: 0, todayGrossAmount: 0, totalFinalSold: 0, todayFinalSold: 0, periodDue: 0, totalDue: 0, todayDue: 0, periodDueCollection: 0, todayDueCollection: 0, pendingCollected: 0, approvedCollected: 0, rejectedCollected: 0, periodProfit: 0, totalProfit: 0, lifetimeProfit: 0 },
+          stock: { totalProducts: 0, activeProducts: 0, inactiveProducts: 0, lowStockProducts: 0, outOfStockProducts: 0, inStockProducts: 0, stockValue: 0 },
+        },
+        charts: { last7Days: [], monthlyTrend: [] },
+        companySummary: [],
+        topProducts: [],
+        recentOrders: [],
+      };
+    }
   }
 
   async getDrilldownData(

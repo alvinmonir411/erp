@@ -53,6 +53,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const exceptionRes = exception instanceof HttpException ? exception.getResponse() : null;
     console.error('[AllExceptionsFilter]', JSON.stringify(exceptionRes || exception));
     const details = typeof exceptionRes === 'object' && exceptionRes !== null ? (exceptionRes as any).message : null;
+    const origin = request.headers?.origin || '*';
+    response.setHeader('Access-Control-Allow-Origin', origin);
+    response.setHeader('Access-Control-Allow-Credentials', 'true');
+    response.setHeader(
+      'Access-Control-Allow-Methods',
+      'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    );
+    response.setHeader(
+      'Access-Control-Allow-Headers',
+      'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization',
+    );
 
     response.status(status).json({
       statusCode: status,
