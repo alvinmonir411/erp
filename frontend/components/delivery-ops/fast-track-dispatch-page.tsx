@@ -470,7 +470,7 @@ export function FastTrackDispatchPage() {
                     <option value="">ডেলিভারিম্যান সিলেক্ট করুন</option>
                     {deliveryMen.map((person) => (
                       <option key={person.id} value={person.id}>
-                        {person.name} ({person.phone || 'ডেলিভারি'})
+                        {person.name}
                       </option>
                     ))}
                   </select>
