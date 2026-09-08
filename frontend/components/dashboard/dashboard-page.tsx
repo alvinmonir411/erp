@@ -273,31 +273,6 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* 🟢 Info Notice Banner in Bangla */}
-      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/90 via-blue-50/40 to-white p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white font-black text-xs">
-            ১
-          </div>
-          <div>
-            <p className="font-black text-indigo-950 text-xs sm:text-sm">
-              {isCurrentMonthActive ? 'মাসের ১ তারিখের অটো-হিসাব সাইকেল চালু আছে' : `দেখছেন: ${displayPeriodTitle}`}
-            </p>
-            <p className="text-indigo-800/80 text-[11px] mt-0.5">
-              {isCurrentMonthActive 
-                ? `প্রতি মাসের ১ তারিখে চলতি মাসের বিক্রি, কালেকশন ও লাভের হিসাব স্বয়ংক্রিয়ভাবে ০ থেকে শুরু হয় (১ থেকে ${periodInfo.totalDays || 30} তারিখ)। সব পুরোনো হিসাব ডাটাবেজে অক্ষত আছে।`
-                : `${displayPeriodTitle} মাসের সম্পূর্ণ লেনদেন ও লাভ-ক্ষতির হিসাব দেখানো হচ্ছে।`}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
-          <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-900 text-[11px] font-black px-3 py-1 rounded-full border border-emerald-200">
-            <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
-            লাইভ রিয়েল-টাইম
-          </span>
-        </div>
-      </div>
-
       {/* ⚡ 1. TODAY'S REAL-TIME PULSE */}
       <section>
         <div className="flex items-center gap-2 mb-3">
