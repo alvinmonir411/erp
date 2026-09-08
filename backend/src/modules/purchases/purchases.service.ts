@@ -246,6 +246,9 @@ export class PurchasesService {
   }
 
   async delete(id: number) {
+    if (!id || isNaN(id) || id <= 0) {
+      throw new BadRequestException(`Invalid purchase ID: ${id}`);
+    }
     const purchase = await this.findOne(id);
     if (!purchase) {
       throw new NotFoundException(`Purchase with ID ${id} not found`);
@@ -269,19 +272,22 @@ export class PurchasesService {
       }
 
       // Delete payments tied to this purchase
-      await manager.delete(CompanyPayment, { purchaseId: id });
+      await manager.query('DELETE FROM "company_payments" WHERE "purchaseId" = $1', [id]);
 
       // Delete items
-      await manager.delete(PurchaseItem, { purchaseId: id });
+      await manager.query('DELETE FROM "purchase_items" WHERE "purchaseId" = $1', [id]);
 
       // Delete purchase
-      await manager.delete(Purchase, id);
+      await manager.query('DELETE FROM "purchases" WHERE "id" = $1', [id]);
 
       return { success: true, message: `Purchase invoice #${purchase.invoiceNo || id} deleted successfully` };
     });
   }
 
   async deletePayment(paymentId: number) {
+    if (!paymentId || isNaN(paymentId) || paymentId <= 0) {
+      throw new BadRequestException(`Invalid payment ID: ${paymentId}`);
+    }
     const payment = await this.paymentRepository.findOne({
       where: { id: paymentId },
     });
@@ -304,16 +310,16 @@ export class PurchasesService {
         }
       }
 
-      await manager.delete(CompanyPayment, paymentId);
+      await manager.query('DELETE FROM "company_payments" WHERE "id" = $1', [paymentId]);
       return { success: true, message: `Payment of ${payment.amount} deleted successfully` };
     });
   }
 
   async resetDemoData() {
     return this.dataSource.transaction(async (manager) => {
-      await manager.createQueryBuilder().delete().from(CompanyPayment).execute();
-      await manager.createQueryBuilder().delete().from(PurchaseItem).execute();
-      await manager.createQueryBuilder().delete().from(Purchase).execute();
+      await manager.query('DELETE FROM "company_payments"');
+      await manager.query('DELETE FROM "purchase_items"');
+      await manager.query('DELETE FROM "purchases"');
       return { success: true, message: 'All purchases and company payments have been reset to 0' };
     });
   }
