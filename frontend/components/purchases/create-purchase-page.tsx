@@ -265,6 +265,8 @@ function CreatePurchaseContent() {
       }
     }
 
+    // If general payment without breakdown, provide a fresh clean row
+    setItems([initialRow()]);
     setToastTone('success');
     setToastMessage(`পেমেন্ট #${payment.id} (৳${payment.amount}) চালানের সাথে যুক্ত করা হয়েছে!`);
   };
@@ -503,6 +505,8 @@ function CreatePurchaseContent() {
                   onChange={(e) => {
                     setCompanyId(e.target.value);
                     setSelectedPaymentId(null);
+                    setPaidAmountInput('');
+                    setItems([initialRow()]);
                   }}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                 >
