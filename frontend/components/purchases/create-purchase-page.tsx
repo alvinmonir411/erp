@@ -9,7 +9,7 @@ import { createPurchase, getCompanyPayments } from '@/lib/api/purchases';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { useToastNotification } from '@/components/ui/toast-provider';
 import { formatCurrency, formatDate, toNumber } from '@/lib/utils/format';
-import type { Company, Product, PurchasePayment } from '@/types/api';
+import type { Company, Product, PurchasePayment, Purchase } from '@/types/api';
 import {
   Building2,
   Calendar,
@@ -28,6 +28,7 @@ import {
   Sparkles,
   ArrowRight,
   RefreshCw,
+  Printer,
 } from 'lucide-react';
 
 export type PurchaseRowItem = {
@@ -98,6 +99,7 @@ function CreatePurchaseContent() {
   const [items, setItems] = useState<PurchaseRowItem[]>([initialRow()]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [savedResult, setSavedResult] = useState<Purchase | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
 
@@ -422,16 +424,13 @@ function CreatePurchaseContent() {
 
       const result = await createPurchase(payload);
 
+      setSavedResult(result);
       setToastTone('success');
       setToastMessage(
         confirmStockIn
           ? `চালান #${result.invoiceNo || result.id} সফলভাবে তৈরি ও গোডাউনে স্টক ইন সম্পন্ন হয়েছে!`
           : `চালান #${result.invoiceNo || result.id} খসড়া হিসেবে সংরক্ষিত হয়েছে!`,
       );
-
-      setTimeout(() => {
-        router.push('/purchases');
-      }, 1200);
     } catch (err: any) {
       setToastTone('error');
       setToastMessage(err.message || 'চালান সংরক্ষণ করতে সমস্যা হয়েছে');
@@ -1068,6 +1067,97 @@ function CreatePurchaseContent() {
             </div>
           </div>
         </form>
+      )}
+
+      {/* 🌟 Success Modal Dialog (Shown upon successful challan save) */}
+      {savedResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-slate-200 animate-scaleUp">
+            {/* Header / Success Icon */}
+            <div className="text-center space-y-2">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 ring-8 ring-emerald-50">
+                <CheckCircle2 className="h-9 w-9" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900">
+                {confirmStockIn
+                  ? 'চালান ও গোডাউনে স্টক ইন সম্পন্ন হয়েছে!'
+                  : 'চালান খসড়া সংরক্ষণ সম্পন্ন হয়েছে!'}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                ইনভয়েস / চালান নং: <b className="text-indigo-900 font-mono font-bold">#{savedResult.invoiceNo || savedResult.id}</b>
+              </p>
+            </div>
+
+            {/* Summary Breakdown */}
+            <div className="my-6 space-y-3 rounded-2xl bg-slate-50 p-4 border border-slate-100 text-xs">
+              <div className="flex justify-between items-center text-slate-600">
+                <span>কোম্পানি / সরবরাহকারী:</span>
+                <span className="font-bold text-slate-900">{selectedCompany?.name || 'কোম্পানি'}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>মোট প্রাপ্ত মালের মূল্য:</span>
+                <span className="font-black text-slate-900 text-sm">{formatCurrency(invoiceTotal)}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>ব্যাংক ড্রাফটে প্রদত্ত টাকা:</span>
+                <span className="font-black text-indigo-900 text-sm">{formatCurrency(effectivePaid)}</span>
+              </div>
+              <div className="pt-2 border-t border-slate-200 flex justify-between items-center font-bold">
+                <span>চূড়ান্ত সমন্বয় স্থিতি:</span>
+                {remainingAdvance > 0 ? (
+                  <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md font-black">
+                    💎 অগ্রিম জমা অবশিষ্ট: {formatCurrency(remainingAdvance)}
+                  </span>
+                ) : remainingDue > 0 ? (
+                  <span className="text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md font-black">
+                    ⚠️ বকেয়া পাওনা: {formatCurrency(remainingDue)}
+                  </span>
+                ) : (
+                  <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md font-black">
+                    ✅ সম্পূর্ণ সমন্বিত (০ বকেয়া)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2.5">
+              <Link
+                href={`/purchases/${savedResult.id}/print-challan`}
+                target="_blank"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-98"
+              >
+                <Printer className="h-4 w-4" />
+                <span>🖨️ চালান ও ব্যাংক ড্রাফট সমন্বয় ভাউচার প্রিন্ট করুন</span>
+              </Link>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push('/purchases')}
+                  className="flex-1 rounded-2xl bg-slate-100 hover:bg-slate-200 py-2.5 text-xs font-bold text-slate-700 transition-colors text-center"
+                >
+                  📑 সকল চালান তালিকায় যান
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSavedResult(null);
+                    setItems([initialRow()]);
+                    setSelectedPaymentId(null);
+                    setPaidAmountInput('');
+                    setInvoiceNo(
+                      `CHL-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
+                    );
+                  }}
+                  className="flex-1 rounded-2xl border border-slate-200 hover:bg-slate-50 py-2.5 text-xs font-bold text-slate-600 transition-colors text-center"
+                >
+                  ➕ আরেকটি চালান ইন করুন
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

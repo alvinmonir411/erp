@@ -12,6 +12,8 @@ import { Company } from '../../companies/entities/company.entity';
 import { Product } from '../../products/entities/product.entity';
 import { numericColumnTransformer } from '../../../common/database/numeric.transformer';
 
+import { CompanyPayment } from './company-payment.entity';
+
 export enum PurchaseStatus {
   DRAFT = 'DRAFT',
   CONFIRMED = 'CONFIRMED',
@@ -79,6 +81,9 @@ export class Purchase {
 
   @OneToMany(() => PurchaseItem, (item) => item.purchase, { cascade: true })
   items: PurchaseItem[];
+
+  @OneToMany(() => CompanyPayment, (payment) => payment.purchase)
+  payments: CompanyPayment[];
 
   @CreateDateColumn()
   createdAt: Date;

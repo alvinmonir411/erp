@@ -52,6 +52,7 @@ import {
   ChevronUp,
   Trash2,
   User,
+  Printer,
 } from 'lucide-react';
 
 const pageSize = 12;
@@ -307,7 +308,7 @@ export function PurchasesPage() {
     }
 
     setPaymentDate(formatDateInput(new Date()));
-    setPaymentMethod('CASH');
+    setPaymentMethod('BANK');
     setTransactionRef('');
     setPaymentNote('');
     setIsProductBreakdownMode(true);
@@ -625,14 +626,14 @@ export function PurchasesPage() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95"
             >
               <Wallet className="h-4 w-4" />
-              <span>💸 কোম্পানিকে টাকা দিন</span>
+              <span>🏦 ব্যাংক ড্রাফট / টাকা পরিশোধ (অগ্রিম অর্ডার)</span>
             </button>
             <Link
               href="/purchases/create"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-95"
             >
               <Plus className="h-4 w-4" />
-              <span>+ নতুন চালান / স্টক ইন</span>
+              <span>📦 চালান ইন ও স্টক ইন</span>
             </Link>
           </div>
         </div>
@@ -857,7 +858,7 @@ export function PurchasesPage() {
           }`}
         >
           <Wallet className="h-4 w-4 shrink-0" />
-          <span className="truncate">💳 পরিশোধের হিসাব ({filteredPayments.length})</span>
+          <span className="truncate">💳 প্রি-অর্ডার ও পেমেন্ট ({filteredPayments.length})</span>
         </button>
       </div>
 
@@ -1174,6 +1175,16 @@ export function PurchasesPage() {
                             )}
 
                             <Link
+                              href={`/purchases/${purchase.id}/print-challan`}
+                              target="_blank"
+                              className="rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-2 text-xs font-bold transition-colors flex items-center gap-1.5"
+                              title="চালান ও ব্যাংক ড্রাফট সমন্বয় ভাউচার প্রিন্ট করুন"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              <span>প্রিন্ট</span>
+                            </Link>
+
+                            <Link
                               href={`/purchases/companies/${purchase.companyId}`}
                               className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 p-2 text-xs font-bold transition-colors"
                               title="কোম্পানি লেজার দেখুন"
@@ -1371,8 +1382,8 @@ export function PurchasesPage() {
                   <Wallet className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">কোম্পানিকে টাকা পরিশোধ</h3>
-                  <p className="text-xs text-slate-500">সাধারণ বা একাধিক প্রোডাক্টের জন্য টাকা পরিশোধের হিসাব সংরক্ষণ করুন</p>
+                  <h3 className="text-lg font-black text-slate-900">🏦 কোম্পানিকে ব্যাংক ড্রাফট / অগ্রিম টাকা পরিশোধ ও পণ্যের অর্ডার</h3>
+                  <p className="text-xs text-slate-500">কোম্পানিকে ব্যাংক ড্রাফট বা অগ্রিম টাকা প্রদানের সময় কোন কোন পণ্যের কত কোয়ান্টিটি অর্ডার দিচ্ছেন তা যুক্ত করুন। পরবর্তীতে চালান আসার সময় এই ড্রাফট সিলেক্ট করলেই সব পণ্য স্বয়ংক্রিয়ভাবে লোড হবে।</p>
                 </div>
               </div>
               <button
@@ -1445,7 +1456,7 @@ export function PurchasesPage() {
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-indigo-600" />
                     <span className="text-xs font-bold text-slate-800">
-                      কোন কোন প্রোডাক্টের জন্য কত টাকা দেওয়া হচ্ছে:
+                      📦 অর্ডারকৃত পণ্যের তালিকা (Products to Pre-Order):
                     </span>
                   </div>
                   <button
@@ -1454,7 +1465,7 @@ export function PurchasesPage() {
                     className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>+ প্রোডাক্ট যোগ করুন</span>
+                    <span>+ অর্ডারে প্রোডাক্ট যোগ করুন</span>
                   </button>
                 </div>
 
@@ -1750,32 +1761,32 @@ export function PurchasesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    পেমেন্ট মেথড
+                    পেমেন্টের মাধ্যম
                   </label>
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
                   >
-                    <option value="CASH">নগদ (Cash)</option>
-                    <option value="BANK">ব্যাংক ট্রান্সফার (Bank)</option>
-                    <option value="BKASH">বিকাশ (bKash)</option>
-                    <option value="NAGAD">নগদ (Nagad)</option>
-                    <option value="CHEQUE">চেক (Cheque)</option>
+                    <option value="BANK">🏦 ব্যাংক ড্রাফট / ট্রান্সফার (Bank Draft / Transfer)</option>
+                    <option value="CHEQUE">📝 চেক (Cheque)</option>
+                    <option value="CASH">💵 নগদ ক্যাশ (Cash)</option>
+                    <option value="BKASH">📱 বিকাশ (bKash)</option>
+                    <option value="NAGAD">📱 নগদ (Nagad)</option>
                     <option value="OTHER">অন্যান্য (Other)</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    চেক বা স্লিপ নম্বর
+                    ড্রাফট / চেক / ট্রানজেকশন নম্বর
                   </label>
                   <input
                     type="text"
                     value={transactionRef}
                     onChange={(e) => setTransactionRef(e.target.value)}
-                    placeholder="যেমন: CHQ-9981 / TrxID"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
+                    placeholder="যেমন: BD-982341 / CHQ-10492"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold focus:border-indigo-500 focus:bg-white focus:outline-none"
                   />
                 </div>
               </div>
@@ -1783,13 +1794,13 @@ export function PurchasesPage() {
               {/* Note / Description */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  নোট / অতিরিক্ত বিবরণ
+                  ব্যাংক ড্রাফটের নোট / মন্তব্য
                 </label>
                 <textarea
                   value={paymentNote}
                   onChange={(e) => setPaymentNote(e.target.value)}
                   rows={2}
-                  placeholder="যেমন: সানলাইট কয়েল ও অন্যান্য পণ্য বাবদ চেক পরিশোধ..."
+                  placeholder="যেমন: ১০ টি পণ্যের অগ্রিম ব্যাংক ড্রাফট বাবদ প্রদান করা হলো..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
                 />
               </div>
@@ -1808,7 +1819,7 @@ export function PurchasesPage() {
                   disabled={isSubmittingPayment}
                   className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
                 >
-                  {isSubmittingPayment ? 'সংরক্ষণ হচ্ছে...' : 'পেমেন্ট নিশ্চিত করুন'}
+                  {isSubmittingPayment ? 'সংরক্ষণ হচ্ছে...' : '✅ ব্যাংক ড্রাফট ও প্রি-অর্ডার সংরক্ষণ করুন'}
                 </button>
               </div>
             </form>

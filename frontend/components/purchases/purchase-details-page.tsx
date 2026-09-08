@@ -116,12 +116,21 @@ export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
               Back to purchases
             </Link>
             {purchase ? (
-              <Link
-                href={`/purchases/companies/${purchase.companyId}`}
-                className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700"
-              >
-                Company ledger
-              </Link>
+              <>
+                <Link
+                  href={`/purchases/${purchase.id}/print-challan`}
+                  target="_blank"
+                  className="rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-4 py-3 text-sm font-bold text-white shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <span>🖨️ চালান ভাউচার প্রিন্ট</span>
+                </Link>
+                <Link
+                  href={`/purchases/companies/${purchase.companyId}`}
+                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Company ledger
+                </Link>
+              </>
             ) : null}
           </div>
         }

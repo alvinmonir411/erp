@@ -47,6 +47,7 @@ export class PurchasesService {
       .leftJoinAndSelect('p.company', 'company')
       .leftJoinAndSelect('p.items', 'items')
       .leftJoinAndSelect('items.product', 'product')
+      .leftJoinAndSelect('p.payments', 'payments')
       .orderBy('p.purchaseDate', 'DESC')
       .addOrderBy('p.createdAt', 'DESC');
 
@@ -84,7 +85,7 @@ export class PurchasesService {
     try {
       const purchase = await this.purchaseRepository.findOne({
         where: { id: numId },
-        relations: ['company', 'items', 'items.product'],
+        relations: ['company', 'items', 'items.product', 'payments'],
       });
       if (purchase) return purchase;
     } catch {
