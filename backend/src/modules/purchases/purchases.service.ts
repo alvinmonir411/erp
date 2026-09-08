@@ -311,9 +311,9 @@ export class PurchasesService {
 
   async resetDemoData() {
     return this.dataSource.transaction(async (manager) => {
-      await manager.delete(CompanyPayment, {});
-      await manager.delete(PurchaseItem, {});
-      await manager.delete(Purchase, {});
+      await manager.createQueryBuilder().delete().from(CompanyPayment).execute();
+      await manager.createQueryBuilder().delete().from(PurchaseItem).execute();
+      await manager.createQueryBuilder().delete().from(Purchase).execute();
       return { success: true, message: 'All purchases and company payments have been reset to 0' };
     });
   }
