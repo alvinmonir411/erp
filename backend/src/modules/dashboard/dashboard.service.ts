@@ -3,6 +3,8 @@ import {
   isTodayBD,
   isTodayBDDate,
   getBDTodayString,
+  getBDMonthRange,
+  BDMonthRange,
 } from '../../common/utils/date.utils';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, Not, Repository, DataSource } from 'typeorm';
@@ -21,6 +23,11 @@ import {
 import { ProductsService } from '../products/products.service';
 import { DispatchBatch } from '../delivery-ops/entities/dispatch-batch.entity';
 
+export interface DashboardQueryOptions {
+  period?: string; // 'this_month' | 'last_month' | 'custom' | 'all_time'
+  month?: number;  // 1-12
+  year?: number;   // e.g. 2026
+}
 
 @Injectable()
 export class DashboardService {
@@ -42,7 +49,11 @@ export class DashboardService {
   ) {}
   private readonly logger = new Logger(DashboardService.name);
 
-  async getDashboardData(companyId?: number, user?: any) {
+  async getDashboardData(
+    companyId?: number,
+    user?: any,
+    options: DashboardQueryOptions = {},
+  ) {
     const { startUtc: todayStartUTC, endUtc: todayEndUTC } = getBDDayRange();
     const todayDateStr = getBDTodayString();
     const safeNum = (val: any) => {
@@ -57,11 +68,57 @@ export class DashboardService {
     const where: any = companyId ? { companyId } : {};
     if (isSR) {
       if (!userId)
-        return { uiMetrics: null, charts: { last7Days: [] }, recentOrders: [] };
+        return { uiMetrics: null, charts: { last7Days: [], monthlyTrend: [] }, recentOrders: [] };
       where.createdById = userId;
     }
 
-    // 1. Conditional SQL Aggregations (Single Query for all Order Metrics)
+    // 0. Parse Period and Month Range
+    const period = options.period || 'this_month';
+    const bdToday = getBDTodayString();
+    const [currentYear, currentMonth] = bdToday.split('-').map(Number);
+
+    let monthRange: BDMonthRange | null = null;
+    let periodStartDateStr: string | null = null;
+    let periodEndDateStr: string | null = null;
+    let periodStartUtc: Date | null = null;
+    let periodEndUtc: Date | null = null;
+    let periodLabel = 'This Month';
+    let isAllTime = false;
+
+    if (period === 'last_month') {
+      let targetMonth = currentMonth - 1;
+      let targetYear = currentYear;
+      if (targetMonth < 1) {
+        targetMonth = 12;
+        targetYear -= 1;
+      }
+      monthRange = getBDMonthRange(targetYear, targetMonth);
+      periodStartDateStr = monthRange.startDateStr;
+      periodEndDateStr = monthRange.endDateStr;
+      periodStartUtc = monthRange.startUtc;
+      periodEndUtc = monthRange.endUtc;
+      periodLabel = `${monthRange.monthName} ${monthRange.year}`;
+    } else if (period === 'custom' && options.month && options.year) {
+      monthRange = getBDMonthRange(options.year, options.month);
+      periodStartDateStr = monthRange.startDateStr;
+      periodEndDateStr = monthRange.endDateStr;
+      periodStartUtc = monthRange.startUtc;
+      periodEndUtc = monthRange.endUtc;
+      periodLabel = `${monthRange.monthName} ${monthRange.year}`;
+    } else if (period === 'all_time') {
+      isAllTime = true;
+      periodLabel = 'All Time (Full History)';
+    } else {
+      // Default: this_month (1st of current month to end of current month: 28/29/30/31)
+      monthRange = getBDMonthRange(currentYear, currentMonth);
+      periodStartDateStr = monthRange.startDateStr;
+      periodEndDateStr = monthRange.endDateStr;
+      periodStartUtc = monthRange.startUtc;
+      periodEndUtc = monthRange.endUtc;
+      periodLabel = `${monthRange.monthName} ${monthRange.year}`;
+    }
+
+    // 1. Conditional SQL Aggregations for Orders (All-Time, Period, & Today)
     let aggResult: any;
     if (companyId) {
       const qb = this.ordersRepository
@@ -74,24 +131,56 @@ export class DashboardService {
         qb.andWhere('order.createdById = :userId', { userId });
       }
 
+      // Period condition sql snippet
+      const periodCondition = isAllTime
+        ? '1=1'
+        : `order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr`;
+      const periodSettledCondition = isAllTime
+        ? '1=1'
+        : `order.settledAt >= :periodStartUtc AND order.settledAt <= :periodEndUtc`;
+
       aggResult = await qb
-        .select('COUNT(DISTINCT order.id)', 'totalOrdersCount')
+        // Lifetime / All-time totals
+        .select('COUNT(DISTINCT order.id)', 'lifetimeOrdersCount')
         .addSelect(
           "SUM(CASE WHEN order.status <> 'CANCELLED' THEN COALESCE(item.lineTotal, 0) ELSE 0 END)",
-          'totalOrderValue',
+          'lifetimeOrderValue',
         )
         .addSelect(
           "COUNT(DISTINCT CASE WHEN order.status = 'CANCELLED' THEN order.id END)",
-          'cancelledOrdersCount',
+          'lifetimeCancelledCount',
         )
         .addSelect(
           `SUM(CASE WHEN order.status IN ('SETTLED', 'PARTIAL_DUE') THEN
-          COALESCE(item.deliveredPaidQuantity, 0) * (
-            CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
-            ELSE COALESCE(item.unitPrice, 0) END
-          )
-        ELSE 0 END)`,
-          'netSales',
+            COALESCE(item.deliveredPaidQuantity, 0) * (
+              CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+              ELSE COALESCE(item.unitPrice, 0) END
+            )
+          ELSE 0 END)`,
+          'lifetimeNetSales',
+        )
+
+        // Period (This Month / Selected Month) metrics
+        .addSelect(
+          `COUNT(DISTINCT CASE WHEN (${periodCondition}) AND order.status <> 'CANCELLED' THEN order.id END)`,
+          'periodOrdersCount',
+        )
+        .addSelect(
+          `SUM(CASE WHEN (${periodCondition}) AND order.status <> 'CANCELLED' THEN COALESCE(item.lineTotal, 0) ELSE 0 END)`,
+          'periodOrderValue',
+        )
+        .addSelect(
+          `COUNT(DISTINCT CASE WHEN (${periodCondition}) AND order.status = 'CANCELLED' THEN order.id END)`,
+          'periodCancelledCount',
+        )
+        .addSelect(
+          `SUM(CASE WHEN order.status IN ('SETTLED', 'PARTIAL_DUE') AND (${periodCondition} OR ${periodSettledCondition}) THEN
+            COALESCE(item.deliveredPaidQuantity, 0) * (
+              CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+              ELSE COALESCE(item.unitPrice, 0) END
+            )
+          ELSE 0 END)`,
+          'periodNetSales',
         )
 
         // Daily (today) metrics
@@ -103,7 +192,6 @@ export class DashboardService {
           "SUM(CASE WHEN order.orderDate = :todayDateStr AND order.status <> 'CANCELLED' THEN COALESCE(item.lineTotal, 0) ELSE 0 END)",
           'todayOrderValue',
         )
-
         .addSelect(
           'COUNT(DISTINCT CASE WHEN order.dispatchedAt >= :todayStartUTC AND order.dispatchedAt <= :todayEndUTC THEN order.id END)',
           'todayDispatchCount',
@@ -114,11 +202,11 @@ export class DashboardService {
         )
         .addSelect(
           `SUM(CASE WHEN order.status IN ('SETTLED', 'PARTIAL_DUE') AND order.settledAt >= :todayStartUTC AND order.settledAt <= :todayEndUTC THEN
-          COALESCE(item.deliveredPaidQuantity, 0) * (
-            CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
-            ELSE COALESCE(item.unitPrice, 0) END
-          )
-        ELSE 0 END)`,
+            COALESCE(item.deliveredPaidQuantity, 0) * (
+              CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+              ELSE COALESCE(item.unitPrice, 0) END
+            )
+          ELSE 0 END)`,
           'todaySettledValue',
         )
         .addSelect(
@@ -126,20 +214,29 @@ export class DashboardService {
           'todayCancelledCount',
         )
 
-        // Delivery status totals
+        // Delivery status totals for period
         .addSelect(
-          'COUNT(DISTINCT CASE WHEN order.dispatchedAt IS NOT NULL THEN order.id END)',
-          'totalDispatchCount',
+          `COUNT(DISTINCT CASE WHEN (${periodCondition}) AND order.dispatchedAt IS NOT NULL THEN order.id END)`,
+          'periodDispatchOrdersCount',
         )
         .addSelect(
-          "COUNT(DISTINCT CASE WHEN order.status IN ('CONFIRMED', 'ASSIGNED') THEN order.id END)",
-          'pendingDispatchCount',
+          `COUNT(DISTINCT CASE WHEN (${periodCondition}) AND order.status IN ('CONFIRMED', 'ASSIGNED') THEN order.id END)`,
+          'periodPendingDispatchCount',
         )
         .addSelect(
-          "COUNT(DISTINCT CASE WHEN order.status IN ('DELIVERED', 'SETTLED') THEN order.id END)",
-          'deliveredCount',
+          `COUNT(DISTINCT CASE WHEN (${periodCondition}) AND order.status IN ('DELIVERED', 'SETTLED') THEN order.id END)`,
+          'periodDeliveredCount',
         )
-        .setParameters({ todayStartUTC, todayEndUTC, companyId, todayDateStr })
+        .setParameters({
+          todayStartUTC,
+          todayEndUTC,
+          companyId,
+          todayDateStr,
+          periodStartDateStr,
+          periodEndDateStr,
+          periodStartUtc,
+          periodEndUtc,
+        })
         .getRawOne();
     } else {
       const baseQb = this.ordersRepository.createQueryBuilder('order');
@@ -147,19 +244,45 @@ export class DashboardService {
         baseQb.andWhere('order.createdById = :userId', { userId });
       }
 
+      const periodCondition = isAllTime
+        ? '1=1'
+        : `order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr`;
+      const periodSettledCondition = isAllTime
+        ? '1=1'
+        : `order.settledAt >= :periodStartUtc AND order.settledAt <= :periodEndUtc`;
+
       aggResult = await baseQb
-        .select('COUNT(order.id)', 'totalOrdersCount')
+        // Lifetime / All-time totals
+        .select('COUNT(order.id)', 'lifetimeOrdersCount')
         .addSelect(
           `SUM(CASE WHEN order.status <> 'CANCELLED' THEN COALESCE(order.grandTotal, 0) ELSE 0 END)`,
-          'totalOrderValue',
+          'lifetimeOrderValue',
         )
         .addSelect(
           `SUM(CASE WHEN order.status = 'CANCELLED' THEN 1 ELSE 0 END)`,
-          'cancelledOrdersCount',
+          'lifetimeCancelledCount',
         )
         .addSelect(
           `SUM(CASE WHEN order.status IN ('SETTLED', 'PARTIAL_DUE') THEN COALESCE(order.actualSoldAmount, 0) ELSE 0 END)`,
-          'netSales',
+          'lifetimeNetSales',
+        )
+
+        // Period (This Month / Selected Month) metrics
+        .addSelect(
+          `COUNT(CASE WHEN (${periodCondition}) AND order.status <> 'CANCELLED' THEN 1 END)`,
+          'periodOrdersCount',
+        )
+        .addSelect(
+          `SUM(CASE WHEN (${periodCondition}) AND order.status <> 'CANCELLED' THEN COALESCE(order.grandTotal, 0) ELSE 0 END)`,
+          'periodOrderValue',
+        )
+        .addSelect(
+          `COUNT(CASE WHEN (${periodCondition}) AND order.status = 'CANCELLED' THEN 1 END)`,
+          'periodCancelledCount',
+        )
+        .addSelect(
+          `SUM(CASE WHEN order.status IN ('SETTLED', 'PARTIAL_DUE') AND (${periodCondition} OR ${periodSettledCondition}) THEN COALESCE(order.actualSoldAmount, 0) ELSE 0 END)`,
+          'periodNetSales',
         )
 
         // Daily (today) metrics
@@ -171,7 +294,6 @@ export class DashboardService {
           `SUM(CASE WHEN order.orderDate = :todayDateStr AND order.status <> 'CANCELLED' THEN COALESCE(order.grandTotal, 0) ELSE 0 END)`,
           'todayOrderValue',
         )
-
         .addSelect(
           `COUNT(CASE WHEN order.dispatchedAt >= :todayStartUTC AND order.dispatchedAt <= :todayEndUTC THEN 1 END)`,
           'todayDispatchCount',
@@ -191,53 +313,115 @@ export class DashboardService {
 
         // Delivery status totals
         .addSelect(
-          `COUNT(CASE WHEN order.dispatchedAt IS NOT NULL THEN 1 END)`,
-          'totalDispatchCount',
+          `COUNT(CASE WHEN (${periodCondition}) AND order.dispatchedAt IS NOT NULL THEN 1 END)`,
+          'periodDispatchOrdersCount',
         )
         .addSelect(
-          `COUNT(CASE WHEN order.status IN ('CONFIRMED', 'ASSIGNED') THEN 1 END)`,
-          'pendingDispatchCount',
+          `COUNT(CASE WHEN (${periodCondition}) AND order.status IN ('CONFIRMED', 'ASSIGNED') THEN 1 END)`,
+          'periodPendingDispatchCount',
         )
         .addSelect(
-          `COUNT(CASE WHEN order.status IN ('DELIVERED', 'SETTLED') THEN 1 END)`,
-          'deliveredCount',
+          `COUNT(CASE WHEN (${periodCondition}) AND order.status IN ('DELIVERED', 'SETTLED') THEN 1 END)`,
+          'periodDeliveredCount',
         )
-        .setParameters({ todayStartUTC, todayEndUTC, todayDateStr })
+        .setParameters({
+          todayStartUTC,
+          todayEndUTC,
+          todayDateStr,
+          periodStartDateStr,
+          periodEndDateStr,
+          periodStartUtc,
+          periodEndUtc,
+        })
         .getRawOne();
     }
 
-    // 2. Profit calculation via direct query
-    const profitResult = await this.orderItemsRepository
-      .createQueryBuilder('item')
-      .leftJoin('item.product', 'product')
-      .leftJoin('item.order', 'order')
-      .select(
-        `SUM(
-        COALESCE(item.deliveredPaidQuantity, 0) * (
-          CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
-          ELSE COALESCE(item.unitPrice, 0) END - COALESCE(product.buyPrice, 0)
-        )
-      )`,
-        'profit',
-      )
-      .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
-      .andWhere(companyId ? 'product.companyId = :companyId' : '1=1', {
-        companyId,
-      })
-      .andWhere(isSR ? 'order.createdById = :userId' : '1=1', { userId })
-      .getRawOne();
+    // 2. Profit calculation (Period Profit & Lifetime Profit)
+    const canViewProfit =
+      user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER;
 
-    const totalProfit = safeNum(profitResult?.profit);
+    let periodProfit = 0;
+    let lifetimeProfit = 0;
+
+    if (canViewProfit) {
+      try {
+        const profitQb = this.orderItemsRepository
+          .createQueryBuilder('item')
+          .leftJoin('item.product', 'product')
+          .leftJoin('item.order', 'order')
+          .select(
+            `SUM(
+              COALESCE(item.deliveredPaidQuantity, 0) * (
+                CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+                ELSE COALESCE(item.unitPrice, 0) END - COALESCE(product.buyPrice, 0)
+              )
+            )`,
+            'lifetimeProfit',
+          )
+          .where('order.status IN (:...statuses)', {
+            statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE],
+          });
+
+        if (companyId) {
+          profitQb.andWhere('product.companyId = :companyId', { companyId });
+        }
+        if (isSR) {
+          profitQb.andWhere('order.createdById = :userId', { userId });
+        }
+
+        const lifetimeProfitRes = await profitQb.getRawOne();
+        lifetimeProfit = safeNum(lifetimeProfitRes?.lifetimeProfit);
+
+        // Calculate Period Profit
+        const periodProfitQb = this.orderItemsRepository
+          .createQueryBuilder('item')
+          .leftJoin('item.product', 'product')
+          .leftJoin('item.order', 'order')
+          .select(
+            `SUM(
+              COALESCE(item.deliveredPaidQuantity, 0) * (
+                CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+                ELSE COALESCE(item.unitPrice, 0) END - COALESCE(product.buyPrice, 0)
+              )
+            )`,
+            'periodProfit',
+          )
+          .where('order.status IN (:...statuses)', {
+            statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE],
+          });
+
+        if (!isAllTime && periodStartDateStr && periodEndDateStr) {
+          periodProfitQb.andWhere(
+            '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (order.settledAt >= :periodStartUtc AND order.settledAt <= :periodEndUtc))',
+            { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
+          );
+        }
+        if (companyId) {
+          periodProfitQb.andWhere('product.companyId = :companyId', { companyId });
+        }
+        if (isSR) {
+          periodProfitQb.andWhere('order.createdById = :userId', { userId });
+        }
+
+        const periodProfitRes = await periodProfitQb.getRawOne();
+        periodProfit = safeNum(periodProfitRes?.periodProfit);
+      } catch (err) {
+        this.logger.error('Error calculating profit for dashboard:', err.message);
+      }
+    }
 
     // 3. Dues and Collections metrics via database aggregations
-    let totalDueAmount = 0;
+    let totalDueAmount = 0; // Current Live Total Due (Never resets)
     let todayDueAmount = 0;
+    let periodDueAmount = 0;
     let todayCollectedAmount = 0;
+    let periodCollectedAmount = 0;
     let pendingCollected = 0;
     let approvedCollected = 0;
     let rejectedCollected = 0;
 
     try {
+      // Current Outstanding Total Due across all time
       const duesQb = this.duesRepository
         .createQueryBuilder('due')
         .leftJoin('due.order', 'order');
@@ -254,6 +438,7 @@ export class DashboardService {
         .getRawOne();
       totalDueAmount = safeNum(dueRes?.totalDue);
 
+      // Today's new due created
       const todayDuesQb = this.duesRepository
         .createQueryBuilder('due')
         .innerJoin('due.order', 'order')
@@ -269,6 +454,28 @@ export class DashboardService {
       const todayDueRes = await todayDuesQb.getRawOne();
       todayDueAmount = safeNum(todayDueRes?.todayDue);
 
+      // Period's new due created
+      const periodDuesQb = this.duesRepository
+        .createQueryBuilder('due')
+        .innerJoin('due.order', 'order')
+        .select('SUM(COALESCE(due.dueAmount, 0))', 'periodDue');
+      if (!isAllTime && periodStartDateStr && periodEndDateStr) {
+        periodDuesQb.where(
+          'order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr',
+          { periodStartDateStr, periodEndDateStr },
+        );
+      }
+      if (companyId) {
+        periodDuesQb
+          .innerJoin('order.items', 'item')
+          .innerJoin('item.product', 'product')
+          .andWhere('product.companyId = :companyId', { companyId });
+      }
+      if (isSR) periodDuesQb.andWhere('due.srId = :userId', { userId });
+      const periodDueRes = await periodDuesQb.getRawOne();
+      periodDueAmount = safeNum(periodDueRes?.periodDue);
+
+      // Collections Breakdown (Pending, Approved, Rejected)
       const collQb = this.collectionsRepository
         .createQueryBuilder('coll')
         .leftJoin('coll.order', 'order');
@@ -304,7 +511,7 @@ export class DashboardService {
       approvedCollected = safeNum(collRes?.approved);
       rejectedCollected = safeNum(collRes?.rejected);
 
-      // Fetch today's approved due collections
+      // Fetch Today's approved due collections
       const todayCollQb = this.collectionsRepository
         .createQueryBuilder('coll')
         .leftJoin('coll.order', 'order')
@@ -325,6 +532,31 @@ export class DashboardService {
       if (isSR) todayCollQb.andWhere('coll.srId = :userId', { userId });
       const todayCollRes = await todayCollQb.getRawOne();
       todayCollectedAmount = safeNum(todayCollRes?.todayCollected);
+
+      // Fetch Period's approved due collections
+      const periodCollQb = this.collectionsRepository
+        .createQueryBuilder('coll')
+        .leftJoin('coll.order', 'order')
+        .select('SUM(COALESCE(coll.collectedAmount, 0))', 'periodCollected')
+        .where('coll.status = :approved', {
+          approved: CollectionStatus.APPROVED,
+        });
+
+      if (!isAllTime && periodStartUtc && periodEndUtc) {
+        periodCollQb.andWhere(
+          'coll.createdAt >= :periodStartUtc AND coll.createdAt <= :periodEndUtc',
+          { periodStartUtc, periodEndUtc },
+        );
+      }
+      if (companyId) {
+        periodCollQb
+          .innerJoin('order.items', 'item')
+          .innerJoin('item.product', 'product')
+          .andWhere('product.companyId = :companyId', { companyId });
+      }
+      if (isSR) periodCollQb.andWhere('coll.srId = :userId', { userId });
+      const periodCollRes = await periodCollQb.getRawOne();
+      periodCollectedAmount = safeNum(periodCollRes?.periodCollected);
     } catch (err) {
       this.logger.error(
         'Error fetching dues/collections for dashboard:',
@@ -332,13 +564,7 @@ export class DashboardService {
       );
     }
 
-    // 4. Daily Operations
-    const todayOrders = {
-      amount: safeNum(aggResult?.todayOrderValue),
-      count: safeNum(aggResult?.todayOrdersCount),
-    };
-
-    // Calculate dispatch metrics based on dispatch batches instead of individual orders
+    // 4. Dispatch Batches Metrics
     const batchRepo = this.dataSource.getRepository(DispatchBatch);
     const batchQb = batchRepo.createQueryBuilder('batch');
 
@@ -358,21 +584,23 @@ export class DashboardService {
         'todayDispatchCount',
       )
       .addSelect(
-        "COUNT(DISTINCT CASE WHEN batch.dispatchedAt IS NOT NULL AND batch.status <> 'CANCELLED' THEN batch.id END)",
-        'totalDispatchCount',
+        isAllTime
+          ? "COUNT(DISTINCT CASE WHEN batch.dispatchedAt IS NOT NULL AND batch.status <> 'CANCELLED' THEN batch.id END)"
+          : "COUNT(DISTINCT CASE WHEN batch.dispatchedAt >= :periodStartUtc AND batch.dispatchedAt <= :periodEndUtc AND batch.status <> 'CANCELLED' THEN batch.id END)",
+        'periodDispatchCount',
       )
-      .setParameters({ todayStartUTC, todayEndUTC })
+      .setParameters({
+        todayStartUTC,
+        todayEndUTC,
+        periodStartUtc,
+        periodEndUtc,
+      })
       .getRawOne();
 
     const todayDispatchCount = safeNum(batchMetrics?.todayDispatchCount);
-    const totalDispatchCount = safeNum(batchMetrics?.totalDispatchCount);
+    const periodDispatchCount = safeNum(batchMetrics?.periodDispatchCount);
 
-    const todayDispatch = todayDispatchCount;
-    const todaySettledValue = safeNum(aggResult?.todaySettledValue);
-    const todayCancelled = safeNum(aggResult?.todayCancelledCount);
-
-
-    // 5. Stock metrics from ProductsService (Unified Source)
+    // 5. Stock metrics from ProductsService (Live State)
     let productMetrics: any = {
       totalProducts: 0,
       stockValue: 0,
@@ -380,6 +608,7 @@ export class DashboardService {
       inactiveProducts: 0,
       lowStockProducts: 0,
       outOfStockProducts: 0,
+      inStockProducts: 0,
     };
     try {
       productMetrics = await this.productsService.getSummary(companyId);
@@ -394,19 +623,20 @@ export class DashboardService {
       take: 10,
     });
 
-    // 7. Main Chart: Last 7 Days Sales (Single Grouped Query)
+    // 7. Charts:
+    // A) Last 7 Days (Always for fast rolling trend)
     const last7Days = [];
     const BD_OFFSET_MS = 6 * 60 * 60 * 1000;
     const startOfTodayBD = new Date(new Date().getTime() + BD_OFFSET_MS);
     startOfTodayBD.setUTCHours(0, 0, 0, 0);
 
-    const startRangeUtc = new Date(
+    const startRange7DaysUtc = new Date(
       startOfTodayBD.getTime() - 6 * 24 * 60 * 60 * 1000 - BD_OFFSET_MS,
     );
 
-    const chartQb = this.ordersRepository.createQueryBuilder('order');
+    const chart7DaysQb = this.ordersRepository.createQueryBuilder('order');
     if (companyId) {
-      chartQb
+      chart7DaysQb
         .innerJoin('order.items', 'item')
         .innerJoin('item.product', 'product')
         .select(
@@ -415,45 +645,43 @@ export class DashboardService {
         )
         .addSelect(
           `SUM(
-          COALESCE(item.deliveredPaidQuantity, 0) * (
-            CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
-            ELSE COALESCE(item.unitPrice, 0) END
-          )
-        )`,
+            COALESCE(item.deliveredPaidQuantity, 0) * (
+              CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+              ELSE COALESCE(item.unitPrice, 0) END
+            )
+          )`,
           'daySales',
         )
         .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
         .andWhere('product.companyId = :companyId', { companyId })
-        .andWhere('order.settledAt >= :startRangeUtc', { startRangeUtc })
+        .andWhere('order.settledAt >= :startRange7DaysUtc', { startRange7DaysUtc })
         .groupBy(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`);
     } else {
-      chartQb
+      chart7DaysQb
         .select(
           `DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`,
           'dayDate',
         )
         .addSelect('SUM(COALESCE(order.actualSoldAmount, 0))', 'daySales')
         .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
-        .andWhere('order.settledAt >= :startRangeUtc', { startRangeUtc })
+        .andWhere('order.settledAt >= :startRange7DaysUtc', { startRange7DaysUtc })
         .groupBy(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`);
     }
 
-    if (isSR) chartQb.andWhere('order.createdById = :userId', { userId });
-
-    const chartData = await chartQb.getRawMany();
-
-    const chartMap = new Map<string, number>();
-    for (const row of chartData) {
+    if (isSR) chart7DaysQb.andWhere('order.createdById = :userId', { userId });
+    const chart7DaysData = await chart7DaysQb.getRawMany();
+    const chart7Map = new Map<string, number>();
+    for (const row of chart7DaysData) {
       if (row.dayDate) {
         const dStr = new Date(row.dayDate).toISOString().split('T')[0];
-        chartMap.set(dStr, safeNum(row.daySales));
+        chart7Map.set(dStr, safeNum(row.daySales));
       }
     }
 
     for (let i = 6; i >= 0; i--) {
       const d = new Date(startOfTodayBD.getTime() - i * 24 * 60 * 60 * 1000);
       const dKey = d.toISOString().split('T')[0];
-      const salesAmount = chartMap.get(dKey) || 0;
+      const salesAmount = chart7Map.get(dKey) || 0;
 
       last7Days.push({
         date: d.toLocaleDateString('en-GB', {
@@ -465,7 +693,67 @@ export class DashboardService {
       });
     }
 
-    // 8. Company-wise Sales and Profit
+    // B) Month Daily Breakdown Chart (from Day 1 to totalDays: 28/29/30/31)
+    const monthlyTrend = [];
+    if (monthRange) {
+      const { startUtc, endUtc, totalDays, year, month, monthName } = monthRange;
+      const monthChartQb = this.ordersRepository.createQueryBuilder('order');
+      if (companyId) {
+        monthChartQb
+          .innerJoin('order.items', 'item')
+          .innerJoin('item.product', 'product')
+          .select(
+            `DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`,
+            'dayDate',
+          )
+          .addSelect(
+            `SUM(
+              COALESCE(item.deliveredPaidQuantity, 0) * (
+                CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+                ELSE COALESCE(item.unitPrice, 0) END
+              )
+            )`,
+            'daySales',
+          )
+          .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
+          .andWhere('product.companyId = :companyId', { companyId })
+          .andWhere('order.settledAt >= :startUtc AND order.settledAt <= :endUtc', { startUtc, endUtc })
+          .groupBy(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`);
+      } else {
+        monthChartQb
+          .select(
+            `DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`,
+            'dayDate',
+          )
+          .addSelect('SUM(COALESCE(order.actualSoldAmount, 0))', 'daySales')
+          .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] })
+          .andWhere('order.settledAt >= :startUtc AND order.settledAt <= :endUtc', { startUtc, endUtc })
+          .groupBy(`DATE_TRUNC('day', order.settledAt + INTERVAL '6 hours')`);
+      }
+
+      if (isSR) monthChartQb.andWhere('order.createdById = :userId', { userId });
+      const monthChartData = await monthChartQb.getRawMany();
+      const monthMap = new Map<string, number>();
+      for (const row of monthChartData) {
+        if (row.dayDate) {
+          const dStr = new Date(row.dayDate).toISOString().split('T')[0];
+          monthMap.set(dStr, safeNum(row.daySales));
+        }
+      }
+
+      for (let dNum = 1; dNum <= totalDays; dNum++) {
+        const dStr = `${year}-${String(month).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`;
+        const salesAmount = monthMap.get(dStr) || 0;
+        monthlyTrend.push({
+          day: dNum,
+          date: dStr,
+          label: `${dNum} ${monthName.slice(0, 3)}`,
+          amount: salesAmount,
+        });
+      }
+    }
+
+    // 8. Company-wise Sales & Profit for Selected Period
     const salesQb = this.orderItemsRepository
       .createQueryBuilder('item')
       .leftJoin('item.order', 'order')
@@ -475,15 +763,21 @@ export class DashboardService {
       .addSelect('company.name', 'companyName')
       .addSelect(
         `SUM(
-        COALESCE(item.deliveredPaidQuantity, 0) * (
-          CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
-          ELSE COALESCE(item.unitPrice, 0) END
-        )
-      )`,
+          COALESCE(item.deliveredPaidQuantity, 0) * (
+            CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+            ELSE COALESCE(item.unitPrice, 0) END
+          )
+        )`,
         'sales',
       )
       .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] });
 
+    if (!isAllTime && periodStartDateStr && periodEndDateStr) {
+      salesQb.andWhere(
+        '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (order.settledAt >= :periodStartUtc AND order.settledAt <= :periodEndUtc))',
+        { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
+      );
+    }
     if (companyId) {
       salesQb.andWhere('product.companyId = :companyId', { companyId });
     }
@@ -511,38 +805,42 @@ export class DashboardService {
       });
     }
 
-    const canViewProfit =
-      user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER;
     if (canViewProfit) {
       try {
-        const profitQb = this.orderItemsRepository
+        const companyProfitQb = this.orderItemsRepository
           .createQueryBuilder('item')
           .leftJoin('item.order', 'order')
           .leftJoin('item.product', 'product')
           .select('product.companyId', 'companyId')
           .addSelect(
             `SUM(
-            COALESCE(item.deliveredPaidQuantity, 0) * (
-              CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
-              ELSE COALESCE(item.unitPrice, 0) END - COALESCE(product.buyPrice, 0)
-            )
-          )`,
+              COALESCE(item.deliveredPaidQuantity, 0) * (
+                CASE WHEN COALESCE(item.quantity, 0) > 0 THEN (COALESCE(item.lineTotal, 0) / item.quantity)
+                ELSE COALESCE(item.unitPrice, 0) END - COALESCE(product.buyPrice, 0)
+              )
+            )`,
             'profit',
           )
           .where('order.status IN (:...statuses)', { statuses: [OrderStatus.SETTLED, OrderStatus.PARTIAL_DUE] });
 
+        if (!isAllTime && periodStartDateStr && periodEndDateStr) {
+          companyProfitQb.andWhere(
+            '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (order.settledAt >= :periodStartUtc AND order.settledAt <= :periodEndUtc))',
+            { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
+          );
+        }
         if (companyId) {
-          profitQb.andWhere('product.companyId = :companyId', { companyId });
+          companyProfitQb.andWhere('product.companyId = :companyId', { companyId });
         }
         if (isSR) {
-          profitQb.andWhere('order.createdById = :userId', { userId });
+          companyProfitQb.andWhere('order.createdById = :userId', { userId });
         }
 
-        const profitData = await profitQb
+        const compProfitData = await companyProfitQb
           .groupBy('product.companyId')
           .getRawMany();
 
-        for (const p of profitData) {
+        for (const p of compProfitData) {
           const cId = Number(p.companyId);
           const existing = companyMap.get(cId);
           if (existing) {
@@ -557,48 +855,87 @@ export class DashboardService {
           }
         }
       } catch (err) {
-        this.logger.error(
-          'Error fetching company-wise profit for dashboard:',
-          err.message,
-        );
+        this.logger.error('Error fetching company-wise profit for dashboard:', err.message);
       }
     }
 
     const companySummary = Array.from(companyMap.values());
 
     return {
+      periodInfo: {
+        key: period,
+        label: periodLabel,
+        isAllTime,
+        month: monthRange?.month,
+        year: monthRange?.year,
+        monthName: monthRange?.monthName,
+        startDateStr: periodStartDateStr,
+        endDateStr: periodEndDateStr,
+        totalDays: monthRange?.totalDays || 0,
+      },
       uiMetrics: {
+        // Today metrics (Always Today in BD Time)
+        today: {
+          ordersCount: safeNum(aggResult?.todayOrdersCount),
+          orderValue: safeNum(aggResult?.todayOrderValue),
+          dispatchCount: todayDispatchCount,
+          dispatchAmount: safeNum(aggResult?.todayDispatchValue),
+          settledValue: safeNum(aggResult?.todaySettledValue),
+          cancelledOrders: safeNum(aggResult?.todayCancelledCount),
+          dueAmount: todayDueAmount,
+          dueCollection: todayCollectedAmount,
+        },
+        // Period / Monthly metrics (Selected Period / Month)
+        period: {
+          ordersCount: safeNum(aggResult?.periodOrdersCount),
+          orderValue: safeNum(aggResult?.periodOrderValue),
+          cancelledOrders: safeNum(aggResult?.periodCancelledCount),
+          netSales: safeNum(aggResult?.periodNetSales),
+          dispatchCount: periodDispatchCount,
+          pendingDispatch: safeNum(aggResult?.periodPendingDispatchCount),
+          deliveredCount: safeNum(aggResult?.periodDeliveredCount),
+          newDue: periodDueAmount,
+          dueCollection: periodCollectedAmount,
+          profit: canViewProfit ? periodProfit : 0,
+        },
+        // Orders Overview (Legacy + Period values)
         orders: {
-          totalOrders: safeNum(aggResult?.totalOrdersCount),
-          todayOrdersCount: todayOrders.count,
-          totalOrderValue: safeNum(aggResult?.totalOrderValue),
-          todayOrderValue: todayOrders.amount,
-          cancelledOrders: safeNum(aggResult?.cancelledOrdersCount),
-          todayCancelled,
+          totalOrders: safeNum(aggResult?.periodOrdersCount),
+          todayOrdersCount: safeNum(aggResult?.todayOrdersCount),
+          totalOrderValue: safeNum(aggResult?.periodOrderValue),
+          todayOrderValue: safeNum(aggResult?.todayOrderValue),
+          cancelledOrders: safeNum(aggResult?.periodCancelledCount),
+          todayCancelled: safeNum(aggResult?.todayCancelledCount),
+          lifetimeOrders: safeNum(aggResult?.lifetimeOrdersCount),
+          lifetimeOrderValue: safeNum(aggResult?.lifetimeOrderValue),
         },
+        // Delivery Operations
         delivery: {
-          totalDispatch: totalDispatchCount,
-          todayDispatch,
+          totalDispatch: periodDispatchCount,
+          todayDispatch: todayDispatchCount,
           todayDispatchAmount: safeNum(aggResult?.todayDispatchValue),
-          pendingDispatch: safeNum(aggResult?.pendingDispatchCount),
-          delivered: safeNum(aggResult?.deliveredCount),
+          pendingDispatch: safeNum(aggResult?.periodPendingDispatchCount),
+          delivered: safeNum(aggResult?.periodDeliveredCount),
         },
+        // Financials & Money
         money: {
-          totalGrossAmount: safeNum(aggResult?.totalOrderValue),
-          todayGrossAmount: todayOrders.amount,
-          totalFinalSold: safeNum(aggResult?.netSales),
-          todayFinalSold: todaySettledValue,
-          totalDue: totalDueAmount,
+          totalGrossAmount: safeNum(aggResult?.periodOrderValue),
+          todayGrossAmount: safeNum(aggResult?.todayOrderValue),
+          totalFinalSold: safeNum(aggResult?.periodNetSales),
+          todayFinalSold: safeNum(aggResult?.todaySettledValue),
+          periodDue: periodDueAmount,
+          totalDue: totalDueAmount, // Current Live Market Remaining Due
           todayDue: todayDueAmount,
+          periodDueCollection: periodCollectedAmount,
           todayDueCollection: todayCollectedAmount,
           pendingCollected,
           approvedCollected,
           rejectedCollected,
-          totalProfit:
-            user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER
-              ? totalProfit
-              : 0,
+          periodProfit: canViewProfit ? periodProfit : 0,
+          totalProfit: canViewProfit ? periodProfit : 0,
+          lifetimeProfit: canViewProfit ? lifetimeProfit : 0,
         },
+        // Live Stock / Inventory (Always Live State)
         stock: {
           totalProducts: productMetrics.totalProducts,
           activeProducts: productMetrics.activeProducts,
@@ -606,13 +943,13 @@ export class DashboardService {
           lowStockProducts: productMetrics.lowStockProducts,
           outOfStockProducts: productMetrics.outOfStockProducts,
           inStockProducts: productMetrics.inStockProducts,
-          stockValue:
-            user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER
-              ? productMetrics.totalStockValue
-              : 0,
+          stockValue: canViewProfit ? productMetrics.totalStockValue : 0,
         },
       },
-      charts: { last7Days },
+      charts: {
+        last7Days,
+        monthlyTrend,
+      },
       companySummary,
       recentOrders: recentOrders.map((o) => ({
         id: o.id,

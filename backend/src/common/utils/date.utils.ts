@@ -68,3 +68,55 @@ export function isTodayBDDate(date: Date | string | undefined): boolean {
 
   return dateStr === getBDTodayString();
 }
+
+export interface BDMonthRange {
+  startUtc: Date;
+  endUtc: Date;
+  startDateStr: string;
+  endDateStr: string;
+  year: number;
+  month: number;
+  monthName: string;
+  totalDays: number;
+}
+
+/**
+ * Returns the exact monthly boundary for Bangladesh timezone (1st of month to 28th/30th/31st).
+ * @param targetYear Optional year (e.g. 2026). Defaults to current year in BD.
+ * @param targetMonth Optional 1-indexed month (1=Jan .. 12=Dec). Defaults to current month in BD.
+ */
+export function getBDMonthRange(targetYear?: number, targetMonth?: number): BDMonthRange {
+  const bdToday = getBDTodayString();
+  const [currentYear, currentMonth] = bdToday.split('-').map(Number);
+
+  const year = targetYear ?? currentYear;
+  const month = targetMonth ?? currentMonth; // 1-12
+
+  // Total days in target month (handles 28, 29, 30, 31 dynamically)
+  const totalDays = new Date(year, month, 0).getDate();
+
+  const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+  const endDateStr = `${year}-${String(month).padStart(2, '0')}-${String(totalDays).padStart(2, '0')}`;
+
+  // Start of day 1 in BD (00:00:00 BD time = UTC-6)
+  const startUtc = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0) - 6 * 60 * 60 * 1000);
+  // End of last day in BD (23:59:59.999 BD time)
+  const endUtc = new Date(Date.UTC(year, month - 1, totalDays, 23, 59, 59, 999) - 6 * 60 * 60 * 1000);
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  return {
+    startUtc,
+    endUtc,
+    startDateStr,
+    endDateStr,
+    year,
+    month,
+    monthName: monthNames[month - 1] || `Month ${month}`,
+    totalDays,
+  };
+}
+

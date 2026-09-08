@@ -20,11 +20,20 @@ export class DashboardController {
   )
   async getMetrics(
     @Query('companyId') companyId: string | undefined,
+    @Query('period') period: string | undefined,
+    @Query('month') month: string | undefined,
+    @Query('year') year: string | undefined,
     @CurrentUser() user: any,
   ) {
     return this.dashboardService.getDashboardData(
-      companyId ? parseInt(companyId) : undefined,
+      companyId ? parseInt(companyId, 10) : undefined,
       user,
+      {
+        period: period || 'this_month',
+        month: month ? parseInt(month, 10) : undefined,
+        year: year ? parseInt(year, 10) : undefined,
+      },
     );
   }
 }
+
