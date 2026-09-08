@@ -23,6 +23,11 @@ import {
   FileCheck,
   Hash,
   Layers,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 
 export type PurchaseRowItem = {
@@ -102,7 +107,7 @@ function CreatePurchaseContent() {
     tone: toastTone,
   });
 
-  // Load initial data
+  // Load initial data (companies and products)
   useEffect(() => {
     async function init() {
       try {
@@ -137,23 +142,37 @@ function CreatePurchaseContent() {
     async function loadPayments() {
       try {
         const pays = await getCompanyPayments({ companyId: Number(companyId) });
-        setCompanyPayments(Array.isArray(pays) ? pays : []);
+        const list = Array.isArray(pays) ? pays : [];
+        setCompanyPayments(list);
+
+        // Auto-select if requested in URL, OR if there is an active advance payment/order
+        if (initialPaymentIdParam) {
+          const match = list.find((p) => p.id === Number(initialPaymentIdParam));
+          if (match) {
+            applyPaymentBreakdown(match, allProducts);
+            return;
+          }
+        }
+
+        // If user already had a selected payment
+        if (selectedPaymentId) {
+          const match = list.find((p) => p.id === selectedPaymentId);
+          if (match) {
+            applyPaymentBreakdown(match, allProducts);
+            return;
+          }
+        }
+
+        // If exactly 1 payment/order exists for this company, auto-select it for convenience!
+        if (list.length === 1) {
+          applyPaymentBreakdown(list[0], allProducts);
+        }
       } catch {
         setCompanyPayments([]);
       }
     }
     void loadPayments();
-  }, [companyId]);
-
-  // Handle preselected payment if query param exists or changes
-  useEffect(() => {
-    if (selectedPaymentId && companyPayments.length > 0) {
-      const match = companyPayments.find((p) => p.id === selectedPaymentId);
-      if (match) {
-        applyPaymentBreakdown(match);
-      }
-    }
-  }, [selectedPaymentId, companyPayments]);
+  }, [companyId, allProducts.length]);
 
   const selectedCompany = useMemo(
     () => companies.find((c) => String(c.id) === companyId),
@@ -168,27 +187,68 @@ function CreatePurchaseContent() {
     return matched.length > 0 ? matched : allProducts;
   }, [allProducts, companyId]);
 
-  // Auto populate rows when a payment with productBreakdown is selected
-  const applyPaymentBreakdown = (payment: PurchasePayment) => {
+  // Safely parse breakdown from array or JSON string
+  const parseBreakdown = (payment: PurchasePayment): any[] => {
+    if (Array.isArray(payment.productBreakdown)) {
+      return payment.productBreakdown;
+    }
+    if (typeof payment.productBreakdown === 'string') {
+      try {
+        const parsed = JSON.parse(payment.productBreakdown);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  };
+
+  // Auto populate rows when a payment / order is selected
+  const applyPaymentBreakdown = (payment: PurchasePayment, productList = allProducts) => {
     setSelectedPaymentId(payment.id);
     setPaidAmountInput(String(payment.amount));
 
     if (payment.note && !note) {
-      setNote(`পেমেন্ট #${payment.id} এর চালান সমন্বয়: ${payment.note}`);
+      setNote(`পেমেন্ট #${payment.id} এর চালান সমন্বয়: ${payment.note}`);
     }
 
-    if (Array.isArray(payment.productBreakdown) && payment.productBreakdown.length > 0) {
-      const newRows: PurchaseRowItem[] = payment.productBreakdown.map((b, idx) => {
-        const matchedProd = allProducts.find((p) => p.id === Number(b.productId));
-        const price = b.unitPrice ?? (matchedProd ? matchedProd.buyPrice : '');
-        const qty = b.quantity ? String(b.quantity) : '1';
+    let breakdownList = parseBreakdown(payment);
+
+    // Fallback: If breakdownList is empty, but payment has note with product info
+    if (breakdownList.length === 0 && payment.note && productList.length > 0) {
+      const matched = productList.filter((p) =>
+        payment.note.toLowerCase().includes(p.name.toLowerCase()),
+      );
+      if (matched.length > 0) {
+        breakdownList = matched.map((p) => ({
+          productId: p.id,
+          productName: p.name,
+          quantity: 1,
+          unitPrice: p.buyPrice || 0,
+          unit: p.unit || 'Pcs',
+        }));
+      }
+    }
+
+    if (breakdownList.length > 0) {
+      const newRows: PurchaseRowItem[] = breakdownList.map((b: any, idx: number) => {
+        const matchedProd = productList.find(
+          (p) =>
+            p.id === Number(b.productId) ||
+            (b.productName && p.name.trim().toLowerCase() === String(b.productName).trim().toLowerCase()),
+        );
+        const price =
+          b.unitPrice != null && b.unitPrice !== ''
+            ? Number(b.unitPrice)
+            : matchedProd ? matchedProd.buyPrice : 0;
+        const qty = b.quantity != null && b.quantity !== '' ? Number(b.quantity) : 1;
 
         return {
           id: 'row-' + Date.now() + '-' + idx,
-          productId: b.productId ? Number(b.productId) : (matchedProd ? matchedProd.id : ''),
+          productId: b.productId ? Number(b.productId) : matchedProd ? matchedProd.id : '',
           productName: b.productName || matchedProd?.name || '',
-          orderedQty: b.quantity ? Number(b.quantity) : undefined,
-          quantity: qty,
+          orderedQty: qty,
+          quantity: String(qty), // default received = ordered qty
           unitPrice: price ? String(price) : '',
           unit: b.unit || matchedProd?.unit || 'Pcs',
           note: b.note || '',
@@ -207,6 +267,14 @@ function CreatePurchaseContent() {
 
     setToastTone('success');
     setToastMessage(`পেমেন্ট #${payment.id} (৳${payment.amount}) চালানের সাথে যুক্ত করা হয়েছে!`);
+  };
+
+  // Deselect payment
+  const handleClearSelectedPayment = () => {
+    setSelectedPaymentId(null);
+    setPaidAmountInput('0');
+    setToastTone('success');
+    setToastMessage('পেমেন্ট সংযোগ বাতিল করা হয়েছে। ম্যানুয়াল চালান এন্ট্রি মোড সক্রিয়।');
   };
 
   // Row Manipulation
@@ -271,10 +339,22 @@ function CreatePurchaseContent() {
     });
   };
 
-  // Total invoice sum
+  // Total invoice sum (Total Received Goods Value)
   const invoiceTotal = useMemo(() => {
     return items.reduce((sum, row) => {
       const q = parseFloat(row.quantity || '0');
+      const p = parseFloat(row.unitPrice || '0');
+      if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
+        return sum + q * p;
+      }
+      return sum;
+    }, 0);
+  }, [items]);
+
+  // Total Ordered Goods Value from order breakdown
+  const orderedTotal = useMemo(() => {
+    return items.reduce((sum, row) => {
+      const q = typeof row.orderedQty === 'number' ? row.orderedQty : parseFloat(String(row.orderedQty || '0'));
       const p = parseFloat(row.unitPrice || '0');
       if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
         return sum + q * p;
@@ -295,6 +375,7 @@ function CreatePurchaseContent() {
 
   const remainingDue = Math.max(0, invoiceTotal - effectivePaid);
   const remainingAdvance = Math.max(0, effectivePaid - invoiceTotal);
+  const isBalanced = Math.abs(invoiceTotal - effectivePaid) < 0.01;
 
   // Submit Handler
   const handleSubmit = async (e: FormEvent) => {
@@ -375,7 +456,7 @@ function CreatePurchaseContent() {
               <span>নতুন চালান ও গোডাউনে স্টক ইন</span>
             </h1>
             <p className="mt-1.5 text-sm text-slate-300 max-w-2xl">
-              কোম্পানি থেকে আগত মালের চালান এন্ট্রি করুন। পূর্বের অগ্রিম পেমেন্ট সিলেক্ট করে এক ক্লিকে অর্ডারকৃত পণ্য ও প্রাপ্ত পরিমাণ মিলিয়ে গোডাউনে স্টক ইন সম্পন্ন করুন।
+              কোম্পানির অর্ডারের চালান এন্ট্রি করুন। পূর্বের পরিশোধ সিলেক্ট করলে সকল অর্ডারকৃত পণ্য স্বয়ংক্রিয়ভাবে লোড হবে এবং প্রাপ্ত পরিমাণের সাথে মিলিয়ে গোডাউন স্টক ইন হবে।
             </p>
           </div>
 
@@ -406,9 +487,9 @@ function CreatePurchaseContent() {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* 🏢 1. Company & Advance Payment Selector Card */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm mb-4">
-              <Building2 className="h-4 w-4" />
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+            <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
+              <Building2 className="h-5 w-5" />
               <span>কোম্পানি ও পেমেন্ট সংযোগ (Company & Paid Order Selection)</span>
             </div>
 
@@ -473,70 +554,80 @@ function CreatePurchaseContent() {
 
             {/* 💳 Available Paid Payments / Advance Orders List for this Company */}
             {companyPayments.length > 0 && (
-              <div className="mt-6 pt-5 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-3">
+              <div className="pt-5 border-t border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                   <div className="flex items-center gap-2">
                     <Wallet className="h-4 w-4 text-emerald-600" />
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      এই কোম্পানির পূর্বের পরিশোধিত পেমেন্ট / অগ্রিম অর্ডারসমূহ ({companyPayments.length} টি পাওয়া গেছে)
+                      এই কোম্পানির পূর্বের পরিশোধিত পেমেন্ট / অর্ডার তালিকা ({companyPayments.length} টি পাওয়া গেছে)
                     </span>
                   </div>
-                  {selectedPaymentId && (
+                  {selectedPaymentId ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedPaymentId(null);
-                        setPaidAmountInput('0');
-                      }}
-                      className="text-xs font-bold text-rose-500 hover:underline"
+                      onClick={handleClearSelectedPayment}
+                      className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:underline flex items-center gap-1 self-start sm:self-auto"
                     >
-                      পেমেন্ট সংযোগ বাতিল করুন
+                      <RefreshCw className="h-3 w-3" />
+                      <span>পেমেন্ট সংযোগ বাতিল (সরাসরি চালান মোড)</span>
                     </button>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {companyPayments.map((pay) => {
                     const isSelected = selectedPaymentId === pay.id;
-                    const hasBreakdown =
-                      Array.isArray(pay.productBreakdown) && pay.productBreakdown.length > 0;
+                    const breakdown = parseBreakdown(pay);
+                    const hasBreakdown = breakdown.length > 0;
 
                     return (
                       <div
                         key={pay.id}
                         onClick={() => applyPaymentBreakdown(pay)}
-                        className={`cursor-pointer rounded-2xl border p-4 transition-all ${
+                        className={`group cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${
                           isSelected
-                            ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/30 shadow-md'
-                            : 'border-slate-200 bg-slate-50/60 hover:border-indigo-300 hover:bg-indigo-50/30'
+                            ? 'border-indigo-600 bg-indigo-50/90 ring-2 ring-indigo-600/30 shadow-md'
+                            : 'border-slate-200 bg-slate-50/70 hover:border-indigo-300 hover:bg-white'
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-xs font-black text-emerald-800">
+                            <span
+                              className={`rounded-lg px-2.5 py-0.5 text-xs font-black ${
+                                isSelected
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
                               পেমেন্ট #{pay.id}
                             </span>
                             <span className="text-xs font-semibold text-slate-500">
                               {pay.paymentDate ? formatDate(pay.paymentDate) : ''}
                             </span>
                           </div>
-                          <span className="text-sm font-black text-emerald-700">
+                          <span className="text-base font-black text-emerald-700">
                             {formatCurrency(pay.amount)}
                           </span>
                         </div>
 
                         <p className="mt-2 text-xs text-slate-600 line-clamp-2 font-medium">
-                          {pay.note || `Method: ${pay.paymentMethod}`}
+                          {pay.note || `মেথড: ${pay.paymentMethod}`}
                         </p>
 
                         <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
-                          <span className="text-[11px] font-bold text-indigo-600">
+                          <span className="text-[11px] font-bold text-indigo-700">
                             {hasBreakdown
-                              ? `📦 ${pay.productBreakdown.length} টি প্রোডাক্টের অর্ডার ছিল`
+                              ? `📦 ${breakdown.length} টি পণ্যের অর্ডার`
                               : '💸 সাধারণ পেমেন্ট'}
                           </span>
-                          <span className="font-bold text-emerald-600 flex items-center gap-1">
-                            {isSelected ? '✓ সিলেক্টেড' : '+ অর্ডার লোড করুন'}
+                          <span
+                            className={`font-bold flex items-center gap-1 text-xs ${
+                              isSelected
+                                ? 'text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full'
+                                : 'text-slate-600 group-hover:text-indigo-600'
+                            }`}
+                          >
+                            {isSelected ? '✓ সিলেক্টেড (মাল লোড হয়েছে)' : '+ অর্ডার লোড করুন'}
                           </span>
                         </div>
                       </div>
@@ -547,16 +638,16 @@ function CreatePurchaseContent() {
             )}
           </div>
 
-          {/* 📦 2. Reconcile Products (Order Qty vs Actually Received Qty) */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          {/* 📦 2. Reconcile Products (Order Qty vs Actually Received Qty Table) */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-100">
               <div>
-                <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
-                  <Layers className="h-4 w-4" />
+                <div className="flex items-center gap-2 text-indigo-600 font-bold text-base">
+                  <Layers className="h-5 w-5" />
                   <span>চালানের পণ্যের তালিকা ও গোডাউনে স্টক ইন (Product Reconciliation Table)</span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  অর্ডারকৃত পণ্যের সাথে বাস্তবের প্রাপ্ত পরিমাণ (Actually Received Qty) মিলিয়ে ইনপুট দিন।
+                  কোম্পানিকে অর্ডারকৃত সংখ্যার সাথে বাস্তবের প্রাপ্ত পরিমাণ (Actually Received Qty) মিলিয়ে ইনপুট দিন।
                 </p>
               </div>
 
@@ -570,12 +661,12 @@ function CreatePurchaseContent() {
               </button>
             </div>
 
-            {/* Product Table Header */}
-            <div className="hidden lg:grid grid-cols-12 gap-3 px-4 py-2.5 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">
-              <div className="col-span-4">পণ্য নির্বাচন (Product)</div>
-              <div className="col-span-2 text-center">অর্ডার ছিল (Order Qty)</div>
-              <div className="col-span-2 text-center">প্রাপ্ত পরিমাণ (Received) *</div>
-              <div className="col-span-2 text-right">ক্রয় দর (Rate ৳) *</div>
+            {/* Desktop Table Header */}
+            <div className="hidden lg:grid grid-cols-12 gap-3 px-4 py-3 rounded-2xl bg-slate-100/80 text-xs font-black uppercase tracking-wider text-slate-600">
+              <div className="col-span-4">পণ্য নির্বাচন (PRODUCT)</div>
+              <div className="col-span-2 text-center">অর্ডার ছিল (ORDER QTY)</div>
+              <div className="col-span-2 text-center">বাস্তবে প্রাপ্ত পরিমাণ (RECEIVED) *</div>
+              <div className="col-span-2 text-right">ক্রয় দর (RATE ৳) *</div>
               <div className="col-span-1 text-right">মোট টাকা (৳)</div>
               <div className="col-span-1 text-center">অ্যাকশন</div>
             </div>
@@ -585,62 +676,65 @@ function CreatePurchaseContent() {
               {items.map((row, idx) => {
                 const q = parseFloat(row.quantity || '0');
                 const p = parseFloat(row.unitPrice || '0');
-                const lineTotal = !isNaN(q) && !isNaN(p) && q > 0 && p >= 0 ? q * p : 0;
-                const ordQ = row.orderedQty !== undefined ? Number(row.orderedQty) : null;
-                const isShort = ordQ !== null && q < ordQ;
-                const isExtra = ordQ !== null && q > ordQ;
+                const lineTotal = !isNaN(q) && !isNaN(p) ? q * p : 0;
+                const ordQ =
+                  row.orderedQty !== undefined && row.orderedQty !== null && row.orderedQty !== ''
+                    ? typeof row.orderedQty === 'number'
+                      ? row.orderedQty
+                      : parseFloat(String(row.orderedQty))
+                    : null;
+
+                const isShort = ordQ !== null && !isNaN(ordQ) && q < ordQ;
+                const isExtra = ordQ !== null && !isNaN(ordQ) && q > ordQ;
+                const isExact = ordQ !== null && !isNaN(ordQ) && q === ordQ;
 
                 return (
                   <div
                     key={row.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 transition-all hover:bg-slate-50 lg:p-3"
+                    className="rounded-2xl border border-slate-200/90 bg-slate-50/40 p-4 transition-all hover:bg-white hover:border-slate-300"
                   >
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
-                      {/* Product Selector with Interactive Search Dropdown */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                      {/* Product Selector / Search */}
                       <div className="lg:col-span-4 relative">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          পণ্য নির্বাচন (Product)
+                          পণ্য নির্বাচন
                         </label>
                         <div className="relative">
-                          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                           <input
                             type="text"
-                            value={row.searchText ?? row.productName ?? ''}
+                            value={row.searchText || row.productName}
                             onChange={(e) => handleUpdateRow(idx, 'searchText', e.target.value)}
                             onFocus={() => handleUpdateRow(idx, 'showResults', true)}
                             placeholder="প্রোডাক্ট নাম বা কোড লিখুন..."
-                            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                           />
+                          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                         </div>
 
-                        {/* Search Results Dropdown */}
                         {row.showResults && (
-                          <div className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-2xl">
+                          <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
                             {companyFilteredProducts
-                              .filter((p) => {
-                                const term = (row.searchText || '').toLowerCase();
-                                if (!term) return true;
-                                return (
-                                  p.name.toLowerCase().includes(term) ||
-                                  p.sku?.toLowerCase().includes(term)
-                                );
-                              })
-                              .slice(0, 15)
+                              .filter(
+                                (p) =>
+                                  !row.searchText ||
+                                  p.name.toLowerCase().includes(row.searchText.toLowerCase()) ||
+                                  p.sku?.toLowerCase().includes(row.searchText.toLowerCase()),
+                              )
                               .map((p) => (
                                 <button
-                                  key={p.id}
                                   type="button"
+                                  key={p.id}
                                   onClick={() => handleSelectProduct(idx, p)}
-                                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-900 transition-all flex items-center justify-between"
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 border-b border-slate-100 flex items-center justify-between"
                                 >
                                   <div>
-                                    <p className="font-bold text-slate-900">{p.name}</p>
-                                    <p className="text-[10px] text-slate-500">
+                                    <p className="font-bold text-slate-800">{p.name}</p>
+                                    <p className="text-[10px] text-slate-400">
                                       কোড: {p.sku || 'N/A'} • ইউনিট: {p.unit || 'Pcs'}
                                     </p>
                                   </div>
-                                  <span className="font-mono text-xs font-bold text-emerald-600">
-                                    ৳{p.buyPrice || '0'}
+                                  <span className="font-bold text-indigo-600">
+                                    ৳{p.buyPrice?.toFixed(2) || '0.00'}
                                   </span>
                                 </button>
                               ))}
@@ -654,9 +748,9 @@ function CreatePurchaseContent() {
                           অর্ডার পরিমাণ (Order Qty)
                         </label>
                         {ordQ !== null ? (
-                          <div className="inline-flex items-center gap-1 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700">
-                            <span>{ordQ}</span>
-                            <span className="text-[11px] font-medium">{row.unit || 'টি'}</span>
+                          <div className="inline-flex items-center gap-1 rounded-xl bg-indigo-100/80 px-3 py-1.5 text-xs font-black text-indigo-800 border border-indigo-200">
+                            <span>📦 {ordQ}</span>
+                            <span className="text-[11px] font-semibold">{row.unit || 'PCS'}</span>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400 font-medium">— (সরাসরি)</span>
@@ -666,7 +760,7 @@ function CreatePurchaseContent() {
                       {/* Actually Received Quantity (Stock In Qty) */}
                       <div className="lg:col-span-2">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          প্রকৃত প্রাপ্ত পরিমাণ (Actually Received) *
+                          বাস্তবে প্রাপ্ত পরিমাণ (Received Qty) *
                         </label>
                         <div className="relative">
                           <input
@@ -675,23 +769,28 @@ function CreatePurchaseContent() {
                             min="0"
                             value={row.quantity}
                             onChange={(e) => handleUpdateRow(idx, 'quantity', e.target.value)}
-                            className={`w-full rounded-xl border px-3 py-2 text-center text-xs font-black text-slate-900 focus:outline-none focus:ring-2 ${
+                            className={`w-full rounded-xl border px-3 py-2 text-center text-xs font-black text-slate-900 focus:outline-none focus:ring-2 transition-all ${
                               isShort
-                                ? 'border-amber-400 bg-amber-50 focus:ring-amber-400/20'
+                                ? 'border-amber-400 bg-amber-50/80 focus:ring-amber-400/20'
                                 : isExtra
-                                ? 'border-indigo-400 bg-indigo-50 focus:ring-indigo-400/20'
-                                : 'border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-500/20'
+                                ? 'border-indigo-400 bg-indigo-50/80 focus:ring-indigo-400/20'
+                                : 'border-emerald-300 bg-emerald-50/30 focus:border-emerald-500 focus:ring-emerald-500/20'
                             }`}
                           />
                         </div>
+                        {isExact && (
+                          <p className="mt-1 text-[10px] font-bold text-emerald-600 text-center">
+                            ✓ সম্পূর্ণ প্রাপ্ত
+                          </p>
+                        )}
                         {isShort && (
                           <p className="mt-1 text-[10px] font-bold text-amber-600 text-center">
-                            ⚠️ {ordQ - q} টি কম এসেছে
+                            ⚠️ {ordQ! - q} টি কম এসেছে
                           </p>
                         )}
                         {isExtra && (
                           <p className="mt-1 text-[10px] font-bold text-indigo-600 text-center">
-                            ✨ {q - ordQ} টি বেশি এসেছে
+                            ✨ {q - ordQ!} টি বেশি এসেছে
                           </p>
                         )}
                       </div>
@@ -699,7 +798,7 @@ function CreatePurchaseContent() {
                       {/* Buy Rate ৳ */}
                       <div className="lg:col-span-2">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          ক্রয় দর (Rate ৳) *
+                          ক্রয় দর (Rate ৳) *
                         </label>
                         <div className="relative">
                           <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
@@ -754,16 +853,90 @@ function CreatePurchaseContent() {
 
               <div className="text-right">
                 <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mr-2">
-                  মোট মালের মূল্য:
+                  প্রাপ্ত মালের মোট মূল্য:
                 </span>
-                <span className="text-lg font-black text-indigo-900">
+                <span className="text-xl font-black text-indigo-900">
                   {formatCurrency(invoiceTotal)}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* 🚚 3. Additional Details & Financial Reconciliation Box */}
+          {/* 🌟 3. Live Financial Reconciliation & Calculation Dashboard */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+              <Sparkles className="h-4 w-4 text-indigo-600" />
+              <span>টাকা ও মাল প্রাপ্তির হিসাব সামারি (Financial Comparison & Settlement)</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Card 1: Total Paid */}
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-1">
+                <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider">
+                  ১. কোম্পানিকে দেওয়া টাকা / অর্ডারের মূল্য
+                </p>
+                <p className="text-2xl font-black text-indigo-950">
+                  {formatCurrency(effectivePaid)}
+                </p>
+                <p className="text-[11px] text-indigo-600 font-medium">
+                  {selectedPaymentId ? `পেমেন্ট #${selectedPaymentId} এর মাধ্যমে পরিশোধিত` : 'ম্যানুয়াল পরিশোধ/অগ্রিম ইনপুট'}
+                </p>
+              </div>
+
+              {/* Card 2: Total Received Goods Value */}
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-1">
+                <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
+                  ২. বাস্তবে প্রাপ্ত মালের মোট মূল্য
+                </p>
+                <p className="text-2xl font-black text-emerald-950">
+                  {formatCurrency(invoiceTotal)}
+                </p>
+                <p className="text-[11px] text-emerald-600 font-medium">
+                  প্রাপ্ত পরিমাণ × ক্রয় দর অনুযায়ী গোডাউনে স্টক ইন
+                </p>
+              </div>
+
+              {/* Card 3: Reconciliation Balance */}
+              <div
+                className={`rounded-2xl border p-4 space-y-1 ${
+                  isBalanced
+                    ? 'border-emerald-300 bg-emerald-100/70 text-emerald-900'
+                    : remainingDue > 0
+                    ? 'border-rose-300 bg-rose-100/70 text-rose-900'
+                    : 'border-sky-300 bg-sky-100/70 text-sky-900'
+                }`}
+              >
+                <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  {isBalanced ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                  ) : remainingDue > 0 ? (
+                    <AlertCircle className="h-4 w-4 text-rose-700" />
+                  ) : (
+                    <Wallet className="h-4 w-4 text-sky-700" />
+                  )}
+                  <span>৩. হিসাবের ফলাফল ও ব্যালেন্স</span>
+                </p>
+
+                <p className="text-2xl font-black">
+                  {isBalanced
+                    ? 'সম্পূর্ণ সমন্বয় (0.00)'
+                    : remainingDue > 0
+                    ? `কোম্পানি পাবে: ${formatCurrency(remainingDue)}`
+                    : `অগ্রিম রইলো: ${formatCurrency(remainingAdvance)}`}
+                </p>
+
+                <p className="text-[11px] font-semibold opacity-90">
+                  {isBalanced
+                    ? 'টাকা ও মালের হিসাব শতভাগ মিলে গেছে।'
+                    : remainingDue > 0
+                    ? 'মালের মূল্য বেশি এসেছে, অবশিষ্ট টাকা কোম্পানিকে দিতে হবে।'
+                    : 'মাল কম এসেছে, অতিরিক্ত টাকা কোম্পানির কাছে অগ্রিম জমা রইলো।'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 🚚 4. Additional Details & Final Submission */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-7 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
