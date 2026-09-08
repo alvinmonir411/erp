@@ -593,8 +593,8 @@ export function PurchasesPage() {
     <div className="space-y-6 pb-16 text-slate-800">
       {/* 🌟 Header Section */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-5 sm:p-7 md:p-8 text-white shadow-xl">
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-          <div className="space-y-1.5 max-w-2xl">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 backdrop-blur-md">
               <Building2 className="h-3.5 w-3.5" />
               <span>কোম্পানি সাপ্লাইয়ার ও পারচেজ লেজার</span>
@@ -605,19 +605,31 @@ export function PurchasesPage() {
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               কোম্পানি কোন কোন প্রোডাক্ট কত টাকার পাঠিয়েছে এবং কোম্পানিকে কত টাকা কোন পণ্যের জন্য দেওয়া হয়েছে তার পূর্ণাঙ্গ খতিয়ান ও ব্যালেন্স শিট।
             </p>
+
+            {/* Invoices & Companies Count Chips */}
+            <div className="flex items-center gap-2.5 pt-1 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold text-slate-200 backdrop-blur-md border border-white/10">
+                <FileText className="h-3.5 w-3.5 text-amber-400" />
+                <span>মোট চালান: <b className="text-white">{kpiStats.totalInvoices} টি</b></span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold text-slate-200 backdrop-blur-md border border-white/10">
+                <Building2 className="h-3.5 w-3.5 text-indigo-400" />
+                <span>মোট কোম্পানি: <b className="text-white">{kpiStats.totalCompanies} টি</b></span>
+              </span>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 shrink-0">
             <button
               onClick={() => openPaymentModal()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95"
             >
               <Wallet className="h-4 w-4" />
               <span>💸 কোম্পানিকে টাকা দিন</span>
             </button>
             <Link
               href="/purchases/create"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-95"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-95"
             >
               <Plus className="h-4 w-4" />
               <span>+ নতুন চালান / স্টক ইন</span>
@@ -626,109 +638,87 @@ export function PurchasesPage() {
         </div>
       </div>
 
-      {/* 📊 Top 5 KPI Metrics (Fully Responsive Grid) */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+      {/* 📊 Top 4 Core Financial KPI Metrics (Spacious & Clean Layout) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Goods In */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 line-clamp-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               মোট প্রাপ্ত মাল (Goods In)
             </span>
-            <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600 shrink-0">
-              <Package className="h-4 w-4 sm:h-5 sm:w-5" />
+            <div className="rounded-2xl bg-indigo-50 p-2.5 text-indigo-600 shrink-0">
+              <Package className="h-5 w-5" />
             </div>
           </div>
-          <p className="mt-2 text-base sm:text-lg md:text-xl xl:text-2xl font-black text-slate-900 truncate" title={formatCurrency(kpiStats.totalPurchases)}>
+          <p className="mt-3 text-xl sm:text-2xl md:text-2xl font-black text-slate-900">
             {formatCurrency(kpiStats.totalPurchases)}
           </p>
-          <p className="mt-1 text-[10px] sm:text-xs text-slate-400 font-medium line-clamp-1">
+          <p className="mt-1 text-xs text-slate-400 font-medium">
             সকল চালান মিলিয়ে মোট মালের মূল্য
           </p>
         </div>
 
         {/* Card 2: Total Paid */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 line-clamp-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               মোট পরিশোধিত টাকা (Total Paid)
             </span>
-            <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 shrink-0">
-              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+            <div className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-600 shrink-0">
+              <CheckCircle className="h-5 w-5" />
             </div>
           </div>
-          <p className="mt-2 text-base sm:text-lg md:text-xl xl:text-2xl font-black text-emerald-600 truncate" title={formatCurrency(kpiStats.totalPaid)}>
+          <p className="mt-3 text-xl sm:text-2xl md:text-2xl font-black text-emerald-600">
             {formatCurrency(kpiStats.totalPaid)}
           </p>
-          <p className="mt-1 text-[10px] sm:text-xs text-slate-400 font-medium line-clamp-1">
-            কোম্পানিগুলোকে মোট পরিশোধ
+          <p className="mt-1 text-xs text-slate-400 font-medium">
+            কোম্পানিগুলোকে এ পর্যন্ত মোট পরিশোধ
           </p>
         </div>
 
         {/* Card 3: Payable Due */}
-        <div className="relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/40 p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+        <div className="relative overflow-hidden rounded-3xl border border-rose-200 bg-rose-50/50 p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-rose-700 line-clamp-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
               কোম্পানির পাওনা (Payable)
             </span>
-            <div className="rounded-xl bg-rose-100 p-2 text-rose-600 shrink-0">
-              <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5" />
+            <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-600 shrink-0">
+              <TrendingDown className="h-5 w-5" />
             </div>
           </div>
-          <p className="mt-2 text-base sm:text-lg md:text-xl xl:text-2xl font-black text-rose-600 truncate" title={formatCurrency(kpiStats.totalPayable)}>
+          <p className="mt-3 text-xl sm:text-2xl md:text-2xl font-black text-rose-600">
             {formatCurrency(kpiStats.totalPayable)}
           </p>
-          <p className="mt-1 text-[10px] sm:text-xs text-rose-600/80 font-medium line-clamp-1">
+          <p className="mt-1 text-xs text-rose-600/80 font-medium">
             কোম্পানি আমাদের কাছে এখনো পাবে
           </p>
         </div>
 
         {/* Card 4: Advance Balance */}
-        <div className="relative overflow-hidden rounded-2xl border border-sky-200 bg-sky-50/50 p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
+        <div className="relative overflow-hidden rounded-3xl border border-sky-200 bg-sky-50/50 p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-sky-700 line-clamp-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-sky-700">
               আমাদের অগ্রিম জমা (Advance)
             </span>
-            <div className="rounded-xl bg-sky-100 p-2 text-sky-600 shrink-0">
-              <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
+            <div className="rounded-2xl bg-sky-100 p-2.5 text-sky-600 shrink-0">
+              <Wallet className="h-5 w-5" />
             </div>
           </div>
-          <p className="mt-2 text-base sm:text-lg md:text-xl xl:text-2xl font-black text-sky-700 truncate" title={formatCurrency(kpiStats.totalAdvance)}>
+          <p className="mt-3 text-xl sm:text-2xl md:text-2xl font-black text-sky-700">
             {formatCurrency(kpiStats.totalAdvance)}
           </p>
-          <p className="mt-1 text-[10px] sm:text-xs text-sky-700/80 font-medium line-clamp-1">
-            কোম্পানি আমাদের মাল/টাকা ফেরত দেবে
-          </p>
-        </div>
-
-        {/* Card 5: Invoices & Companies Count */}
-        <div className="col-span-2 sm:col-span-2 md:col-span-1 lg:col-span-1 relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 line-clamp-1">
-              মোট চালান ও কোম্পানি
-            </span>
-            <div className="rounded-xl bg-amber-50 p-2 text-amber-600 shrink-0">
-              <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
-            <span className="text-base sm:text-lg md:text-xl xl:text-2xl font-black text-slate-900">{kpiStats.totalInvoices}</span>
-            <span className="text-[11px] font-semibold text-slate-500">টি চালান</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-sm sm:text-base md:text-lg font-bold text-indigo-600">{kpiStats.totalCompanies}</span>
-            <span className="text-[11px] font-semibold text-slate-500">টি কোম্পানি</span>
-          </div>
-          <p className="mt-1 text-[10px] sm:text-xs text-slate-400 font-medium line-clamp-1">
-            সর্বমোট এন্ট্রি সংখ্যা
+          <p className="mt-1 text-xs text-sky-700/80 font-medium">
+            কোম্পানি আমাদের পণ্য বা টাকা ফেরত দেবে
           </p>
         </div>
       </div>
 
-      {/* 🔍 Filter Bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm">
+      {/* 🔍 Filter Bar (Aligned 3-Section Grid) */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
           {/* Search */}
           <div className="sm:col-span-2 lg:col-span-4 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
@@ -737,48 +727,46 @@ export function PurchasesPage() {
                 setCurrentPage(1);
               }}
               placeholder="সার্চ (কোম্পানি, প্রোডাক্ট, ইনভয়েস)..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
             />
           </div>
 
           {/* Company Dropdown */}
-          <div className="sm:col-span-1 lg:col-span-3 relative">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <div className="sm:col-span-1 lg:col-span-4 relative">
+            <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <select
               value={selectedCompanyId ?? ''}
               onChange={(e) => {
                 setSelectedCompanyId(e.target.value ? Number(e.target.value) : null);
                 setCurrentPage(1);
               }}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none truncate"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all truncate"
             >
-              <option value="">🏢 সকল কোম্পানি (All Companies)</option>
+              <option value="">🏢 সকল কোম্পানি</option>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.name} {c.code ? `(${c.code})` : ''}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* From Date */}
-          <div className="sm:col-span-1 lg:col-span-2 relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
-            />
-          </div>
-
-          {/* To Date & Clear */}
-          <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
+          {/* Date Range & Clear */}
+          <div className="sm:col-span-1 lg:col-span-4 flex items-center gap-2">
             <div className="relative flex-1">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => {
+                  setFromDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
+                title="শুরুর তারিখ"
+              />
+            </div>
+            <span className="text-slate-400 text-xs font-bold">হতে</span>
+            <div className="relative flex-1">
               <input
                 type="date"
                 value={toDate}
@@ -786,7 +774,8 @@ export function PurchasesPage() {
                   setToDate(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
+                title="শেষ তারিখ"
               />
             </div>
             {(selectedCompanyId || fromDate || toDate || searchTerm || companyStatusFilter !== 'all') && (
@@ -799,7 +788,7 @@ export function PurchasesPage() {
                   setCompanyStatusFilter('all');
                   setCurrentPage(1);
                 }}
-                className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
+                className="rounded-2xl border border-rose-200 bg-rose-50 p-2.5 text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
                 title="ফিল্টার ক্লিয়ার করুন"
               >
                 <FilterX className="h-4 w-4" />
