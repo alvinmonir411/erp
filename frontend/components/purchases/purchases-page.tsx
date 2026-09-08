@@ -290,7 +290,7 @@ export function PurchasesPage() {
   ]);
 
   const openPaymentModal = (companyId?: number) => {
-    const cId = companyId || selectedCompanyId || companies[0]?.id || null;
+    const cId = companyId || selectedCompanyId || null;
     setPaymentCompanyId(cId);
 
     // If company selected, auto suggest its payable due
@@ -335,9 +335,10 @@ export function PurchasesPage() {
   };
 
   const handleSelectProduct = (index: number, product: Product) => {
-    // Auto-select this product's company if available
-    if (product.companyId) {
-      setPaymentCompanyId(product.companyId);
+    // Auto-select this product's company
+    const compId = product.companyId || (product as any).company?.id;
+    if (compId) {
+      setPaymentCompanyId(Number(compId));
     }
 
     setProductPaymentRows((prev) => {
@@ -387,21 +388,28 @@ export function PurchasesPage() {
         target.showResults = true;
         if (value && typeof value === 'string') {
           const trimmed = value.trim().toLowerCase();
-          const matched = allProducts.find(
-            (p) => p.name?.toLowerCase().trim() === trimmed || p.sku?.toLowerCase().trim() === trimmed,
-          );
-          if (matched) {
-            target.productId = matched.id;
-            target.productName = matched.name;
-            target.unit = matched.unit || 'Pcs';
-            if (matched.buyPrice !== undefined && matched.buyPrice !== null && !target.unitPrice) {
-              target.unitPrice = String(toNumber(matched.buyPrice));
+          if (trimmed.length > 0) {
+            const matched = allProducts.find(
+              (p) =>
+                p.name?.toLowerCase().trim() === trimmed ||
+                p.sku?.toLowerCase().trim() === trimmed ||
+                p.name?.toLowerCase().trim().startsWith(trimmed) ||
+                (trimmed.length >= 3 && p.name?.toLowerCase().includes(trimmed)),
+            );
+            if (matched) {
+              target.productId = matched.id;
+              target.productName = matched.name;
+              target.unit = matched.unit || 'Pcs';
+              if (matched.buyPrice !== undefined && matched.buyPrice !== null) {
+                target.unitPrice = String(toNumber(matched.buyPrice));
+              }
+              const compId = matched.companyId || (matched as any).company?.id;
+              if (compId) {
+                setPaymentCompanyId(Number(compId));
+              }
+              const calc = calculateRowAmount(target.unitPrice, target.quantity);
+              if (calc) target.amount = calc;
             }
-            if (matched.companyId && !paymentCompanyId) {
-              setPaymentCompanyId(matched.companyId);
-            }
-            const calc = calculateRowAmount(target.unitPrice, target.quantity);
-            if (calc) target.amount = calc;
           }
         }
       } else if (field === 'unitPrice') {
@@ -1334,8 +1342,8 @@ export function PurchasesPage() {
 
       {/* 💳 RECORD PAYMENT MODAL */}
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="relative w-full max-w-2xl my-8 rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
+          <div className="relative w-full max-w-4xl lg:max-w-5xl my-4 sm:my-6 rounded-3xl bg-white p-5 sm:p-7 shadow-2xl border border-slate-100 max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
@@ -1385,21 +1393,29 @@ export function PurchasesPage() {
                     );
                   })}
                 </select>
-                {selectedCompanySummary && (
-                  <div className="mt-1.5 flex items-center gap-3 text-xs font-semibold">
-                    {toNumber(selectedCompanySummary.totalPayableAmount ?? selectedCompanySummary.totalPayable) > 0 ? (
-                      <span className="text-rose-600">
-                        ⚠️ বর্তমান বকেয়া পাওনা: {formatCurrency(toNumber(selectedCompanySummary.totalPayableAmount ?? selectedCompanySummary.totalPayable))}
-                      </span>
-                    ) : toNumber(selectedCompanySummary.advanceAmount ?? selectedCompanySummary.advanceBalance) > 0 ? (
-                      <span className="text-sky-700 font-bold">
-                        💎 আমাদের অগ্রিম জমা: {formatCurrency(toNumber(selectedCompanySummary.advanceAmount ?? selectedCompanySummary.advanceBalance))}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-600">✅ কোনো বাকি বা অগ্রিম নেই</span>
-                    )}
-                  </div>
-                )}
+                {(() => {
+                  const compSummary = payableSummary.find((s) => s.companyId === paymentCompanyId);
+                  if (!compSummary) return null;
+                  const due = toNumber(compSummary.totalPayableAmount ?? compSummary.totalPayable);
+                  const adv = toNumber(compSummary.advanceAmount ?? compSummary.advanceBalance);
+                  return (
+                    <div className="mt-2 flex items-center gap-3 text-xs font-semibold">
+                      {due > 0 ? (
+                        <span className="text-rose-600 font-bold bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100">
+                          ⚠️ বর্তমান বকেয়া পাওনা: {formatCurrency(due)}
+                        </span>
+                      ) : adv > 0 ? (
+                        <span className="text-sky-700 font-bold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
+                          💎 আমাদের অগ্রিম জমা: {formatCurrency(adv)}
+                        </span>
+                      ) : (
+                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                          ✅ কোনো বাকি বা অগ্রিম নেই
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* 📦 MULTI-PRODUCT ALLOCATION (PERMANENTLY OPEN & DIRECT) */}

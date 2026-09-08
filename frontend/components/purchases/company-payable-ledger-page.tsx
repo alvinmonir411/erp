@@ -194,18 +194,25 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
         target.showResults = true;
         if (value && typeof value === 'string') {
           const trimmed = value.trim().toLowerCase();
-          const matched = allProducts.find(
-            (p) => p.name?.toLowerCase().trim() === trimmed || p.sku?.toLowerCase().trim() === trimmed,
-          );
-          if (matched) {
-            target.productId = matched.id;
-            target.productName = matched.name;
-            target.unit = matched.unit || 'Pcs';
-            if (matched.buyPrice !== undefined && matched.buyPrice !== null && !target.unitPrice) {
-              target.unitPrice = String(toNumber(matched.buyPrice));
+          if (trimmed.length > 0) {
+            const matched = allProducts.find(
+              (p) =>
+                (p.companyId ? p.companyId === companyId : true) &&
+                (p.name?.toLowerCase().trim() === trimmed ||
+                  p.sku?.toLowerCase().trim() === trimmed ||
+                  p.name?.toLowerCase().trim().startsWith(trimmed) ||
+                  (trimmed.length >= 3 && p.name?.toLowerCase().includes(trimmed))),
+            );
+            if (matched) {
+              target.productId = matched.id;
+              target.productName = matched.name;
+              target.unit = matched.unit || 'Pcs';
+              if (matched.buyPrice !== undefined && matched.buyPrice !== null) {
+                target.unitPrice = String(toNumber(matched.buyPrice));
+              }
+              const calc = calculateRowAmount(target.unitPrice, target.quantity);
+              if (calc) target.amount = calc;
             }
-            const calc = calculateRowAmount(target.unitPrice, target.quantity);
-            if (calc) target.amount = calc;
           }
         }
       } else if (field === 'unitPrice') {
@@ -821,8 +828,8 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
 
       {/* 💳 RECORD PAYMENT MODAL */}
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="relative w-full max-w-2xl my-8 rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
+          <div className="relative w-full max-w-4xl lg:max-w-5xl my-4 sm:my-6 rounded-3xl bg-white p-5 sm:p-7 shadow-2xl border border-slate-100 max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
