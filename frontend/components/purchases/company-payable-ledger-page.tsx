@@ -117,8 +117,10 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     setPaymentMethod('CASH');
     setTransactionRef('');
     setPaymentNote(purchaseId ? `Invoice #${purchaseId} settlement` : '');
-    setIsProductBreakdownMode(false);
-    setProductPaymentRows([]);
+    setIsProductBreakdownMode(true);
+    setProductPaymentRows([
+      { productId: '', quantity: '', amount: '', note: '' }
+    ]);
     setIsPaymentModalOpen(true);
   };
 

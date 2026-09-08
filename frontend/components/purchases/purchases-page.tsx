@@ -302,8 +302,10 @@ export function PurchasesPage() {
     setPaymentMethod('CASH');
     setTransactionRef('');
     setPaymentNote('');
-    setIsProductBreakdownMode(false);
-    setProductPaymentRows([]);
+    setIsProductBreakdownMode(true);
+    setProductPaymentRows([
+      { productId: '', quantity: '', amount: '', note: '' }
+    ]);
     setIsPaymentModalOpen(true);
   };
 
