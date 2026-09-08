@@ -7,7 +7,12 @@ export class SchemaSyncService implements OnApplicationBootstrap {
 
   constructor(private readonly dataSource: DataSource) {}
 
-  async onApplicationBootstrap() {
+  onApplicationBootstrap() {
+    // Run asynchronously in the background so serverless cold start is instantaneous (< 300ms)
+    void this.runSyncSafely();
+  }
+
+  private async runSyncSafely() {
     if (!this.dataSource || !this.dataSource.isInitialized) {
       this.logger.warn('DataSource not initialized yet. Skipping schema sync.');
       return;
