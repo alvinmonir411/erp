@@ -1170,11 +1170,31 @@ export function PurchasesPage() {
                                 <div className="text-[11px] text-slate-500">Branch: {pay.branchName}</div>
                               )}
                             </td>
-                            <td className="py-3.5 px-4 text-center">
-                              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
-                                <Package className="h-3 w-3" />
-                                <span>{breakdown.length > 0 ? `${breakdown.length} Products` : 'General Draft'}</span>
-                              </span>
+                            <td className="py-3.5 px-4 text-left">
+                              {breakdown.length > 0 ? (
+                                <div className="space-y-1 max-w-sm">
+                                  {breakdown.map((b: any, bIdx: number) => (
+                                    <div
+                                      key={bIdx}
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 border border-indigo-100 px-2 py-1 text-xs text-indigo-900 font-semibold mr-1 mb-1 shadow-sm"
+                                    >
+                                      <span className="font-bold text-slate-900">{b.productName}</span>
+                                      <span className="rounded bg-indigo-200/80 px-1.5 py-0.5 text-[10px] font-black text-indigo-950">
+                                        × {b.quantity} {b.unit || 'Pcs'}
+                                      </span>
+                                      {b.unitPrice ? (
+                                        <span className="text-[10px] text-emerald-700 font-bold">
+                                          (৳{b.unitPrice})
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                                  <span>💸 General Advance Payment</span>
+                                </span>
+                              )}
                             </td>
                             <td className="py-3.5 px-4 text-right font-black text-emerald-600 text-sm whitespace-nowrap">
                               {formatCurrency(pay.amount)}
@@ -1562,20 +1582,36 @@ export function PurchasesPage() {
 
               {/* SECTION C — PRE-ORDER PRODUCTS */}
               <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
-                    <Package className="h-4 w-4 text-indigo-600" />
-                    <span>SECTION C: 📦 Pre-Order Products</span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
+                      <Package className="h-4 w-4 text-indigo-600" />
+                      <span>SECTION C: 📦 Pre-Order Products & Quantities</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Specify ordered products, exact quantities, and unit purchase prices for this draft.
+                    </p>
                   </div>
 
                   <button
                     type="button"
                     onClick={handleAddPreOrderRow}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-md transition-all hover:scale-105 active:scale-95"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-md transition-all hover:scale-105 active:scale-95 self-start sm:self-auto"
                   >
                     <Plus className="h-4 w-4" />
                     <span>+ Add Product</span>
                   </button>
+                </div>
+
+                {/* Table Header with Clear Column Titles */}
+                <div className="hidden sm:grid grid-cols-12 gap-2.5 px-3 py-2 rounded-xl bg-slate-200/80 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                  <div className="col-span-4">Product Name & Search</div>
+                  <div className="col-span-2 text-center">SKU / Code</div>
+                  <div className="col-span-2 text-center bg-indigo-100/80 text-indigo-900 rounded py-0.5">
+                    Order Qty
+                  </div>
+                  <div className="col-span-2 text-right">Buy Price (৳)</div>
+                  <div className="col-span-2 text-right">Line Total (৳)</div>
                 </div>
 
                 {/* Pre-Order Product Table */}
@@ -1583,18 +1619,24 @@ export function PurchasesPage() {
                   {preOrderItems.map((row, idx) => (
                     <div
                       key={idx}
-                      className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm items-center"
+                      className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm items-center hover:border-slate-300 transition-all"
                     >
                       {/* Product Search & Dropdown */}
                       <div className="relative sm:col-span-4">
-                        <input
-                          type="text"
-                          placeholder="Select product or type name..."
-                          value={row.searchText !== undefined ? row.searchText : row.productName}
-                          onFocus={() => handleUpdatePreOrderRow(idx, 'showResults', true)}
-                          onChange={(e) => handleUpdatePreOrderRow(idx, 'searchText', e.target.value)}
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                        />
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden mb-1">
+                          Product Name
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Select product or search..."
+                            value={row.searchText !== undefined ? row.searchText : row.productName}
+                            onFocus={() => handleUpdatePreOrderRow(idx, 'showResults', true)}
+                            onChange={(e) => handleUpdatePreOrderRow(idx, 'searchText', e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                          />
+                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                        </div>
 
                         {row.showResults && (
                           <div className="absolute left-0 top-full z-50 mt-1 max-h-52 w-full min-w-[260px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl">
@@ -1626,52 +1668,66 @@ export function PurchasesPage() {
 
                       {/* SKU (Readonly display) */}
                       <div className="sm:col-span-2">
-                        <input
-                          type="text"
-                          readOnly
-                          value={row.sku || '-'}
-                          placeholder="SKU"
-                          className="w-full rounded-xl border border-slate-100 bg-slate-100/60 p-2 text-xs font-mono text-slate-600 text-center"
-                        />
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden mb-1">
+                          SKU / Code
+                        </label>
+                        <div className="flex items-center justify-center rounded-xl bg-slate-100 border border-slate-200 px-2 py-2 text-xs font-mono font-bold text-slate-700">
+                          <span>{row.sku ? `SKU: ${row.sku}` : 'SKU: —'}</span>
+                        </div>
                       </div>
 
                       {/* Order Quantity */}
                       <div className="sm:col-span-2">
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          value={row.quantity}
-                          onChange={(e) => handleUpdatePreOrderRow(idx, 'quantity', e.target.value)}
-                          placeholder="Quantity"
-                          title="Order Quantity"
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-800 text-center focus:border-indigo-500 focus:bg-white focus:outline-none"
-                        />
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden mb-1">
+                          Order Qty (Pcs)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            value={row.quantity}
+                            onChange={(e) => handleUpdatePreOrderRow(idx, 'quantity', e.target.value)}
+                            placeholder="Qty"
+                            title="Order Quantity"
+                            className="w-full rounded-xl border border-indigo-300 bg-indigo-50/50 py-2 px-3 text-xs font-black text-indigo-950 text-center focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                          />
+                        </div>
                       </div>
 
                       {/* Buy Rate */}
                       <div className="sm:col-span-2">
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          value={row.unitPrice}
-                          onChange={(e) => handleUpdatePreOrderRow(idx, 'unitPrice', e.target.value)}
-                          placeholder="Buy Price (৳)"
-                          className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-800 text-right focus:border-indigo-500 focus:bg-white focus:outline-none"
-                        />
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden mb-1">
+                          Buy Price (৳)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            value={row.unitPrice}
+                            onChange={(e) => handleUpdatePreOrderRow(idx, 'unitPrice', e.target.value)}
+                            placeholder="0.00"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-2.5 text-xs font-bold text-slate-800 text-right focus:border-indigo-500 focus:bg-white focus:outline-none"
+                          />
+                        </div>
                       </div>
 
                       {/* Line Total & Remove */}
                       <div className="sm:col-span-2 flex items-center justify-between gap-2">
-                        <span className="font-black text-emerald-800 text-xs truncate">
-                          {formatCurrency(parseFloat(row.amount) || 0)}
-                        </span>
+                        <div className="text-right flex-1 min-w-0">
+                          <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden">
+                            Total
+                          </label>
+                          <span className="font-black text-emerald-700 text-xs truncate block">
+                            {formatCurrency(parseFloat(row.amount) || 0)}
+                          </span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => handleRemovePreOrderRow(idx)}
                           className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors shrink-0"
-                          title="Remove Row"
+                          title="Remove Product"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

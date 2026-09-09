@@ -812,8 +812,36 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                       <td className="px-5 py-3.5 text-slate-600 text-xs font-mono">
                         {pay.transactionRef || '-'}
                       </td>
-                      <td className="px-5 py-3.5 text-slate-700 text-xs max-w-xs">
-                        {pay.note || '-'}
+                      <td className="px-5 py-3.5 text-slate-700 text-xs max-w-sm">
+                        {(() => {
+                          const breakdown = Array.isArray(pay.productBreakdown)
+                            ? pay.productBreakdown
+                            : typeof pay.productBreakdown === 'string'
+                            ? JSON.parse(pay.productBreakdown || '[]')
+                            : [];
+
+                          return (
+                            <div className="space-y-1">
+                              {breakdown.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-1">
+                                  {breakdown.map((b: any, bIdx: number) => (
+                                    <span
+                                      key={bIdx}
+                                      className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 text-[11px] font-bold text-indigo-900"
+                                    >
+                                      <span>{b.productName}</span>
+                                      <span className="rounded bg-indigo-200/80 px-1 text-[10px] font-black text-indigo-950">
+                                        × {b.quantity} {b.unit || 'Pcs'}
+                                      </span>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {pay.note && <div className="text-slate-500">{pay.note}</div>}
+                              {!pay.note && breakdown.length === 0 && <span className="text-slate-400">-</span>}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">

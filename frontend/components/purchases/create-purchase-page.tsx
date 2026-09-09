@@ -121,115 +121,32 @@ function CreatePurchaseContent() {
     tone: toastTone,
   });
 
-  // Load initial data (companies and products)
-  useEffect(() => {
-    async function init() {
-      try {
-        setIsLoading(true);
-        const [compList, prodList] = await Promise.all([
-          getCompanies().catch(() => []),
-          getProducts().catch(() => []),
-        ]);
-        setCompanies(compList);
-        const prods = Array.isArray(prodList) ? prodList : (prodList as any)?.data || [];
-        setAllProducts(prods);
-
-        if (!companyId && compList.length > 0) {
-          setCompanyId(String(compList[0].id));
-        }
-      } catch (err: any) {
-        setToastTone('error');
-        setToastMessage(err.message || 'Failed to load form data');
-      } finally {
-        setIsLoading(false);
-      }
+  // Helper to auto-populate company catalog products
+  const autoPopulateCompanyProducts = (cid: number, productList = allProducts) => {
+    const compProds = productList.filter((p) => p.companyId === cid);
+    if (compProds.length > 0) {
+      const newRows: PurchaseRowItem[] = compProds.map((p, idx) => ({
+        id: 'row-comp-' + p.id + '-' + idx,
+        productId: p.id,
+        productName: p.name,
+        sku: p.sku || '',
+        orderedQty: null,
+        quantity: '',
+        unitPrice: String(p.buyPrice || '0'),
+        unit: p.unit || 'Pcs',
+        note: '',
+        searchText: p.name,
+        showResults: false,
+      }));
+      setItems(newRows);
+    } else {
+      setItems([initialRow()]);
     }
-    void init();
-  }, []);
-
-  // Fetch company payments whenever selected company changes
-  useEffect(() => {
-    if (!companyId) {
-      setCompanyPayments([]);
-      return;
-    }
-    async function loadPayments() {
-      try {
-        const pays = await getCompanyPayments({ companyId: Number(companyId) });
-        const list = Array.isArray(pays) ? pays : [];
-        setCompanyPayments(list);
-
-        // Auto-select if requested in URL, OR if there is an active advance payment/order
-        if (initialPaymentIdParam) {
-          const match = list.find((p) => p.id === Number(initialPaymentIdParam));
-          if (match) {
-            applyPaymentBreakdown(match, allProducts);
-            return;
-          }
-        }
-
-        // If user already had a selected payment
-        if (selectedPaymentId) {
-          const match = list.find((p) => p.id === selectedPaymentId);
-          if (match) {
-            applyPaymentBreakdown(match, allProducts);
-            return;
-          }
-        }
-
-        // If exactly 1 payment/order exists for this company, auto-select it for convenience!
-        if (list.length === 1) {
-          applyPaymentBreakdown(list[0], allProducts);
-          return;
-        }
-
-        // If no payments, auto-populate the company's catalog products
-        if (list.length === 0 && allProducts.length > 0) {
-          const compProds = allProducts.filter((p) => p.companyId === Number(companyId));
-          if (compProds.length > 0) {
-            const newRows: PurchaseRowItem[] = compProds.map((p, idx) => ({
-              id: 'row-comp-' + p.id + '-' + idx,
-              productId: p.id,
-              productName: p.name,
-              sku: p.sku || '',
-              orderedQty: null,
-              quantity: '',
-              unitPrice: String(p.buyPrice || '0'),
-              unit: p.unit || 'Pcs',
-              note: '',
-              searchText: p.name,
-              showResults: false,
-            }));
-            setItems(newRows);
-          }
-        }
-      } catch {
-        setCompanyPayments([]);
-      }
-    }
-    void loadPayments();
-  }, [companyId, allProducts.length]);
-
-  const selectedCompany = useMemo(
-    () => companies.find((c) => String(c.id) === companyId),
-    [companies, companyId],
-  );
-
-  const selectedPayment = useMemo(
-    () => companyPayments.find((p) => p.id === selectedPaymentId),
-    [companyPayments, selectedPaymentId],
-  );
-
-  // Filter products for the selected company if assigned
-  const companyFilteredProducts = useMemo(() => {
-    if (!companyId) return allProducts;
-    const cid = Number(companyId);
-    const matched = allProducts.filter((p) => p.companyId === cid);
-    return matched.length > 0 ? matched : allProducts;
-  }, [allProducts, companyId]);
+  };
 
   // Safely parse breakdown from array, JSON string, purchase items, or structured note
   const parseBreakdown = (payment: PurchasePayment): any[] => {
+    if (!payment) return [];
     if (Array.isArray(payment.productBreakdown) && payment.productBreakdown.length > 0) {
       return payment.productBreakdown;
     }
@@ -246,6 +163,7 @@ function CreatePurchaseContent() {
       return (payment as any).items.map((it: any) => ({
         productId: it.productId,
         productName: it.productName || it.product?.name,
+        sku: it.sku || it.product?.sku,
         quantity: it.quantity,
         unitPrice: it.unitCost,
         unit: it.unit || it.product?.unit || 'Pcs',
@@ -256,6 +174,7 @@ function CreatePurchaseContent() {
       return (payment.purchase as any).items.map((it: any) => ({
         productId: it.productId,
         productName: it.productName || it.product?.name,
+        sku: it.sku || it.product?.sku,
         quantity: it.quantity,
         unitPrice: it.unitCost,
         unit: it.unit || it.product?.unit || 'Pcs',
@@ -263,7 +182,7 @@ function CreatePurchaseContent() {
       }));
     }
 
-    // Check if note contains structured items e.g. [পণ্যসমূহ: ...] or [Products: ...]
+    // Check if note contains structured items e.g. [Products: ...] or [পণ্যসমূহ: ...]
     if (payment.note) {
       const match = payment.note.match(/\[(?:Products|পণ্যসমূহ):\s*(.+?)\]/i) || payment.note.match(/(?:পণ্য বাবদ পরিশোধ|Product payment):\s*(.+)$/i);
       if (match && match[1]) {
@@ -291,7 +210,11 @@ function CreatePurchaseContent() {
   };
 
   // Auto populate rows when a payment / order is selected
-  const applyPaymentBreakdown = (payment: PurchasePayment, productList = allProducts) => {
+  const applyPaymentBreakdown = (
+    payment: PurchasePayment,
+    productList = allProducts,
+    currentCid = companyId,
+  ) => {
     setSelectedPaymentId(payment.id);
     setPaidAmountInput(String(payment.amount));
 
@@ -301,7 +224,7 @@ function CreatePurchaseContent() {
 
     let breakdownList = parseBreakdown(payment);
 
-    // Fallback: If breakdownList is empty, but payment has note with product info
+    // Fallback: If breakdownList is empty, check if payment note has product names
     if (breakdownList.length === 0 && payment.note && productList.length > 0) {
       const matched = productList.filter((p) =>
         payment.note!.toLowerCase().includes(p.name.toLowerCase()),
@@ -355,33 +278,117 @@ function CreatePurchaseContent() {
     }
 
     // If general payment without breakdown, auto-populate all catalog products for this company!
-    const cid = payment.companyId || Number(companyId);
-    const compProds = productList.filter((p) => p.companyId === cid);
-    if (compProds.length > 0) {
-      const newRows: PurchaseRowItem[] = compProds.map((p, idx) => ({
-        id: 'row-comp-' + p.id + '-' + idx,
-        productId: p.id,
-        productName: p.name,
-        sku: p.sku || '',
-        orderedQty: null,
-        quantity: '',
-        unitPrice: String(p.buyPrice || '0'),
-        unit: p.unit || 'Pcs',
-        note: '',
-        searchText: p.name,
-        showResults: false,
-      }));
-      setItems(newRows);
-      setToastTone('success');
-      setToastMessage(`Loaded ${newRows.length} products for ${payment.company?.name || 'company'}!`);
-      return;
+    const cid = payment.companyId || Number(currentCid);
+    autoPopulateCompanyProducts(cid, productList);
+    setToastTone('success');
+    setToastMessage(`Draft #${payment.id} (৳${payment.amount}) loaded for ${payment.company?.name || 'company'}!`);
+  };
+
+  // Coordinated Initial Load (companies, products, and payments)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function init() {
+      try {
+        setIsLoading(true);
+        const [compList, prodList] = await Promise.all([
+          getCompanies().catch(() => []),
+          getProducts().catch(() => []),
+        ]);
+
+        if (!isMounted) return;
+
+        const companiesArray = Array.isArray(compList) ? compList : [];
+        const productsArray = Array.isArray(prodList) ? prodList : (prodList as any)?.data || [];
+
+        setCompanies(companiesArray);
+        setAllProducts(productsArray);
+
+        let targetCompanyId = initialCompanyIdParam || '';
+        const targetPaymentId = initialPaymentIdParam ? Number(initialPaymentIdParam) : null;
+
+        let initialPayment: PurchasePayment | null = null;
+        let loadedPayments: PurchasePayment[] = [];
+
+        // 1. If we have a paymentId in URL, fetch payment directly or via payments list
+        if (targetPaymentId) {
+          const payRes = await getCompanyPayments({ paymentId: targetPaymentId }).catch(() => []);
+          const payList = Array.isArray(payRes) ? payRes : [];
+          const found = payList.find((p) => p.id === targetPaymentId);
+          if (found) {
+            initialPayment = found;
+            if (!targetCompanyId && found.companyId) {
+              targetCompanyId = String(found.companyId);
+            }
+          }
+        }
+
+        // 2. Determine target company if still not set
+        if (!targetCompanyId && companiesArray.length > 0) {
+          targetCompanyId = String(companiesArray[0].id);
+        }
+
+        // 3. Load payments for that company
+        if (targetCompanyId) {
+          setCompanyId(targetCompanyId);
+          const pays = await getCompanyPayments({ companyId: Number(targetCompanyId) }).catch(() => []);
+          loadedPayments = Array.isArray(pays) ? pays : [];
+          setCompanyPayments(loadedPayments);
+
+          if (targetPaymentId && !initialPayment) {
+            const match = loadedPayments.find((p) => p.id === targetPaymentId);
+            if (match) initialPayment = match;
+          }
+        }
+
+        if (!isMounted) return;
+
+        // 4. Populate rows
+        if (initialPayment) {
+          applyPaymentBreakdown(initialPayment, productsArray, targetCompanyId);
+        } else if (targetCompanyId) {
+          // If exactly 1 payment exists and has item breakdown, auto-load it
+          const firstWithItems = loadedPayments.find((p) => parseBreakdown(p).length > 0);
+          if (firstWithItems && loadedPayments.length === 1) {
+            applyPaymentBreakdown(firstWithItems, productsArray, targetCompanyId);
+          } else {
+            autoPopulateCompanyProducts(Number(targetCompanyId), productsArray);
+          }
+        }
+      } catch (err: any) {
+        setToastTone('error');
+        setToastMessage(err.message || 'Failed to initialize form data');
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
     }
 
-    // If no catalog products found, provide a fresh clean row
-    setItems([initialRow()]);
-    setToastTone('success');
-    setToastMessage(`Payment #${payment.id} (৳${payment.amount}) linked with invoice!`);
-  };
+    void init();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const selectedCompany = useMemo(
+    () => companies.find((c) => String(c.id) === companyId),
+    [companies, companyId],
+  );
+
+  const selectedPayment = useMemo(
+    () => companyPayments.find((p) => p.id === selectedPaymentId),
+    [companyPayments, selectedPaymentId],
+  );
+
+  // Filter products for the selected company if assigned
+  const companyFilteredProducts = useMemo(() => {
+    if (!companyId) return allProducts;
+    const cid = Number(companyId);
+    const matched = allProducts.filter((p) => p.companyId === cid);
+    return matched.length > 0 ? matched : allProducts;
+  }, [allProducts, companyId]);
 
   // Load all products for current company
   const handleLoadAllCompanyProducts = () => {
@@ -408,6 +415,9 @@ function CreatePurchaseContent() {
   const handleClearSelectedPayment = () => {
     setSelectedPaymentId(null);
     setPaidAmountInput('0');
+    if (companyId) {
+      autoPopulateCompanyProducts(Number(companyId), allProducts);
+    }
     setToastTone('success');
     setToastMessage('Payment unlinked. Manual invoice entry mode active.');
   };
@@ -694,10 +704,30 @@ function CreatePurchaseContent() {
                 <select
                   value={companyId}
                   onChange={(e) => {
-                    setCompanyId(e.target.value);
+                    const newId = e.target.value;
+                    setCompanyId(newId);
                     setSelectedPaymentId(null);
                     setPaidAmountInput('');
-                    setItems([initialRow()]);
+                    if (!newId) {
+                      setCompanyPayments([]);
+                      setItems([initialRow()]);
+                      return;
+                    }
+                    getCompanyPayments({ companyId: Number(newId) })
+                      .then((pays) => {
+                        const list = Array.isArray(pays) ? pays : [];
+                        setCompanyPayments(list);
+                        const draftWithItems = list.find((p) => parseBreakdown(p).length > 0);
+                        if (draftWithItems && list.length === 1) {
+                          applyPaymentBreakdown(draftWithItems, allProducts, newId);
+                        } else {
+                          autoPopulateCompanyProducts(Number(newId), allProducts);
+                        }
+                      })
+                      .catch(() => {
+                        setCompanyPayments([]);
+                        autoPopulateCompanyProducts(Number(newId), allProducts);
+                      });
                   }}
                   required
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"

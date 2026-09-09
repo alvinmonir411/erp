@@ -269,6 +269,8 @@ export type DeliveryPerson = {
 };
 
 export type PurchaseQuery = {
+  id?: number;
+  paymentId?: number;
   companyId?: number;
   fromDate?: string;
   toDate?: string;

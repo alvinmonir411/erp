@@ -815,6 +815,10 @@ export class PurchasesService {
       .orderBy('pay.paymentDate', 'DESC')
       .addOrderBy('pay.createdAt', 'DESC');
 
+    if (query.paymentId || query.id) {
+      qb.andWhere('pay.id = :payId', { payId: Number(query.paymentId || query.id) });
+    }
+
     if (query.companyId) {
       qb.andWhere('pay.companyId = :companyId', { companyId: Number(query.companyId) });
     }
