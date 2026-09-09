@@ -1133,7 +1133,7 @@ export function PurchasesPage() {
                         <th className="py-3.5 px-4 text-left">Company / Supplier</th>
                         <th className="py-3.5 px-4 text-left">Payment / Ref No</th>
                         <th className="py-3.5 px-4 text-left">Method / Bank</th>
-                        <th className="py-3.5 px-4 text-left">Pre-Ordered Products (Total & Items)</th>
+                        <th className="py-3.5 px-4 text-center">Pre-Ordered Products</th>
                         <th className="py-3.5 px-4 text-right">Advance Paid (৳)</th>
                         <th className="py-3.5 px-4 text-center">Actions</th>
                       </tr>
@@ -1184,35 +1184,15 @@ export function PurchasesPage() {
                                 <div className="text-[11px] text-slate-500">Branch: {pay.branchName}</div>
                               )}
                             </td>
-                            <td className="py-3.5 px-4 text-left">
+                            <td className="py-3.5 px-4 text-center">
                               {breakdown.length > 0 ? (
-                                <div className="space-y-1.5 max-w-md">
-                                  <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100/90 text-indigo-950 font-black text-[11px] px-2.5 py-0.5 border border-indigo-200">
-                                    <Package className="h-3.5 w-3.5 text-indigo-600" />
-                                    <span>{breakdown.length} Products • Total {totalUnits} Pcs</span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {breakdown.map((b: any, bIdx: number) => (
-                                      <span
-                                        key={bIdx}
-                                        className="inline-flex items-center gap-1 rounded-lg bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] text-slate-800 font-semibold"
-                                      >
-                                        <span className="font-bold">{b.productName}</span>
-                                        <span className="rounded bg-indigo-200/80 px-1 text-[10px] font-black text-indigo-900">
-                                          × {b.quantity} {b.unit || 'Pcs'}
-                                        </span>
-                                        {b.unitPrice ? (
-                                          <span className="text-[10px] text-emerald-700 font-bold">
-                                            (@৳{b.unitPrice})
-                                          </span>
-                                        ) : null}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold text-xs px-3 py-1 shadow-sm">
+                                  <Package className="h-3.5 w-3.5 text-indigo-600" />
+                                  <span>{breakdown.length} Products • Total {totalUnits} Pcs</span>
+                                </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1 text-xs font-bold">
-                                  <span>💸 Advance Payment • Open Catalog</span>
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold text-xs px-3 py-1">
+                                  <span>💸 Advance Payment</span>
                                 </span>
                               )}
                             </td>

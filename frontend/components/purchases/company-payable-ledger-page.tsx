@@ -820,24 +820,20 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                             ? JSON.parse(pay.productBreakdown || '[]')
                             : [];
 
+                          const totalUnits = breakdown.reduce(
+                            (sum: number, it: any) => sum + (Number(it.quantity) || 0),
+                            0,
+                          );
+
                           return (
                             <div className="space-y-1">
                               {breakdown.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mb-1">
-                                  {breakdown.map((b: any, bIdx: number) => (
-                                    <span
-                                      key={bIdx}
-                                      className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 text-[11px] font-bold text-indigo-900"
-                                    >
-                                      <span>{b.productName}</span>
-                                      <span className="rounded bg-indigo-200/80 px-1 text-[10px] font-black text-indigo-950">
-                                        × {b.quantity} {b.unit || 'Pcs'}
-                                      </span>
-                                    </span>
-                                  ))}
-                                </div>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-900">
+                                  <Package className="h-3 w-3 text-indigo-600" />
+                                  <span>{breakdown.length} Products • {totalUnits} Pcs</span>
+                                </span>
                               )}
-                              {pay.note && <div className="text-slate-500">{pay.note}</div>}
+                              {pay.note && <div className="text-slate-500 text-[11px]">{pay.note}</div>}
                               {!pay.note && breakdown.length === 0 && <span className="text-slate-400">-</span>}
                             </div>
                           );
