@@ -140,6 +140,7 @@ export function PurchasesPage() {
   // Post-Save Success Dialog State
   const [savedDraftResult, setSavedDraftResult] = useState<{
     id: number;
+    companyId?: number;
     draftNo: string;
     supplierName: string;
     amount: number;
@@ -478,6 +479,7 @@ export function PurchasesPage() {
 
       setSavedDraftResult({
         id: res.id,
+        companyId: selectedSupplier.id,
         draftNo: draftRefNo.trim() || `BD-${res.id}`,
         supplierName: selectedSupplier.name,
         amount: amt,
@@ -1776,9 +1778,13 @@ export function PurchasesPage() {
 
             <div className="flex flex-col gap-2.5 pt-2">
               <Link
-                href="/purchases/create"
+                href={
+                  savedDraftResult
+                    ? `/purchases/create?paymentId=${savedDraftResult.id}&companyId=${savedDraftResult.companyId || ''}`
+                    : '/purchases/create'
+                }
                 onClick={() => setSavedDraftResult(null)}
-                className="w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-3 text-xs sm:text-sm font-black text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02]"
+                className="w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-3 text-xs sm:text-sm font-black text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] text-center"
               >
                 📦 Receive Challan Now
               </Link>

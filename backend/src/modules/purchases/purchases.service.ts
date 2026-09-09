@@ -810,6 +810,8 @@ export class PurchasesService {
       .createQueryBuilder('pay')
       .leftJoinAndSelect('pay.company', 'company')
       .leftJoinAndSelect('pay.purchase', 'purchase')
+      .leftJoinAndSelect('purchase.items', 'items')
+      .leftJoinAndSelect('items.product', 'itemsProduct')
       .orderBy('pay.paymentDate', 'DESC')
       .addOrderBy('pay.createdAt', 'DESC');
 

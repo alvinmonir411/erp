@@ -206,17 +206,63 @@ function CreatePurchaseContent() {
     return matched.length > 0 ? matched : allProducts;
   }, [allProducts, companyId]);
 
-  // Safely parse breakdown from array or JSON string
+  // Safely parse breakdown from array, JSON string, purchase items, or structured note
   const parseBreakdown = (payment: PurchasePayment): any[] => {
-    if (Array.isArray(payment.productBreakdown)) {
+    if (Array.isArray(payment.productBreakdown) && payment.productBreakdown.length > 0) {
       return payment.productBreakdown;
     }
     if (typeof payment.productBreakdown === 'string') {
       try {
         const parsed = JSON.parse(payment.productBreakdown);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {
         // ignore
+      }
+    }
+    // Check if payment has linked purchase items
+    if (Array.isArray((payment as any).items) && (payment as any).items.length > 0) {
+      return (payment as any).items.map((it: any) => ({
+        productId: it.productId,
+        productName: it.productName || it.product?.name,
+        quantity: it.quantity,
+        unitPrice: it.unitCost,
+        unit: it.unit || it.product?.unit || 'Pcs',
+        amount: it.lineTotal,
+      }));
+    }
+    if (payment.purchase && Array.isArray((payment.purchase as any).items) && (payment.purchase as any).items.length > 0) {
+      return (payment.purchase as any).items.map((it: any) => ({
+        productId: it.productId,
+        productName: it.productName || it.product?.name,
+        quantity: it.quantity,
+        unitPrice: it.unitCost,
+        unit: it.unit || it.product?.unit || 'Pcs',
+        amount: it.lineTotal,
+      }));
+    }
+
+    // Check if note contains structured items e.g. [পণ্যসমূহ: ...] or [Products: ...]
+    if (payment.note) {
+      const match = payment.note.match(/\[(?:Products|পণ্যসমূহ):\s*(.+?)\]/i) || payment.note.match(/(?:পণ্য বাবদ পরিশোধ|Product payment):\s*(.+)$/i);
+      if (match && match[1]) {
+        const parts = match[1].split('|');
+        const parsedItems: any[] = [];
+        for (const part of parts) {
+          const cleanPart = part.replace(/^\d+\.\s*/, '').trim();
+          const qtyMatch = cleanPart.match(/\((\d+(?:\.\d+)?)\s*([^\s@\)]+)?(?:\s*@\s*[৳Tk]?(\d+(?:\.\d+)?))?\)/i);
+          const amtMatch = cleanPart.match(/-\s*[৳Tk]?(\d+(?:\.\d+)?)/i);
+          const name = cleanPart.replace(/\(.*?\)/g, '').replace(/-\s*[৳Tk]?\d+(?:\.\d+)?/g, '').replace(/\[.*?\]/g, '').trim();
+          if (name) {
+            parsedItems.push({
+              productName: name,
+              quantity: qtyMatch ? parseFloat(qtyMatch[1]) : 1,
+              unit: qtyMatch && qtyMatch[2] ? qtyMatch[2] : 'Pcs',
+              unitPrice: qtyMatch && qtyMatch[3] ? parseFloat(qtyMatch[3]) : 0,
+              amount: amtMatch ? parseFloat(amtMatch[1]) : 0,
+            });
+          }
+        }
+        if (parsedItems.length > 0) return parsedItems;
       }
     }
     return [];
@@ -259,6 +305,7 @@ function CreatePurchaseContent() {
         const price =
           b.unitPrice != null && b.unitPrice !== ''
             ? Number(b.unitPrice)
+            : b.amount && b.quantity ? Number(b.amount) / Number(b.quantity)
             : matchedProd ? matchedProd.buyPrice : 0;
         const qty = b.quantity != null && b.quantity !== '' ? Number(b.quantity) : 1;
 
@@ -266,7 +313,7 @@ function CreatePurchaseContent() {
           id: 'row-' + Date.now() + '-' + idx,
           productId: b.productId ? Number(b.productId) : matchedProd ? matchedProd.id : '',
           productName: b.productName || matchedProd?.name || '',
-          sku: matchedProd?.sku || '',
+          sku: b.sku || matchedProd?.sku || '',
           orderedQty: qty,
           quantity: String(qty), // default received = ordered qty
           unitPrice: price ? String(price) : '',
@@ -289,6 +336,27 @@ function CreatePurchaseContent() {
     setItems([initialRow()]);
     setToastTone('success');
     setToastMessage(`Payment #${payment.id} (৳${payment.amount}) linked with invoice!`);
+  };
+
+  // Load all products for current company
+  const handleLoadAllCompanyProducts = () => {
+    if (companyFilteredProducts.length === 0) return;
+    const newRows: PurchaseRowItem[] = companyFilteredProducts.map((p, idx) => ({
+      id: 'row-all-' + p.id + '-' + idx,
+      productId: p.id,
+      productName: p.name,
+      sku: p.sku || '',
+      orderedQty: null,
+      quantity: '',
+      unitPrice: String(p.buyPrice || '0'),
+      unit: p.unit || 'Pcs',
+      note: '',
+      searchText: p.name,
+      showResults: false,
+    }));
+    setItems(newRows);
+    setToastTone('success');
+    setToastMessage(`Loaded ${newRows.length} products for ${selectedCompany?.name || 'company'}!`);
   };
 
   // Deselect payment
@@ -874,21 +942,37 @@ function CreatePurchaseContent() {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={handleAddRow}
-                className="inline-flex items-center gap-1.5 rounded-2xl bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-100 transition-all self-start sm:self-auto"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>+ Add Extra Item</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {companyFilteredProducts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleLoadAllCompanyProducts}
+                    className="inline-flex items-center gap-1.5 rounded-2xl bg-slate-100 hover:bg-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition-all shadow-sm"
+                    title={`Load all ${companyFilteredProducts.length} catalog products for this company`}
+                  >
+                    <Package className="h-3.5 w-3.5 text-indigo-600" />
+                    <span>Load All Company Products ({companyFilteredProducts.length})</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="inline-flex items-center gap-1.5 rounded-2xl bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-100 transition-all self-start sm:self-auto"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>+ Add Extra Item</span>
+                </button>
+              </div>
             </div>
 
             {/* Desktop Table Header */}
             <div className="hidden lg:grid grid-cols-12 gap-3 px-4 py-3 rounded-2xl bg-slate-100/90 text-xs font-black uppercase tracking-wider text-slate-700">
               <div className="col-span-1 text-center w-8">SL</div>
               <div className="col-span-3">PRODUCT & SKU</div>
-              <div className="col-span-2 text-center">ORDER QTY</div>
+              <div className="col-span-2 text-center bg-slate-200/80 text-slate-900 rounded-lg py-0.5">
+                ORDER QTY
+              </div>
               <div className="col-span-2 text-center bg-indigo-100/70 text-indigo-900 rounded-lg py-0.5">
                 RECEIVED QTY *
               </div>
@@ -975,19 +1059,30 @@ function CreatePurchaseContent() {
                         )}
                       </div>
 
-                      {/* Order Quantity Display (READ-ONLY) */}
+                      {/* Order Quantity Display */}
                       <div className="lg:col-span-2 text-left lg:text-center">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
                           Order Qty
                         </label>
-                        {ordQ !== null ? (
-                          <div className="inline-flex items-center gap-1 rounded-xl bg-slate-200/80 px-3 py-1.5 text-xs font-black text-slate-800 border border-slate-300">
-                            <span>📦 {ordQ}</span>
-                            <span className="text-[11px] font-semibold text-slate-600">{row.unit || 'PCS'}</span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-400 font-medium">— (Direct Entry)</span>
-                        )}
+                        <div className="flex items-center justify-start lg:justify-center gap-1.5">
+                          {ordQ !== null && ordQ > 0 ? (
+                            <div className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-900 border border-indigo-200 shadow-sm">
+                              <span>📦 {ordQ}</span>
+                              <span className="text-[10px] font-bold text-indigo-600 uppercase">{row.unit || 'PCS'}</span>
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              value={row.orderedQty !== undefined && row.orderedQty !== null ? row.orderedQty : ''}
+                              onChange={(e) => handleUpdateRow(idx, 'orderedQty', e.target.value)}
+                              placeholder="Direct"
+                              className="w-20 rounded-xl border border-dashed border-slate-300 bg-white px-2 py-1 text-center text-xs font-bold text-slate-700 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none"
+                              title="Enter ordered quantity (optional)"
+                            />
+                          )}
+                        </div>
                       </div>
 
                       {/* Actually Received Quantity (EDITABLE Input) */}
