@@ -216,7 +216,7 @@ export function ShopsPage() {
               </div>
               <div className="rounded-2xl border border-amber-500/30 bg-amber-500/15 p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-400">Total Due</p>
-                <p className="mt-2 truncate text-2xl font-bold text-amber-100">{formatCurrency(totalDue)}</p>
+                <p className="mt-2 text-xl sm:text-2xl font-black text-amber-100 break-normal">{formatCurrency(totalDue)}</p>
                 <p className="mt-1 text-xs text-slate-500">Filtered view</p>
               </div>
             </div>

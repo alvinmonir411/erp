@@ -32,6 +32,14 @@ const iconThemeClasses = {
   slate: 'bg-white/20 text-white shadow-inner',
 };
 
+const getValueFontSize = (val: string | number) => {
+  const str = String(val);
+  if (str.length >= 16) return 'text-xs sm:text-sm lg:text-xs xl:text-sm 2xl:text-base';
+  if (str.length >= 12) return 'text-sm sm:text-base lg:text-sm xl:text-base 2xl:text-lg';
+  if (str.length >= 9) return 'text-base sm:text-lg lg:text-base xl:text-lg 2xl:text-xl';
+  return 'text-lg sm:text-xl lg:text-lg xl:text-xl 2xl:text-2xl';
+};
+
 export function StatCard({
   label,
   value,
@@ -45,10 +53,10 @@ export function StatCard({
 
   return (
     <div 
-      className={`relative w-full min-h-[100px] rounded-[16px] border p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg shadow-sm backdrop-blur-md overflow-hidden flex flex-col justify-between ${containerClass}`}
+      className={`relative w-full min-h-[92px] rounded-[16px] border p-3.5 sm:p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg shadow-sm backdrop-blur-md flex flex-col justify-between ${containerClass}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-wider opacity-70 leading-tight">
+      <div className="flex items-start justify-between gap-1.5">
+        <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-wider opacity-80 leading-tight">
           {label}
         </h3>
         {Icon && (
@@ -58,18 +66,19 @@ export function StatCard({
         )}
       </div>
       
-      <div className="mt-2 flex-grow flex flex-col justify-end">
+      <div className="mt-1.5 flex-grow flex flex-col justify-end">
         {isLoading ? (
           <div className="h-6 w-20 animate-pulse rounded-md bg-black/10" />
         ) : (
           <div className="w-full">
             <p 
-              className="text-sm sm:text-base md:text-lg lg:text-xl font-black tracking-tight whitespace-nowrap overflow-hidden text-ellipsis"
+              className={`${getValueFontSize(value)} font-black tracking-tight leading-tight select-all break-normal whitespace-nowrap`}
+              title={typeof value === 'string' ? value : undefined}
             >
               {value}
             </p>
             {description && (
-              <p className="mt-1 text-[10px] sm:text-xs font-medium opacity-60 line-clamp-1">
+              <p className="mt-0.5 text-[10px] sm:text-xs font-medium opacity-75 line-clamp-1">
                 {description}
               </p>
             )}

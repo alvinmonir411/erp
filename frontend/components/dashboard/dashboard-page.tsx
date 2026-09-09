@@ -425,7 +425,7 @@ export function DashboardPage() {
             <p className="text-[11px] font-semibold text-slate-400">Live order booking, dispatches, and cash collection for today</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3 xl:gap-3">
           <StatCard
             label="Today Orders"
             value={formatNumber(today?.ordersCount ?? orders?.todayOrdersCount)}
@@ -493,7 +493,7 @@ export function DashboardPage() {
         </div>
 
         {/* 6 Clickable Interactive Cards */}
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3 xl:gap-3">
           
           {/* Card 1: Sales */}
           <div 

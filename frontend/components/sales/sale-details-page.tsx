@@ -144,7 +144,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 p-6 shadow-lg shadow-slate-900/20 text-white transition-transform hover:-translate-y-1">
                 <div className="relative z-10">
                   <p className="text-sm font-medium opacity-90">Total amount</p>
-                  <p className="mt-2 text-3xl font-bold tracking-tight truncate">
+                  <p className="mt-2 text-2xl sm:text-3xl font-black tracking-tight break-normal">
                     {formatCurrency(sale.totalAmount)}
                   </p>
                 </div>
@@ -154,7 +154,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-400 to-indigo-600 p-6 shadow-lg shadow-indigo-500/20 text-white transition-transform hover:-translate-y-1">
                 <div className="relative z-10">
                   <p className="text-sm font-medium opacity-90">Paid amount</p>
-                  <p className="mt-2 text-3xl font-bold tracking-tight truncate">
+                  <p className="mt-2 text-2xl sm:text-3xl font-black tracking-tight break-normal">
                     {formatCurrency(sale.paidAmount)}
                   </p>
                 </div>
@@ -167,7 +167,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
                 }`}>
                 <div className="relative z-10">
                   <p className="text-sm font-medium opacity-90">Due amount</p>
-                  <p className="mt-2 text-3xl font-bold tracking-tight truncate">
+                  <p className="mt-2 text-2xl sm:text-3xl font-black tracking-tight break-normal">
                     {formatCurrency(sale.dueAmount)}
                   </p>
                   {toNumber(sale.dueAmount) === 0 && (
@@ -180,7 +180,7 @@ export function SaleDetailsPage({ saleId }: { saleId: number }) {
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-6 shadow-lg shadow-emerald-500/20 text-white transition-transform hover:-translate-y-1">
                 <div className="relative z-10">
                   <p className="text-sm font-medium opacity-90">Total profit</p>
-                  <p className="mt-2 text-3xl font-bold tracking-tight truncate">
+                  <p className="mt-2 text-2xl sm:text-3xl font-black tracking-tight break-normal">
                     {formatCurrency(sale.totalProfit ?? 0)}
                   </p>
                 </div>

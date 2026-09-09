@@ -194,7 +194,7 @@ export function DeliveryReportsPage() {
             <div className="p-2 bg-slate-50 rounded-xl"><DollarSign className="h-4 w-4 text-slate-400" /></div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 leading-none">Gross Dispatch</p>
-              <h3 className="mt-1 text-lg font-black text-slate-900 truncate">{formatCurrency(report?.totals?.grossDispatchedValue || 0)}</h3>
+              <h3 className="mt-1 text-base sm:text-lg font-black text-slate-900 break-normal">{formatCurrency(report?.totals?.grossDispatchedValue || 0)}</h3>
             </div>
           </div>
         </div>
@@ -203,7 +203,7 @@ export function DeliveryReportsPage() {
             <div className="p-2 bg-emerald-50 rounded-xl"><TrendingUp className="h-4 w-4 text-emerald-600" /></div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 leading-none">Final Sold</p>
-              <h3 className="mt-1 text-lg font-black text-emerald-700 truncate">{formatCurrency(report?.totals?.finalSoldValue || 0)}</h3>
+              <h3 className="mt-1 text-base sm:text-lg font-black text-emerald-700 break-normal">{formatCurrency(report?.totals?.finalSoldValue || 0)}</h3>
             </div>
           </div>
         </div>
@@ -212,7 +212,7 @@ export function DeliveryReportsPage() {
             <div className="p-2 bg-cyan-50 rounded-xl"><Wallet className="h-4 w-4 text-cyan-600" /></div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 leading-none">Collected</p>
-              <h3 className="mt-1 text-lg font-black text-cyan-700 truncate">{formatCurrency(report?.totals?.totalCollectedAmount || 0)}</h3>
+              <h3 className="mt-1 text-base sm:text-lg font-black text-cyan-700 break-normal">{formatCurrency(report?.totals?.totalCollectedAmount || 0)}</h3>
             </div>
           </div>
         </div>
@@ -221,7 +221,7 @@ export function DeliveryReportsPage() {
             <div className="p-2 bg-amber-50 rounded-xl"><AlertCircle className="h-4 w-4 text-amber-600" /></div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 leading-none">Due</p>
-              <h3 className="mt-1 text-lg font-black text-amber-700 truncate">{formatCurrency(report?.totals?.totalDueAmount || 0)}</h3>
+              <h3 className="mt-1 text-base sm:text-lg font-black text-amber-700 break-normal">{formatCurrency(report?.totals?.totalDueAmount || 0)}</h3>
             </div>
           </div>
         </div>

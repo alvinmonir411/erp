@@ -1,9 +1,11 @@
 export function formatCurrency(value: number | string) {
   const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '৳0.00';
+  if (isNaN(num)) return 'BDT 0';
+  const hasDecimals = Math.abs(num % 1) >= 0.01;
   return new Intl.NumberFormat('en-BD', {
     style: 'currency',
     currency: 'BDT',
+    minimumFractionDigits: hasDecimals ? 2 : 0,
     maximumFractionDigits: 2,
   }).format(num);
 }
