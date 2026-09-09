@@ -1378,12 +1378,12 @@ export function PurchasesPage() {
       {/* 3. BUTTON 1 MODAL: BANK DRAFT / ADVANCE PAYMENT & PRE-ORDER     */}
       {/* ============================================================== */}
       {isBankDraftModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto animate-fadeIn">
-          <div className="relative w-full max-w-4xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl max-h-[92vh] overflow-y-auto border border-slate-100">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-4xl max-h-[88vh] flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden">
+            {/* Modal Header (Sticky / Fixed) */}
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 bg-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
+                <div className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-600">
                   <Wallet className="h-6 w-6" />
                 </div>
                 <div>
@@ -1404,7 +1404,8 @@ export function PurchasesPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmitBankDraft} className="space-y-6">
+            {/* Scrollable Form Content */}
+            <form id="bankDraftModalForm" onSubmit={handleSubmitBankDraft} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
               {/* SECTION A — Supplier Information */}
               <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
                 <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
@@ -1767,31 +1768,32 @@ export function PurchasesPage() {
                   </div>
                 </div>
               </div>
-
-              {/* SECTION E — SAVE BUTTONS */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsBankDraftModalOpen(false)}
-                  className="rounded-2xl border border-slate-200 px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingDraft}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 px-7 py-3 text-xs sm:text-sm font-black text-white shadow-xl shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                >
-                  {isSubmittingDraft ? (
-                    <span>Saving...</span>
-                  ) : (
-                    <>
-                      <span>💾 Save Advance Payment & Pre-Order</span>
-                    </>
-                  )}
-                </button>
-              </div>
             </form>
+
+            {/* Modal Footer (Sticky / Fixed at Bottom) */}
+            <div className="flex items-center justify-end gap-3 p-4 sm:p-5 border-t border-slate-100 bg-slate-50/90 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsBankDraftModalOpen(false)}
+                className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                form="bankDraftModalForm"
+                type="submit"
+                disabled={isSubmittingDraft}
+                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 px-7 py-2.5 text-xs sm:text-sm font-black text-white shadow-xl shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              >
+                {isSubmittingDraft ? (
+                  <span>Saving...</span>
+                ) : (
+                  <>
+                    <span>💾 Save Advance Payment & Pre-Order</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1889,13 +1891,13 @@ export function PurchasesPage() {
 
       {/* 🌟 FULL DETAILS MODAL: PRE-ORDER & ADVANCE PAYMENT DETAILS */}
       {viewingPaymentDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 sm:p-7 shadow-2xl space-y-5 border border-slate-100">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-3xl max-h-[88vh] flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden">
+            {/* Header (Sticky / Fixed) */}
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 bg-white shrink-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 shadow-inner">
-                  <Package className="h-6 w-6" />
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 shadow-inner shrink-0">
+                  <Package className="h-5 w-5" />
                 </div>
                 <div>
                   <h3 className="text-lg sm:text-xl font-black text-slate-900">
@@ -1915,158 +1917,161 @@ export function PurchasesPage() {
               </button>
             </div>
 
-            {/* Info Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
-                <span className="text-slate-400 font-semibold block">Supplier Company</span>
-                <b className="text-slate-900 text-sm font-bold block mt-0.5 truncate">
-                  {viewingPaymentDetails.company?.name || 'Company'}
-                </b>
-                {viewingPaymentDetails.company?.phone && (
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">📞 {viewingPaymentDetails.company.phone}</span>
-                )}
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+              {/* Info Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
+                  <span className="text-slate-400 font-semibold block">Supplier Company</span>
+                  <b className="text-slate-900 text-sm font-bold block mt-0.5 truncate">
+                    {viewingPaymentDetails.company?.name || 'Company'}
+                  </b>
+                  {viewingPaymentDetails.company?.phone && (
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">📞 {viewingPaymentDetails.company.phone}</span>
+                  )}
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
+                  <span className="text-slate-400 font-semibold block">Payment Date</span>
+                  <b className="text-slate-900 text-sm font-bold block mt-0.5">
+                    {formatDate(viewingPaymentDetails.paymentDate)}
+                  </b>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
+                  <span className="text-slate-400 font-semibold block">Method & Bank</span>
+                  <b className="text-slate-900 text-xs font-bold block mt-0.5 uppercase">
+                    {viewingPaymentDetails.paymentMethod} {viewingPaymentDetails.bankName ? `• ${viewingPaymentDetails.bankName}` : ''}
+                  </b>
+                  {viewingPaymentDetails.branchName && (
+                    <span className="text-[10px] text-slate-500 block">Branch: {viewingPaymentDetails.branchName}</span>
+                  )}
+                </div>
+
+                <div className="rounded-2xl bg-emerald-50 p-3.5 border border-emerald-200">
+                  <span className="text-emerald-700 font-semibold block">Advance Paid</span>
+                  <b className="text-emerald-800 text-base font-black block mt-0.5">
+                    {formatCurrency(viewingPaymentDetails.amount)}
+                  </b>
+                </div>
               </div>
 
-              <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
-                <span className="text-slate-400 font-semibold block">Payment Date</span>
-                <b className="text-slate-900 text-sm font-bold block mt-0.5">
-                  {formatDate(viewingPaymentDetails.paymentDate)}
-                </b>
-              </div>
+              {/* Itemized Products Table */}
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Pre-Ordered Products Breakdown:
+                  </h4>
+                  {(() => {
+                    const bd = Array.isArray(viewingPaymentDetails.productBreakdown)
+                      ? viewingPaymentDetails.productBreakdown
+                      : typeof viewingPaymentDetails.productBreakdown === 'string'
+                      ? JSON.parse(viewingPaymentDetails.productBreakdown || '[]')
+                      : [];
+                    if (bd.length > 0) {
+                      const totalQty = bd.reduce((sum: number, it: any) => sum + (Number(it.quantity) || 0), 0);
+                      return (
+                        <span className="rounded-full bg-indigo-50 border border-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
+                          📦 {bd.length} Products • Total {totalQty} Units
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
 
-              <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
-                <span className="text-slate-400 font-semibold block">Method & Bank</span>
-                <b className="text-slate-900 text-xs font-bold block mt-0.5 uppercase">
-                  {viewingPaymentDetails.paymentMethod} {viewingPaymentDetails.bankName ? `• ${viewingPaymentDetails.bankName}` : ''}
-                </b>
-                {viewingPaymentDetails.branchName && (
-                  <span className="text-[10px] text-slate-500 block">Branch: {viewingPaymentDetails.branchName}</span>
-                )}
-              </div>
-
-              <div className="rounded-2xl bg-emerald-50 p-3.5 border border-emerald-200">
-                <span className="text-emerald-700 font-semibold block">Advance Paid</span>
-                <b className="text-emerald-800 text-base font-black block mt-0.5">
-                  {formatCurrency(viewingPaymentDetails.amount)}
-                </b>
-              </div>
-            </div>
-
-            {/* Itemized Products Table */}
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Pre-Ordered Products Breakdown:
-                </h4>
                 {(() => {
                   const bd = Array.isArray(viewingPaymentDetails.productBreakdown)
                     ? viewingPaymentDetails.productBreakdown
                     : typeof viewingPaymentDetails.productBreakdown === 'string'
                     ? JSON.parse(viewingPaymentDetails.productBreakdown || '[]')
                     : [];
-                  if (bd.length > 0) {
-                    const totalQty = bd.reduce((sum: number, it: any) => sum + (Number(it.quantity) || 0), 0);
+
+                  if (bd.length === 0) {
                     return (
-                      <span className="rounded-full bg-indigo-50 border border-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
-                        📦 {bd.length} Products • Total {totalQty} Units
-                      </span>
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">
+                        <p className="font-semibold text-slate-700">💸 General Advance Payment (No itemized pre-order)</p>
+                        <p className="text-slate-400 mt-1">
+                          Products were not pre-listed during payment. Clicking "Receive Challan" will allow you to receive any stock from this company against this <b>{formatCurrency(viewingPaymentDetails.amount)}</b> advance balance.
+                        </p>
+                      </div>
                     );
                   }
-                  return null;
+
+                  const totalVal = bd.reduce(
+                    (sum: number, it: any) => sum + (Number(it.amount) || (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0)),
+                    0,
+                  );
+
+                  return (
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                      <table className="min-w-full divide-y divide-slate-200 text-xs">
+                        <thead className="bg-slate-100/90 font-bold uppercase text-slate-700 text-[10px] tracking-wider">
+                          <tr>
+                            <th className="py-2.5 px-3 text-center w-8">SL</th>
+                            <th className="py-2.5 px-3 text-left">Product Name</th>
+                            <th className="py-2.5 px-3 text-center">SKU</th>
+                            <th className="py-2.5 px-3 text-center bg-indigo-50 text-indigo-900 font-black">Order Qty</th>
+                            <th className="py-2.5 px-3 text-right">Unit Price (৳)</th>
+                            <th className="py-2.5 px-3 text-right font-black">Total (৳)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {bd.map((item: any, i: number) => {
+                            const qty = Number(item.quantity) || 1;
+                            const rate = Number(item.unitPrice) || 0;
+                            const total = Number(item.amount) || qty * rate;
+                            return (
+                              <tr key={i} className="hover:bg-slate-50">
+                                <td className="py-2.5 px-3 text-center font-mono text-slate-400">{i + 1}</td>
+                                <td className="py-2.5 px-3 font-bold text-slate-900">{item.productName || item.searchText || 'Product'}</td>
+                                <td className="py-2.5 px-3 text-center font-mono text-slate-500">{item.sku || '—'}</td>
+                                <td className="py-2.5 px-3 text-center font-black text-indigo-950 bg-indigo-50/50">
+                                  📦 {qty} <span className="text-[10px] font-normal text-indigo-600 uppercase">{item.unit || 'PCS'}</span>
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-semibold text-slate-700">
+                                  {formatCurrency(rate)}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-black text-emerald-700">
+                                  {formatCurrency(total)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot className="bg-slate-50/90 border-t border-slate-200 font-bold text-xs">
+                          <tr>
+                            <td colSpan={3} className="py-2.5 px-3 text-right font-black text-slate-700">
+                              Total Pre-Order Value:
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-black text-indigo-900">
+                              {bd.reduce((sum: number, it: any) => sum + (Number(it.quantity) || 0), 0)} Units
+                            </td>
+                            <td colSpan={2} className="py-2.5 px-3 text-right font-black text-emerald-800 text-sm">
+                              {formatCurrency(totalVal > 0 ? totalVal : viewingPaymentDetails.amount)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  );
                 })()}
               </div>
 
-              {(() => {
-                const bd = Array.isArray(viewingPaymentDetails.productBreakdown)
-                  ? viewingPaymentDetails.productBreakdown
-                  : typeof viewingPaymentDetails.productBreakdown === 'string'
-                  ? JSON.parse(viewingPaymentDetails.productBreakdown || '[]')
-                  : [];
-
-                if (bd.length === 0) {
-                  return (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">
-                      <p className="font-semibold text-slate-700">💸 General Advance Payment (No itemized pre-order)</p>
-                      <p className="text-slate-400 mt-1">
-                        Products were not pre-listed during payment. Clicking "Receive Challan" will allow you to receive any stock from this company against this <b>{formatCurrency(viewingPaymentDetails.amount)}</b> advance balance.
-                      </p>
-                    </div>
-                  );
-                }
-
-                const totalVal = bd.reduce(
-                  (sum: number, it: any) => sum + (Number(it.amount) || (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0)),
-                  0,
-                );
-
-                return (
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                    <table className="min-w-full divide-y divide-slate-200 text-xs">
-                      <thead className="bg-slate-100/90 font-bold uppercase text-slate-700 text-[10px] tracking-wider">
-                        <tr>
-                          <th className="py-2.5 px-3 text-center w-8">SL</th>
-                          <th className="py-2.5 px-3 text-left">Product Name</th>
-                          <th className="py-2.5 px-3 text-center">SKU</th>
-                          <th className="py-2.5 px-3 text-center bg-indigo-50 text-indigo-900 font-black">Order Qty</th>
-                          <th className="py-2.5 px-3 text-right">Unit Price (৳)</th>
-                          <th className="py-2.5 px-3 text-right font-black">Total (৳)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {bd.map((item: any, i: number) => {
-                          const qty = Number(item.quantity) || 1;
-                          const rate = Number(item.unitPrice) || 0;
-                          const total = Number(item.amount) || qty * rate;
-                          return (
-                            <tr key={i} className="hover:bg-slate-50">
-                              <td className="py-2.5 px-3 text-center font-mono text-slate-400">{i + 1}</td>
-                              <td className="py-2.5 px-3 font-bold text-slate-900">{item.productName || item.searchText || 'Product'}</td>
-                              <td className="py-2.5 px-3 text-center font-mono text-slate-500">{item.sku || '—'}</td>
-                              <td className="py-2.5 px-3 text-center font-black text-indigo-950 bg-indigo-50/50">
-                                📦 {qty} <span className="text-[10px] font-normal text-indigo-600 uppercase">{item.unit || 'PCS'}</span>
-                              </td>
-                              <td className="py-2.5 px-3 text-right font-semibold text-slate-700">
-                                {formatCurrency(rate)}
-                              </td>
-                              <td className="py-2.5 px-3 text-right font-black text-emerald-700">
-                                {formatCurrency(total)}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot className="bg-slate-50/90 border-t border-slate-200 font-bold text-xs">
-                        <tr>
-                          <td colSpan={3} className="py-2.5 px-3 text-right font-black text-slate-700">
-                            Total Pre-Order Value:
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-black text-indigo-900">
-                            {bd.reduce((sum: number, it: any) => sum + (Number(it.quantity) || 0), 0)} Units
-                          </td>
-                          <td colSpan={2} className="py-2.5 px-3 text-right font-black text-emerald-800 text-sm">
-                            {formatCurrency(totalVal > 0 ? totalVal : viewingPaymentDetails.amount)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                );
-              })()}
+              {viewingPaymentDetails.note && (
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-700">
+                  <span className="font-bold text-slate-900 block mb-0.5">Remarks / Notes:</span>
+                  <p>{viewingPaymentDetails.note}</p>
+                </div>
+              )}
             </div>
 
-            {viewingPaymentDetails.note && (
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-700">
-                <span className="font-bold text-slate-900 block mb-0.5">Remarks / Notes:</span>
-                <p>{viewingPaymentDetails.note}</p>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
+            {/* Modal Footer (Sticky / Fixed at Bottom) */}
+            <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-t border-slate-100 bg-slate-50/90 shrink-0">
               <button
                 type="button"
                 onClick={() => setViewingPaymentDetails(null)}
-                className="rounded-2xl border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 Close
               </button>

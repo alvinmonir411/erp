@@ -875,9 +875,10 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
 
       {/* 💳 RECORD PAYMENT MODAL */}
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="relative w-full max-w-4xl lg:max-w-5xl my-4 sm:my-6 rounded-3xl bg-white p-5 sm:p-7 shadow-2xl border border-slate-100 max-h-[92vh] flex flex-col">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-4xl lg:max-w-5xl rounded-3xl bg-white shadow-2xl border border-slate-100 max-h-[88vh] flex flex-col overflow-hidden">
+            {/* Modal Header (Sticky) */}
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100 bg-white shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
                   <Wallet className="h-5 w-5" />
@@ -895,7 +896,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               </button>
             </div>
 
-            <form onSubmit={handleSavePayment} className="mt-5 space-y-4 overflow-y-auto pr-1 flex-1">
+            <form id="ledgerPaymentForm" onSubmit={handleSavePayment} className="p-5 sm:p-6 space-y-4 overflow-y-auto pr-2 flex-1">
               {/* Balance Banner */}
               {isAdvance ? (
                 <div className="rounded-xl bg-sky-50 p-3 border border-sky-200 flex items-center justify-between">
@@ -1261,24 +1262,26 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsPaymentModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingPayment}
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
-                >
-                  {isSubmittingPayment ? 'Saving...' : 'Confirm Payment'}
-                </button>
-              </div>
             </form>
+
+            {/* Modal Footer (Sticky) */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/90 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsPaymentModalOpen(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                form="ledgerPaymentForm"
+                type="submit"
+                disabled={isSubmittingPayment}
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
+              >
+                {isSubmittingPayment ? 'Saving...' : 'Confirm Payment'}
+              </button>
+            </div>
           </div>
         </div>
       )}
