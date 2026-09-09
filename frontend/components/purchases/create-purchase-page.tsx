@@ -180,6 +180,28 @@ function CreatePurchaseContent() {
         // If exactly 1 payment/order exists for this company, auto-select it for convenience!
         if (list.length === 1) {
           applyPaymentBreakdown(list[0], allProducts);
+          return;
+        }
+
+        // If no payments, auto-populate the company's catalog products
+        if (list.length === 0 && allProducts.length > 0) {
+          const compProds = allProducts.filter((p) => p.companyId === Number(companyId));
+          if (compProds.length > 0) {
+            const newRows: PurchaseRowItem[] = compProds.map((p, idx) => ({
+              id: 'row-comp-' + p.id + '-' + idx,
+              productId: p.id,
+              productName: p.name,
+              sku: p.sku || '',
+              orderedQty: null,
+              quantity: '',
+              unitPrice: String(p.buyPrice || '0'),
+              unit: p.unit || 'Pcs',
+              note: '',
+              searchText: p.name,
+              showResults: false,
+            }));
+            setItems(newRows);
+          }
         }
       } catch {
         setCompanyPayments([]);
@@ -332,7 +354,30 @@ function CreatePurchaseContent() {
       }
     }
 
-    // If general payment without breakdown, provide a fresh clean row
+    // If general payment without breakdown, auto-populate all catalog products for this company!
+    const cid = payment.companyId || Number(companyId);
+    const compProds = productList.filter((p) => p.companyId === cid);
+    if (compProds.length > 0) {
+      const newRows: PurchaseRowItem[] = compProds.map((p, idx) => ({
+        id: 'row-comp-' + p.id + '-' + idx,
+        productId: p.id,
+        productName: p.name,
+        sku: p.sku || '',
+        orderedQty: null,
+        quantity: '',
+        unitPrice: String(p.buyPrice || '0'),
+        unit: p.unit || 'Pcs',
+        note: '',
+        searchText: p.name,
+        showResults: false,
+      }));
+      setItems(newRows);
+      setToastTone('success');
+      setToastMessage(`Loaded ${newRows.length} products for ${payment.company?.name || 'company'}!`);
+      return;
+    }
+
+    // If no catalog products found, provide a fresh clean row
     setItems([initialRow()]);
     setToastTone('success');
     setToastMessage(`Payment #${payment.id} (৳${payment.amount}) linked with invoice!`);
