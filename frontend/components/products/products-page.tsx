@@ -10,7 +10,7 @@ import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
 import { formatCurrency, formatNumber } from '@/lib/utils/format';
 import type { Company, Product, ProductUnit } from '@/types/api';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Package, Layers, AlertTriangle, Wallet, Search, CheckCircle2 } from 'lucide-react';
 
 const unitOptions: ProductUnit[] = [
   'PCS',
@@ -245,113 +245,183 @@ export function ProductsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* 1. Summary Cards */}
+      {/* 1. Top KPI Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8">
-          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Products</div>
-            <div className="mt-1 text-xl sm:text-2xl font-black text-slate-900">{formatNumber(summary.totalProducts)}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total Catalog Products */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Products</span>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <Package className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="mt-2 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              {formatNumber(summary.totalProducts)}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs font-semibold">
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                {formatNumber(summary.activeProducts)} Active
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+                {formatNumber(summary.inactiveProducts)} Inactive
+              </span>
+            </div>
           </div>
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5 shadow-sm">
-            <div className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">In Stock</div>
-            <div className="mt-1 text-xl sm:text-2xl font-black text-emerald-800">{formatNumber(summary.inStockProducts)}</div>
+
+          {/* Warehouse Stock Units */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Stock Qty</span>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                <Layers className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="mt-2 text-2xl sm:text-3xl font-black text-emerald-900 tracking-tight">
+              {formatNumber(summary.totalStockQuantity)}{' '}
+              <span className="text-xs font-medium text-emerald-600">Units</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+              <span className="font-semibold text-emerald-700 inline-flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                {formatNumber(summary.inStockProducts)} SKUs In Stock
+              </span>
+            </div>
           </div>
-          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
-            <div className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Active</div>
-            <div className="mt-1 text-xl sm:text-2xl font-black text-emerald-700">{formatNumber(summary.activeProducts)}</div>
+
+          {/* Inventory Stock Alerts */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Stock Alerts</span>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="mt-2 text-2xl sm:text-3xl font-black text-amber-900 tracking-tight">
+              {formatNumber((summary.lowStockProducts || 0) + (summary.outOfStockProducts || 0))}{' '}
+              <span className="text-xs font-medium text-amber-600">Needs Attention</span>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs font-semibold">
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-amber-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                {formatNumber(summary.lowStockProducts)} Low
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-rose-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                {formatNumber(summary.outOfStockProducts)} Out of Stock
+              </span>
+            </div>
           </div>
-          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
-            <div className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider">Inactive</div>
-            <div className="mt-1 text-xl sm:text-2xl font-black text-rose-700">{formatNumber(summary.inactiveProducts)}</div>
-          </div>
-          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3.5 shadow-sm">
-            <div className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">Low Stock</div>
-            <div className="mt-1 text-xl sm:text-2xl font-black text-amber-800">{formatNumber(summary.lowStockProducts)}</div>
-          </div>
-          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3.5 shadow-sm">
-            <div className="text-[11px] font-semibold text-rose-700 uppercase tracking-wider">Out of Stock</div>
-            <div className="mt-1 text-xl sm:text-2xl font-black text-rose-800">{formatNumber(summary.outOfStockProducts)}</div>
-          </div>
-          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Stock Qty</div>
-            <div className="mt-1 text-xl sm:text-2xl font-black text-slate-900">{formatNumber(summary.totalStockQuantity)}</div>
-          </div>
-          <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-3.5 shadow-sm col-span-2 sm:col-span-1 md:col-span-1 lg:col-span-1 2xl:col-span-1">
-            <div className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">Stock Value</div>
-            <div className="mt-1 text-lg sm:text-xl font-black text-indigo-900 break-normal">{formatCurrency(summary.totalStockValue)}</div>
+
+          {/* Total Stock Valuation */}
+          <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-white to-indigo-50/30 p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">Total Stock Value</span>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+                <Wallet className="h-5 w-5" />
+              </div>
+            </div>
+            <div className="mt-2 text-xl sm:text-2xl 2xl:text-3xl font-black text-indigo-950 tracking-tight break-normal">
+              {formatCurrency(summary.totalStockValue)}
+            </div>
+            <div className="mt-3 flex items-center justify-between pt-2 border-t border-indigo-100/80 text-xs text-indigo-600 font-medium">
+              <span>Inventory Asset Worth</span>
+            </div>
           </div>
         </div>
       )}
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
         <PageCard
-          title={selectedCompanyId ? `${companies.find(c => c.id === selectedCompanyId)?.name || ''} Product Catalog`.trim() : "Products"}
+          title={selectedCompanyId ? `${companies.find(c => c.id === selectedCompanyId)?.name || ''} Products`.trim() : "Products"}
           description="View products by company and verify pricing, unit, and active status from the backend."
           action={
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-3 md:flex-row">
-                <input
-                  value={searchTerm}
-                  onChange={(event) => {
-                    setCurrentPage(1);
-                    setSearchTerm(event.target.value);
-                  }}
-                  placeholder="Search name/SKU..."
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900 min-w-[200px]"
-                />
-                <select
-                  value={selectedCompanyId ?? ''}
-                  onChange={(event) => {
-                    setEditingProduct(null);
-                    setCurrentPage(1);
-                    const val = event.target.value;
-                    setSelectedCompanyId(val === '' ? null : Number(val));
-                  }}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900"
-                >
-                  <option value="">All Companies</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="flex bg-slate-100 p-1 rounded-2xl shrink-0">
-                  <button 
-                    onClick={() => { setCurrentPage(1); setActiveFilter('active'); }}
-                    className={`px-4 py-1.5 text-sm font-bold rounded-xl transition ${activeFilter === 'active' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    Active
-                  </button>
-                  <button 
-                    onClick={() => { setCurrentPage(1); setActiveFilter('inactive'); }}
-                    className={`px-4 py-1.5 text-sm font-bold rounded-xl transition ${activeFilter === 'inactive' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    Inactive
-                  </button>
-                  <button 
-                    onClick={() => { setCurrentPage(1); setActiveFilter('all'); }}
-                    className={`px-4 py-1.5 text-sm font-bold rounded-xl transition ${activeFilter === 'all' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                    All
-                  </button>
-                </div>
-                <select
-                  value={stockLevelFilter}
-                  onChange={(e) => {
-                    setCurrentPage(1);
-                    setStockLevelFilter(e.target.value);
-                  }}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-900"
-                >
-                  <option value="all">All Stock Levels</option>
-                  <option value="low">Low Stock</option>
-                  <option value="out">Out of Stock</option>
-                  <option value="normal">Normal Stock</option>
-                </select>
-              </div>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+              <Package className="h-3.5 w-3.5 text-slate-500" />
+              <span>{formatNumber(totalProducts)} Products</span>
             </div>
           }
         >
+          {/* Dedicated Full-Width Filter & Search Toolbar */}
+          <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 rounded-2xl bg-slate-50/80 p-3 border border-slate-100">
+            {/* Search */}
+            <div className="relative lg:col-span-4">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={searchTerm}
+                onChange={(event) => {
+                  setCurrentPage(1);
+                  setSearchTerm(event.target.value);
+                }}
+                placeholder="Search name or SKU..."
+                className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Company Dropdown */}
+            <div className="lg:col-span-3">
+              <select
+                value={selectedCompanyId ?? ''}
+                onChange={(event) => {
+                  setEditingProduct(null);
+                  setCurrentPage(1);
+                  const val = event.target.value;
+                  setSelectedCompanyId(val === '' ? null : Number(val));
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="">All Companies ({companies.length})</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Status Pills */}
+            <div className="lg:col-span-3 flex bg-white p-1 rounded-xl border border-slate-200">
+              <button 
+                type="button"
+                onClick={() => { setCurrentPage(1); setActiveFilter('active'); }}
+                className={`flex-1 px-2.5 py-1 text-xs font-bold rounded-lg transition ${activeFilter === 'active' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                Active
+              </button>
+              <button 
+                type="button"
+                onClick={() => { setCurrentPage(1); setActiveFilter('inactive'); }}
+                className={`flex-1 px-2.5 py-1 text-xs font-bold rounded-lg transition ${activeFilter === 'inactive' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                Inactive
+              </button>
+              <button 
+                type="button"
+                onClick={() => { setCurrentPage(1); setActiveFilter('all'); }}
+                className={`flex-1 px-2.5 py-1 text-xs font-bold rounded-lg transition ${activeFilter === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                All
+              </button>
+            </div>
+
+            {/* Stock Level Dropdown */}
+            <div className="lg:col-span-2">
+              <select
+                value={stockLevelFilter}
+                onChange={(e) => {
+                  setCurrentPage(1);
+                  setStockLevelFilter(e.target.value);
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="all">All Stocks</option>
+                <option value="low">Low Stock</option>
+                <option value="out">Out of Stock</option>
+                <option value="normal">Normal Stock</option>
+              </select>
+            </div>
+          </div>
         {isLoading ? <LoadingBlock label="Loading products..." /> : null}
         {!isLoading && !error ? (
           <>
