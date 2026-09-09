@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PageCard } from '@/components/ui/page-card';
 import { useToast } from '@/components/ui/toast-provider';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
@@ -238,13 +238,14 @@ export function ExpensesPage() {
           {/* Preset Buttons */}
           <div className="flex flex-wrap items-center gap-1.5 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
             {[
-              { id: 'today', label: 'Today' },
-              { id: 'yesterday', label: 'Yesterday' },
-              { id: '7days', label: 'Last 7 Days' },
-              { id: '30days', label: 'Last 30 Days' },
-              { id: 'this_month', label: 'This Month' },
-              { id: 'last_month', label: 'Last Month' },
-              { id: 'custom', label: 'Custom Date' },
+              { id: 'today', label: 'Today (আজ)' },
+              { id: 'yesterday', label: 'Yesterday (গতকাল)' },
+              { id: '7days', label: 'Last 7 Days (৭ দিন)' },
+              { id: '30days', label: 'Last 30 Days (৩০ দিন)' },
+              { id: 'this_month', label: 'This Month (চলতি মাস)' },
+              { id: 'last_month', label: 'Last Month (গত মাস)' },
+              { id: 'all_time', label: 'All Time (সব সময়ের মোট)' },
+              { id: 'custom', label: 'Custom Date (তারিখ)' },
             ].map((p) => (
               <button
                 key={p.id}
@@ -259,6 +260,34 @@ export function ExpensesPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Active Filter Period Indicator Banner */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-indigo-50/70 dark:bg-indigo-950/40 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-900/50">
+          <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <span>বর্তমানে প্রদর্শিত সময়কাল:</span>
+          <span className="font-black text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded shadow-sm border border-indigo-200 dark:border-indigo-800">
+            {datePreset === 'this_month'
+              ? 'This Month (চলতি মাসের লাভ ও হিসাব)'
+              : datePreset === 'today'
+              ? 'Today (আজকের দিনের লাভ ও হিসাব)'
+              : datePreset === 'yesterday'
+              ? 'Yesterday (গতকালের লাভ ও হিসাব)'
+              : datePreset === '7days'
+              ? 'Last 7 Days (গত ৭ দিনের লাভ ও হিসাব)'
+              : datePreset === '30days'
+              ? 'Last 30 Days (গত ৩০ দিনের লাভ ও হিসাব)'
+              : datePreset === 'last_month'
+              ? 'Last Month (গত মাসের লাভ ও হিসাব)'
+              : datePreset === 'all_time'
+              ? 'All Time (সব সময়ের মোট লাভ ও হিসাব)'
+              : `Custom: ${startDate || 'Start'} to ${endDate || 'End'}`}
+          </span>
+          {data?.filters?.startDate && data?.filters?.endDate && datePreset !== 'all_time' && (
+            <span className="text-[11px] text-slate-500 font-normal ml-auto hidden sm:inline">
+              ({data.filters.startDate} থেকে {data.filters.endDate})
+            </span>
+          )}
         </div>
 
         {/* Custom date range & parameters */}
@@ -913,7 +942,7 @@ export function ExpensesPage() {
                   {filteredTableData.map((row: any, i: number) => {
                     const isExpanded = expandedCompanyId === row.companyId;
                     return (
-                      <tbody key={i} className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                      <Fragment key={row.companyId || i}>
                         <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition">
                           <td className="py-3 px-3 font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <span className="p-1 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
@@ -1020,7 +1049,7 @@ export function ExpensesPage() {
                             </td>
                           </tr>
                         )}
-                      </tbody>
+                      </Fragment>
                     );
                   })}
                   {filteredTableData.length === 0 && (

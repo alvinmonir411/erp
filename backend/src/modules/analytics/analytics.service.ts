@@ -75,6 +75,9 @@ export class AnalyticsService {
       const last = new Date(now.getFullYear(), now.getMonth(), 0);
       startDate = first.toISOString().split('T')[0];
       endDate = last.toISOString().split('T')[0];
+    } else if (preset === 'all_time') {
+      startDate = undefined;
+      endDate = undefined;
     }
 
     return { startDate, endDate, preset };
