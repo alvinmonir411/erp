@@ -2,15 +2,13 @@ export const dynamic = 'force-dynamic';
 import type { Metadata } from "next";
 import "./globals.css";
 import { AdminShell } from "@/components/layout/admin-shell";
+import { Providers } from "@/components/providers";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "Dealer ERP Admin",
   description: "Frontend for company, product, and stock management",
 };
-
-import { Providers } from "@/components/providers";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Analytics } from "@vercel/analytics/next";
 
 export default function RootLayout({
   children,
@@ -23,10 +21,8 @@ export default function RootLayout({
         <Providers>
           <AdminShell>{children}</AdminShell>
         </Providers>
-        <SpeedInsights />
-        <Analytics />
+        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   );
 }
-
