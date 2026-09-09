@@ -652,9 +652,9 @@ export function PurchasesPage() {
             </div>
           </div>
 
-          {/* TWO PRIMARY ACTION BUTTONS (Distinct Visual Hierarchy) */}
+          {/* PRIMARY ACTION BUTTON */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-            {/* Button 1: Money Goes to Supplier */}
+            {/* Money Goes to Supplier: Bank Draft / Advance Payment */}
             <button
               onClick={() => openBankDraftModal()}
               className="group relative inline-flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-6 py-4 text-xs sm:text-sm font-black text-white shadow-xl shadow-emerald-950/40 transition-all hover:scale-[1.02] active:scale-95 border border-emerald-400/30"
@@ -667,20 +667,6 @@ export function PurchasesPage() {
                 <div className="text-[11px] font-semibold text-emerald-100">Pre-orders & advance booking</div>
               </div>
             </button>
-
-            {/* Button 2: Goods Come from Supplier */}
-            <Link
-              href="/purchases/create"
-              className="group relative inline-flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 px-6 py-4 text-xs sm:text-sm font-black text-white shadow-xl shadow-indigo-950/40 transition-all hover:scale-[1.02] active:scale-95 border border-indigo-400/30"
-            >
-              <div className="rounded-xl bg-white/20 p-1.5">
-                <Package className="h-5 w-5 text-white" />
-              </div>
-              <div className="text-left">
-                <div className="font-black text-white leading-tight">📦 Receive Challan & Stock In</div>
-                <div className="text-[11px] font-semibold text-indigo-100">Stock receipt matched with draft</div>
-              </div>
-            </Link>
           </div>
         </div>
       </div>
