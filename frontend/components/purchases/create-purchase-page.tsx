@@ -752,11 +752,11 @@ function CreatePurchaseContent() {
                     </div>
                     {companyPayments.length > 0 ? (
                       <span className="rounded-xl bg-indigo-100 text-indigo-800 px-3 py-1 text-xs font-bold">
-                        {companyPayments.length} Draft / Payment Records Available
+                        {companyPayments.length} Advance Payment / Pre-Order Records Available
                       </span>
                     ) : (
                       <span className="rounded-xl bg-amber-100 text-amber-800 px-3 py-1 text-xs font-bold">
-                        No draft records found
+                        No advance payment records found
                       </span>
                     )}
                   </div>
@@ -764,17 +764,20 @@ function CreatePurchaseContent() {
               )}
             </div>
 
-            {/* Interactive Bank Draft Cards */}
+            {/* Interactive Bank Draft / Advance Payment Cards */}
             {companyPayments.length > 0 && (
               <div className="pt-3">
                 <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
-                  Available Bank Drafts (Click to load):
+                  Available Advance Payments & Pre-Orders (Click to load):
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {companyPayments.map((pay) => {
                     const isSelected = selectedPaymentId === pay.id;
                     const breakdown = parseBreakdown(pay);
                     const hasBreakdown = breakdown.length > 0;
+                    const totalUnits = hasBreakdown
+                      ? breakdown.reduce((sum: number, it: any) => sum + (Number(it.quantity) || 0), 0)
+                      : 0;
 
                     return (
                       <div
@@ -795,7 +798,7 @@ function CreatePurchaseContent() {
                                   : 'bg-emerald-100 text-emerald-800'
                               }`}
                             >
-                              Draft #{pay.id}
+                              Payment #{pay.id}
                             </span>
                             <span className="text-xs font-semibold text-slate-500">
                               {pay.paymentDate ? formatDate(pay.paymentDate) : ''}
@@ -819,8 +822,8 @@ function CreatePurchaseContent() {
                         <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
                           <span className="text-[11px] font-bold text-indigo-700">
                             {hasBreakdown
-                              ? `📦 ${breakdown.length} Pre-Ordered Items`
-                              : '💸 General Payment'}
+                              ? `📦 ${breakdown.length} Products (${totalUnits} Pcs)`
+                              : '💸 Advance Payment'}
                           </span>
                           <span
                             className={`font-bold text-xs ${
