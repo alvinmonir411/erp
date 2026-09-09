@@ -32,10 +32,14 @@ import {
   UserCheck,
   Building2,
   ChevronDown,
+  ChevronUp,
   ArrowUpRight,
   ArrowDownRight,
   Activity,
   Zap,
+  Coins,
+  Award,
+  Percent,
 } from 'lucide-react';
 
 export function ExpensesPage() {
@@ -56,8 +60,9 @@ export function ExpensesPage() {
   const [selectedPersonnelId, setSelectedPersonnelId] = useState<string>('');
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [tableSearch, setTableSearch] = useState<string>('');
+  const [expandedCompanyId, setExpandedCompanyId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'expenses' | 'freeItems' | 'damage' | 'inventory' | 'sales' | 'collections'
+    'overview' | 'companyProfits' | 'expenses' | 'freeItems' | 'damage' | 'inventory' | 'sales' | 'collections'
   >('overview');
 
   // Sorting state for tables
@@ -116,10 +121,16 @@ export function ExpensesPage() {
       showErrorToast('No data available to export');
       return;
     }
-    const headers = Object.keys(rows[0]).join(',');
+    const cleanRows = rows.map((r) => {
+      const copy: any = { ...r };
+      delete copy.productBreakdown;
+      delete copy.topProducts;
+      return copy;
+    });
+    const headers = Object.keys(cleanRows[0]).join(',');
     const csvContent =
       'data:text/csv;charset=utf-8,' +
-      [headers, ...rows.map((r) => Object.values(r).map((v) => `"${v}"`).join(','))].join('\n');
+      [headers, ...cleanRows.map((r) => Object.values(r).map((v) => `"${v}"`).join(','))].join('\n');
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
@@ -138,18 +149,28 @@ export function ExpensesPage() {
   // Safe defaults
   const inventory = data?.inventory || { totalStockQty: 0, totalStockValue: 0, currentStockWorth: 0, lowStockCount: 0, outOfStockCount: 0, list: [] };
   const sales = data?.sales || { totalSalesAmount: 0, totalOrders: 0, list: [] };
+  const companyProfits = data?.companyProfits || {
+    totalGrossProfit: 0,
+    totalNetProfit: 0,
+    totalSalesAmount: 0,
+    totalCostAmount: 0,
+    overallProfitMarginPct: 0,
+    topCompany: null,
+    list: [],
+  };
   const collections = data?.collections || { totalCollectedCash: 0, pendingCollection: 0, collectionEfficiencyPct: 0, list: [] };
   const expenses = data?.expenses || { totalExpenses: 0, vanRent: 0, salary: 0, fuel: 0, food: 0, otherExpenses: 0, breakdownByRoute: [], breakdownByPerson: [], list: [] };
   const freeItems = data?.freeItems || { totalQty: 0, totalCost: 0, list: [] };
   const damage = data?.damage || { totalQty: 0, totalLossValue: 0, list: [] };
   const businessHealth = data?.businessHealth || { netBusinessWorth: 0, netBusinessAsset: 0, operationalLeakage: 0, leakagePct: 0, status: 'HEALTHY', label: 'Healthy', badgeColor: 'emerald' };
   const insights = data?.insights || [];
-  const charts = data?.charts || { expenseCategoryPie: [], routeWiseExpense: [], deliveryPersonExpense: [], operationalLeakageBreakdown: [] };
+  const charts = data?.charts || { expenseCategoryPie: [], routeWiseExpense: [], deliveryPersonExpense: [], operationalLeakageBreakdown: [], companyProfitBreakdown: [] };
 
   // Filtered rows for active tab table search
   const filteredTableData = useMemo(() => {
     let list: any[] = [];
-    if (activeTab === 'expenses') list = expenses.list || [];
+    if (activeTab === 'companyProfits') list = companyProfits.list || [];
+    else if (activeTab === 'expenses') list = expenses.list || [];
     else if (activeTab === 'freeItems') list = freeItems.list || [];
     else if (activeTab === 'damage') list = damage.list || [];
     else if (activeTab === 'inventory') list = inventory.list || [];
@@ -159,9 +180,13 @@ export function ExpensesPage() {
     if (!tableSearch.trim()) return list;
     const q = tableSearch.toLowerCase().trim();
     return list.filter((item) =>
-      Object.values(item).some((val) => String(val).toLowerCase().includes(q)),
+      Object.values(item).some((val) =>
+        typeof val === 'object' && val !== null
+          ? JSON.stringify(val).toLowerCase().includes(q)
+          : String(val).toLowerCase().includes(q),
+      ),
     );
-  }, [activeTab, tableSearch, expenses, freeItems, damage, inventory, sales]);
+  }, [activeTab, tableSearch, companyProfits, expenses, freeItems, damage, inventory, sales]);
 
   return (
     <div className="space-y-6 pb-12 print:p-0 print:space-y-4">
@@ -342,7 +367,7 @@ export function ExpensesPage() {
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               2. Total Sales Revenue
             </span>
-            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+            <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
@@ -359,11 +384,54 @@ export function ExpensesPage() {
           </div>
         </div>
 
-        {/* 3. Total Cash Collection */}
+        {/* 3. Total Gross Profit (মোট লাভ) */}
+        <div className="bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 dark:from-gray-800 dark:to-gray-800 rounded-xl p-5 shadow-sm border border-emerald-200 dark:border-emerald-800/80 hover:shadow-md transition">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+              <span>3. Gross Profit (মোট লাভ)</span>
+            </span>
+            <div className="p-2 rounded-lg bg-emerald-600 text-white">
+              <Coins className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl font-extrabold text-emerald-950 dark:text-emerald-300">
+              {formatCurrency(companyProfits.totalGrossProfit)}
+            </div>
+            <div className="flex items-center justify-between mt-1 text-xs text-emerald-800 dark:text-emerald-400 font-semibold">
+              <span>Profit Margin:</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black">
+                {companyProfits.overallProfitMarginPct}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Commercial Net Profit (প্রকৃত লাভ) */}
+        <div className="bg-gradient-to-br from-teal-50/70 via-white to-sky-50/50 dark:from-gray-800 dark:to-gray-800 rounded-xl p-5 shadow-sm border border-teal-200 dark:border-teal-800/80 hover:shadow-md transition">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-300">
+              4. Net Profit (প্রকৃত লাভ)
+            </span>
+            <div className="p-2 rounded-lg bg-teal-600 text-white">
+              <Award className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl font-extrabold text-teal-950 dark:text-teal-300">
+              {formatCurrency(companyProfits.totalNetProfit)}
+            </div>
+            <div className="flex items-center justify-between mt-1 text-xs text-teal-700 dark:text-teal-400 font-medium">
+              <span>After Free & Damage deductions</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 5. Total Cash Collection */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              3. Cash Collection
+              5. Cash Collection
             </span>
             <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400">
               <DollarSign className="w-5 h-5" />
@@ -382,11 +450,11 @@ export function ExpensesPage() {
           </div>
         </div>
 
-        {/* 4. Total Operational Expenses */}
+        {/* 6. Total Operational Expenses */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              4. Operational Expenses
+              6. Operational Expenses
             </span>
             <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
               <Receipt className="w-5 h-5" />
@@ -403,34 +471,11 @@ export function ExpensesPage() {
           </div>
         </div>
 
-        {/* 5. Total Free Items */}
+        {/* 7. Total Operational Leakage */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              5. Total Free Items Value
-            </span>
-            <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
-              <Gift className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {formatCurrency(freeItems.totalCost)}
-            </div>
-            <div className="flex items-center justify-between mt-1 text-xs text-gray-500 dark:text-gray-400">
-              <span>Free Items Qty:</span>
-              <span className="font-semibold text-gray-800 dark:text-gray-200">
-                {freeItems.totalQty.toLocaleString('en-IN')} pcs
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 6. Total Damage Loss */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              6. Damage Loss
+              7. Operational Leakage
             </span>
             <div className="p-2 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
               <AlertTriangle className="w-5 h-5" />
@@ -438,33 +483,11 @@ export function ExpensesPage() {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">
-              {formatCurrency(damage.totalLossValue)}
+              {formatCurrency(businessHealth.operationalLeakage)}
             </div>
             <div className="flex items-center justify-between mt-1 text-xs text-gray-500 dark:text-gray-400">
-              <span>Damaged Qty:</span>
-              <span className="font-semibold text-rose-600 dark:text-rose-400">
-                {damage.totalQty.toLocaleString('en-IN')} pcs
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 7. Current Stock Worth (Market) */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              7. Stock Market Value
-            </span>
-            <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-              {formatCurrency(inventory.currentStockWorth)}
-            </div>
-            <div className="flex items-center justify-between mt-1 text-xs text-gray-500 dark:text-gray-400">
-              <span>Expected Sales Assets</span>
+              <span>Damage: {formatCurrency(damage.totalLossValue)}</span>
+              <span>Free: {formatCurrency(freeItems.totalCost)}</span>
             </div>
           </div>
         </div>
@@ -622,6 +645,63 @@ export function ExpensesPage() {
 
       {/* VISUAL CHARTS & BREAKDOWNS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Company Profit Ranking Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 lg:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-emerald-600" />
+                <span>Company-Wise Profit & Margin Ranking (কোম্পানি ভিত্তিক লাভ ও মার্জিন)</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Overview of gross profit, sales volume, and net profit generated per supplier company
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setActiveTab('companyProfits');
+                setTableSearch('');
+              }}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 rounded-lg flex items-center gap-1 transition hover:bg-indigo-100"
+            >
+              <span>View All ({companyProfits.list?.length || 0}) Companies</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(charts.companyProfitBreakdown || []).slice(0, 6).map((c: any, idx: number) => {
+              const totalGross = Math.max(1, companyProfits.totalGrossProfit);
+              const profitShare = Math.round((c.grossProfit / totalGross) * 100);
+              return (
+                <div key={idx} className="p-3.5 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/60 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-bold text-xs text-gray-900 dark:text-white line-clamp-1">{c.companyName}</div>
+                      <div className="text-[11px] text-gray-500">Sales: {formatCurrency(c.sales)}</div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
+                      {c.marginPct}% Margin
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-200/60 dark:border-gray-700 text-xs">
+                    <span className="text-gray-500 text-[11px]">Gross Profit:</span>
+                    <span className="font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(c.grossProfit)}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      style={{ width: `${Math.min(100, Math.max(0, profitShare))}%` }}
+                      className="bg-emerald-500 h-full rounded-full"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            {(!charts.companyProfitBreakdown || charts.companyProfitBreakdown.length === 0) && (
+              <div className="text-center py-6 text-xs text-gray-400 col-span-full">No company profit records for this period</div>
+            )}
+          </div>
+        </div>
+
         {/* Expense Category Pie Breakdown */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
@@ -737,6 +817,7 @@ export function ExpensesPage() {
           <div className="flex flex-wrap items-center gap-1">
             {[
               { id: 'overview', label: '📊 Overview' },
+              { id: 'companyProfits', label: `🏢 Company Profit (${companyProfits.list?.length || 0})` },
               { id: 'expenses', label: `💸 Expenses (${expenses.list?.length || 0})` },
               { id: 'freeItems', label: `🎁 Free Items (${freeItems.list?.length || 0})` },
               { id: 'damage', label: `⚠️ Damage Loss (${damage.list?.length || 0})` },
@@ -782,6 +863,178 @@ export function ExpensesPage() {
 
         {/* Tab Content Tables */}
         <div className="overflow-x-auto">
+          {activeTab === 'companyProfits' && (
+            <div className="space-y-4">
+              {/* Summary Stats Header for Company Profits */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-gradient-to-r from-emerald-50/80 via-teal-50/80 to-indigo-50/80 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 border border-emerald-100 dark:border-gray-700">
+                <div>
+                  <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total Sales (বিক্রয়)</div>
+                  <div className="text-base sm:text-lg font-black text-gray-900 dark:text-white mt-0.5">
+                    {formatCurrency(companyProfits.totalSalesAmount)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total Cost (ক্রয় খরচ)</div>
+                  <div className="text-base sm:text-lg font-black text-gray-700 dark:text-gray-300 mt-0.5">
+                    {formatCurrency(companyProfits.totalCostAmount)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Gross Profit (মোট লাভ)</div>
+                  <div className="text-base sm:text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    {formatCurrency(companyProfits.totalGrossProfit)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">Profit Margin (মার্জিন)</div>
+                  <div className="text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400 mt-0.5">
+                    {companyProfits.overallProfitMarginPct}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Company Profits Table */}
+              <table className="w-full text-left text-xs text-gray-700 dark:text-gray-300">
+                <thead className="bg-gray-50 dark:bg-gray-900/60 uppercase font-semibold text-gray-500">
+                  <tr>
+                    <th className="py-2.5 px-3">Company Name</th>
+                    <th className="py-2.5 px-3 text-center">Orders</th>
+                    <th className="py-2.5 px-3 text-right">Sold Units</th>
+                    <th className="py-2.5 px-3 text-right">Sales Revenue</th>
+                    <th className="py-2.5 px-3 text-right">Product Cost</th>
+                    <th className="py-2.5 px-3 text-right">Free & Damage</th>
+                    <th className="py-2.5 px-3 text-right">Gross Profit (মোট লাভ)</th>
+                    <th className="py-2.5 px-3 text-right">Net Profit (প্রকৃত লাভ)</th>
+                    <th className="py-2.5 px-3 text-center">Margin</th>
+                    <th className="py-2.5 px-3 text-center">Products</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                  {filteredTableData.map((row: any, i: number) => {
+                    const isExpanded = expandedCompanyId === row.companyId;
+                    return (
+                      <tbody key={i} className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                        <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition">
+                          <td className="py-3 px-3 font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <span className="p-1 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
+                              <Building2 className="w-3.5 h-3.5" />
+                            </span>
+                            <span>{row.companyName}</span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                              {row.totalOrders} ord
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right font-medium">{row.totalSoldQty?.toLocaleString('en-IN')} pcs</td>
+                          <td className="py-3 px-3 text-right font-semibold text-gray-900 dark:text-white">
+                            {formatCurrency(row.totalSalesAmount)}
+                          </td>
+                          <td className="py-3 px-3 text-right text-gray-600 dark:text-gray-400">
+                            {formatCurrency(row.totalCostAmount)}
+                          </td>
+                          <td className="py-3 px-3 text-right text-rose-600 dark:text-rose-400 font-medium">
+                            {row.freeItemLoss + row.damageLoss > 0 ? (
+                              <span>- {formatCurrency(row.freeItemLoss + row.damageLoss)}</span>
+                            ) : (
+                              <span className="text-gray-400">৳ 0</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-right font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                            {formatCurrency(row.grossProfit)}
+                          </td>
+                          <td className="py-3 px-3 text-right font-black text-indigo-700 dark:text-indigo-300 text-sm">
+                            {formatCurrency(row.netProfit)}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-black ${
+                              row.profitMarginPct >= 20
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : row.profitMarginPct >= 10
+                                ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300'
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            }`}>
+                              {row.profitMarginPct}%
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedCompanyId(isExpanded ? null : row.companyId)}
+                              className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition inline-flex items-center gap-1"
+                            >
+                              <span>{row.topProducts?.length || 0} Items</span>
+                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </button>
+                          </td>
+                        </tr>
+
+                        {/* Expandable Product Breakdown Row */}
+                        {isExpanded && row.topProducts && row.topProducts.length > 0 && (
+                          <tr className="bg-slate-50/90 dark:bg-slate-900/60">
+                            <td colSpan={10} className="p-4">
+                              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-gray-800 p-3 shadow-inner space-y-2">
+                                <div className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center justify-between">
+                                  <span>📦 Product Profit Breakdown for {row.companyName}:</span>
+                                  <span className="text-[11px] text-gray-500 font-normal">Sorted by highest profit</span>
+                                </div>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-gray-50 dark:bg-gray-900/40 text-[10px] uppercase font-bold text-gray-500">
+                                      <tr>
+                                        <th className="py-2 px-3">Product Name</th>
+                                        <th className="py-2 px-3">SKU</th>
+                                        <th className="py-2 px-3 text-right">Buy Price</th>
+                                        <th className="py-2 px-3 text-right">Sale Price</th>
+                                        <th className="py-2 px-3 text-right">Sold Qty</th>
+                                        <th className="py-2 px-3 text-right">Total Revenue</th>
+                                        <th className="py-2 px-3 text-right">Total Cost</th>
+                                        <th className="py-2 px-3 text-right font-bold text-emerald-600">Total Profit</th>
+                                        <th className="py-2 px-3 text-center">Margin %</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700/40">
+                                      {row.topProducts.map((p: any, pIdx: number) => (
+                                        <tr key={pIdx} className="hover:bg-gray-50/60 dark:hover:bg-gray-700/20">
+                                          <td className="py-2 px-3 font-semibold text-gray-900 dark:text-white">{p.productName}</td>
+                                          <td className="py-2 px-3 font-mono text-[11px] text-gray-500">{p.sku || '-'}</td>
+                                          <td className="py-2 px-3 text-right">{formatCurrency(p.buyPrice)}</td>
+                                          <td className="py-2 px-3 text-right">{formatCurrency(p.salePrice)}</td>
+                                          <td className="py-2 px-3 text-right font-medium">{p.soldQty} {p.unit}</td>
+                                          <td className="py-2 px-3 text-right font-semibold">{formatCurrency(p.revenue)}</td>
+                                          <td className="py-2 px-3 text-right text-gray-600">{formatCurrency(p.cost)}</td>
+                                          <td className="py-2 px-3 text-right font-black text-emerald-600 dark:text-emerald-400">
+                                            {formatCurrency(p.profit)}
+                                          </td>
+                                          <td className="py-2 px-3 text-center">
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                              {p.profitMarginPct}%
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    );
+                  })}
+                  {filteredTableData.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="text-center py-8 text-gray-400">
+                        No company profit records found for the selected period.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {activeTab === 'expenses' && (
             <table className="w-full text-left text-xs text-gray-700 dark:text-gray-300">
               <thead className="bg-gray-50 dark:bg-gray-900/60 uppercase font-semibold text-gray-500">
@@ -987,6 +1240,18 @@ export function ExpensesPage() {
                 <div className="p-3 bg-gray-50 dark:bg-gray-900/60 rounded-lg">
                   <div className="text-xs text-gray-500">Total Sales Delivered</div>
                   <div className="text-base font-bold">{formatCurrency(sales.totalSalesAmount)}</div>
+                </div>
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                  <div className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">Total Gross Profit (মোট লাভ)</div>
+                  <div className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(companyProfits.totalGrossProfit)} ({companyProfits.overallProfitMarginPct}%)
+                  </div>
+                </div>
+                <div className="p-3 bg-teal-50 dark:bg-teal-950/40 rounded-lg border border-teal-200 dark:border-teal-800">
+                  <div className="text-xs text-teal-700 dark:text-teal-400 font-bold">Commercial Net Profit (প্রকৃত লাভ)</div>
+                  <div className="text-base font-extrabold text-teal-600 dark:text-teal-400">
+                    {formatCurrency(companyProfits.totalNetProfit)}
+                  </div>
                 </div>
                 <div className="p-3 bg-gray-50 dark:bg-gray-900/60 rounded-lg">
                   <div className="text-xs text-gray-500">Cash Collected</div>

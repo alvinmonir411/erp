@@ -424,7 +424,190 @@ export class AnalyticsService {
       };
     });
 
-    // 7. BUSINESS HEALTH CALCULATIONS
+    // 7. COMPANY-WISE PROFIT & PERFORMANCE ANALYTICS
+    const orderItemsQb = this.orderItemRepository
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.product', 'product')
+      .leftJoinAndSelect('product.company', 'productCompany')
+      .leftJoinAndSelect('item.order', 'order')
+      .leftJoinAndSelect('order.company', 'orderCompany')
+      .where("order.status <> 'CANCELLED'");
+
+    if (startDate && endDate) {
+      orderItemsQb.andWhere('order.orderDate BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      });
+    }
+    if (query.routeId) {
+      orderItemsQb.andWhere('order.routeId = :rId', { rId: query.routeId });
+    }
+    if (query.deliveryManId) {
+      orderItemsQb.andWhere('order.assignedDeliveryManId = :dId', { dId: query.deliveryManId });
+    }
+    if (query.companyId) {
+      orderItemsQb.andWhere(
+        '(product.companyId = :cId OR order.companyId = :cId)',
+        { cId: query.companyId },
+      );
+    }
+    if (query.productId) {
+      orderItemsQb.andWhere('item.productId = :pId', { pId: query.productId });
+    }
+
+    const orderItems = await orderItemsQb.getMany();
+
+    // Map company free items and damages
+    const companyFreeCostMap = new Map<number, number>();
+    freeItems.forEach((fi) => {
+      const cId = fi.product?.companyId || fi.order?.companyId || 0;
+      const netQty = Math.max(0, this.safeNum(fi.freeQuantity) - this.safeNum(fi.returnedFreeQuantity));
+      const unitPrice = this.safeNum(fi.product?.buyPrice || fi.product?.salePrice);
+      const val = netQty * unitPrice;
+      companyFreeCostMap.set(cId, (companyFreeCostMap.get(cId) || 0) + val);
+    });
+
+    const companyDamageLossMap = new Map<number, number>();
+    damages.forEach((d) => {
+      const cId = d.product?.companyId || 0;
+      const qty = this.safeNum(d.quantity);
+      const price = this.safeNum(d.product?.buyPrice || d.product?.salePrice);
+      const loss = qty * price;
+      companyDamageLossMap.set(cId, (companyDamageLossMap.get(cId) || 0) + loss);
+    });
+
+    const companyMap = new Map<number, any>();
+    const orderSetByCompany = new Map<number, Set<number>>();
+
+    orderItems.forEach((item) => {
+      const company = item.product?.company || item.order?.company;
+      const companyId = company?.id || item.product?.companyId || item.order?.companyId || 0;
+      const companyName = company?.name || (companyId ? `Company #${companyId}` : 'General / Other');
+
+      if (!companyMap.has(companyId)) {
+        companyMap.set(companyId, {
+          companyId,
+          companyName,
+          totalOrders: 0,
+          totalSoldQty: 0,
+          totalSalesAmount: 0,
+          totalCostAmount: 0,
+          grossProfit: 0,
+          profitMarginPct: 0,
+          freeItemLoss: 0,
+          damageLoss: 0,
+          netProfit: 0,
+          productBreakdown: new Map<number, any>(),
+        });
+        orderSetByCompany.set(companyId, new Set<number>());
+      }
+
+      const cData = companyMap.get(companyId);
+      if (item.orderId) {
+        orderSetByCompany.get(companyId)!.add(item.orderId);
+      }
+
+      const soldQty = this.safeNum(item.deliveredPaidQuantity) > 0 
+        ? this.safeNum(item.deliveredPaidQuantity) 
+        : this.safeNum(item.quantity);
+      
+      const lineTotal = this.safeNum(item.lineTotal);
+      const unitPrice = this.safeNum(item.unitPrice) > 0 
+        ? this.safeNum(item.unitPrice) 
+        : this.safeNum(item.product?.salePrice);
+      const revenue = lineTotal > 0 ? lineTotal : soldQty * unitPrice;
+      const buyPrice = this.safeNum(item.product?.buyPrice);
+      const cost = soldQty * buyPrice;
+      const itemProfit = revenue - cost;
+
+      cData.totalSoldQty += soldQty;
+      cData.totalSalesAmount += revenue;
+      cData.totalCostAmount += cost;
+      cData.grossProfit += itemProfit;
+
+      const prodId = item.productId || item.product?.id || 0;
+      const prodName = item.product?.name || `Product #${prodId}`;
+      if (prodId > 0) {
+        if (!cData.productBreakdown.has(prodId)) {
+          cData.productBreakdown.set(prodId, {
+            productId: prodId,
+            productName: prodName,
+            sku: item.product?.sku || '',
+            unit: item.product?.unit || 'PCS',
+            buyPrice,
+            salePrice: unitPrice,
+            soldQty: 0,
+            revenue: 0,
+            cost: 0,
+            profit: 0,
+            profitMarginPct: 0,
+          });
+        }
+        const pEntry = cData.productBreakdown.get(prodId);
+        pEntry.soldQty += soldQty;
+        pEntry.revenue += revenue;
+        pEntry.cost += cost;
+        pEntry.profit += itemProfit;
+      }
+    });
+
+    let overallTotalGrossProfit = 0;
+    let overallTotalNetProfit = 0;
+    let overallTotalSalesForProfit = 0;
+    let overallTotalCostForProfit = 0;
+
+    const companyProfitsList = Array.from(companyMap.values()).map((cData) => {
+      cData.totalOrders = (orderSetByCompany.get(cData.companyId) || new Set()).size;
+      cData.freeItemLoss = companyFreeCostMap.get(cData.companyId) || 0;
+      cData.damageLoss = companyDamageLossMap.get(cData.companyId) || 0;
+      cData.netProfit = cData.grossProfit - (cData.freeItemLoss + cData.damageLoss);
+      cData.profitMarginPct = cData.totalSalesAmount > 0
+        ? Math.round((cData.grossProfit / cData.totalSalesAmount) * 1000) / 10
+        : 0;
+
+      overallTotalGrossProfit += cData.grossProfit;
+      overallTotalNetProfit += cData.netProfit;
+      overallTotalSalesForProfit += cData.totalSalesAmount;
+      overallTotalCostForProfit += cData.totalCostAmount;
+
+      const topProducts = Array.from(cData.productBreakdown.values())
+        .map((p: any) => ({
+          ...p,
+          profitMarginPct: p.revenue > 0 ? Math.round((p.profit / p.revenue) * 1000) / 10 : 0,
+        }))
+        .sort((a: any, b: any) => b.profit - a.profit);
+
+      return {
+        companyId: cData.companyId,
+        companyName: cData.companyName,
+        totalOrders: cData.totalOrders,
+        totalSoldQty: cData.totalSoldQty,
+        totalSalesAmount: cData.totalSalesAmount,
+        totalCostAmount: cData.totalCostAmount,
+        grossProfit: cData.grossProfit,
+        profitMarginPct: cData.profitMarginPct,
+        freeItemLoss: cData.freeItemLoss,
+        damageLoss: cData.damageLoss,
+        netProfit: cData.netProfit,
+        topProducts,
+      };
+    }).sort((a, b) => b.grossProfit - a.grossProfit);
+
+    const overallProfitMarginPct = overallTotalSalesForProfit > 0
+      ? Math.round((overallTotalGrossProfit / overallTotalSalesForProfit) * 1000) / 10
+      : 0;
+
+    const companyProfits = {
+      totalGrossProfit: overallTotalGrossProfit,
+      totalNetProfit: overallTotalNetProfit,
+      totalSalesAmount: overallTotalSalesForProfit,
+      totalCostAmount: overallTotalCostForProfit,
+      overallProfitMarginPct,
+      topCompany: companyProfitsList[0] || null,
+      list: companyProfitsList,
+    };
+
+    // 8. BUSINESS HEALTH CALCULATIONS
     const operationalLeakage = grandTotalExpenses + totalDamageLoss + totalFreeCost;
     const leakagePct = totalStockValue > 0
       ? Math.round((operationalLeakage / totalStockValue) * 1000) / 10
@@ -450,8 +633,17 @@ export class AnalyticsService {
       healthBadgeColor = 'yellow';
     }
 
-    // 8. GENERATE SMART INSIGHTS
+    // 9. GENERATE SMART INSIGHTS
     const insights: any[] = [];
+
+    // Highest profit generating company
+    if (companyProfitsList.length > 0 && companyProfitsList[0].grossProfit > 0) {
+      insights.push({
+        type: 'success',
+        title: `সর্বোচ্চ লাভজনক কোম্পানি: ${companyProfitsList[0].companyName}`,
+        description: `এই কোম্পানি থেকে মোট বিক্রয় ৳ ${companyProfitsList[0].totalSalesAmount.toLocaleString('en-IN')}, মোট লাভ ৳ ${companyProfitsList[0].grossProfit.toLocaleString('en-IN')} (প্রকৃত লাভ ৳ ${companyProfitsList[0].netProfit.toLocaleString('en-IN')}, মার্জিন ${companyProfitsList[0].profitMarginPct}%)।`,
+      });
+    }
 
     // Highest expense route
     const routeBreakdown = Array.from(routeExpenseMap.entries())
@@ -515,7 +707,7 @@ export class AnalyticsService {
       description: `মোট লিকুইডেশন/ক্ষতির হার স্টকের ${leakagePct}% (অপারেটিং লিকেজ ৳ ${operationalLeakage.toLocaleString('en-IN')})।`,
     });
 
-    // 9. CHARTS DATA PREPARATION
+    // 10. CHARTS DATA PREPARATION
     const expenseTrend = Array.from(dateExpenseMap.entries())
       .map(([date, val]) => ({ date, ...val }))
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -535,6 +727,15 @@ export class AnalyticsService {
       { name: 'ফ্রি মালামাল মুল্য (Free Items)', amount: totalFreeCost },
     ];
 
+    const companyProfitBreakdown = companyProfitsList.map((c) => ({
+      companyName: c.companyName,
+      sales: c.totalSalesAmount,
+      cost: c.totalCostAmount,
+      grossProfit: c.grossProfit,
+      netProfit: c.netProfit,
+      marginPct: c.profitMarginPct,
+    }));
+
     return {
       inventory: {
         totalStockQty,
@@ -549,6 +750,7 @@ export class AnalyticsService {
         totalOrders: totalOrdersCount,
         list: salesList,
       },
+      companyProfits,
       collections: {
         totalCollectedCash,
         pendingCollection,
@@ -592,6 +794,7 @@ export class AnalyticsService {
         operationalLeakageBreakdown,
         routeWiseExpense: routeBreakdown,
         deliveryPersonExpense: personBreakdown,
+        companyProfitBreakdown,
       },
       filters: {
         preset,
