@@ -247,38 +247,38 @@ export function ProductsPage() {
     <div className="flex flex-col gap-6">
       {/* 1. Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-8">
-          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Products</div>
-            <div className="mt-1 text-2xl font-bold text-slate-900">{formatNumber(summary.totalProducts)}</div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 2xl:grid-cols-8">
+          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Products</div>
+            <div className="mt-1 text-xl sm:text-2xl font-black text-slate-900">{formatNumber(summary.totalProducts)}</div>
           </div>
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
-            <div className="text-xs font-medium text-emerald-700 uppercase tracking-wider">In Stock</div>
-            <div className="mt-1 text-2xl font-bold text-emerald-800">{formatNumber(summary.inStockProducts)}</div>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5 shadow-sm">
+            <div className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">In Stock</div>
+            <div className="mt-1 text-xl sm:text-2xl font-black text-emerald-800">{formatNumber(summary.inStockProducts)}</div>
           </div>
-          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Active</div>
-            <div className="mt-1 text-2xl font-bold text-emerald-700">{formatNumber(summary.activeProducts)}</div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
+            <div className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Active</div>
+            <div className="mt-1 text-xl sm:text-2xl font-black text-emerald-700">{formatNumber(summary.activeProducts)}</div>
           </div>
-          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium text-rose-600 uppercase tracking-wider">Inactive</div>
-            <div className="mt-1 text-2xl font-bold text-rose-700">{formatNumber(summary.inactiveProducts)}</div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
+            <div className="text-[11px] font-semibold text-rose-600 uppercase tracking-wider">Inactive</div>
+            <div className="mt-1 text-xl sm:text-2xl font-black text-rose-700">{formatNumber(summary.inactiveProducts)}</div>
           </div>
-          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
-            <div className="text-xs font-medium text-amber-700 uppercase tracking-wider">Low Stock</div>
-            <div className="mt-1 text-2xl font-bold text-amber-800">{formatNumber(summary.lowStockProducts)}</div>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3.5 shadow-sm">
+            <div className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">Low Stock</div>
+            <div className="mt-1 text-xl sm:text-2xl font-black text-amber-800">{formatNumber(summary.lowStockProducts)}</div>
           </div>
-          <div className="rounded-3xl border border-rose-100 bg-rose-50 p-4 shadow-sm">
-            <div className="text-xs font-medium text-rose-700 uppercase tracking-wider">Out of Stock</div>
-            <div className="mt-1 text-2xl font-bold text-rose-800">{formatNumber(summary.outOfStockProducts)}</div>
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3.5 shadow-sm">
+            <div className="text-[11px] font-semibold text-rose-700 uppercase tracking-wider">Out of Stock</div>
+            <div className="mt-1 text-xl sm:text-2xl font-black text-rose-800">{formatNumber(summary.outOfStockProducts)}</div>
           </div>
-          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Stock Qty</div>
-            <div className="mt-1 text-xl font-bold text-slate-900">{formatNumber(summary.totalStockQuantity)}</div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Stock Qty</div>
+            <div className="mt-1 text-xl sm:text-2xl font-black text-slate-900">{formatNumber(summary.totalStockQuantity)}</div>
           </div>
-          <div className="rounded-3xl border border-indigo-100 bg-indigo-50 p-4 shadow-sm col-span-2 md:col-span-4 xl:col-span-2">
-            <div className="text-xs font-medium text-indigo-700 uppercase tracking-wider">Stock Value</div>
-            <div className="mt-1 text-xl font-bold text-indigo-900">{formatCurrency(summary.totalStockValue)}</div>
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-3.5 shadow-sm col-span-2 sm:col-span-1 md:col-span-1 lg:col-span-1 2xl:col-span-1">
+            <div className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">Stock Value</div>
+            <div className="mt-1 text-lg sm:text-xl font-black text-indigo-900 break-normal">{formatCurrency(summary.totalStockValue)}</div>
           </div>
         </div>
       )}
