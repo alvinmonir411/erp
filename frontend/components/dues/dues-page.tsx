@@ -101,7 +101,7 @@ export function DuesPage() {
       const orderData = await getOrder(orderId);
       setViewingOrder(orderData);
     } catch (err: any) {
-      showErrorToast(err.message || 'অর্ডার তথ্য লোড হতে ব্যর্থ হয়েছে');
+      showErrorToast(err.message || 'Failed to load order details');
     } finally {
       setIsViewingOrderLoading(false);
     }
@@ -173,11 +173,11 @@ export function DuesPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PAID':
-        return { label: 'পরিশোধিত', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { label: 'Total Paid', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
       case 'PARTIAL':
-        return { label: 'আংশিক বাকি', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+        return { label: 'Partial Due', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
       default:
-        return { label: 'বাকি আছে', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
+        return { label: 'Unpaid Due', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
     }
   };
 
@@ -186,8 +186,8 @@ export function DuesPage() {
       {/* Header & Tabs in Natural Bangla */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between no-print">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">বকেয়া ও কালেকশন ব্যবস্থাপনা</h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">দোকানের বাকি পাওনা, নগদ আদায় ও পেমেন্ট অনুমোদন</p>
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Due & Collection Management</h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Shop due ledgers, cash collections, and payment approvals</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -195,14 +195,14 @@ export function DuesPage() {
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-black text-white shadow-md shadow-indigo-500/20"
           >
             <DollarSign className="w-4 h-4" />
-            বকেয়া তালিকা
+            Due List
           </Link>
           <Link
             href="/dues/collections"
             className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
           >
             <Clock className="w-4 h-4 text-amber-500" />
-            আদায় হিস্ট্রি
+            Collection History
           </Link>
           {user?.role === Role.SUPER_ADMIN && (
             <>
@@ -211,14 +211,14 @@ export function DuesPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 <CheckCircle className="w-4 h-4 text-emerald-500" />
-                পেমেন্ট অনুমোদন
+                Payment Approvals
               </Link>
               <button
                 onClick={() => setIsManualDueModalOpen(true)}
                 className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2 text-xs sm:text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
               >
                 <Plus className="w-4 h-4" />
-                নতুন বাকি এন্ট্রি
+                + Manual Due Entry
               </button>
             </>
           )}
@@ -233,7 +233,7 @@ export function DuesPage() {
               <AlertCircle className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">মার্কেটে মোট বাকি পাওনা</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Market Receivable</p>
               <p className="text-xl sm:text-2xl font-black text-rose-600 mt-0.5">
                 {formatCurrency(stats?.totalRemaining ?? 0)}
               </p>
@@ -247,7 +247,7 @@ export function DuesPage() {
               <CheckCircle className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">মোট নগদ আদায়</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Cash Collected</p>
               <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">
                 {formatCurrency(stats?.totalPaid ?? 0)}
               </p>
@@ -261,7 +261,7 @@ export function DuesPage() {
               <Clock className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">অনুমোদনের অপেক্ষায় জমা</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Approval</p>
               <p className="text-xl sm:text-2xl font-black text-amber-600 mt-0.5">
                 {formatCurrency(stats?.pendingApproval ?? 0)}
               </p>
@@ -275,9 +275,9 @@ export function DuesPage() {
               <FileText className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">চলতি বকেয়া চালান</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Due Invoices</p>
               <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
-                {dues.filter((d: any) => d.remainingDue > 0).length} টি
+                {dues.filter((d: any) => d.remainingDue > 0).length} Invoices
               </p>
             </div>
           </div>
@@ -293,7 +293,7 @@ export function DuesPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="দোকানের নাম, মালিকের নাম, মোবাইল নম্বর..."
+                placeholder="Search by shop name, owner, or mobile number..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
@@ -307,7 +307,7 @@ export function DuesPage() {
                 onChange={(e) => setSelectedDeliveryMan(e.target.value)}
                 className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
               >
-                <option value="">সকল ডেলিভারিম্যান</option>
+                <option value="">All Delivery Personnel</option>
                 {uniqueDeliveryMen.map(name => (
                   <option key={name} value={name}>{name}</option>
                 ))}
@@ -321,7 +321,7 @@ export function DuesPage() {
                 onChange={(e) => setSelectedSR(e.target.value)}
                 className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
               >
-                <option value="">সকল এসআর (SR)</option>
+                <option value="">All Sales Representatives (SR)</option>
                 {uniqueSRs.map(name => (
                   <option key={name} value={name}>{name}</option>
                 ))}
@@ -335,7 +335,7 @@ export function DuesPage() {
                 onChange={(e) => setSelectedCompany(e.target.value)}
                 className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
               >
-                <option value="">সকল কোম্পানি</option>
+                <option value="">All Companies</option>
                 {uniqueCompanies.map(name => (
                   <option key={name} value={name}>{name}</option>
                 ))}
@@ -349,7 +349,7 @@ export function DuesPage() {
                 onChange={(e) => setSelectedRoute(e.target.value)}
                 className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
               >
-                <option value="">সকল রুট / এলাকা</option>
+                <option value="">All Routes / Areas</option>
                 {uniqueRoutes.map(name => (
                   <option key={name} value={name}>{name}</option>
                 ))}
@@ -360,7 +360,7 @@ export function DuesPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200/60">
             {/* Date Filter */}
             <div className="flex items-center gap-2.5">
-              <span className="text-xs text-slate-500 font-bold">অর্ডারের তারিখ:</span>
+              <span className="text-xs text-slate-500 font-bold">Order Date:</span>
               <input
                 type="date"
                 value={selectedDate}
@@ -372,14 +372,14 @@ export function DuesPage() {
                   onClick={handleResetFilters}
                   className="text-xs text-rose-600 hover:text-rose-700 font-bold hover:underline ml-2"
                 >
-                  ফিল্টার মুছুন
+                  Clear Filters
                 </button>
               )}
             </div>
 
             {/* Total due in filtered list */}
             <div className="text-xs text-slate-600 font-bold">
-              ফিল্টারকৃত মোট বাকি: <span className="text-rose-600 font-black text-sm">{formatCurrency(filteredDuesTotalRemaining)}</span>
+              Filtered Total Due: <span className="text-rose-600 font-black text-sm">{formatCurrency(filteredDuesTotalRemaining)}</span>
             </div>
           </div>
         </div>
@@ -389,13 +389,13 @@ export function DuesPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="px-5 py-3.5">দোকান ও অর্ডার</th>
-                <th className="px-5 py-3.5">ডেলিভারিম্যান</th>
-                <th className="px-5 py-3.5">মূল বাকি</th>
-                <th className="px-5 py-3.5">পরিশোধিত</th>
-                <th className="px-5 py-3.5">অবশিষ্ট বাকি</th>
-                <th className="px-5 py-3.5">অবস্থা</th>
-                <th className="px-5 py-3.5 text-right">অ্যাকশন</th>
+                <th className="px-5 py-3.5">Shop & Order</th>
+                <th className="px-5 py-3.5">Delivery Person</th>
+                <th className="px-5 py-3.5">Original Due</th>
+                <th className="px-5 py-3.5">Total Paid</th>
+                <th className="px-5 py-3.5">Remaining Due</th>
+                <th className="px-5 py-3.5">Status</th>
+                <th className="px-5 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -403,13 +403,13 @@ export function DuesPage() {
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center">
                     <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto" />
-                    <p className="mt-2 text-xs font-bold text-slate-400">বকেয়া তালিকা লোড হচ্ছে...</p>
+                    <p className="mt-2 text-xs font-bold text-slate-400">Loading due records...</p>
                   </td>
                 </tr>
               ) : filteredDues.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm font-bold">
-                    কোনো বকেয়া বাকি পাওয়া যায়নি।
+                    No due records found.
                   </td>
                 </tr>
               ) : (
@@ -430,13 +430,13 @@ export function DuesPage() {
                               }}
                               className="font-black text-slate-900 hover:text-indigo-600 transition-colors text-left hover:underline block text-sm"
                             >
-                              {due.shop?.name || 'সরাসরি বিক্রি'}
+                              {due.shop?.name || 'Direct Sale'}
                             </button>
                             <button
                               onClick={() => handleViewOrder(due.orderId)}
                               className="text-[10px] font-black text-indigo-600 hover:underline tracking-tight block text-left mt-0.5"
                             >
-                              অর্ডার #{due.orderId}
+                              Order #{due.orderId}
                             </button>
                           </div>
                         </div>
@@ -469,7 +469,7 @@ export function DuesPage() {
                               setIsHistoryModalOpen(true);
                             }}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200"
-                            title="আদায় হিস্ট্রি দেখুন"
+                            title="View Collection History"
                           >
                             <History className="w-4 h-4" />
                           </button>
@@ -482,7 +482,7 @@ export function DuesPage() {
                               className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
                             >
                               <DollarSign className="w-3.5 h-3.5" />
-                              আদায়
+                              Collect
                             </button>
                           )}
                         </div>
@@ -500,11 +500,11 @@ export function DuesPage() {
           {isLoading ? (
             <div className="p-12 text-center">
               <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto" />
-              <p className="mt-2 text-xs text-slate-400 font-bold">বকেয়া তালিকা লোড হচ্ছে...</p>
+              <p className="mt-2 text-xs text-slate-400 font-bold">Loading due records...</p>
             </div>
           ) : filteredDues.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs font-bold">
-              কোনো বকেয়া বাকি পাওয়া যায়নি।
+              No due records found.
             </div>
           ) : (
             filteredDues.map((due: any) => {
@@ -524,15 +524,15 @@ export function DuesPage() {
                           }}
                           className="font-black text-slate-900 hover:text-indigo-600 text-sm transition-colors text-left hover:underline block"
                         >
-                          {due.shop?.name || 'সরাসরি বিক্রি'}
+                          {due.shop?.name || 'Direct Sale'}
                         </button>
                         <button
                           onClick={() => handleViewOrder(due.orderId)}
                           className="text-[10px] font-black text-indigo-600 hover:underline tracking-tight block text-left mb-0.5"
                         >
-                          অর্ডার #{due.orderId}
+                          Order #{due.orderId}
                         </button>
-                        <p className="text-[10px] font-medium text-slate-400">ডেলিভারিম্যান: {due.deliveryManName || '—'}</p>
+                        <p className="text-[10px] font-medium text-slate-400">Delivery Person: {due.deliveryManName || '—'}</p>
                       </div>
                     </div>
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${badge.cls}`}>
@@ -542,15 +542,15 @@ export function DuesPage() {
                   
                   <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">মূল বাকি</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Original Due</p>
                       <p className="font-bold text-slate-900 text-xs sm:text-sm">{formatCurrency(due.dueAmount)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">পরিশোধিত</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Total Paid</p>
                       <p className="font-bold text-emerald-600 text-xs sm:text-sm">{formatCurrency(due.paidAmount)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">অবশিষ্ট বাকি</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Remaining Due</p>
                       <p className={`font-black text-xs sm:text-sm ${due.remainingDue > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                         {formatCurrency(due.remainingDue)}
                       </p>
@@ -566,7 +566,7 @@ export function DuesPage() {
                       className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors"
                     >
                       <History className="w-4 h-4" />
-                      হিস্ট্রি
+                      History
                     </button>
                     {due.remainingDue > 0 && (
                       <button
@@ -577,7 +577,7 @@ export function DuesPage() {
                         className="flex-[2] inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
                       >
                         <DollarSign className="w-4 h-4" />
-                        আদায় করুন
+                        Collect Payment
                       </button>
                     )}
                   </div>
@@ -610,7 +610,7 @@ export function DuesPage() {
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/30 backdrop-blur-xs">
           <div className="bg-white p-6 rounded-2xl shadow-xl flex items-center gap-3">
             <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-            <span className="text-sm font-bold text-slate-700">অর্ডারের তথ্য লোড হচ্ছে...</span>
+            <span className="text-sm font-bold text-slate-700">Loading order details...</span>
           </div>
         </div>
       )}
@@ -675,17 +675,17 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
     const parsedAmount = Number(amount);
 
     if (!shopId) {
-      showErrorToast('অনুগ্রহ করে একটি দোকান নির্বাচন করুন।');
+      showErrorToast('Please select a shop.');
       return;
     }
 
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      showErrorToast('টাকার পরিমাণ ০ এর বেশি হতে হবে।');
+      showErrorToast('Amount must be greater than 0.');
       return;
     }
 
     if (reason.trim().length < 3) {
-      showErrorToast('বাকির কারণ কমপক্ষে ৩ অক্ষরের হতে হবে।');
+      showErrorToast('Reason must be at least 3 characters long.');
       return;
     }
 
@@ -697,11 +697,11 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
         reason: reason.trim(),
         note: note.trim() || undefined,
       });
-      showSuccessToast('নতুন বকেয়া সফলভাবে যুক্ত হয়েছে।');
+      showSuccessToast('New manual due added successfully.');
       onSuccess();
       onClose();
     } catch (err: any) {
-      showErrorToast(err.message || 'বকেয়া যোগ করতে ব্যর্থ হয়েছে');
+      showErrorToast(err.message || 'Failed to add manual due.');
     } finally {
       setIsSubmitting(false);
     }
@@ -711,7 +711,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in duration-200 mb-0 pb-safe pb-4 sm:pb-0">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <h3 className="text-base sm:text-lg font-black text-slate-900">নতুন বকেয়া বাকি এন্ট্রি</h3>
+          <h3 className="text-base sm:text-lg font-black text-slate-900">Add Manual Due Entry</h3>
           <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
             <XCircle className="w-5 h-5 text-slate-400" />
           </button>
@@ -719,7 +719,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="space-y-1.5 relative">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">দোকান নির্বাচন করুন</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Select Shop</label>
 
             {selectedShop ? (
               <div className="flex items-center justify-between p-3 border border-indigo-200 rounded-xl bg-indigo-50/40 shadow-xs">
@@ -730,7 +730,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
                   <div>
                     <p className="text-sm font-bold text-slate-900">{selectedShop.name}</p>
                     <p className="text-xs text-slate-500">
-                      {selectedShop.route?.name ? `রুট: ${selectedShop.route.name}` : ''}
+                      {selectedShop.route?.name ? `Route: ${selectedShop.route.name}` : ''}
                       {selectedShop.ownerName ? ` · ${selectedShop.ownerName}` : ''}
                     </p>
                   </div>
@@ -740,7 +740,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
                   onClick={() => { setShopId(''); setShopSearch(''); setIsDropdownOpen(true); }}
                   className="text-xs font-bold text-indigo-600 hover:underline px-2 py-1"
                 >
-                  পরিবর্তন
+                  Change
                 </button>
               </div>
             ) : (
@@ -755,13 +755,13 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
                       setIsDropdownOpen(true);
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
-                    placeholder="দোকানের নাম, রুট বা মোবাইল দিয়ে খুঁজুন..."
+                    placeholder="Search shop by name, route or mobile..."
                     disabled={isLoading}
                     className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
                   />
                 </div>
 
-                {isLoading && <p className="text-[10px] text-slate-400 mt-1">দোকানের তালিকা লোড হচ্ছে...</p>}
+                {isLoading && <p className="text-[10px] text-slate-400 mt-1">Loading shops...</p>}
 
                 {isDropdownOpen && !isLoading && (
                   <div className="absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-50 divide-y divide-slate-100">
@@ -780,7 +780,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
                           <div>
                             <p className="text-sm font-bold text-slate-900">{shop.name}</p>
                             <p className="text-xs text-slate-500">
-                              {shop.route?.name ? `রুট: ${shop.route.name}` : 'রুট নেই'}
+                              {shop.route?.name ? `Route: ${shop.route.name}` : 'No Route'}
                               {shop.ownerName ? ` · ${shop.ownerName}` : ''}
                             </p>
                           </div>
@@ -792,7 +792,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
                         </button>
                       ))
                     ) : (
-                      <div className="p-4 text-center text-xs text-slate-400">&quot;{shopSearch}&quot; নামে কোনো দোকান পাওয়া যায়নি</div>
+                      <div className="p-4 text-center text-xs text-slate-400">&quot;{shopSearch}&quot; No shops found</div>
                     )}
                   </div>
                 )}
@@ -801,7 +801,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">বাকি টাকার পরিমাণ (৳)</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Due Amount (৳)</label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -817,7 +817,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">বাকির কারণ / রেফারেন্স</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Due Reason / Reference</label>
             <input
               type="text"
               required
@@ -826,32 +826,32 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              placeholder="যেমন: পূর্বের মেমোর বকেয়া টাকা"
+              placeholder="e.g., Previous unpaid balance, adjustment memo"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">নোট (ঐচ্ছিক)</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Notes (Optional)</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               maxLength={2000}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              placeholder="অতিরিক্ত কোনো তথ্য থাকলে লিখুন..."
+              placeholder="Add any additional notes here..."
             />
           </div>
 
           <div className="pt-3 flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-xs sm:text-sm font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-              বাতিল
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || isLoading}
               className="flex-1 px-4 py-2 text-xs sm:text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md shadow-indigo-500/20 disabled:opacity-50"
             >
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'বাকি সংরক্ষণ করুন'}
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Due Entry'}
             </button>
           </div>
         </form>
@@ -883,12 +883,12 @@ function CollectModal({ due, onClose, onSuccess }: { due: any, onClose: () => vo
     const collectAmount = Number(amount);
     
     if (collectAmount <= 0) {
-      showErrorToast('আদায়ের পরিমাণ ০ এর বেশি হতে হবে');
+      showErrorToast('Collection amount must be greater than 0.');
       return;
     }
     
     if (collectAmount > maxCollectable) {
-      showErrorToast(`আদায়ের পরিমাণ সর্বোচ্চ সীমা (${formatCurrency(maxCollectable)}) এর বেশি হতে পারবে না।`);
+      showErrorToast(`Collection amount cannot exceed (${formatCurrency(maxCollectable)}) maximum collectable balance.`);
       return;
     }
 
@@ -900,11 +900,11 @@ function CollectModal({ due, onClose, onSuccess }: { due: any, onClose: () => vo
         note,
         collectionDate: date
       });
-      showSuccessToast('কালেকশনটি সফলভাবে অনুমোদনের জন্য জমা দেওয়া হয়েছে।');
+      showSuccessToast('Collection submitted successfully for approval.');
       onSuccess();
       onClose();
     } catch (err: any) {
-      showErrorToast(err.message || 'কালেকশন জমা হতে ব্যর্থ হয়েছে');
+      showErrorToast(err.message || 'Failed to submit collection.');
     } finally {
       setIsSubmitting(false);
     }
@@ -914,7 +914,7 @@ function CollectModal({ due, onClose, onSuccess }: { due: any, onClose: () => vo
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm">
       <div className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in duration-200 mb-0 pb-safe pb-4 sm:pb-0">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <h3 className="text-base sm:text-lg font-black text-slate-900">বকেয়া টাকা আদায় (Collection)</h3>
+          <h3 className="text-base sm:text-lg font-black text-slate-900">Collect Due Payment</h3>
           <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
             <XCircle className="w-5 h-5 text-slate-400" />
           </button>
@@ -923,27 +923,27 @@ function CollectModal({ due, onClose, onSuccess }: { due: any, onClose: () => vo
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 space-y-2 text-xs sm:text-sm">
             <div className="flex justify-between">
-              <span className="text-slate-500">দোকান:</span>
+              <span className="text-slate-500">Shop:</span>
               <span className="font-bold text-slate-900">{due.shop?.name}</span>
             </div>
             <div className="flex justify-between text-rose-600">
-              <span className="font-medium">অবশিষ্ট বাকি:</span>
+              <span className="font-medium">Remaining Due:</span>
               <span className="font-black">{formatCurrency(due.remainingDue)}</span>
             </div>
             {pendingAmount > 0 && (
               <div className="flex justify-between text-amber-600">
-                <span className="font-medium">অনুমোদনের অপেক্ষায় আছে:</span>
+                <span className="font-medium">Pending Approval:</span>
                 <span className="font-bold">-{formatCurrency(pendingAmount)}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-slate-200 pt-2 font-black text-emerald-600">
-              <span>সর্বোচ্চ আদায়যোগ্য:</span>
+              <span>Max Collectable:</span>
               <span>{formatCurrency(maxCollectable)}</span>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">আদায়ের পরিমাণ (৳)</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Collection Amount (৳)</label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -960,7 +960,7 @@ function CollectModal({ due, onClose, onSuccess }: { due: any, onClose: () => vo
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">আদায়ের তারিখ</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Collection Date</label>
             <input
               type="date"
               required
@@ -971,26 +971,26 @@ function CollectModal({ due, onClose, onSuccess }: { due: any, onClose: () => vo
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">নোট / মন্তব্য (ঐচ্ছিক)</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Notes / Comments (Optional)</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              placeholder="পেমেন্ট সম্পর্কিত বিবরণ..."
+              placeholder="Payment reference or notes..."
             />
           </div>
 
           <div className="pt-3 flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-xs sm:text-sm font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-              বাতিল
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || maxCollectable <= 0}
               className="flex-1 px-4 py-2 text-xs sm:text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md shadow-indigo-500/20 disabled:opacity-50"
             >
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'জমা দিন'}
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Collection'}
             </button>
           </div>
         </form>
@@ -1008,11 +1008,11 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'APPROVED':
-        return { label: 'অনুমোদিত', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { label: 'Approved', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
       case 'PENDING':
-        return { label: 'পেন্ডিং', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+        return { label: 'Pending', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
       default:
-        return { label: 'বাতিল', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
+        return { label: 'Cancel', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
     }
   };
 
@@ -1021,8 +1021,8 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
       <div className="w-full sm:max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in duration-200">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
           <div>
-            <h3 className="text-base sm:text-lg font-black text-slate-900 leading-none">আদায় ও পেমেন্ট হিস্ট্রি</h3>
-            <p className="text-xs font-bold text-slate-500 mt-1">দোকান: {due.shop?.name} · অর্ডার #{due.orderId}</p>
+            <h3 className="text-base sm:text-lg font-black text-slate-900 leading-none">Payment & Collection History</h3>
+            <p className="text-xs font-bold text-slate-500 mt-1">Shop: {due.shop?.name} · Order #{due.orderId}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
             <XCircle className="w-5 h-5 text-slate-400" />
@@ -1032,15 +1032,15 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
         <div className="p-6 overflow-y-auto space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
              <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-100">
-                <p className="text-[10px] font-black uppercase text-slate-400">মূল বাকি</p>
+                <p className="text-[10px] font-black uppercase text-slate-400">Original Due</p>
                 <p className="text-lg font-black text-slate-900 mt-0.5">{formatCurrency(due.dueAmount)}</p>
              </div>
              <div className="rounded-xl bg-emerald-50 p-3.5 border border-emerald-100">
-                <p className="text-[10px] font-black uppercase text-emerald-600">পরিশোধিত</p>
+                <p className="text-[10px] font-black uppercase text-emerald-600">Total Paid</p>
                 <p className="text-lg font-black text-emerald-700 mt-0.5">{formatCurrency(due.paidAmount)}</p>
              </div>
              <div className="rounded-xl bg-rose-50 p-3.5 border border-rose-100">
-                <p className="text-[10px] font-black uppercase text-rose-600">অবশিষ্ট বাকি</p>
+                <p className="text-[10px] font-black uppercase text-rose-600">Remaining Due</p>
                 <p className="text-lg font-black text-rose-700 mt-0.5">{formatCurrency(due.remainingDue)}</p>
              </div>
           </div>
@@ -1049,10 +1049,10 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
             <table className="w-full min-w-[400px] text-left text-sm">
               <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3">তারিখ</th>
-                  <th className="px-4 py-3">আদায়কারী (SR)</th>
-                  <th className="px-4 py-3 text-right">আদায়ের পরিমাণ</th>
-                  <th className="px-4 py-3 text-center">অবস্থা</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Collected By (SR)</th>
+                  <th className="px-4 py-3 text-right">Amount Collected</th>
+                  <th className="px-4 py-3 text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1064,7 +1064,7 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
                   </tr>
                 ) : collections.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400 text-xs font-bold">কোনো পূর্বের আদায় হিস্ট্রি নেই।</td>
+                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400 text-xs font-bold">No prior collection history found.</td>
                   </tr>
                 ) : (
                   collections.map((c: any) => {
@@ -1090,7 +1090,7 @@ function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
         
         <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
           <button onClick={onClose} className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold">
-            বন্ধ করুন
+            Close
           </button>
         </div>
       </div>

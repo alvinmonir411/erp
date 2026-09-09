@@ -611,7 +611,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       });
 
       if (actualCashReceived === '' || actualCashReceived === null || actualCashReceived === undefined || isNaN(Number(actualCashReceived))) {
-        showErrorToast('Actual Cash Received by Admin constraint: অ্যাডমিন কতৃক প্রাপ্ত নগদ টাকা ফিল্ডটি দেওয়া বাধ্যতামূলক!');
+        showErrorToast('Actual Cash Received by Admin constraint: Cash received field is required!');
         return;
       }
 
@@ -1312,13 +1312,13 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   {/* Expense Entry Section */}
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                      <p className="text-xs font-black uppercase text-slate-900 tracking-wider">ডেলিভারি ম্যানের দৈনিক খরচ (EXPENSES)</p>
-                      <p className="text-xs font-black text-rose-600">মোট: {formatCurrency(totalExpensesVal)}</p>
+                      <p className="text-xs font-black uppercase text-slate-900 tracking-wider">Delivery Daily Expenses</p>
+                      <p className="text-xs font-black text-rose-600">Total: {formatCurrency(totalExpensesVal)}</p>
                     </div>
 
                     {/* Default Field: Van Rent */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">ভ্যান ভাড়া (VAN RENT)</label>
+                      <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Van Rent</label>
                       <input
                         type="number"
                         value={vanRent}
@@ -1331,14 +1331,14 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                     {/* Custom Expenses List */}
                     {customExpenses.length > 0 && (
                       <div className="space-y-3 pt-2 border-t border-slate-200">
-                        <p className="text-[10px] font-black uppercase text-slate-500">অতিরিক্ত খরচের ফিল্ডসমূহ</p>
+                        <p className="text-[10px] font-black uppercase text-slate-500">Additional Expenses</p>
                         {customExpenses.map((exp, idx) => (
                           <div key={exp.id || idx} className="bg-white p-3 rounded-2xl border border-slate-200 space-y-2 shadow-xs">
                             {/* Top row: Name Input & Remove Button */}
                             <div className="flex items-center justify-between gap-2">
                               <input
                                 type="text"
-                                placeholder="খরচের নাম (যেমন: বেতন/লেবার, ফুয়েল, খাবার)"
+                                placeholder="Expense description (e.g. Labor, Fuel, Food)"
                                 value={exp.name}
                                 onChange={(e) => {
                                   const updated = [...customExpenses];
@@ -1362,7 +1362,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                             {/* Bottom row: Price Input */}
                             <div className="space-y-1">
                               <label className="text-[10px] font-bold text-slate-400 uppercase">
-                                {exp.name.trim() ? `${exp.name.trim()} (পরিমাণ / কয় টাকা)` : 'পরিমাণ (কয় টাকা)'}
+                                {exp.name.trim() ? `${exp.name.trim()} (Amount ৳)` : 'Amount (৳)'}
                               </label>
                               <input
                                 type="number"
@@ -1391,38 +1391,38 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                       }}
                       className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 bg-white text-xs font-black uppercase tracking-wider text-slate-700 hover:bg-slate-100 transition-colors shadow-xs"
                     >
-                      + ADD EXPENSE (অতিরিক্ত খরচ যোগ করুন)
+                      + Add Expense
                     </button>
                   </div>
 
                   {/* Settlement Formula Card */}
                   <div className="rounded-2xl bg-slate-900 text-white p-4 space-y-2">
                     <div className="flex justify-between items-center text-xs font-medium text-slate-300">
-                      <span>Gross Order / Dispatch Amount (মোট অর্ডার মূল্য)</span>
+                      <span>Gross Order / Dispatch Amount</span>
                       <span>{formatCurrency(currentGrossDispatched)}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs font-medium text-rose-400">
-                      <span>(-) Total Paid Return Amount (রিটার্ন মূল্য)</span>
+                      <span>(-) Total Return Amount</span>
                       <span>- {formatCurrency(currentReturnAdjusted)}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs font-bold text-white border-t border-white/10 pt-1.5">
-                      <span>= Gross Sold Amount (বিক্রি মূল্য)</span>
+                      <span>= Gross Sold Amount</span>
                       <span>{formatCurrency(currentFinalAmount)}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs font-medium text-rose-400">
-                      <span>(-) Total Customer Due/Baki (মোট বাকি)</span>
+                      <span>(-) Total Customer Due</span>
                       <span>- {formatCurrency(currentCustomerDue)}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs font-bold text-emerald-400 border-t border-white/10 pt-1.5">
-                      <span>= Gross Cash Collectable (সংগ্রহযোগ্য ক্যাশ)</span>
+                      <span>= Gross Cash Collectable</span>
                       <span>{formatCurrency(currentCashCollectable)}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs font-medium text-rose-400">
-                      <span>(-) Total Daily Expenses (সর্বমোট খরচ)</span>
+                      <span>(-) Total Daily Expenses</span>
                       <span>- {formatCurrency(totalExpensesVal)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm font-black text-emerald-400 border-t-2 border-white/20 pt-2">
-                      <span>= Net Expected Cash from Delivery Man (প্রত্যাশিত ক্যাশ)</span>
+                      <span>= Net Expected Cash from Delivery Man</span>
                       <span>{formatCurrency(netExpectedCashFromDeliveryMan)}</span>
                     </div>
                   </div>
@@ -1430,7 +1430,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-900 flex items-center justify-between">
                       <span>Actual Cash Received by Admin <span className="text-rose-600 font-black">*</span></span>
-                      <span className="text-rose-600 font-bold text-[9px] uppercase tracking-normal">(বাধ্যতামূলক)</span>
+                      <span className="text-rose-600 font-bold text-[9px] uppercase tracking-normal">(Required)</span>
                     </label>
                     <input
                       type="number"
@@ -1458,8 +1458,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                           {Math.abs(Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0.01
                             ? 'Balanced'
                             : Number(actualCashReceived) < netExpectedCashFromDeliveryMan
-                            ? 'Shortage (ঘাটতি)'
-                            : 'Excess (অতিরিক্ত)'}
+                            ? 'Shortage'
+                            : 'Excess'}
                         </p>
                         <p className="text-lg font-black">
                           {formatCurrency(Math.abs(Number(actualCashReceived) - netExpectedCashFromDeliveryMan))}
@@ -1672,24 +1672,24 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         {/* Settlement Financial & Expense Reconciliation Table / Card for Print */}
         <div className="border-2 border-black p-4 mb-6 rounded-none bg-white text-xs">
           <h3 className="font-black uppercase tracking-wider text-sm border-b-2 border-black pb-2 mb-3">
-            Settlement Reconciliation & Daily Expenses Breakdown (হিসাব ও খরচ সমীকরণ)
+            Settlement Reconciliation & Daily Expenses Breakdown
           </h3>
 
           <div className="grid grid-cols-2 gap-6">
             {/* Left Column: Expenses Itemization */}
             <div className="space-y-1.5 border-r border-slate-300 pr-4">
               <p className="font-black uppercase text-[11px] text-slate-700 mb-1 border-b border-slate-200 pb-1">
-                Delivery Daily Expenses (দৈনিক খরচসমূহ):
+                Delivery Daily Expenses:
               </p>
 
               <div className="flex justify-between font-bold">
-                <span>1. Van Rent (ভ্যান ভাড়া):</span>
+                <span>1. Van Rent:</span>
                 <span>{formatCurrency(isBatchSettled ? Number(batch.vanRent || 0) : vanRentVal)}</span>
               </div>
 
               {Number(isBatchSettled ? (batch.salary || 0) : salaryVal) > 0 && (
                 <div className="flex justify-between font-bold">
-                  <span>2. Salary/Labor (বেতন):</span>
+                  <span>2. Salary / Labor:</span>
                   <span>{formatCurrency(isBatchSettled ? Number(batch.salary || 0) : salaryVal)}</span>
                 </div>
               )}
@@ -1703,7 +1703,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               ))}
 
               <div className="flex justify-between font-black text-rose-700 border-t border-black pt-1.5 mt-2 text-sm">
-                <span>Total Expenses (সর্বমোট খরচ):</span>
+                <span>Total Expenses:</span>
                 <span>- {formatCurrency(isBatchSettled ? Number(batch.totalExpenses || 0) : totalExpensesVal)}</span>
               </div>
             </div>
@@ -1711,7 +1711,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             {/* Right Column: Final Cash Reconciliation */}
             <div className="space-y-2 font-bold">
               <p className="font-black uppercase text-[11px] text-slate-700 mb-1 border-b border-slate-200 pb-1">
-                Cash Reconciliation (ক্যাশ হিসাব সমীকরণ):
+                Cash Reconciliation:
               </p>
 
               <div className="flex justify-between">
@@ -1761,7 +1761,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                     ? 'text-rose-700 bg-rose-50 border border-rose-200'
                     : 'text-blue-700 bg-blue-50 border border-blue-200'
                 }`}>
-                  <span>Discrepancy ({(isBatchSettled ? Number(batch.shortageOrExcess || 0) : Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0 ? 'Shortage / ঘাটতি' : 'Excess / অতিরিক্ত'}):</span>
+                  <span>Discrepancy ({(isBatchSettled ? Number(batch.shortageOrExcess || 0) : Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0 ? 'Shortage' : 'Excess'}):</span>
                   <span>{formatCurrency(Math.abs(isBatchSettled ? Number(batch.shortageOrExcess || 0) : (Number(actualCashReceived) - netExpectedCashFromDeliveryMan)))}</span>
                 </div>
               )}

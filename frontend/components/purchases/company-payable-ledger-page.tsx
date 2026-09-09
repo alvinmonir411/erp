@@ -78,7 +78,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
 
   useToastNotification({
     message: toastMessage,
-    title: toastTone === 'success' ? 'সফল হয়েছে' : 'ত্রুটি',
+    title: toastTone === 'success' ? 'Success' : 'Error',
     tone: toastTone,
   });
 
@@ -94,7 +94,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
         setDetails(nextDetails);
         setAllProducts(Array.isArray(prods) ? prods : prods?.data || []);
       } catch (loadError: any) {
-        setError(loadError.message || 'কোম্পানি লেজার লোড করা যায়নি');
+        setError(loadError.message || 'Failed to load company ledger');
       } finally {
         if (showLoader) setIsLoading(false);
       }
@@ -275,7 +275,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     const amt = parseFloat(paymentAmount);
     if (!amt || amt <= 0) {
       setToastTone('error');
-      setToastMessage('সঠিক টাকার অংক লিখুন');
+      setToastMessage('Please enter a valid amount');
       return;
     }
 
@@ -310,12 +310,12 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
       });
 
       setToastTone('success');
-      setToastMessage('কোম্পানিকে টাকা পরিশোধের এন্ট্রি সফলভাবে সম্পন্ন হয়েছে!');
+      setToastMessage('Payment to company recorded successfully!');
       setIsPaymentModalOpen(false);
       await refreshDetails(false);
     } catch (err: any) {
       setToastTone('error');
-      setToastMessage(err.message || 'পেমেন্ট সংরক্ষণ করতে সমস্যা হয়েছে');
+      setToastMessage(err.message || 'Failed to save payment');
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -326,11 +326,11 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
       setConfirmingId(purchaseId);
       await confirmPurchase(purchaseId);
       setToastTone('success');
-      setToastMessage('চালানটি স্টক ইন ও নিশ্চিত করা হয়েছে!');
+      setToastMessage('Invoice confirmed and stock received!');
       await refreshDetails(false);
     } catch (err: any) {
       setToastTone('error');
-      setToastMessage(err.message || 'চালান নিশ্চিত করতে সমস্যা হয়েছে');
+      setToastMessage(err.message || 'Failed to confirm invoice');
     } finally {
       setConfirmingId(null);
     }
@@ -340,8 +340,8 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
     return (
       <div className="p-6">
         <LoadingBlock
-          label="কোম্পানি খতিয়ান লোড হচ্ছে..."
-          subLabel="অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন, লেনদেন ও পেমেন্ট হিস্ট্রি প্রস্তুত করা হচ্ছে..."
+          label="Loading company ledger..."
+          subLabel="Please wait, loading transaction history and payment records..."
         />
       </div>
     );
@@ -355,11 +355,11 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-indigo-600"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>কোম্পানি তালিকায় ফিরে যান</span>
+          <span>Back to Company List</span>
         </Link>
         <StateMessage
-          title="কোম্পানি লেজার লোড করা যায়নি"
-          description={error || 'কোম্পানি খুঁজে পাওয়া যায়নি।'}
+          title="Failed to load company ledger"
+          description={error || 'Company not found.'}
         />
       </div>
     );
@@ -384,7 +384,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md mb-3 transition-colors"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>কোম্পানি তালিকায় ফিরুন</span>
+              <span>Back to Company List</span>
             </Link>
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-indigo-500/30 p-3 text-white">
@@ -395,9 +395,9 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                   {company.name}
                 </h1>
                 <p className="mt-0.5 text-xs text-indigo-200">
-                  {company.phone ? `ফোন: ${company.phone} • ` : ''}
-                  {company.address ? `ঠিকানা: ${company.address} • ` : ''}
-                  কোড: {company.code || company.id}
+                  {company.phone ? `Phone: ${company.phone} • ` : ''}
+                  {company.address ? `Address: ${company.address} • ` : ''}
+                  Code: {company.code || company.id}
                 </p>
               </div>
             </div>
@@ -409,14 +409,14 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
             >
               <Wallet className="h-4 w-4" />
-              <span>💸 টাকা পরিশোধ করুন</span>
+              <span>💸 Make Payment</span>
             </button>
             <Link
               href="/purchases/create"
               className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95"
             >
               <Plus className="h-4 w-4" />
-              <span>+ নতুন চালান এন্ট্রি</span>
+              <span>+ New Invoice Entry</span>
             </Link>
           </div>
         </div>
@@ -427,7 +427,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              মোট প্রাপ্ত মাল (Total Goods In)
+              Total Goods Received
             </span>
             <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
               <Package className="h-5 w-5" />
@@ -437,14 +437,14 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
             {formatCurrency(totalPurchases)}
           </p>
           <p className="mt-1 text-xs text-slate-500 font-medium">
-            উক্ত কোম্পানি থেকে মোট আসা মালের মূল্য
+            Total value of goods received from this company
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              মোট পরিশোধিত টাকা (Total Paid)
+              Total Paid Amount
             </span>
             <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
               <CheckCircle className="h-5 w-5" />
@@ -454,7 +454,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
             {formatCurrency(totalPaid)}
           </p>
           <p className="mt-1 text-xs text-slate-500 font-medium">
-            কোম্পানিকে এ পর্যন্ত মোট প্রদান করা হয়েছে
+            Total amount paid to this company to date
           </p>
         </div>
 
@@ -462,7 +462,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           <div className="rounded-2xl border border-sky-300 bg-sky-50/70 p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-sky-800">
-                💎 আমাদের অগ্রিম জমা (আমরা পাব)
+                💎 Advance Credit Balance (Receivable)
               </span>
               <div className="rounded-xl bg-sky-100 p-2.5 text-sky-700">
                 <Wallet className="h-5 w-5" />
@@ -472,14 +472,14 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               {formatCurrency(advanceBalance)}
             </p>
             <p className="mt-1 text-xs text-sky-700 font-medium">
-              কোম্পানি আমাদের <b>{formatCurrency(advanceBalance)}</b> টাকার মাল দিবে বা টাকা ফেরত দিবে
+              Company owes us <b>{formatCurrency(advanceBalance)}</b> in goods or refund
             </p>
           </div>
         ) : hasDue ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
-                ⚠️ কোম্পানির পাওনা (আমাদের দিতে হবে)
+                ⚠️ Company Payable Balance (Due)
               </span>
               <div className="rounded-xl bg-rose-100 p-2.5 text-rose-600">
                 <TrendingDown className="h-5 w-5" />
@@ -489,24 +489,24 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               {formatCurrency(currentPayable)}
             </p>
             <p className="mt-1 text-xs text-rose-600/80 font-medium">
-              কোম্পানি আমাদের কাছে বকেয়া বাবদ এখনো টাকা পাবে
+              Remaining outstanding payable due to company
             </p>
           </div>
         ) : (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                ✅ হিসাব সম্পূর্ণ পরিশোধ
+                ✅ Account Fully Settled
               </span>
               <div className="rounded-xl bg-emerald-100 p-2.5 text-emerald-600">
                 <CheckCircle className="h-5 w-5" />
               </div>
             </div>
             <p className="mt-3 text-2xl font-black text-emerald-700">
-              ৳০
+              ৳0
             </p>
             <p className="mt-1 text-xs text-emerald-600 font-medium">
-              কোনো বকেয়া পাওনা বা অগ্রিম নেই
+              No outstanding payable or advance balance
             </p>
           </div>
         )}
@@ -514,7 +514,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              মোট প্রোডাক্ট ও চালান
+              Total Products & Invoices
             </span>
             <div className="rounded-xl bg-amber-50 p-2.5 text-amber-600">
               <FileText className="h-5 w-5" />
@@ -522,13 +522,13 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-2xl font-black text-slate-900">{productSummary.length}</span>
-            <span className="text-xs font-semibold text-slate-500">টি প্রোডাক্ট</span>
+            <span className="text-xs font-semibold text-slate-500">Products</span>
             <span className="text-slate-300">•</span>
             <span className="text-lg font-bold text-indigo-600">{payablePurchases.length}</span>
-            <span className="text-xs font-semibold text-slate-500">টি চালান</span>
+            <span className="text-xs font-semibold text-slate-500">Invoices</span>
           </div>
           <p className="mt-1 text-xs text-slate-500 font-medium">
-            পেমেন্ট ট্রানজেকশন: {paymentHistory.length} টি
+            Payment Transactions: {paymentHistory.length}
           </p>
         </div>
       </div>
@@ -544,7 +544,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           }`}
         >
           <Package className="h-4 w-4" />
-          <span>📦 কোন কোন প্রোডাক্ট কত টাকার দিয়েছে ({productSummary.length})</span>
+          <span>📦 Product Supplies Summary ({productSummary.length})</span>
         </button>
 
         <button
@@ -556,7 +556,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           }`}
         >
           <FileText className="h-4 w-4" />
-          <span>📑 চালানের তালিকা ও আইটেম ({payablePurchases.length})</span>
+          <span>📑 Invoices & Items ({payablePurchases.length})</span>
         </button>
 
         <button
@@ -568,7 +568,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           }`}
         >
           <Wallet className="h-4 w-4" />
-          <span>💳 টাকা পরিশোধের খতিয়ান ও রিসিট ({paymentHistory.length})</span>
+          <span>💳 Payment Ledger & Receipts ({paymentHistory.length})</span>
         </button>
       </div>
 
@@ -580,13 +580,13 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
                   <tr>
-                    <th className="px-5 py-3.5 text-left">প্রোডাক্টের নাম</th>
-                    <th className="px-5 py-3.5 text-right">মোট প্রাপ্ত সংখ্যা</th>
-                    <th className="px-5 py-3.5 text-right">মোট মালের মূল্য (টাকা)</th>
-                    <th className="px-5 py-3.5 text-right">গড় ক্রয় রেট</th>
-                    <th className="px-5 py-3.5 text-right">বর্তমান স্টক</th>
-                    <th className="px-5 py-3.5 text-center">চালান সংখ্যা</th>
-                    <th className="px-5 py-3.5 text-center">শেষ আসার তারিখ</th>
+                    <th className="px-5 py-3.5 text-left">Product Name</th>
+                    <th className="px-5 py-3.5 text-right">Total Received Qty</th>
+                    <th className="px-5 py-3.5 text-right">Total Goods Value (৳)</th>
+                    <th className="px-5 py-3.5 text-right">Avg Purchase Rate</th>
+                    <th className="px-5 py-3.5 text-right">Current Stock</th>
+                    <th className="px-5 py-3.5 text-center">Invoice Count</th>
+                    <th className="px-5 py-3.5 text-center">Last Received Date</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -594,7 +594,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                     <tr key={p.productId} className="hover:bg-slate-50/70 transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="font-bold text-slate-900">{p.productName}</div>
-                        <div className="text-xs text-slate-500">#{p.productId} • একক: {p.unit || 'Pcs'}</div>
+                        <div className="text-xs text-slate-500">#{p.productId} • Unit: {p.unit || 'Pcs'}</div>
                       </td>
                       <td className="px-5 py-3.5 text-right font-black text-slate-900">
                         {p.totalQuantity} {p.unit || 'Pcs'}
@@ -610,7 +610,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-bold text-slate-700">
-                          {p.purchaseCount} বার
+                          {p.purchaseCount} times
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-center text-xs text-slate-500">
@@ -626,8 +626,8 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           {productSummary.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
               <StateMessage
-                title="কোন প্রোডাক্টের সরবরাহ নেই"
-                description="এই কোম্পানির কোনো চালানের রেকর্ড এখনো পাওয়া যায়নি।"
+                title="No product supplies found"
+                description="No purchase or invoice records found for this company."
               />
             </div>
           )}
@@ -668,27 +668,27 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                               : 'bg-amber-50 text-amber-700 border border-amber-200'
                           }`}
                         >
-                          {isConfirmed ? '✅ স্টক ইন সম্পন্ন' : '⏳ ড্রাফট (Draft)'}
+                          {isConfirmed ? '✅ Stock In Complete' : '⏳ Draft'}
                         </span>
                         <span
                           className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                             isPayable ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'
                           }`}
                         >
-                          {isPayable ? `বাকি: ${formatCurrency(purchase.payableAmount)}` : 'পরিশোধিত'}
+                          {isPayable ? `Due: ${formatCurrency(purchase.payableAmount)}` : 'Paid'}
                         </span>
                       </div>
 
                       <p className="mt-1 text-xs text-slate-500">
-                        তারিখ: {formatDate(purchase.purchaseDate)}
-                        {purchase.supplierName ? ` • সরবরাহকারী: ${purchase.supplierName}` : ''}
+                        Date: {formatDate(purchase.purchaseDate)}
+                        {purchase.supplierName ? ` • Supplier: ${purchase.supplierName}` : ''}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-4 lg:justify-end">
                     <div className="text-left lg:text-right">
-                      <span className="text-xs text-slate-500 font-medium">চালানের মোট মূল্য</span>
+                      <span className="text-xs text-slate-500 font-medium">Total Invoice Value</span>
                       <p className="text-base font-black text-slate-900">
                         {formatCurrency(purchase.totalAmount)}
                       </p>
@@ -701,7 +701,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                           disabled={confirmingId === purchase.id}
                           className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-50"
                         >
-                          {confirmingId === purchase.id ? 'স্টক ইন হচ্ছে...' : 'স্টক ইন নিশ্চিত করুন'}
+                          {confirmingId === purchase.id ? 'Receiving stock...' : 'Confirm Stock In'}
                         </button>
                       )}
 
@@ -710,7 +710,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                           onClick={() => openPaymentModal(purchase.id, toNumber(purchase.payableAmount))}
                           className="rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3.5 py-2 text-xs font-bold transition-all"
                         >
-                          টাকা দিন
+                          Pay Due
                         </button>
                       )}
                     </div>
@@ -721,16 +721,16 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                 {isExpanded && (
                   <div className="border-t border-slate-100 bg-slate-50/50 p-4">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                      চালানে থাকা প্রোডাক্টের তালিকা:
+                      Invoice Items Breakdown:
                     </h4>
                     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
                       <table className="min-w-full divide-y divide-slate-100 text-xs">
                         <thead className="bg-slate-50 text-slate-600 font-semibold">
                           <tr>
-                            <th className="px-4 py-2 text-left">প্রোডাক্ট</th>
-                            <th className="px-4 py-2 text-right">পরিমাণ</th>
-                            <th className="px-4 py-2 text-right">ক্রয় রেট</th>
-                            <th className="px-4 py-2 text-right">মোট টাকা</th>
+                            <th className="px-4 py-2 text-left">Product</th>
+                            <th className="px-4 py-2 text-right">Quantity</th>
+                            <th className="px-4 py-2 text-right">Purchase Rate</th>
+                            <th className="px-4 py-2 text-right">Total Amount</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -754,7 +754,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                       </table>
                     </div>
                     {purchase.note && (
-                      <p className="mt-2 text-xs text-slate-500 italic">নোট: {purchase.note}</p>
+                      <p className="mt-2 text-xs text-slate-500 italic">Note: {purchase.note}</p>
                     )}
                   </div>
                 )}
@@ -765,8 +765,8 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           {payablePurchases.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
               <StateMessage
-                title="কোন চালানের রেকর্ড নেই"
-                description="এই কোম্পানির কোনো চালানের এন্ট্রি পাওয়া যায়নি।"
+                title="No invoices found"
+                description="No invoice entries found for this company."
               />
             </div>
           )}
@@ -781,13 +781,13 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
                   <tr>
-                    <th className="px-5 py-3.5 text-left">পরিশোধের তারিখ</th>
-                    <th className="px-5 py-3.5 text-right">পরিশোধিত টাকা</th>
-                    <th className="px-5 py-3.5 text-center">পেমেন্ট মেথড</th>
-                    <th className="px-5 py-3.5 text-left">চেক / স্লিপ রেফারেন্স</th>
-                    <th className="px-5 py-3.5 text-left">নোট / বিবরণ</th>
-                    <th className="px-5 py-3.5 text-center">এন্ট্রি কারী</th>
-                    <th className="px-5 py-3.5 text-center">অ্যাকশন</th>
+                    <th className="px-5 py-3.5 text-left">Payment Date</th>
+                    <th className="px-5 py-3.5 text-right">Paid Amount</th>
+                    <th className="px-5 py-3.5 text-center">Payment Method</th>
+                    <th className="px-5 py-3.5 text-left">Cheque / Slip Ref</th>
+                    <th className="px-5 py-3.5 text-left">Note / Remarks</th>
+                    <th className="px-5 py-3.5 text-center">Created By</th>
+                    <th className="px-5 py-3.5 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -825,10 +825,10 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                         <Link
                           href={`/purchases/create?companyId=${companyId}&paymentId=${pay.id}`}
                           className="inline-flex items-center gap-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 text-xs font-bold transition-all"
-                          title="এই পেমেন্টের মাল রিসিভ ও চালান স্টক ইন করুন"
+                          title="Receive goods and stock in against this payment"
                         >
                           <Package className="h-3.5 w-3.5" />
-                          <span>চালান ইন</span>
+                          <span>Receive Stock</span>
                         </Link>
                       </td>
                     </tr>
@@ -841,8 +841,8 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
           {paymentHistory.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
               <StateMessage
-                title="কোন পেমেন্টের হিসাব নেই"
-                description="কোম্পানিকে টাকা দেওয়া হলে উপরের 'টাকা পরিশোধ করুন' বাটনে চাপ দিয়ে এন্ট্রি করুন।"
+                title="No payment records found"
+                description="Click 'Make Payment' above to record payments made to this company."
               />
             </div>
           )}
@@ -859,8 +859,8 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                   <Wallet className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">{company.name} কে টাকা পরিশোধ</h3>
-                  <p className="text-xs text-slate-500">সাধারণ বা একাধিক প্রোডাক্টের জন্য টাকা দেওয়ার হিসাব সেভ করুন</p>
+                  <h3 className="text-lg font-bold text-slate-900">Make Payment to {company.name}</h3>
+                  <p className="text-xs text-slate-500">Record general payments or itemized product advance drafts</p>
                 </div>
               </div>
               <button
@@ -875,17 +875,17 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               {/* Balance Banner */}
               {isAdvance ? (
                 <div className="rounded-xl bg-sky-50 p-3 border border-sky-200 flex items-center justify-between">
-                  <span className="text-xs font-bold text-sky-800">💎 আমাদের অগ্রিম জমা আছে:</span>
+                  <span className="text-xs font-bold text-sky-800">💎 Advance Credit Balance:</span>
                   <span className="text-sm font-black text-sky-700">{formatCurrency(advanceBalance)}</span>
                 </div>
               ) : hasDue ? (
                 <div className="rounded-xl bg-rose-50 p-3 border border-rose-100 flex items-center justify-between">
-                  <span className="text-xs font-bold text-rose-700">⚠️ কোম্পানির বর্তমান মোট পাওনা:</span>
+                  <span className="text-xs font-bold text-rose-700">⚠️ Company Total Outstanding Due:</span>
                   <span className="text-sm font-black text-rose-700">{formatCurrency(currentPayable)}</span>
                 </div>
               ) : (
                 <div className="rounded-xl bg-emerald-50 p-3 border border-emerald-100 flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-700">✅ হিসাব পরিশোধিত (কোন বাকি বা অগ্রিম নেই)</span>
+                  <span className="text-xs font-bold text-emerald-700">✅ Account Settled (No Due or Advance)</span>
                 </div>
               )}
 
@@ -895,7 +895,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-indigo-600" />
                     <span className="text-xs font-bold text-slate-800">
-                      কোন কোন প্রোডাক্টের জন্য কত টাকা দেওয়া হচ্ছে:
+                      Product-wise payment allocation (Optional):
                     </span>
                   </div>
                   <button
@@ -904,18 +904,18 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                     className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>+ প্রোডাক্ট যোগ করুন</span>
+                    <span>+ Add Product</span>
                   </button>
                 </div>
 
                 {/* Column Headers for desktop */}
                 {productPaymentRows.length > 0 && (
                   <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-3 pb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <div className="sm:col-span-4">প্রোডাক্ট সিলেক্ট / সার্চ</div>
-                    <div className="sm:col-span-2">ক্রয় দর (৳)</div>
-                    <div className="sm:col-span-2">পরিমাণ</div>
-                    <div className="sm:col-span-2 text-emerald-700">মোট টাকা (৳) *</div>
-                    <div className="sm:col-span-2">নোট (ঐচ্ছিক)</div>
+                    <div className="sm:col-span-4">Select / Search Product</div>
+                    <div className="sm:col-span-2">Buy Price (৳)</div>
+                    <div className="sm:col-span-2">Quantity</div>
+                    <div className="sm:col-span-2 text-emerald-700">Total (৳) *</div>
+                    <div className="sm:col-span-2">Note (Optional)</div>
                   </div>
                 )}
 
@@ -931,7 +931,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                           <input
                             type="text"
-                            placeholder="প্রোডাক্ট খুঁজুন বা নাম লিখুন..."
+                            placeholder="Search product or type name..."
                             value={
                               row.searchText !== undefined
                                 ? row.searchText
@@ -977,7 +977,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                                 });
                               }}
                               className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                              title="মুছুন"
+                              title="Remove"
                             >
                               <X className="h-3 w-3" />
                             </button>
@@ -1000,7 +1000,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                               if (filtered.length === 0) {
                                 return (
                                   <div className="p-3 text-center text-xs text-slate-400 font-medium">
-                                    কোনো প্রোডাক্ট খুঁজে পাওয়া যায়নি
+                                    No products found
                                   </div>
                                 );
                               }
@@ -1028,19 +1028,19 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                                       <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
                                         {p.buyPrice ? (
                                           <span className="text-emerald-700 font-medium">
-                                            ক্রয়: ৳{p.buyPrice}
+                                            Buy: ৳{p.buyPrice}
                                           </span>
                                         ) : null}
                                         {p.currentStock !== undefined && (
                                           <span className="text-slate-400">
-                                            স্টক: {p.currentStock} {p.unit || 'Pcs'}
+                                            Stock: {p.currentStock} {p.unit || 'Pcs'}
                                           </span>
                                         )}
                                       </div>
                                     </div>
                                     <div className="text-right shrink-0">
                                       <span className="inline-block rounded-md bg-indigo-50 hover:bg-indigo-600 hover:text-white px-2 py-1 text-[11px] font-bold text-indigo-700">
-                                        সিলেক্ট
+                                        Select
                                       </span>
                                     </div>
                                   </button>
@@ -1051,7 +1051,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                         )}
                       </div>
 
-                      {/* Unit Buy Rate (ক্রয় দর ৳) */}
+                      {/* Unit Buy Rate (৳) */}
                       <div className="sm:col-span-2 w-full">
                         <div className="relative">
                           <input
@@ -1060,14 +1060,14 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                             min="0"
                             value={row.unitPrice ?? ''}
                             onChange={(e) => handleUpdateProductRow(idx, 'unitPrice', e.target.value)}
-                            placeholder="দর (৳)"
-                            title="একক ক্রয় দর (প্রতি পিস / ইউনিট)"
+                            placeholder="Price (৳)"
+                            title="Unit Purchase Price"
                             className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
                           />
                         </div>
                       </div>
 
-                      {/* Quantity (পরিমাণ) */}
+                      {/* Quantity */}
                       <div className="sm:col-span-2 w-full">
                         <div className="relative">
                           <input
@@ -1076,14 +1076,14 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                             min="0"
                             value={row.quantity || ''}
                             onChange={(e) => handleUpdateProductRow(idx, 'quantity', e.target.value)}
-                            placeholder="পরিমাণ"
-                            title="পরিমাণ / Quantity"
+                            placeholder="Quantity"
+                            title="Quantity"
                             className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
                           />
                         </div>
                       </div>
 
-                      {/* Total Amount (মোট টাকা ৳) */}
+                      {/* Total Amount (৳) */}
                       <div className="sm:col-span-2 w-full">
                         <div className="relative">
                           <input
@@ -1092,8 +1092,8 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                             min="0"
                             value={row.amount}
                             onChange={(e) => handleUpdateProductRow(idx, 'amount', e.target.value)}
-                            placeholder="টাকা (BDT) *"
-                            title="মোট টাকা (দর × পরিমাণ)"
+                            placeholder="Amount (৳) *"
+                            title="Total Amount (Price × Quantity)"
                             className="w-full rounded-lg border border-emerald-300 bg-emerald-50/60 py-1.5 px-2 text-xs font-black text-emerald-800 focus:border-emerald-500 focus:bg-white focus:outline-none"
                           />
                         </div>
@@ -1105,7 +1105,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                           type="text"
                           value={row.note || ''}
                           onChange={(e) => handleUpdateProductRow(idx, 'note', e.target.value)}
-                          placeholder="নোট (ঐচ্ছিক)"
+                          placeholder="Note (Optional)"
                           className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2 text-xs text-slate-600 focus:border-indigo-500 focus:bg-white focus:outline-none"
                         />
 
@@ -1113,7 +1113,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                           type="button"
                           onClick={() => handleRemoveProductRow(idx)}
                           className="shrink-0 rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
-                          title="প্রোডাক্ট সারি মুছুন"
+                          title="Remove product row"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -1123,7 +1123,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
 
                   {productPaymentRows.length === 0 && (
                     <div className="p-3 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-200">
-                      কোনো নির্দিষ্ট প্রোডাক্ট সিলেক্ট করা নেই। প্রোডাক্ট সিলেক্ট করতে উপরে <b className="text-indigo-600">+ প্রোডাক্ট যোগ করুন</b> চাপুন।
+                      No itemized products selected. Click <b className="text-indigo-600">+ Add Product</b> above to itemize.
                     </div>
                   )}
                 </div>
@@ -1132,16 +1132,16 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                   <div className="mt-2.5 flex items-center justify-between rounded-xl bg-emerald-50 px-3.5 py-2.5 text-xs font-bold text-emerald-800 border border-emerald-200/60">
                     <div className="flex items-center gap-3">
                       <span>
-                        মোট প্রোডাক্ট: <b className="text-sm font-black">{productPaymentRows.filter((r) => r.productId || r.amount || r.searchText).length}</b> টি
+                        Total Items: <b className="text-sm font-black">{productPaymentRows.filter((r) => r.productId || r.amount || r.searchText).length}</b>
                       </span>
                       {productPaymentRows.some((r) => r.quantity && parseFloat(r.quantity) > 0) && (
                         <span className="text-emerald-700">
-                          মোট কোয়ান্টিটি: <b className="text-sm font-black">{productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.quantity || '0') || 0), 0)}</b>
+                          Total Quantity: <b className="text-sm font-black">{productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.quantity || '0') || 0), 0)}</b>
                         </span>
                       )}
                     </div>
                     <span>
-                      প্রোডাক্টের মোট যোগফল:{' '}
+                      Total Items Sum:{' '}
                       <b className="text-sm font-black text-emerald-900">
                         {formatCurrency(
                           productPaymentRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0),
@@ -1156,7 +1156,7 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    মোট পরিশোধের পরিমাণ (BDT) *
+                    Total Payment Amount (৳) *
                   </label>
                   <input
                     type="number"
@@ -1165,19 +1165,19 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     required
-                    placeholder="যেমন: 50000"
+                    placeholder="e.g. 50000"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
                   />
                   {isProductBreakdownMode && (
                     <p className="mt-1 text-[11px] text-indigo-600 font-medium">
-                      প্রোডাক্টের টাকার যোগফল স্বয়ংক্রিয়ভাবে এখানে হিসাব হচ্ছে।
+                      Total itemized amount calculates automatically here.
                     </p>
                   )}
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    পরিশোধের তারিখ *
+                    Payment Date *
                   </label>
                   <input
                     type="date"
@@ -1193,31 +1193,31 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    পেমেন্ট মেথড
+                    Payment Method
                   </label>
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
                   >
-                    <option value="CASH">নগদ (Cash)</option>
-                    <option value="BANK">ব্যাংক ট্রান্সফার (Bank)</option>
-                    <option value="BKASH">বিকাশ (bKash)</option>
-                    <option value="NAGAD">নগদ (Nagad)</option>
-                    <option value="CHEQUE">চেক (Cheque)</option>
-                    <option value="OTHER">অন্যান্য (Other)</option>
+                    <option value="CASH">Cash</option>
+                    <option value="BANK">Bank Transfer</option>
+                    <option value="BKASH">bKash</option>
+                    <option value="NAGAD">Nagad</option>
+                    <option value="CHEQUE">Cheque</option>
+                    <option value="OTHER">Other</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    চেক বা স্লিপ নম্বর
+                    Cheque / Slip No
                   </label>
                   <input
                     type="text"
                     value={transactionRef}
                     onChange={(e) => setTransactionRef(e.target.value)}
-                    placeholder="যেমন: CHQ-9981 / TrxID"
+                    placeholder="e.g. CHQ-9981 / TrxID"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
                   />
                 </div>
@@ -1226,13 +1226,13 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
               {/* Note / Description */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  নোট / অতিরিক্ত বিবরণ
+                  Note / Remarks
                 </label>
                 <textarea
                   value={paymentNote}
                   onChange={(e) => setPaymentNote(e.target.value)}
                   rows={2}
-                  placeholder="যেমন: সানলাইট কয়েল ও অন্যান্য পণ্য বাবদ ক্যাশ পরিশোধ..."
+                  placeholder="e.g. Advance cash payment for products..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none"
                 />
               </div>
@@ -1244,14 +1244,14 @@ export function CompanyPayableLedgerPage({ companyId }: { companyId: number }) {
                   onClick={() => setIsPaymentModalOpen(false)}
                   className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                 >
-                  বাতিল
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingPayment}
                   className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
                 >
-                  {isSubmittingPayment ? 'সংরক্ষণ হচ্ছে...' : 'পেমেন্ট নিশ্চিত করুন'}
+                  {isSubmittingPayment ? 'Saving...' : 'Confirm Payment'}
                 </button>
               </div>
             </form>

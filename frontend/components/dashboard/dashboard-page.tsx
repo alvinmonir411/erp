@@ -53,18 +53,18 @@ function Skeleton({ className }: { className?: string }) {
 }
 
 const MONTH_NAMES_BN = [
-  { en: 'January', bn: 'জানুয়ারি' },
-  { en: 'February', bn: 'ফেব্রুয়ারি' },
-  { en: 'March', bn: 'মার্চ' },
-  { en: 'April', bn: 'এপ্রিল' },
-  { en: 'May', bn: 'মে' },
-  { en: 'June', bn: 'জুন' },
-  { en: 'July', bn: 'জুলাই' },
-  { en: 'August', bn: 'আগস্ট' },
-  { en: 'September', bn: 'সেপ্টেম্বর' },
-  { en: 'October', bn: 'অক্টোবর' },
-  { en: 'November', bn: 'নভেম্বর' },
-  { en: 'December', bn: 'ডিসেম্বর' },
+  { en: 'January', bn: 'January' },
+  { en: 'February', bn: 'February' },
+  { en: 'March', bn: 'March' },
+  { en: 'April', bn: 'April' },
+  { en: 'May', bn: 'May' },
+  { en: 'June', bn: 'June' },
+  { en: 'July', bn: 'July' },
+  { en: 'August', bn: 'August' },
+  { en: 'September', bn: 'September' },
+  { en: 'October', bn: 'October' },
+  { en: 'November', bn: 'November' },
+  { en: 'December', bn: 'December' },
 ];
 
 type DrilldownType = 'sales' | 'orders' | 'collections' | 'dues' | 'dispatches' | 'cancelled' | null;
@@ -134,7 +134,7 @@ export function DashboardPage() {
       const orderData = await getOrder(orderId);
       setViewingOrder(orderData);
     } catch (err: any) {
-      showErrorToast(err.message || 'অর্ডারের বিস্তারিত তথ্য লোড হতে সমস্যা হয়েছে');
+      showErrorToast(err.message || 'Failed to load order details');
     } finally {
       setIsViewingOrderLoading(false);
     }
@@ -170,15 +170,15 @@ export function DashboardPage() {
     return (
       <div className="flex h-[50vh] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
         <AlertCircle className="h-14 w-14 text-rose-500 animate-bounce" />
-        <h3 className="mt-4 text-xl font-black text-slate-900">ড্যাশবোর্ড লোড হতে সমস্যা হয়েছে</h3>
+        <h3 className="mt-4 text-xl font-black text-slate-900">Failed to Load Dashboard</h3>
         <p className="mt-2 text-sm text-slate-500 max-w-md">
-          ডাটাবেস কানেকশন অথবা সার্ভার স্ট্যাটাস চেক করুন এবং পুনরায় চেষ্টা করুন।
+          Please check your database connection or server status and try again.
         </p>
         <button
           onClick={() => refetch()}
           className="mt-6 flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition-all"
         >
-          <RefreshCw className="h-4 w-4" /> আবার চেষ্টা করুন
+          <RefreshCw className="h-4 w-4" /> Retry
         </button>
       </div>
     );
@@ -195,10 +195,10 @@ export function DashboardPage() {
 
   const activeMonthBn = periodInfo.month ? MONTH_NAMES_BN[periodInfo.month - 1]?.bn : '';
   const displayPeriodTitle = 
-    period === 'today' ? 'আজকের লাইভ হিসাব' :
-    period === 'last_7_days' ? 'বিগত ৭ দিনের হিসাব' :
-    period === 'this_year' ? `${currentYear} সালের মোট হিসাব` :
-    period === 'all_time' ? 'শুরু থেকে আজ পর্যন্ত (সকল ইতিহাস)' :
+    period === 'today' ? 'Today Live Stats' :
+    period === 'last_7_days' ? 'Last 7 Days Stats' :
+    period === 'this_year' ? `${currentYear} Annual Overview` :
+    period === 'all_time' ? 'All Time History' :
     `${activeMonthBn || periodInfo.monthName || ''} ${periodInfo.year || ''}`;
 
   // Filter Drilldown items with search term
@@ -227,15 +227,15 @@ export function DashboardPage() {
             </div>
             <div>
               <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
-                {user?.role === Role.SR ? 'ফিল্ড সেলস ড্যাশবোর্ড' : 'ব্যবসার সামগ্রিক হিসাব ও ড্যাশবোর্ড'}
+                {user?.role === Role.SR ? 'Field Sales Dashboard' : 'Executive Business Dashboard'}
               </h1>
               <p className="text-xs font-semibold text-slate-600 flex items-center gap-1.5 mt-0.5">
-                <span>📅 সময়কাল: </span>
+                <span>📅 Period: </span>
                 <span className="font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
                   {displayPeriodTitle}
                 </span>
                 {periodInfo.totalDays ? (
-                  <span className="text-slate-500">({periodInfo.totalDays} দিনের মাস)</span>
+                  <span className="text-slate-500">({periodInfo.totalDays} Days)</span>
                 ) : null}
               </p>
             </div>
@@ -258,7 +258,7 @@ export function DashboardPage() {
               }`}
             >
               <Zap className="h-3.5 w-3.5 text-amber-500" />
-              আজকে
+              Today
             </button>
 
             <button
@@ -274,7 +274,7 @@ export function DashboardPage() {
               }`}
             >
               <Activity className="h-3.5 w-3.5 text-indigo-500" />
-              ৭ দিন
+              7 Days
             </button>
 
             <button
@@ -290,7 +290,7 @@ export function DashboardPage() {
               }`}
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              চলতি মাস
+              Current Month
             </button>
 
             <button
@@ -306,7 +306,7 @@ export function DashboardPage() {
               }`}
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              গত মাস
+              Last Month
             </button>
 
             <button
@@ -321,7 +321,7 @@ export function DashboardPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              চলতি বছর
+              Current Year
             </button>
 
             <button
@@ -336,7 +336,7 @@ export function DashboardPage() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              সকল ইতিহাস
+              All Time
             </button>
           </div>
 
@@ -354,7 +354,7 @@ export function DashboardPage() {
               <span>
                 {period === 'custom'
                   ? `${MONTH_NAMES_BN[selectedMonth - 1]?.bn} ${selectedYear}`
-                  : 'অন্য মাস দেখুন...'}
+                  : 'Select Another Month...'}
               </span>
               <ChevronDown className="h-3 w-3 opacity-70" />
             </button>
@@ -362,14 +362,14 @@ export function DashboardPage() {
             {isMonthPickerOpen && (
               <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-2xl p-4 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-                  <span className="text-xs font-black text-slate-800">মাস ও সাল বাছাই করুন</span>
+                  <span className="text-xs font-black text-slate-800">Select Month & Year</span>
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(Number(e.target.value))}
                     className="text-xs font-black bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800"
                   >
                     {[currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map((y) => (
-                      <option key={y} value={y}>{y} সাল</option>
+                      <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
                 </div>
@@ -406,7 +406,7 @@ export function DashboardPage() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            title="রিফ্রেশ করুন"
+            title="Refresh Dashboard"
             className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-indigo-600 hover:bg-slate-50 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin text-indigo-600' : ''}`} />
@@ -420,51 +420,51 @@ export function DashboardPage() {
           <Activity className="h-5 w-5 text-rose-500 animate-pulse" />
           <div>
             <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-              {user?.role === Role.SR ? "আজকের তৎপরতা ও বিক্রি" : "আজকের তাৎক্ষণিক হিসাব"}
+              {user?.role === Role.SR ? "Today Activity & Sales" : "Today Instant Overview"}
             </h2>
-            <p className="text-[11px] font-semibold text-slate-400">আজকের লাইভ অর্ডার বুকিং, ডেলিভারি ও ক্যাশ কালেকশন</p>
+            <p className="text-[11px] font-semibold text-slate-400">Live order booking, dispatches, and cash collection for today</p>
           </div>
         </div>
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard
-            label="আজকের অর্ডার"
+            label="Today Orders"
             value={formatNumber(today?.ordersCount ?? orders?.todayOrdersCount)}
-            description={`মূল্য: ${formatCurrency(today?.orderValue ?? orders?.todayOrderValue)}`}
+            description={`Value: ${formatCurrency(today?.orderValue ?? orders?.todayOrderValue)}`}
             icon={ShoppingCart}
             colorTheme="cyan"
           />
           <StatCard
-            label="আজকের ডেলিভারি চালান"
+            label="Today Dispatches"
             value={formatNumber(today?.dispatchCount ?? delivery?.todayDispatch)}
-            description={(today?.dispatchAmount ?? delivery?.todayDispatchAmount) > 0 ? `মূল্য: ${formatCurrency(today?.dispatchAmount ?? delivery?.todayDispatchAmount)}` : undefined}
+            description={(today?.dispatchAmount ?? delivery?.todayDispatchAmount) > 0 ? `Value: ${formatCurrency(today?.dispatchAmount ?? delivery?.todayDispatchAmount)}` : undefined}
             icon={Truck}
             colorTheme="amber"
           />
           <StatCard
-            label="আজকের নগদ বিক্রি"
+            label="Today Delivered Sales"
             value={formatCurrency(today?.settledValue ?? money?.todayFinalSold ?? 0)}
-            description="ডেলিভারিকৃত প্রকৃত বিক্রি"
+            description="Actual settled sales"
             icon={DollarSign}
             colorTheme="indigo"
           />
           <StatCard
-            label="আজকের নতুন বাকি"
+            label="Today New Due"
             value={formatCurrency(today?.dueAmount ?? money?.todayDue ?? 0)}
-            description="আজকের নতুন বকেয়া"
+            description="Uncollected credit due"
             icon={AlertCircle}
             colorTheme="rose"
           />
           <StatCard
-            label="আজকের ক্যাশ আদায়"
+            label="Today Cash Collected"
             value={formatCurrency(today?.dueCollection ?? money?.todayDueCollection ?? 0)}
-            description="আজকের নগদ কালেকশন"
+            description="Cash received from shops"
             icon={CheckCircle}
             colorTheme="emerald"
           />
           <StatCard
-            label="আজকের বাতিল অর্ডার"
+            label="Today Cancelled Orders"
             value={formatNumber(today?.cancelledOrders ?? orders?.todayCancelled ?? 0)}
-            description="বাতিলকৃত অর্ডার সংখ্যা"
+            description="Cancelled / rejected orders"
             icon={XCircle}
             colorTheme="slate"
           />
@@ -480,15 +480,15 @@ export function DashboardPage() {
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-black text-slate-900">
-                {displayPeriodTitle} — মোট হিসাব-নিকাশ
+                {displayPeriodTitle} — Period Overview
               </h2>
               <p className="text-[11px] font-semibold text-slate-500">
-                👉 নিচের যেকোনো কার্ডে ক্লিক করে সেই হিসাবের সম্পূর্ণ তালিকা ফিল্টার করে দেখুন
+                👉 Click any card below to drilldown into detailed transaction records
               </p>
             </div>
           </div>
           <span className="text-xs font-black text-indigo-700 bg-white border border-indigo-200 px-3.5 py-1.5 rounded-xl shadow-xs self-start sm:self-auto">
-            {isCurrentMonthActive ? `চলতি মাস (১ থেকে ${periodInfo.totalDays || 30} তারিখ)` : displayPeriodTitle}
+            {isCurrentMonthActive ? `Current Month (Days 1 to ${periodInfo.totalDays || 30})` : displayPeriodTitle}
           </span>
         </div>
 
@@ -505,9 +505,9 @@ export function DashboardPage() {
             }`}
           >
             <StatCard
-              label="মাসের মোট বিক্রি 👆"
+              label="Total Delivered Sales 👆"
               value={formatCurrency(periodMetrics?.netSales ?? money?.totalFinalSold)}
-              description={activeDrilldown === 'sales' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'ক্লিক করে তালিকা দেখুন'}
+              description={activeDrilldown === 'sales' ? '🟢 Active filter (tap to close)' : 'Click to view sales records'}
               icon={CheckCircle}
               colorTheme="emerald"
             />
@@ -523,9 +523,9 @@ export function DashboardPage() {
             }`}
           >
             <StatCard
-              label="মোট অর্ডার বুকিং মূল্য 👆"
+              label="Total Order Value 👆"
               value={formatCurrency(periodMetrics?.orderValue ?? orders?.totalOrderValue)}
-              description={activeDrilldown === 'orders' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : `অর্ডার সংখ্যা: ${formatNumber(periodMetrics?.ordersCount ?? orders?.totalOrders)}টি`}
+              description={activeDrilldown === 'orders' ? '🟢 Active filter (tap to close)' : `Total Orders: ${formatNumber(periodMetrics?.ordersCount ?? orders?.totalOrders)}`}
               icon={DollarSign}
               colorTheme="indigo"
             />
@@ -541,9 +541,9 @@ export function DashboardPage() {
             }`}
           >
             <StatCard
-              label="মাসের মোট ক্যাশ আদায় 👆"
+              label="Total Cash Collected 👆"
               value={formatCurrency(periodMetrics?.dueCollection ?? money?.periodDueCollection ?? 0)}
-              description={activeDrilldown === 'collections' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'ক্লিক করে আদায় তালিকা দেখুন'}
+              description={activeDrilldown === 'collections' ? '🟢 Active filter (tap to close)' : 'Click to view collection records'}
               icon={Wallet}
               colorTheme="cyan"
             />
@@ -559,9 +559,9 @@ export function DashboardPage() {
             }`}
           >
             <StatCard
-              label="মাসের নতুন বাকি 👆"
+              label="New Market Due 👆"
               value={formatCurrency(periodMetrics?.newDue ?? money?.periodDue ?? 0)}
-              description={activeDrilldown === 'dues' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'ক্লিক করে বাকির তালিকা দেখুন'}
+              description={activeDrilldown === 'dues' ? '🟢 Active filter (tap to close)' : 'Click to view due records'}
               icon={AlertCircle}
               colorTheme="amber"
             />
@@ -577,9 +577,9 @@ export function DashboardPage() {
             }`}
           >
             <StatCard
-              label="মোট ডেলিভারি চালান 👆"
+              label="Total Dispatched Orders 👆"
               value={formatNumber(periodMetrics?.dispatchCount ?? delivery?.totalDispatch)}
-              description={activeDrilldown === 'dispatches' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : `ডেলিভারি সম্পন্ন: ${formatNumber(periodMetrics?.deliveredCount ?? delivery?.delivered)}টি`}
+              description={activeDrilldown === 'dispatches' ? '🟢 Active filter (tap to close)' : `Delivered: ${formatNumber(periodMetrics?.deliveredCount ?? delivery?.delivered)}`}
               icon={Truck}
               colorTheme="primary"
             />
@@ -595,9 +595,9 @@ export function DashboardPage() {
             }`}
           >
             <StatCard
-              label="মাসের বাতিল অর্ডার 👆"
+              label="Cancelled Orders 👆"
               value={formatNumber(periodMetrics?.cancelledOrders ?? orders?.cancelledOrders ?? 0)}
-              description={activeDrilldown === 'cancelled' ? '🟢 তালিকা চালু আছে (বন্ধ করতে চাপুন)' : 'ক্লিক করে বাতিল তালিকা দেখুন'}
+              description={activeDrilldown === 'cancelled' ? '🟢 Active filter (tap to close)' : 'Click to view cancelled records'}
               icon={XCircle}
               colorTheme="rose"
             />
@@ -612,16 +612,16 @@ export function DashboardPage() {
                 <div className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full bg-indigo-600 animate-ping" />
                   <h3 className="text-base sm:text-lg font-black text-slate-900">
-                    {activeDrilldown === 'sales' && `মাসের মোট বিক্রির তালিকা (${drilldownItems.length}টি মেমো)`}
-                    {activeDrilldown === 'orders' && `মাসের মোট অর্ডার বুকিং তালিকা (${drilldownItems.length}টি অর্ডার)`}
-                    {activeDrilldown === 'collections' && `মাসের ক্যাশ আদায় তালিকা (${drilldownItems.length}টি কালেকশন)`}
-                    {activeDrilldown === 'dues' && `মাসের নতুন বাকির তালিকা (${drilldownItems.length}টি বকেয়া)`}
-                    {activeDrilldown === 'dispatches' && `মাসের ডেলিভারি চালান তালিকা (${drilldownItems.length}টি চালান)`}
-                    {activeDrilldown === 'cancelled' && `মাসের বাতিলকৃত অর্ডারের তালিকা (${drilldownItems.length}টি বাতিল অর্ডার)`}
+                    {activeDrilldown === 'sales' && `Delivered Sales Breakdown (${drilldownItems.length} Invoices)`}
+                    {activeDrilldown === 'orders' && `Booked Orders List (${drilldownItems.length} Orders)`}
+                    {activeDrilldown === 'collections' && `Cash Collection Records (${drilldownItems.length} Collections)`}
+                    {activeDrilldown === 'dues' && `New Market Due Invoices (${drilldownItems.length} Invoices)`}
+                    {activeDrilldown === 'dispatches' && `Delivery Dispatch Batches (${drilldownItems.length} Batches)`}
+                    {activeDrilldown === 'cancelled' && `Cancelled Orders List (${drilldownItems.length} Cancelled)`}
                   </h3>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  সময়কাল: <span className="font-bold text-indigo-700">{displayPeriodTitle}</span> • যেকোনো অর্ডারের উপর ক্লিক করে মেমো দেখুন
+                  Period: <span className="font-bold text-indigo-700">{displayPeriodTitle}</span> • Click any order to view memo
                 </p>
               </div>
 
@@ -630,7 +630,7 @@ export function DashboardPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="এই তালিকায় খুঁজুন..."
+                    placeholder="Filter this list..."
                     value={drilldownSearch}
                     onChange={(e) => setDrilldownSearch(e.target.value)}
                     className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-slate-50"
@@ -641,7 +641,7 @@ export function DashboardPage() {
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-colors"
                 >
                   <X className="w-3.5 h-3.5 text-rose-500" />
-                  তালিকা বন্ধ করুন
+                  Close Table
                 </button>
               </div>
             </div>
@@ -651,82 +651,82 @@ export function DashboardPage() {
               {isDrilldownLoading ? (
                 <div className="py-12 text-center">
                   <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
-                  <p className="mt-2 text-xs font-bold text-slate-400">ডাটা লোড হচ্ছে...</p>
+                  <p className="mt-2 text-xs font-bold text-slate-400">Loading data...</p>
                 </div>
               ) : drilldownItems.length === 0 ? (
                 <div className="py-8 text-center text-slate-400 text-xs font-bold">
-                  কোনো তথ্য পাওয়া যায়নি।
+                  No records found.
                 </div>
               ) : (
                 <table className="w-full text-left text-xs min-w-[650px]">
                   <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b border-slate-200">
                     {activeDrilldown === 'sales' && (
                       <tr>
-                        <th className="px-4 py-3">অর্ডার #</th>
-                        <th className="px-4 py-3">দোকানের নাম</th>
-                        <th className="px-4 py-3">রুট</th>
-                        <th className="px-4 py-3">ডেলিভারিম্যান</th>
-                        <th className="px-4 py-3">তারিখ</th>
-                        <th className="px-4 py-3 text-right">বিক্রি (Settled)</th>
-                        <th className="px-4 py-3 text-right">বাকি</th>
-                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
+                        <th className="px-4 py-3">Order #</th>
+                        <th className="px-4 py-3">Shop Name</th>
+                        <th className="px-4 py-3">Route</th>
+                        <th className="px-4 py-3">Delivery Person</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3 text-right">Settled Sales</th>
+                        <th className="px-4 py-3 text-right">Due Amount</th>
+                        <th className="px-4 py-3 text-center">Action</th>
                       </tr>
                     )}
                     {activeDrilldown === 'orders' && (
                       <tr>
-                        <th className="px-4 py-3">অর্ডার #</th>
-                        <th className="px-4 py-3">দোকানের নাম</th>
-                        <th className="px-4 py-3">রুট</th>
-                        <th className="px-4 py-3">এসআর (SR)</th>
-                        <th className="px-4 py-3">তারিখ</th>
-                        <th className="px-4 py-3 text-right">অর্ডার মোট মূল্য</th>
-                        <th className="px-4 py-3 text-center">অবস্থা</th>
-                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
+                        <th className="px-4 py-3">Order #</th>
+                        <th className="px-4 py-3">Shop Name</th>
+                        <th className="px-4 py-3">Route</th>
+                        <th className="px-4 py-3">Sales Rep (SR)</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3 text-right">Order Value</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-center">Action</th>
                       </tr>
                     )}
                     {activeDrilldown === 'collections' && (
                       <tr>
-                        <th className="px-4 py-3">অর্ডার #</th>
-                        <th className="px-4 py-3">দোকানের নাম</th>
-                        <th className="px-4 py-3">আদায়কারী (SR)</th>
-                        <th className="px-4 py-3">তারিখ</th>
-                        <th className="px-4 py-3 text-right">আদায়কৃত টাকা</th>
-                        <th className="px-4 py-3 text-center">অবস্থা</th>
-                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
+                        <th className="px-4 py-3">Order #</th>
+                        <th className="px-4 py-3">Shop Name</th>
+                        <th className="px-4 py-3">Collected By (SR)</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3 text-right">Collected Amount</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-center">Action</th>
                       </tr>
                     )}
                     {activeDrilldown === 'dues' && (
                       <tr>
-                        <th className="px-4 py-3">অর্ডার #</th>
-                        <th className="px-4 py-3">দোকানের নাম</th>
-                        <th className="px-4 py-3">রুট</th>
-                        <th className="px-4 py-3">এসআর (SR)</th>
-                        <th className="px-4 py-3 text-right">মূল বাকি</th>
-                        <th className="px-4 py-3 text-right">পরিশোধিত</th>
-                        <th className="px-4 py-3 text-right">অবশিষ্ট বাকি</th>
-                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
+                        <th className="px-4 py-3">Order #</th>
+                        <th className="px-4 py-3">Shop Name</th>
+                        <th className="px-4 py-3">Route</th>
+                        <th className="px-4 py-3">Sales Rep (SR)</th>
+                        <th className="px-4 py-3 text-right">Original Due</th>
+                        <th className="px-4 py-3 text-right">Paid</th>
+                        <th className="px-4 py-3 text-right">Remaining Due</th>
+                        <th className="px-4 py-3 text-center">Action</th>
                       </tr>
                     )}
                     {activeDrilldown === 'dispatches' && (
                       <tr>
-                        <th className="px-4 py-3">চালান / ব্যাচ #</th>
-                        <th className="px-4 py-3">ডেলিভারি ম্যান</th>
-                        <th className="px-4 py-3">চালান তারিখ</th>
-                        <th className="px-4 py-3 text-center">মোট অর্ডার সংখ্যা</th>
-                        <th className="px-4 py-3 text-right">মোট মাল মূল্য</th>
-                        <th className="px-4 py-3 text-center">অবস্থা</th>
+                        <th className="px-4 py-3">Batch #</th>
+                        <th className="px-4 py-3">Delivery Person</th>
+                        <th className="px-4 py-3">Dispatch Date</th>
+                        <th className="px-4 py-3 text-center">Orders Count</th>
+                        <th className="px-4 py-3 text-right">Total Batch Value</th>
+                        <th className="px-4 py-3 text-center">Status</th>
                       </tr>
                     )}
                     {activeDrilldown === 'cancelled' && (
                       <tr>
-                        <th className="px-4 py-3">অর্ডার #</th>
-                        <th className="px-4 py-3">দোকানের নাম</th>
-                        <th className="px-4 py-3">রুট</th>
-                        <th className="px-4 py-3">এসআর (SR)</th>
-                        <th className="px-4 py-3">তারিখ</th>
-                        <th className="px-4 py-3 text-right">অর্ডার মোট মূল্য</th>
-                        <th className="px-4 py-3 text-center">অবস্থা</th>
-                        <th className="px-4 py-3 text-center">অ্যাকশন</th>
+                        <th className="px-4 py-3">Order #</th>
+                        <th className="px-4 py-3">Shop Name</th>
+                        <th className="px-4 py-3">Route</th>
+                        <th className="px-4 py-3">Sales Rep (SR)</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3 text-right">Order Value</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-center">Action</th>
                       </tr>
                     )}
                   </thead>
@@ -747,7 +747,7 @@ export function DashboardPage() {
                                 onClick={() => handleViewOrder(item.id)}
                                 className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
                               >
-                                <Eye className="w-3.5 h-3.5" /> মেমো দেখুন
+                                <Eye className="w-3.5 h-3.5" /> View Memo
                               </button>
                             </td>
                           </>
@@ -770,7 +770,7 @@ export function DashboardPage() {
                                 onClick={() => handleViewOrder(item.id)}
                                 className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
                               >
-                                <Eye className="w-3.5 h-3.5" /> মেমো দেখুন
+                                <Eye className="w-3.5 h-3.5" /> View Memo
                               </button>
                             </td>
                           </>
@@ -787,7 +787,7 @@ export function DashboardPage() {
                                 item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                                 item.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200'
                               }`}>
-                                {item.status === 'APPROVED' ? 'অনুমোদিত' : item.status === 'PENDING' ? 'পেন্ডিং' : 'বাতিল'}
+                                {item.status === 'APPROVED' ? 'Approved' : item.status === 'PENDING' ? 'Pending' : 'Cancelled'}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-center">
@@ -795,7 +795,7 @@ export function DashboardPage() {
                                 onClick={() => handleViewOrder(item.orderId)}
                                 className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
                               >
-                                <Eye className="w-3.5 h-3.5" /> মেমো
+                                <Eye className="w-3.5 h-3.5" /> Memo
                               </button>
                             </td>
                           </>
@@ -814,7 +814,7 @@ export function DashboardPage() {
                                 onClick={() => handleViewOrder(item.orderId)}
                                 className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
                               >
-                                <Eye className="w-3.5 h-3.5" /> মেমো
+                                <Eye className="w-3.5 h-3.5" /> Memo
                               </button>
                             </td>
                           </>
@@ -824,7 +824,7 @@ export function DashboardPage() {
                             <td className="px-4 py-3 font-black text-indigo-600">#{item.batchNumber}</td>
                             <td className="px-4 py-3 font-bold text-slate-900">{item.deliveryPersonName || '—'}</td>
                             <td className="px-4 py-3 text-slate-500">{item.dispatchDate}</td>
-                            <td className="px-4 py-3 text-center font-bold text-slate-800">{item.totalOrders} টি</td>
+                            <td className="px-4 py-3 text-center font-bold text-slate-800">{item.totalOrders} </td>
                             <td className="px-4 py-3 text-right font-black text-slate-900">{formatCurrency(item.totalAmount)}</td>
                             <td className="px-4 py-3 text-center">
                               <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">
@@ -851,7 +851,7 @@ export function DashboardPage() {
                                 onClick={() => handleViewOrder(item.id)}
                                 className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
                               >
-                                <Eye className="w-3.5 h-3.5" /> মেমো দেখুন
+                                <Eye className="w-3.5 h-3.5" /> View Memo
                               </button>
                             </td>
                           </>
@@ -872,47 +872,47 @@ export function DashboardPage() {
           <Wallet className="h-5 w-5 text-emerald-600" />
           <div>
             <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-              সার্বিক মোট বকেয়া ও গুদাম স্টক (Live Status)
+              Overall Market Due & Warehouse Stock (Live Status)
             </h2>
-            <p className="text-[11px] font-semibold text-slate-400">মার্কেটে মোট পাওনা বাকি ও গুদামে থাকা পণ্যের বর্তমান স্থিতি</p>
+            <p className="text-[11px] font-semibold text-slate-400">Current market dues and warehouse inventory summary</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label="মার্কেটে মোট বাকি পাওনা"
+            label="Total Market Due"
             value={formatCurrency(money?.totalDue ?? 0)}
-            description="গ্রাহকদের কাছে বর্তমান মোট বাকি"
+            description="Total customer receivables"
             icon={AlertCircle}
             colorTheme="rose"
           />
           <StatCard
-            label="অনুমোদনের অপেক্ষায় আদায়"
+            label="Pending Collections"
             value={formatCurrency(money?.pendingCollected ?? 0)}
-            description="কালেকশন জমা (পেন্ডিং)"
+            description="Unapproved collection receipts"
             icon={Clock}
             colorTheme="amber"
           />
           <StatCard
-            label="সর্বমোট অনুমোদিত আদায়"
+            label="Total Approved Collections"
             value={formatCurrency(money?.approvedCollected ?? 0)}
-            description="আজীবন মোট কালেকশন"
+            description="Lifetime settled cash"
             icon={CheckCircle}
             colorTheme="emerald"
           />
           {(user?.role === Role.SUPER_ADMIN || user?.role === Role.MANAGER || user?.role === Role.ADMIN) ? (
             <StatCard
-              label="গুদামে মোট মালের দাম (স্টক)"
+              label="Total Inventory Value"
               value={formatCurrency(stock?.stockValue ?? 0)}
-              description={`মোট পণ্য সংখ্যা: ${formatNumber(stock?.activeProducts ?? 0)}টি`}
+              description={`Active Items: ${formatNumber(stock?.activeProducts ?? 0)}`}
               icon={Layers}
               colorTheme="violet"
             />
           ) : (
             <StatCard
-              label="বাতিলকৃত কালেকশন"
+              label="Rejected Collections"
               value={formatCurrency(money?.rejectedCollected ?? 0)}
-              description="অস্বীকৃত কালেকশন"
+              description="Rejected payment receipts"
               icon={XCircle}
               colorTheme="slate"
             />
@@ -925,31 +925,31 @@ export function DashboardPage() {
         <section>
           <div className="flex items-center gap-2 mb-3">
             <Package className="h-5 w-5 text-cyan-600" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-600">গুদাম স্টক স্থিতি (ইনভেন্টরি রিপোর্ট)</h2>
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-600">Warehouse Stock Overview (Inventory Report)</h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">মোট পণ্য</p>
-              <p className="text-lg font-black text-slate-900">{formatNumber(stock.totalProducts)} টি</p>
+              <p className="text-[10px] font-black uppercase text-slate-400">Total SKUs</p>
+              <p className="text-lg font-black text-slate-900">{formatNumber(stock.totalProducts)} </p>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">চালু পণ্য</p>
-              <p className="text-lg font-black text-emerald-600">{formatNumber(stock.activeProducts)} টি</p>
+              <p className="text-[10px] font-black uppercase text-slate-400">Active Products</p>
+              <p className="text-lg font-black text-emerald-600">{formatNumber(stock.activeProducts)} </p>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">মজুদ আছে</p>
-              <p className="text-lg font-black text-blue-600">{formatNumber(stock.inStockProducts)} টি</p>
+              <p className="text-[10px] font-black uppercase text-slate-400">In Stock</p>
+              <p className="text-lg font-black text-blue-600">{formatNumber(stock.inStockProducts)} </p>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">কম স্টক (সতর্কতা)</p>
-              <p className="text-lg font-black text-amber-600">{formatNumber(stock.lowStockProducts)} টি</p>
+              <p className="text-[10px] font-black uppercase text-slate-400">Low Stock Alert</p>
+              <p className="text-lg font-black text-amber-600">{formatNumber(stock.lowStockProducts)} </p>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">স্টক শেষ</p>
-              <p className="text-lg font-black text-rose-600">{formatNumber(stock.outOfStockProducts)} টি</p>
+              <p className="text-[10px] font-black uppercase text-slate-400">Out of Stock</p>
+              <p className="text-lg font-black text-rose-600">{formatNumber(stock.outOfStockProducts)} </p>
             </div>
             <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
-              <p className="text-[10px] font-black uppercase text-slate-400">মোট স্টক মূল্য</p>
+              <p className="text-[10px] font-black uppercase text-slate-400">Total Stock Value</p>
               <p className="text-lg font-black text-violet-600">{formatCurrency(stock.stockValue)}</p>
             </div>
           </div>
@@ -963,17 +963,17 @@ export function DashboardPage() {
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-indigo-600" />
               <h3 className="text-base sm:text-lg font-black text-slate-900">
-                {displayPeriodTitle} — দিনভিত্তিক বিক্রয় গ্রাফ (Daily Sales Trend)
+                {displayPeriodTitle} — Daily Sales Trend
               </h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              ১ তারিখ থেকে {periodInfo.totalDays || 30} তারিখ পর্যন্ত প্রতিদিন কত টাকার মাল ডেলিভারি/বিক্রি হয়েছে
+              From 1st to {periodInfo.totalDays || 30} Daily delivered and settled sales value
             </p>
           </div>
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1.5 text-xs font-black text-indigo-700 bg-indigo-50 px-3.5 py-1.5 rounded-xl border border-indigo-100">
               <span className="h-2.5 w-2.5 rounded-full bg-indigo-600" />
-              সেটেল্ড নগদ বিক্রি
+              Settled Cash Sales
             </span>
           </div>
         </div>
@@ -990,13 +990,13 @@ export function DashboardPage() {
                 <span className="text-sm font-black text-indigo-700">
                   {formatCurrency(hoveredChartDay.amount)}
                 </span>
-                <span className="ml-2 text-[11px] font-semibold text-slate-500">নগদ ডেলিভারি বিক্রি</span>
+                <span className="ml-2 text-[11px] font-semibold text-slate-500">Delivered Sales</span>
               </div>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
               <Sparkles className="w-4 h-4 text-indigo-500" />
-              <span>যেকোনো তারিখের বিক্রি দেখতে নিচে বারের উপর মাউস রাখুন অথবা টাচ করুন</span>
+              <span>Hover or tap on any bar to see sales details for that day</span>
             </div>
           )}
           {hoveredChartDay && (
@@ -1004,7 +1004,7 @@ export function DashboardPage() {
               onClick={() => setHoveredChartDay(null)}
               className="text-[11px] font-bold text-slate-400 hover:text-slate-600 px-2 py-0.5 rounded-md hover:bg-white transition-colors"
             >
-              রিসেট
+              Reset
             </button>
           )}
         </div>
@@ -1063,9 +1063,9 @@ export function DashboardPage() {
               })}
             </div>
             <div className="flex justify-between text-[11px] font-black text-slate-400 px-2 pt-2 border-t border-slate-100">
-              <span>১ তারিখ</span>
-              <span>১৫ তারিখ</span>
-              <span>{periodInfo.totalDays || 30} তারিখ (মাসের শেষ দিন)</span>
+              <span>Day 1</span>
+              <span>Day 15</span>
+              <span>{periodInfo.totalDays || 30} Day (End of Month)</span>
             </div>
           </div>
         ) : (
@@ -1105,9 +1105,9 @@ export function DashboardPage() {
             <Building2 className="h-5 w-5 text-indigo-600" />
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-                কোম্পানি অনুযায়ী মোট বিক্রি ({displayPeriodTitle})
+                Sales by Company ({displayPeriodTitle})
               </h2>
-              <p className="text-[11px] font-semibold text-slate-400">নির্বাচিত সময়ে কোম্পানি বা সাপ্লায়ারভিত্তিক মোট বিক্রয় পারফরম্যান্স</p>
+              <p className="text-[11px] font-semibold text-slate-400">Total sales performance broken down by company and supplier</p>
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1124,18 +1124,18 @@ export function DashboardPage() {
                       </div>
                       <div>
                         <h4 className="text-sm font-black text-slate-900 line-clamp-1">{c.companyName}</h4>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">কোম্পানি সামারি</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Company Summary</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase text-slate-400">মোট বিক্রি</p>
+                      <p className="text-[10px] font-black uppercase text-slate-400">Total Sales</p>
                       <p className="text-sm font-black text-emerald-600">{formatCurrency(c.sales)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-black uppercase text-slate-400">কোম্পানি আইডি</p>
+                      <p className="text-[10px] font-black uppercase text-slate-400">Company ID</p>
                       <p className="text-sm font-black text-slate-500">#{c.companyId}</p>
                     </div>
                   </div>
@@ -1149,14 +1149,14 @@ export function DashboardPage() {
                       className="flex-1 py-2 px-2.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-black flex items-center justify-center gap-1 hover:bg-indigo-600 hover:text-white transition-all shadow-xs active:scale-95 cursor-pointer"
                     >
                       <Flame className="w-3.5 h-3.5 text-orange-500" />
-                      রানিং পণ্য
+                      Active Products
                     </button>
                     <Link
                       href={`/purchases/companies/${c.companyId}`}
                       className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                      title="কোম্পানির মালের হিসাব ও পেমেন্ট লেজার"
+                      title="Company Ledger & Purchases"
                     >
-                      <span>খতিয়ান</span>
+                      <span>Ledger</span>
                       <ArrowUpRight className="w-3.5 h-3.5 text-slate-400" />
                     </Link>
                   </div>
@@ -1178,10 +1178,10 @@ export function DashboardPage() {
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-black text-slate-900">
-                    কোম্পানি অনুযায়ী সর্বাধিক বিক্রিত পণ্য (Top Running Products)
+                    Top Selling Products by Company
                   </h2>
                   <p className="text-xs text-slate-500">
-                    {displayPeriodTitle} — কোন কোম্পানির কোন পণ্য বাজারে সবচেয়ে বেশি চলছে তার র‍্যাংকিং তালিকা
+                    {displayPeriodTitle} — Top running and best selling items ranking
                   </p>
                 </div>
               </div>
@@ -1200,7 +1200,7 @@ export function DashboardPage() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    🔥 শুধু রানিং বিক্রিত ({(d.topProducts || []).filter((p: any) => p.soldQuantity > 0).length}টি)
+                    🔥 Selling Items ({(d.topProducts || []).filter((p: any) => p.soldQuantity > 0).length})
                   </button>
                   <button
                     onClick={() => setProductSalesFilter('unsold')}
@@ -1210,7 +1210,7 @@ export function DashboardPage() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    ⚪ কোনো বিক্রি নেই ({(d.topProducts || []).filter((p: any) => p.soldQuantity === 0).length}টি)
+                    ⚪ No Sales ({(d.topProducts || []).filter((p: any) => p.soldQuantity === 0).length})
                   </button>
                   <button
                     onClick={() => setProductSalesFilter('all')}
@@ -1220,18 +1220,18 @@ export function DashboardPage() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    সব পণ্য ({(d.topProducts || []).length}টি)
+                    All Products ({(d.topProducts || []).length})
                   </button>
                 </div>
 
                 {/* Stock Filter Pills */}
                 <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs text-xs font-bold">
-                  <span className="text-[10px] text-slate-400 font-bold px-1 hidden sm:inline">স্টক:</span>
+                  <span className="text-[10px] text-slate-400 font-bold px-1 hidden sm:inline">Stock:</span>
                   {[
-                    { id: 'all', label: 'সব' },
-                    { id: 'in_stock', label: '🟢 ইন-স্টক' },
-                    { id: 'low_stock', label: '🟡 কম স্টক' },
-                    { id: 'out_of_stock', label: '🔴 স্টক শেষ' },
+                    { id: 'all', label: 'All' },
+                    { id: 'in_stock', label: '🟢 In Stock' },
+                    { id: 'low_stock', label: '🟡 Low Stock' },
+                    { id: 'out_of_stock', label: '🔴 Out of Stock' },
                   ].map((st) => (
                     <button
                       key={st.id}
@@ -1253,17 +1253,17 @@ export function DashboardPage() {
                 {/* Sort Dropdown */}
                 <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-xs">
                   <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-[11px] font-bold text-slate-500">ক্রমানুসার:</span>
+                  <span className="text-[11px] font-bold text-slate-500">Sort By:</span>
                   <select
                     value={topProductSort}
                     onChange={(e) => setTopProductSort(e.target.value as any)}
                     className="text-xs font-black text-slate-800 bg-transparent focus:outline-none cursor-pointer"
                   >
-                    <option value="sold_qty_desc">🔥 বিক্রি সংখ্যা (বেশি থেকে কম)</option>
-                    <option value="sold_val_desc">💰 বিক্রি মূল্য (বেশি থেকে কম)</option>
-                    <option value="stock_desc">📦 মজুদ স্টক (বেশি থেকে কম)</option>
-                    <option value="stock_asc">⚠️ কম স্টক আগে (রিঅর্ডার)</option>
-                    <option value="name_asc">🔤 পণ্যের নাম (A-Z)</option>
+                    <option value="sold_qty_desc">🔥 Quantity Sold (High to Low)</option>
+                    <option value="sold_val_desc">💰 Sales Value (High to Low)</option>
+                    <option value="stock_desc">📦 In-Stock Qty (High to Low)</option>
+                    <option value="stock_asc">⚠️ Low Stock First (Reorder)</option>
+                    <option value="name_asc">🔤 Product Name (A-Z)</option>
                   </select>
                 </div>
 
@@ -1272,7 +1272,7 @@ export function DashboardPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="প্রোডাক্ট বা কোম্পানি খুঁজুন..."
+                    placeholder="Search product or company..."
                     value={topProductSearch}
                     onChange={(e) => setTopProductSearch(e.target.value)}
                     className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white w-full sm:w-52 shadow-xs"
@@ -1293,7 +1293,7 @@ export function DashboardPage() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                সব কোম্পানি ({
+                All Companies ({
                   (d.topProducts || []).filter((p: any) => {
                     if (productSalesFilter === 'sold') return p.soldQuantity > 0;
                     if (productSalesFilter === 'unsold') return p.soldQuantity === 0;
@@ -1364,10 +1364,10 @@ export function DashboardPage() {
                 return (
                   <div className="py-12 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                     {productSalesFilter === 'sold'
-                      ? 'এই ফিল্টারে কোনো পণ্য এখনও বিক্রি হয়নি (সব পণ্য দেখতে "সব পণ্য" বাটনে চাপুন)।'
+                      ? 'No items sold under this filter.'
                       : productSalesFilter === 'unsold'
-                      ? 'এই ফিল্টারে ০ বিক্রির কোনো পণ্য পাওয়া যায়নি।'
-                      : 'কোনো পণ্য পাওয়া যায়নি।'}
+                      ? 'No zero-sales products found under this filter.'
+                      : 'No products found.'}
                   </div>
                 );
               }
@@ -1376,14 +1376,14 @@ export function DashboardPage() {
                 <table className="w-full text-left text-xs min-w-[700px]">
                   <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3 text-center">র‍্যাংক</th>
-                      <th className="px-4 py-3">পণ্যের নাম</th>
-                      <th className="px-4 py-3">কোম্পানি</th>
-                      <th className="px-4 py-3 text-right">বিক্রয় দর</th>
-                      <th className="px-4 py-3 text-center">মোট বিক্রি সংখ্যা</th>
-                      <th className="px-4 py-3 text-right">মোট বিক্রি মূল্য</th>
-                      <th className="px-4 py-3 text-center">গুদাম স্টক</th>
-                      <th className="px-4 py-3 text-center">রানিং স্ট্যাটাস</th>
+                      <th className="px-4 py-3 text-center">Rank</th>
+                      <th className="px-4 py-3">Product Name</th>
+                      <th className="px-4 py-3">Company</th>
+                      <th className="px-4 py-3 text-right">Selling Price</th>
+                      <th className="px-4 py-3 text-center">Quantity Sold</th>
+                      <th className="px-4 py-3 text-right">Sales Amount</th>
+                      <th className="px-4 py-3 text-center">Warehouse Stock</th>
+                      <th className="px-4 py-3 text-center">Selling Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1435,20 +1435,20 @@ export function DashboardPage() {
                             {prod.soldQuantity > 0 ? (
                               isTop1 ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 text-[10px] font-black border border-orange-200 animate-pulse">
-                                  <Flame className="w-3 h-3 text-orange-500" /> ১নং সেরা রানিং
+                                  <Flame className="w-3 h-3 text-orange-500" /> #1 Top Seller
                                 </span>
                               ) : isTop3 ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-black border border-indigo-200">
-                                  ⚡ দ্রুত চলছে
+                                  ⚡ Fast Moving
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                                  🟢 রানিং পণ্য
+                                  🟢 Active Products
                                 </span>
                               )
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 text-slate-400 text-[10px] font-semibold border border-slate-200">
-                                ⚪ কোনো বিক্রি নেই
+                                ⚪ No Sales
                               </span>
                             )}
                           </td>
@@ -1469,7 +1469,7 @@ export function DashboardPage() {
           <div className="flex items-center gap-2 mb-4">
             <AlertCircle className="h-5 w-5 text-rose-500" />
             <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-              আমার পাওনা বকেয়া তালিকা (My Outstanding Dues)
+              My Outstanding Dues
             </h2>
           </div>
           <SRDuesList />
@@ -1495,10 +1495,10 @@ export function DashboardPage() {
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-black text-slate-900">
-                    {viewingCompanyProducts.companyName} — সর্বাধিক বিক্রিত ও রানিং পণ্য
+                    {viewingCompanyProducts.companyName} — Top Selling & Active Products
                   </h3>
                   <p className="text-xs text-slate-500">
-                    {displayPeriodTitle} • এই কোম্পানির কোন পণ্য মোট কত পিস বিক্রি হয়েছে তার র‍্যাংকিং তালিকা
+                    {displayPeriodTitle} • Top products ranking and quantities sold for this company
                   </p>
                 </div>
               </div>
@@ -1508,7 +1508,7 @@ export function DashboardPage() {
                     href={`/purchases/companies/${viewingCompanyProducts.companyId}`}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 text-xs font-bold transition-colors"
                   >
-                    <span>📄 মালের হিসাব ও লেজার</span>
+                    <span>📄 Purchases & Company Ledger</span>
                     <ArrowUpRight className="h-3.5 w-3.5" />
                   </Link>
                   <button
@@ -1527,7 +1527,7 @@ export function DashboardPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="এই কোম্পানির পণ্য খুঁজুন..."
+                  placeholder="Search products in this company..."
                   value={modalProductSearch}
                   onChange={(e) => setModalProductSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-slate-50 font-medium"
@@ -1545,7 +1545,7 @@ export function DashboardPage() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    🔥 শুধু বিক্রিত ({(d.topProducts || []).filter((p: any) => p.companyId === viewingCompanyProducts.companyId && p.soldQuantity > 0).length}টি)
+                    🔥 Sold Items ({(d.topProducts || []).filter((p: any) => p.companyId === viewingCompanyProducts.companyId && p.soldQuantity > 0).length})
                   </button>
                   <button
                     onClick={() => setModalSalesFilter('unsold')}
@@ -1555,7 +1555,7 @@ export function DashboardPage() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    ⚪ কোনো বিক্রি নেই ({(d.topProducts || []).filter((p: any) => p.companyId === viewingCompanyProducts.companyId && p.soldQuantity === 0).length}টি)
+                    ⚪ No Sales ({(d.topProducts || []).filter((p: any) => p.companyId === viewingCompanyProducts.companyId && p.soldQuantity === 0).length})
                   </button>
                   <button
                     onClick={() => setModalSalesFilter('all')}
@@ -1565,16 +1565,16 @@ export function DashboardPage() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    সব ({(d.topProducts || []).filter((p: any) => p.companyId === viewingCompanyProducts.companyId).length}টি)
+                    All ({(d.topProducts || []).filter((p: any) => p.companyId === viewingCompanyProducts.companyId).length})
                   </button>
                 </div>
 
                 {/* Stock Filter Pills */}
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
                   {[
-                    { id: 'all', label: 'সব স্টক' },
-                    { id: 'in_stock', label: '🟢 ইন-স্টক' },
-                    { id: 'out_of_stock', label: '🔴 স্টক শেষ' },
+                    { id: 'all', label: 'All Stock' },
+                    { id: 'in_stock', label: '🟢 In Stock' },
+                    { id: 'out_of_stock', label: '🔴 Out of Stock' },
                   ].map((st) => (
                     <button
                       key={st.id}
@@ -1596,10 +1596,10 @@ export function DashboardPage() {
                   onChange={(e) => setModalProductSort(e.target.value as any)}
                   className="text-xs font-black text-slate-800 bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
                 >
-                  <option value="sold_qty_desc">🔥 বিক্রি সংখ্যা</option>
-                  <option value="sold_val_desc">💰 বিক্রি মূল্য</option>
-                  <option value="stock_desc">📦 মজুদ স্টক</option>
-                  <option value="name_asc">🔤 নাম (A-Z)</option>
+                  <option value="sold_qty_desc">🔥 Sold Quantity</option>
+                  <option value="sold_val_desc">💰 Sales Value</option>
+                  <option value="stock_desc">📦 Current Stock</option>
+                  <option value="name_asc">🔤 Name (A-Z)</option>
                 </select>
               </div>
             </div>
@@ -1635,10 +1635,10 @@ export function DashboardPage() {
                   return (
                     <div className="py-16 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                       {modalSalesFilter === 'sold'
-                        ? 'এই কোম্পানির কোনো পণ্য এখনও বিক্রি হয়নি (সব পণ্য দেখতে "সব" বাটনে চাপুন)।'
+                        ? 'No products sold for this company yet.'
                         : modalSalesFilter === 'unsold'
-                        ? 'এই কোম্পানিতে ০ বিক্রির কোনো পণ্য নেই।'
-                        : 'এই কোম্পানির জন্য কোনো পণ্য পাওয়া যায়নি।'}
+                        ? 'No zero-sales products for this company.'
+                        : 'No products found for this company.'}
                     </div>
                   );
                 }
@@ -1647,13 +1647,13 @@ export function DashboardPage() {
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b border-slate-200">
                       <tr>
-                        <th className="px-4 py-3 text-center">র‍্যাংক</th>
-                        <th className="px-4 py-3">পণ্যের নাম</th>
-                        <th className="px-4 py-3 text-right">বিক্রয় দর</th>
-                        <th className="px-4 py-3 text-center">মোট বিক্রি সংখ্যা</th>
-                        <th className="px-4 py-3 text-right">মোট বিক্রি মূল্য</th>
-                        <th className="px-4 py-3 text-center">গুদাম স্টক</th>
-                        <th className="px-4 py-3 text-center">রানিং অবস্থা</th>
+                        <th className="px-4 py-3 text-center">Rank</th>
+                        <th className="px-4 py-3">Product Name</th>
+                        <th className="px-4 py-3 text-right">Selling Price</th>
+                        <th className="px-4 py-3 text-center">Quantity Sold</th>
+                        <th className="px-4 py-3 text-right">Sales Amount</th>
+                        <th className="px-4 py-3 text-center">Warehouse Stock</th>
+                        <th className="px-4 py-3 text-center">Selling Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1700,20 +1700,20 @@ export function DashboardPage() {
                               {prod.soldQuantity > 0 ? (
                                 isTop1 ? (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 text-[10px] font-black border border-orange-200 animate-pulse">
-                                    <Flame className="w-3 h-3 text-orange-500" /> ১নং সেরা রানিং
+                                    <Flame className="w-3 h-3 text-orange-500" /> #1 Top Seller
                                   </span>
                                 ) : isTop3 ? (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-black border border-indigo-200">
-                                    ⚡ দ্রুত চলছে
+                                    ⚡ Fast Moving
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                                    🟢 রানিং পণ্য
+                                    🟢 Active Products
                                   </span>
                                 )
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 text-slate-400 text-[10px] font-semibold border border-slate-200">
-                                  ⚪ কোনো বিক্রি নেই
+                                  ⚪ No Sales
                                 </span>
                               )}
                             </td>
@@ -1732,7 +1732,7 @@ export function DashboardPage() {
                 onClick={() => setViewingCompanyProducts(null)}
                 className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-xs cursor-pointer"
               >
-                বন্ধ করুন
+                Close
               </button>
             </div>
           </div>
@@ -1744,7 +1744,7 @@ export function DashboardPage() {
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/30 backdrop-blur-xs">
           <div className="bg-white p-6 rounded-2xl shadow-xl flex items-center gap-3">
             <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-            <span className="text-sm font-bold text-slate-700">মেমোর বিস্তারিত তথ্য লোড হচ্ছে...</span>
+            <span className="text-sm font-bold text-slate-700">Loading invoice memo details...</span>
           </div>
         </div>
       )}

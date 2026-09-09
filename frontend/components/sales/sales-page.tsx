@@ -328,7 +328,7 @@ function SalesTable({ sales, isFetching, onDeleted }: { sales: Sale[], isFetchin
     setIsDeleting(true);
     try {
       await deleteSale(deleteTarget.id);
-      showSuccessToast('বিক্রয় রেকর্ডটি সফলভাবে মুছে ফেলা হয়েছে');
+      showSuccessToast('Sale invoice deleted successfully');
       setDeleteTarget(null);
       onDeleted();
     } catch (e) {
@@ -400,16 +400,16 @@ function SalesTable({ sales, isFetching, onDeleted }: { sales: Sale[], isFetchin
         isOpen={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}
-        title="বিক্রয় চালান মুছে ফেলতে চান?"
-        description="এই চালানটি মুছে ফেললে পণ্যের স্টক ও লেনদেনের ব্যালেন্স পূর্বাবস্থায় ফিরে যাবে।"
-        confirmText="হ্যাঁ, মুছে ফেলুন"
-        cancelText="বাতিল"
+        title="Delete Sale Invoice?"
+        description="Deleting this sale will restore product stock and reverse all associated due amounts."
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
         variant="danger"
         isLoading={isDeleting}
         details={deleteTarget ? [
-          { label: 'ইনভয়েস নং', value: deleteTarget.invoiceNo },
-          { label: 'দোকান / কাস্টমার', value: deleteTarget.shop?.name ?? 'Direct Sale' },
-          { label: 'বিক্রয় মূল্য', value: formatCurrency(deleteTarget.totalAmount) },
+          { label: 'Invoice No', value: deleteTarget.invoiceNo },
+          { label: 'Customer / Shop', value: deleteTarget.shop?.name ?? 'Direct Sale' },
+          { label: 'Total Amount', value: formatCurrency(deleteTarget.totalAmount) },
         ] : []}
       />
     </div>

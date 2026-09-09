@@ -8,8 +8,8 @@ interface LoadingBlockProps {
 }
 
 export function LoadingBlock({
-  label = 'ডেটা লোড হচ্ছে...',
-  subLabel = 'অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন...',
+  label = 'Loading data...',
+  subLabel = 'Please wait a moment...',
   className = '',
 }: LoadingBlockProps) {
   return (

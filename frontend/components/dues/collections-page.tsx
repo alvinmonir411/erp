@@ -38,11 +38,11 @@ export function CollectionsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'APPROVED':
-        return { label: 'অনুমোদিত', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { label: 'Approved', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
       case 'REJECTED':
-        return { label: 'বাতিলকৃত', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
+        return { label: 'Rejected', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
       case 'PENDING':
-        return { label: 'অনুমোদনের অপেক্ষায়', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+        return { label: 'Pending Approval', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
       default:
         return { label: status, cls: 'bg-slate-50 text-slate-700 border-slate-200' };
     }
@@ -53,8 +53,8 @@ export function CollectionsPage() {
       {/* Header & Tabs */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">বকেয়া ও কালেকশন ব্যবস্থাপনা</h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">দোকানের বাকি পাওনা, নগদ আদায় ও পেমেন্ট অনুমোদন</p>
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Due & Collection History</h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Shop due ledgers, cash collections, and payment history</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -62,14 +62,14 @@ export function CollectionsPage() {
             className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
           >
             <DollarSign className="w-4 h-4 text-indigo-600" />
-            বকেয়া তালিকা
+            Due List
           </Link>
           <Link
             href="/dues/collections"
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-black text-white shadow-md shadow-indigo-500/20"
           >
             <Clock className="w-4 h-4" />
-            আদায় হিস্ট্রি
+            Collection History
           </Link>
           {user?.role === Role.SUPER_ADMIN && (
             <Link
@@ -77,7 +77,7 @@ export function CollectionsPage() {
               className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <CheckCircle className="w-4 h-4 text-emerald-500" />
-              পেমেন্ট অনুমোদন
+              Payment Approvals
             </Link>
           )}
         </div>
@@ -89,7 +89,7 @@ export function CollectionsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="আদায় হিস্ট্রি খুঁজুন (দোকান বা এসআর নাম)..."
+              placeholder="Search history (shop or SR name)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
@@ -102,12 +102,12 @@ export function CollectionsPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="px-5 py-3.5">দোকান ও অর্ডার</th>
-                <th className="px-5 py-3.5">আদায়কারী (SR)</th>
-                <th className="px-5 py-3.5">আদায়ের পরিমাণ</th>
-                <th className="px-5 py-3.5">তারিখ</th>
-                <th className="px-5 py-3.5">অবস্থা</th>
-                <th className="px-5 py-3.5">নোট / কারণ</th>
+                <th className="px-5 py-3.5">Shop & Order</th>
+                <th className="px-5 py-3.5">Collected By (SR)</th>
+                <th className="px-5 py-3.5">Collected Amount</th>
+                <th className="px-5 py-3.5">Date</th>
+                <th className="px-5 py-3.5">Status</th>
+                <th className="px-5 py-3.5">Notes / Reason</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -115,13 +115,13 @@ export function CollectionsPage() {
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto" />
-                    <p className="mt-2 text-xs text-slate-400 font-bold">আদায় তালিকা লোড হচ্ছে...</p>
+                    <p className="mt-2 text-xs text-slate-400 font-bold">Loading collections...</p>
                   </td>
                 </tr>
               ) : filteredCollections.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm font-bold">
-                    কোনো আদায়ের রেকর্ড পাওয়া যায়নি।
+                    No collection records found.
                   </td>
                 </tr>
               ) : (
@@ -132,7 +132,7 @@ export function CollectionsPage() {
                       <td className="px-5 py-3.5">
                         <div>
                           <p className="font-black text-slate-900 text-sm">{c.shop?.name}</p>
-                          <p className="text-[10px] font-black text-indigo-600 tracking-tight">অর্ডার #{c.orderId}</p>
+                          <p className="text-[10px] font-black text-indigo-600 tracking-tight">Order #{c.orderId}</p>
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
@@ -153,7 +153,7 @@ export function CollectionsPage() {
                       <td className="px-5 py-3.5 text-xs text-slate-600 max-w-xs truncate">
                         {c.note || '-'}
                         {c.rejectedReason && (
-                          <p className="text-rose-500 font-bold mt-0.5">বাতিলের কারণ: {c.rejectedReason}</p>
+                          <p className="text-rose-500 font-bold mt-0.5">Rejected Reason: {c.rejectedReason}</p>
                         )}
                       </td>
                     </tr>
@@ -169,11 +169,11 @@ export function CollectionsPage() {
           {isLoading ? (
             <div className="p-12 text-center">
               <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto" />
-              <p className="mt-2 text-xs text-slate-400 font-bold">আদায় তালিকা লোড হচ্ছে...</p>
+              <p className="mt-2 text-xs text-slate-400 font-bold">Loading collections...</p>
             </div>
           ) : filteredCollections.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs font-bold">
-              কোনো আদায়ের রেকর্ড পাওয়া যায়নি।
+              No collection records found.
             </div>
           ) : (
             filteredCollections.map((c: any) => {
@@ -183,7 +183,7 @@ export function CollectionsPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-black text-slate-900 text-sm">{c.shop?.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">অর্ডার #{c.orderId} • এসআর: {c.srName}</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">Order #{c.orderId} • SR: {c.srName}</p>
                     </div>
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${badge.cls}`}>
                       {badge.label}
@@ -192,19 +192,19 @@ export function CollectionsPage() {
                   
                   <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100 mt-1">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">আদায়ের পরিমাণ</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Collected Amount</p>
                       <p className="font-black text-emerald-600 text-base">{formatCurrency(c.collectedAmount)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">তারিখ</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Date</p>
                       <p className="font-bold text-slate-700 text-xs">{new Date(c.collectionDate).toLocaleDateString()}</p>
                     </div>
                   </div>
 
                   {(c.note || c.rejectedReason) && (
                     <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                      {c.note && <p><span className="font-bold text-slate-700">নোট:</span> {c.note}</p>}
-                      {c.rejectedReason && <p className="text-rose-500 font-bold mt-0.5">বাতিলের কারণ: {c.rejectedReason}</p>}
+                      {c.note && <p><span className="font-bold text-slate-700">Note:</span> {c.note}</p>}
+                      {c.rejectedReason && <p className="text-rose-500 font-bold mt-0.5">Rejected Reason: {c.rejectedReason}</p>}
                     </div>
                   )}
                 </div>

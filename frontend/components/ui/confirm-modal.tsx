@@ -28,8 +28,8 @@ export function ConfirmModal({
   onConfirm,
   title,
   description,
-  confirmText = 'হ্যাঁ, নিশ্চিত করুন',
-  cancelText = 'বাতিল করুন',
+  confirmText = 'Yes, Confirm',
+  cancelText = 'Cancel',
   variant = 'danger',
   isLoading = false,
   details = [],
@@ -134,7 +134,7 @@ export function ConfirmModal({
             {isLoading ? (
               <>
                 <RefreshCw className="h-4 w-4 animate-spin" />
-                <span>প্রক্রিয়াধীন...</span>
+                <span>Processing...</span>
               </>
             ) : (
               confirmText

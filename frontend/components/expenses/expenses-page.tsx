@@ -174,7 +174,7 @@ export function ExpensesPage() {
             </span>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-                Business Analytics (ব্যবসার বিশ্লেষণ)
+                Business Analytics & Performance Insights
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Real-Time 360° Financial & Operational Executive Control Center
@@ -262,7 +262,7 @@ export function ExpensesPage() {
           )}
 
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Route (রুট)</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Route</label>
             <select
               value={selectedRouteId}
               onChange={(e) => setSelectedRouteId(e.target.value)}
@@ -278,7 +278,7 @@ export function ExpensesPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Delivery Person (কর্মী)</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Delivery Person</label>
             <select
               value={selectedPersonnelId}
               onChange={(e) => setSelectedPersonnelId(e.target.value)}
@@ -294,7 +294,7 @@ export function ExpensesPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Company (কোম্পানি)</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Company</label>
             <select
               value={selectedCompanyId}
               onChange={(e) => setSelectedCompanyId(e.target.value)}
@@ -317,7 +317,7 @@ export function ExpensesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              1. Total Inventory (স্টক)
+              1. Total Inventory Stock
             </span>
             <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
               <Box className="w-5 h-5" />
@@ -340,7 +340,7 @@ export function ExpensesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              2. Total Sales (মোট বিক্রি)
+              2. Total Sales Revenue
             </span>
             <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
               <TrendingUp className="w-5 h-5" />
@@ -363,7 +363,7 @@ export function ExpensesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              3. Cash Collection (কালেকশন)
+              3. Cash Collection
             </span>
             <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400">
               <DollarSign className="w-5 h-5" />
@@ -386,7 +386,7 @@ export function ExpensesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              4. Operational Expenses (খরচ)
+              4. Operational Expenses
             </span>
             <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
               <Receipt className="w-5 h-5" />
@@ -407,7 +407,7 @@ export function ExpensesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              5. Total Free Items (ফ্রি মালামাল)
+              5. Total Free Items Value
             </span>
             <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
               <Gift className="w-5 h-5" />
@@ -430,7 +430,7 @@ export function ExpensesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              6. Damage Loss (ড্যামেজ ক্ষতি)
+              6. Damage Loss
             </span>
             <div className="p-2 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
               <AlertTriangle className="w-5 h-5" />
@@ -453,7 +453,7 @@ export function ExpensesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              7. Stock Market Worth (বাজারমূল্য)
+              7. Stock Market Value
             </span>
             <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
               <BarChart3 className="w-5 h-5" />
@@ -473,7 +473,7 @@ export function ExpensesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-indigo-200 dark:border-indigo-900 bg-gradient-to-br from-indigo-50/50 to-white dark:from-gray-800 dark:to-gray-800 hover:shadow-md transition">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-              8. Net Business Worth (প্রকৃত সম্পদ)
+              8. Net Business Assets
             </span>
             <div className="p-2 rounded-lg bg-indigo-600 text-white">
               <ShieldCheck className="w-5 h-5" />
@@ -499,11 +499,11 @@ export function ExpensesPage() {
                 <Activity className="w-5 h-5" />
               </span>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                Business Health Indicator (ব্যবসার সামগ্রিক অবস্থা)
+                Business Health Indicator
               </h2>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Operational Leakage calculate করা হয়েছে (Expenses + Damage Loss + Free Items). যা মোট স্টক সম্পদ থেকে লিকেজ হার নির্দেশ করে।
+              Operational leakage is calculated as (Expenses + Damage Loss + Free Items), indicating the leakage rate against total inventory assets.
             </p>
           </div>
 
@@ -593,7 +593,7 @@ export function ExpensesPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
           <div className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-white">
             <Zap className="w-5 h-5 text-amber-500" />
-            <span>Smart Business Insights & Analysis (ব্যবসার অটোমেটিক পর্যবেক্ষণ)</span>
+            <span>Smart Business Insights & Automated Analysis</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {insights.map((ins: any, idx: number) => (
@@ -627,7 +627,7 @@ export function ExpensesPage() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <PieChart className="w-5 h-5 text-indigo-500" />
-              Expense Category Distribution (খরচের খাতসমূহ)
+              Expense Category Distribution
             </h3>
           </div>
           <div className="space-y-3">
@@ -658,7 +658,7 @@ export function ExpensesPage() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-rose-500" />
-              Operational Leakage Components (লিকেজ বিভাজন)
+              Operational Leakage Breakdown
             </h3>
           </div>
           <div className="space-y-4">
@@ -692,7 +692,7 @@ export function ExpensesPage() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Truck className="w-5 h-5 text-teal-500" />
-              Route-Wise Expense Ranking (রুট ভিত্তিক খরচ)
+              Route-Wise Expense Ranking
             </h3>
           </div>
           <div className="space-y-3">
@@ -713,7 +713,7 @@ export function ExpensesPage() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-amber-500" />
-              Delivery Person Expense Ranking (কর্মী ভিত্তিক খরচ)
+              Delivery Personnel Expense Ranking
             </h3>
           </div>
           <div className="space-y-3">
@@ -977,7 +977,7 @@ export function ExpensesPage() {
           {activeTab === 'overview' && (
             <div className="py-4 space-y-4">
               <div className="text-sm font-bold text-gray-900 dark:text-white">
-                Executive Business Financial Summary (ব্যবসার সারসংক্ষেপ)
+                Executive Financial & Operational Summary
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="p-3 bg-gray-50 dark:bg-gray-900/60 rounded-lg">

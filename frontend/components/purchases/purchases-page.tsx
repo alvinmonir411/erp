@@ -148,7 +148,7 @@ export function PurchasesPage() {
 
   useToastNotification({
     message: toastMessage,
-    title: toastTone === 'success' ? 'সফল হয়েছে' : 'ত্রুটি',
+    title: toastTone === 'success' ? 'Success' : 'Error',
     tone: toastTone,
   });
 
@@ -185,7 +185,7 @@ export function PurchasesPage() {
       setProductSupplies(prodList);
       setPayments(payList);
     } catch (err: any) {
-      setError(err.message || 'ডেটা লোড করতে সমস্যা হয়েছে');
+      setError(err.message || 'Failed to load purchase data');
     } finally {
       setIsLoading(false);
     }
@@ -427,14 +427,14 @@ export function PurchasesPage() {
 
     if (!selectedSupplier) {
       setToastTone('error');
-      setToastMessage('অনুগ্রহ করে সরবরাহকারী / কোম্পানি নির্বাচন করুন');
+      setToastMessage('Please select a supplier / company');
       return;
     }
 
     const amt = parseFloat(draftAmount);
     if (isNaN(amt) || amt <= 0) {
       setToastTone('error');
-      setToastMessage('সঠিক পরিশোধের টাকা লিখুন (১ বা তার বেশি)');
+      setToastMessage('Please enter a valid payment amount (1 or more)');
       return;
     }
 
@@ -447,7 +447,7 @@ export function PurchasesPage() {
 
         return {
           productId: row.productId ? Number(row.productId) : undefined,
-          productName: row.productName || row.searchText || 'পণ্য',
+          productName: row.productName || row.searchText || 'Product',
           sku: row.sku || undefined,
           unit: row.unit || 'Pcs',
           quantity: q,
@@ -459,7 +459,7 @@ export function PurchasesPage() {
 
     if (validBreakdown.length === 0) {
       setToastTone('error');
-      setToastMessage('প্রি-অর্ডারের জন্য কমপক্ষে ১টি পণ্য এবং সঠিক কোয়ান্টিটি যোগ করুন');
+      setToastMessage('Please add at least 1 product with a valid quantity for pre-order');
       return;
     }
 
@@ -485,11 +485,11 @@ export function PurchasesPage() {
       });
 
       setToastTone('success');
-      setToastMessage('✅ ব্যাংক ড্রাফট ও প্রি-অর্ডার সফলভাবে সংরক্ষণ করা হয়েছে!');
+      setToastMessage('✅ Bank draft and pre-order saved successfully!');
       await loadData();
     } catch (err: any) {
       setToastTone('error');
-      setToastMessage(err.message || 'ব্যাংক ড্রাফট সংরক্ষণ করতে সমস্যা হয়েছে');
+      setToastMessage(err.message || 'Failed to save bank draft');
     } finally {
       setIsSubmittingDraft(false);
     }
@@ -556,13 +556,13 @@ export function PurchasesPage() {
       isOpen: true,
       type: 'purchase',
       id: p.id,
-      title: 'চালানটি কি নিশ্চিতভাবে মুছে ফেলতে চান?',
-      description: 'এই চালানটি মুছে ফেললে সিস্টেমের ক্রয় তালিকা ও স্টক খতিয়ান থেকে এটি স্থায়ীভাবে সরানো হবে।',
+      title: 'Are you sure you want to delete this invoice?',
+      description: 'Deleting this invoice will permanently remove it from purchase records and update stock.',
       details: [
-        { label: 'চালান নং / আইডি', value: `#${p.invoiceNo || p.referenceNo || p.id}` },
-        { label: 'কোম্পানি / সরবরাহকারী', value: p.company?.name || p.supplierName || 'N/A' },
-        { label: 'চালানের তারিখ', value: formatDate(p.purchaseDate) },
-        { label: 'মোট মূল্য', value: formatCurrency(p.totalAmount) },
+        { label: 'Challan / Invoice No', value: `#${p.invoiceNo || p.referenceNo || p.id}` },
+        { label: 'Company / Supplier', value: p.company?.name || p.supplierName || 'N/A' },
+        { label: 'Challan Date', value: formatDate(p.purchaseDate) },
+        { label: 'Total Amount', value: formatCurrency(p.totalAmount) },
       ],
     });
   };
@@ -573,13 +573,13 @@ export function PurchasesPage() {
       isOpen: true,
       type: 'payment',
       id: pay.id,
-      title: 'অগ্রিম পেমেন্ট / ড্রাফট রেকর্ড মুছে ফেলতে চান?',
-      description: 'এই ব্যাংক ড্রাফট বা অগ্রিম পেমেন্টের রেকর্ডটি স্থায়ীভাবে মুছে ফেলা হবে।',
+      title: 'Delete Advance Payment / Draft Record?',
+      description: 'This bank draft or advance payment record will be permanently deleted.',
       details: [
-        { label: 'ড্রাফট / ট্রানজেকশন নং', value: pay.transactionRef || `BD-${pay.id}` },
-        { label: 'কোম্পানি', value: pay.company?.name || 'N/A' },
-        { label: 'তারিখ', value: formatDate(pay.paymentDate) },
-        { label: 'পেমেন্ট পরিমাণ', value: formatCurrency(pay.amount) },
+        { label: 'Draft / Transaction No', value: pay.transactionRef || `BD-${pay.id}` },
+        { label: 'Company', value: pay.company?.name || 'N/A' },
+        { label: 'Date', value: formatDate(pay.paymentDate) },
+        { label: 'Payment Amount', value: formatCurrency(pay.amount) },
       ],
     });
   };
@@ -592,17 +592,17 @@ export function PurchasesPage() {
       if (deleteModal.type === 'purchase') {
         await deletePurchase(deleteModal.id);
         setToastTone('success');
-        setToastMessage('চালানটি সফলভাবে মুছে ফেলা হয়েছে');
+        setToastMessage('Challan deleted successfully');
       } else {
         await deleteCompanyPayment(deleteModal.id);
         setToastTone('success');
-        setToastMessage('ড্রাফট রেকর্ডটি সফলভাবে মুছে ফেলা হয়েছে');
+        setToastMessage('Draft record deleted successfully');
       }
       setDeleteModal(null);
       await loadData();
     } catch (err: any) {
       setToastTone('error');
-      setToastMessage(err.message || 'রেকর্ড মুছতে সমস্যা হয়েছে');
+      setToastMessage(err.message || 'Failed to delete record');
     } finally {
       setIsDeleting(false);
     }
@@ -618,15 +618,15 @@ export function PurchasesPage() {
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 backdrop-blur-md">
               <Building2 className="h-3.5 w-3.5" />
-              <span>ক্রয় ও সাপ্লায়ার রিকনসিলিয়েশন সিস্টেম</span>
+              <span>Purchases & Supplier Reconciliation</span>
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-                <span>ক্রয় ব্যবস্থাপনা</span>
+                <span>Purchase Management</span>
                 <span className="text-lg sm:text-xl font-normal text-indigo-300 font-sans tracking-normal">(Purchase Management)</span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed font-medium">
-                অগ্রিম পেমেন্ট, প্রি-অর্ডার, চালান গ্রহণ এবং স্টক ইন ব্যবস্থাপনা
+                Advance payments, pre-orders, invoice receipt and stock-in management
               </p>
             </div>
 
@@ -634,15 +634,15 @@ export function PurchasesPage() {
             <div className="flex items-center gap-2.5 pt-2 flex-wrap text-xs font-bold">
               <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-slate-200 backdrop-blur-md border border-white/10">
                 <FileText className="h-3.5 w-3.5 text-amber-400" />
-                <span>মোট চালান: <b className="text-white">{kpiStats.totalInvoices} টি</b></span>
+                <span>Total Invoices: <b className="text-white">{kpiStats.totalInvoices}</b></span>
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-slate-200 backdrop-blur-md border border-white/10">
                 <Wallet className="h-3.5 w-3.5 text-emerald-400" />
-                <span>প্রি-অর্ডার ড্রাফট: <b className="text-white">{kpiStats.totalPreOrders} টি</b></span>
+                <span>Pre-Order Drafts: <b className="text-white">{kpiStats.totalPreOrders}</b></span>
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-slate-200 backdrop-blur-md border border-white/10">
                 <Building2 className="h-3.5 w-3.5 text-indigo-400" />
-                <span>কোম্পানি: <b className="text-white">{kpiStats.totalCompanies} টি</b></span>
+                <span>Companies: <b className="text-white">{kpiStats.totalCompanies}</b></span>
               </span>
             </div>
           </div>
@@ -658,8 +658,8 @@ export function PurchasesPage() {
                 <Wallet className="h-5 w-5 text-white" />
               </div>
               <div className="text-left">
-                <div className="font-black text-white leading-tight">🏦 ব্যাংক ড্রাফট / টাকা পরিশোধ</div>
-                <div className="text-[11px] font-semibold text-emerald-100">অগ্রিম অর্ডার ও পণ্যের বুকিং</div>
+                <div className="font-black text-white leading-tight">🏦 Bank Draft / Advance Payment</div>
+                <div className="text-[11px] font-semibold text-emerald-100">Pre-orders & advance booking</div>
               </div>
             </button>
 
@@ -672,8 +672,8 @@ export function PurchasesPage() {
                 <Package className="h-5 w-5 text-white" />
               </div>
               <div className="text-left">
-                <div className="font-black text-white leading-tight">📦 চালান ইন ও স্টক ইন</div>
-                <div className="text-[11px] font-semibold text-indigo-100">ড্রাফট মিলিয়ে মাল গোডাউনে এন্ট্রি</div>
+                <div className="font-black text-white leading-tight">📦 Receive Challan & Stock In</div>
+                <div className="text-[11px] font-semibold text-indigo-100">Stock receipt matched with draft</div>
               </div>
             </Link>
           </div>
@@ -688,7 +688,7 @@ export function PurchasesPage() {
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              মোট প্রাপ্ত মাল (Goods Received)
+              Total Goods Received
             </span>
             <div className="rounded-2xl bg-indigo-50 p-2.5 text-indigo-600 shrink-0">
               <Package className="h-5 w-5" />
@@ -698,7 +698,7 @@ export function PurchasesPage() {
             {formatCurrency(kpiStats.totalPurchases)}
           </p>
           <p className="mt-1 text-xs text-slate-400 font-medium">
-            সকল চালান মিলিয়ে মোট ইনওয়ার্ড মালের মূল্য
+            Total received goods value across all invoices
           </p>
         </div>
 
@@ -706,7 +706,7 @@ export function PurchasesPage() {
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              মোট পরিশোধিত ড্রাফট (Total Paid)
+              Total Paid Drafts
             </span>
             <div className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-600 shrink-0">
               <CheckCircle2 className="h-5 w-5" />
@@ -716,7 +716,7 @@ export function PurchasesPage() {
             {formatCurrency(kpiStats.totalPaid)}
           </p>
           <p className="mt-1 text-xs text-slate-400 font-medium">
-            কোম্পানিগুলোকে দেওয়া ব্যাংক ড্রাফট ও ক্যাশ
+            Total advance drafts and payments to suppliers
           </p>
         </div>
 
@@ -724,7 +724,7 @@ export function PurchasesPage() {
         <div className="rounded-3xl border border-sky-200 bg-sky-50/50 p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-sky-700">
-              কোম্পানিতে আমাদের অগ্রিম (Advance)
+              Supplier Advance Balance
             </span>
             <div className="rounded-2xl bg-sky-100 p-2.5 text-sky-600 shrink-0">
               <Wallet className="h-5 w-5" />
@@ -734,7 +734,7 @@ export function PurchasesPage() {
             {formatCurrency(kpiStats.totalAdvance)}
           </p>
           <p className="mt-1 text-xs text-sky-700/80 font-medium">
-            কোম্পানি এই মূল্যের মাল বা টাকা ফেরত দেবে
+            Advance credit balance remaining with suppliers
           </p>
         </div>
 
@@ -742,7 +742,7 @@ export function PurchasesPage() {
         <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
-              কোম্পানির বাকি পাওনা (Payable)
+              Company Outstanding Due
             </span>
             <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-600 shrink-0">
               <TrendingDown className="h-5 w-5" />
@@ -752,7 +752,7 @@ export function PurchasesPage() {
             {formatCurrency(kpiStats.totalPayable)}
           </p>
           <p className="mt-1 text-xs text-rose-600/80 font-medium">
-            কোম্পানি আমাদের কাছে এখনো পাবে
+            Outstanding balance payable to suppliers
           </p>
         </div>
       </div>
@@ -772,7 +772,7 @@ export function PurchasesPage() {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="সার্চ (কোম্পানি, ড্রাফট নং, চালান নং, পণ্য)..."
+              placeholder="Search (company, draft no, challan no, product)..."
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
             />
           </div>
@@ -788,7 +788,7 @@ export function PurchasesPage() {
               }}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all truncate"
             >
-              <option value="">🏢 সকল সরবরাহকারী / কোম্পানি</option>
+              <option value="">🏢 All Suppliers / Companies</option>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} {c.code ? `(${c.code})` : ''}
@@ -807,9 +807,9 @@ export function PurchasesPage() {
                 setCurrentPage(1);
               }}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
-              title="শুরুর তারিখ"
+              title="Start Date"
             />
-            <span className="text-slate-400 text-xs font-bold">হতে</span>
+            <span className="text-slate-400 text-xs font-bold">to</span>
             <input
               type="date"
               value={toDate}
@@ -818,7 +818,7 @@ export function PurchasesPage() {
                 setCurrentPage(1);
               }}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
-              title="শেষ তারিখ"
+              title="End Date"
             />
             {(selectedCompanyId || fromDate || toDate || searchTerm) && (
               <button
@@ -830,7 +830,7 @@ export function PurchasesPage() {
                   setCurrentPage(1);
                 }}
                 className="rounded-2xl border border-rose-200 bg-rose-50 p-2.5 text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
-                title="ফিল্টার ক্লিয়ার করুন"
+                title="Clear filters"
               >
                 <FilterX className="h-4 w-4" />
               </button>
@@ -854,7 +854,7 @@ export function PurchasesPage() {
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <span>সব (All)</span>
+          <span>All Records</span>
         </button>
 
         <button
@@ -869,7 +869,7 @@ export function PurchasesPage() {
           }`}
         >
           <Wallet className="h-4 w-4 text-emerald-500" />
-          <span>🏦 অগ্রিম অর্ডার ({filteredPreOrdersList.length})</span>
+          <span>🏦 Pre-Orders ({filteredPreOrdersList.length})</span>
         </button>
 
         <button
@@ -884,7 +884,7 @@ export function PurchasesPage() {
           }`}
         >
           <Package className="h-4 w-4 text-indigo-500" />
-          <span>📦 চালান ({filteredPurchasesList.length})</span>
+          <span>📦 Invoices ({filteredPurchasesList.length})</span>
         </button>
 
         <button
@@ -899,7 +899,7 @@ export function PurchasesPage() {
           }`}
         >
           <span className="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
-          <span>🟡 আংশিক প্রাপ্ত</span>
+          <span>🟡 Partially Received</span>
         </button>
 
         <button
@@ -914,7 +914,7 @@ export function PurchasesPage() {
           }`}
         >
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
-          <span>🟢 সম্পূর্ণ প্রাপ্ত</span>
+          <span>🟢 Fully Received</span>
         </button>
 
         <div className="h-6 w-px bg-slate-300 mx-1 shrink-0"></div>
@@ -931,7 +931,7 @@ export function PurchasesPage() {
           }`}
         >
           <Building2 className="h-4 w-4 text-slate-500" />
-          <span>🏢 কোম্পানি লেজার</span>
+          <span>🏢 Company Ledger</span>
         </button>
 
         <button
@@ -946,7 +946,7 @@ export function PurchasesPage() {
           }`}
         >
           <Layers className="h-4 w-4 text-slate-500" />
-          <span>📊 পণ্যভিত্তিক সরবরাহ</span>
+          <span>📊 Product Breakdown</span>
         </button>
       </div>
 
@@ -955,8 +955,8 @@ export function PurchasesPage() {
       {/* ============================================================== */}
       {isLoading ? (
         <LoadingBlock
-          label="ক্রয় ও চালানের তথ্য লোড হচ্ছে..."
-          subLabel="অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন, সকল খতিয়ান ও স্টক রিকনসিলিয়েশন প্রস্তুত হচ্ছে..."
+          label="Loading purchases and invoices..."
+          subLabel="Please wait, loading ledger entries and stock reconciliation data..."
         />
       ) : (
         <>
@@ -968,14 +968,14 @@ export function PurchasesPage() {
                   <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
                     <thead className="bg-slate-50/80 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                       <tr>
-                        <th className="py-3.5 px-4 text-left">তারিখ (Date)</th>
-                        <th className="py-3.5 px-4 text-left">সরবরাহকারী (Supplier)</th>
-                        <th className="py-3.5 px-4 text-left">ড্রাফট / চালান নং</th>
-                        <th className="py-3.5 px-4 text-right">অর্ডার মূল্য (Order Value)</th>
-                        <th className="py-3.5 px-4 text-right">প্রাপ্ত মূল্য (Received Value)</th>
-                        <th className="py-3.5 px-4 text-right">অবশিষ্ট অগ্রিম (Advance Remaining)</th>
-                        <th className="py-3.5 px-4 text-center">স্ট্যাটাস (Status)</th>
-                        <th className="py-3.5 px-4 text-center">অ্যাকশন (Actions)</th>
+                        <th className="py-3.5 px-4 text-left">Date</th>
+                        <th className="py-3.5 px-4 text-left">Supplier / Company</th>
+                        <th className="py-3.5 px-4 text-left">Draft / Challan No</th>
+                        <th className="py-3.5 px-4 text-right">Order Value</th>
+                        <th className="py-3.5 px-4 text-right">Received Value</th>
+                        <th className="py-3.5 px-4 text-right">Advance Remaining</th>
+                        <th className="py-3.5 px-4 text-center">Status</th>
+                        <th className="py-3.5 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -1000,7 +1000,7 @@ export function PurchasesPage() {
                             {/* Supplier */}
                             <td className="py-3.5 px-4">
                               <div className="font-bold text-slate-900">
-                                {p.company?.name || p.supplierName || 'কোম্পানি'}
+                                {p.company?.name || p.supplierName || 'Company'}
                               </div>
                               {p.company?.phone && (
                                 <div className="text-[11px] text-slate-400">
@@ -1016,7 +1016,7 @@ export function PurchasesPage() {
                               </span>
                               {p.supplierInvoiceNo && (
                                 <div className="text-[10px] text-slate-500 mt-0.5">
-                                  ইনভয়েস: {p.supplierInvoiceNo}
+                                  Invoice: {p.supplierInvoiceNo}
                                 </div>
                               )}
                             </td>
@@ -1039,10 +1039,10 @@ export function PurchasesPage() {
                                 </span>
                               ) : dueRemaining > 0 ? (
                                 <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
-                                  বাকি: {formatCurrency(dueRemaining)}
+                                  Due: {formatCurrency(dueRemaining)}
                                 </span>
                               ) : (
-                                <span className="text-emerald-700 font-bold">৳০.০০</span>
+                                <span className="text-emerald-700 font-bold">0.00</span>
                               )}
                             </td>
 
@@ -1051,16 +1051,16 @@ export function PurchasesPage() {
                               {isFullyReceived || (isConfirmed && advanceRemaining === 0) ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
                                   <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                                  <span>🟢 সম্পূর্ণ প্রাপ্ত</span>
+                                  <span>🟢 Fully Received</span>
                                 </span>
                               ) : advanceRemaining > 0 ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-200">
                                   <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-                                  <span>🟡 আংশিক প্রাপ্ত</span>
+                                  <span>🟡 Partially Received</span>
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                                  <span>স্টক ইন সম্পন্ন</span>
+                                  <span>Stock In Complete</span>
                                 </span>
                               )}
                             </td>
@@ -1071,27 +1071,27 @@ export function PurchasesPage() {
                                 <Link
                                   href={`/purchases/${p.id}`}
                                   className="inline-flex items-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 transition-colors"
-                                  title="চালানের বিবরণ দেখুন"
+                                  title="View challan details"
                                 >
                                   <Eye className="h-3.5 w-3.5" />
-                                  <span>👁️ দেখুন</span>
+                                  <span>👁️ View</span>
                                 </Link>
 
                                 <Link
                                   href={`/purchases/${p.id}/print-challan`}
                                   target="_blank"
                                   className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:scale-105"
-                                  title="A4 চালান ভাউচার প্রিন্ট করুন"
+                                  title="Print A4 Challan Voucher"
                                 >
                                   <Printer className="h-3.5 w-3.5" />
-                                  <span>🖨️ প্রিন্ট</span>
+                                  <span>🖨️ Print</span>
                                 </Link>
 
                                 <button
                                   type="button"
                                   onClick={() => promptDeletePurchase(p)}
                                   className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                  title="চালান মুছুন"
+                                  title="Delete challan"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -1107,8 +1107,8 @@ export function PurchasesPage() {
                 {filteredPurchasesList.length === 0 && (
                   <div className="p-12 text-center">
                     <StateMessage
-                      title="কোন চালান পাওয়া যায়নি"
-                      description="উপরে '📦 চালান ইন ও স্টক ইন' বাটনে ক্লিক করে নতুন চালান যুক্ত করুন।"
+                      title="No challans found"
+                      description="Click 'Receive Challan & Stock In' above to add a new challan."
                     />
                   </div>
                 )}
@@ -1124,13 +1124,13 @@ export function PurchasesPage() {
                   <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
                     <thead className="bg-slate-50/80 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                       <tr>
-                        <th className="py-3.5 px-4 text-left">তারিখ (Date)</th>
-                        <th className="py-3.5 px-4 text-left">কোম্পানি / সরবরাহকারী</th>
-                        <th className="py-3.5 px-4 text-left">ড্রাফট নং ও মেথড</th>
-                        <th className="py-3.5 px-4 text-left">ব্যাংক ও শাখা</th>
-                        <th className="py-3.5 px-4 text-center">প্রি-অর্ডার পণ্য সংখ্যা</th>
-                        <th className="py-3.5 px-4 text-right">পরিশোধিত টাকা (৳)</th>
-                        <th className="py-3.5 px-4 text-center">অ্যাকশন</th>
+                        <th className="py-3.5 px-4 text-left">Date</th>
+                        <th className="py-3.5 px-4 text-left">Company / Supplier</th>
+                        <th className="py-3.5 px-4 text-left">Draft No & Method</th>
+                        <th className="py-3.5 px-4 text-left">Bank & Branch</th>
+                        <th className="py-3.5 px-4 text-center">Pre-Order Items</th>
+                        <th className="py-3.5 px-4 text-right">Paid Amount (৳)</th>
+                        <th className="py-3.5 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -1147,7 +1147,7 @@ export function PurchasesPage() {
                               {formatDate(pay.paymentDate)}
                             </td>
                             <td className="py-3.5 px-4">
-                              <div className="font-bold text-slate-900">{pay.company?.name || 'কোম্পানি'}</div>
+                              <div className="font-bold text-slate-900">{pay.company?.name || 'Company'}</div>
                               {pay.company?.phone && (
                                 <div className="text-[11px] text-slate-400">📞 {pay.company.phone}</div>
                               )}
@@ -1162,16 +1162,16 @@ export function PurchasesPage() {
                             </td>
                             <td className="py-3.5 px-4">
                               <div className="font-semibold text-slate-800">
-                                {pay.bankName || 'সোনালী ব্যাংক / সাধারণ'}
+                                {pay.bankName || 'Bank Draft / Cash'}
                               </div>
                               {pay.branchName && (
-                                <div className="text-[11px] text-slate-500">শাখা: {pay.branchName}</div>
+                                <div className="text-[11px] text-slate-500">Branch: {pay.branchName}</div>
                               )}
                             </td>
                             <td className="py-3.5 px-4 text-center">
                               <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
                                 <Package className="h-3 w-3" />
-                                <span>{breakdown.length > 0 ? `${breakdown.length} টি পণ্য` : 'জেনারেল ড্রাফট'}</span>
+                                <span>{breakdown.length > 0 ? `${breakdown.length} Products` : 'General Draft'}</span>
                               </span>
                             </td>
                             <td className="py-3.5 px-4 text-right font-black text-emerald-600 text-sm whitespace-nowrap">
@@ -1184,14 +1184,14 @@ export function PurchasesPage() {
                                   className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:scale-105"
                                 >
                                   <Package className="h-3.5 w-3.5" />
-                                  <span>📦 চালান ইন করুন</span>
+                                  <span>📦 Receive Challan</span>
                                 </Link>
 
                                 <button
                                   type="button"
                                   onClick={() => promptDeletePayment(pay)}
                                   className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                  title="ড্রাফট মুছুন"
+                                  title="Delete draft"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -1207,8 +1207,8 @@ export function PurchasesPage() {
                 {filteredPreOrdersList.length === 0 && (
                   <div className="p-12 text-center">
                     <StateMessage
-                      title="কোন অগ্রিম ব্যাংক ড্রাফট বা প্রি-অর্ডার পাওয়া যায়নি"
-                      description="উপরে '🏦 ব্যাংক ড্রাফট / টাকা পরিশোধ' বাটনে ক্লিক করে নতুন ড্রাফট তৈরি করুন।"
+                      title="No advance bank drafts or pre-orders found"
+                      description="Click 'Bank Draft / Advance Payment' above to create a new draft."
                     />
                   </div>
                 )}
@@ -1234,30 +1234,30 @@ export function PurchasesPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <h3 className="font-black text-slate-900 text-base">{c.companyName}</h3>
-                          <p className="text-xs text-slate-400 font-mono">আইডি: #{c.companyId} {c.companyCode ? `• কোড: ${c.companyCode}` : ''}</p>
+                          <p className="text-xs text-slate-400 font-mono">ID: #{c.companyId} {c.companyCode ? `• Code: ${c.companyCode}` : ''}</p>
                         </div>
                         {advance > 0 ? (
                           <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 border border-sky-200">
-                            অগ্রিম: {formatCurrency(advance)}
+                            Advance: {formatCurrency(advance)}
                           </span>
                         ) : payable > 0 ? (
                           <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200">
-                            পাওনা: {formatCurrency(payable)}
+                            Payable: {formatCurrency(payable)}
                           </span>
                         ) : (
                           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                            ✓ সমতা
+                            ✓ Settled
                           </span>
                         )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs">
                         <div>
-                          <span className="text-slate-400 font-medium">গৃহীত মোট মাল</span>
+                          <span className="text-slate-400 font-medium">Total Goods Received</span>
                           <p className="font-bold text-slate-800 text-sm mt-0.5">{formatCurrency(totalGoods)}</p>
                         </div>
                         <div>
-                          <span className="text-slate-400 font-medium">মোট পরিশোধ</span>
+                          <span className="text-slate-400 font-medium">Total Paid</span>
                           <p className="font-black text-emerald-600 text-sm mt-0.5">{formatCurrency(totalPaid)}</p>
                         </div>
                       </div>
@@ -1272,7 +1272,7 @@ export function PurchasesPage() {
                         className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-2 text-xs font-bold transition-colors"
                       >
                         <Wallet className="h-3.5 w-3.5" />
-                        <span>ড্রাফট দিন</span>
+                        <span>Pay Draft</span>
                       </button>
 
                       <Link
@@ -1280,13 +1280,13 @@ export function PurchasesPage() {
                         className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 text-xs font-bold transition-colors"
                       >
                         <Package className="h-3.5 w-3.5" />
-                        <span>চালান ইন</span>
+                        <span>Receive Stock</span>
                       </Link>
 
                       <Link
                         href={`/purchases/companies/${c.companyId}`}
                         className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                        title="পূর্ণ লেজার দেখুন"
+                        title="View Full Ledger"
                       >
                         <ArrowUpRight className="h-4 w-4" />
                       </Link>
@@ -1304,13 +1304,13 @@ export function PurchasesPage() {
                 <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
                   <thead className="bg-slate-50/80 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                     <tr>
-                      <th className="py-3.5 px-4 text-left">পণ্য ও কোড (Product)</th>
-                      <th className="py-3.5 px-4 text-left">সরবরাহকারী কোম্পানি</th>
-                      <th className="py-3.5 px-4 text-right">মোট প্রাপ্ত সংখ্যা</th>
-                      <th className="py-3.5 px-4 text-right">মোট গৃহীত মূল্য (৳)</th>
-                      <th className="py-3.5 px-4 text-right">গড় ক্রয় দর (৳)</th>
-                      <th className="py-3.5 px-4 text-right">বর্তমান স্টক</th>
-                      <th className="py-3.5 px-4 text-center">চালান সংখ্যা</th>
+                      <th className="py-3.5 px-4 text-left">Product & SKU</th>
+                      <th className="py-3.5 px-4 text-left">Supplier Company</th>
+                      <th className="py-3.5 px-4 text-right">Total Received Qty</th>
+                      <th className="py-3.5 px-4 text-right">Total Received Value</th>
+                      <th className="py-3.5 px-4 text-right">Avg Buy Price</th>
+                      <th className="py-3.5 px-4 text-right">Current Stock</th>
+                      <th className="py-3.5 px-4 text-center">Invoice Count</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
@@ -1339,7 +1339,7 @@ export function PurchasesPage() {
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                            {p.purchaseCount} বার
+                            {p.purchaseCount} times
                           </span>
                         </td>
                       </tr>
@@ -1366,10 +1366,10 @@ export function PurchasesPage() {
                 </div>
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                    🏦 ব্যাংক ড্রাফট / টাকা পরিশোধ (অগ্রিম অর্ডার)
+                    🏦 Bank Draft / Advance Payment (Pre-Order)
                   </h2>
                   <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    কোম্পানিকে অগ্রিম ব্যাংক ড্রাফট প্রদান এবং পণ্যের প্রি-অর্ডার তালিকা সংরক্ষণ
+                    Record advance bank draft payments to supplier companies and pre-order products
                   </p>
                 </div>
               </div>
@@ -1383,16 +1383,16 @@ export function PurchasesPage() {
             </div>
 
             <form onSubmit={handleSubmitBankDraft} className="space-y-6">
-              {/* SECTION A — Supplier Information (🏢 সরবরাহকারী তথ্য) */}
+              {/* SECTION A — Supplier Information */}
               <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
                 <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
                   <Building2 className="h-4 w-4 text-indigo-600" />
-                  <span>SECTION A: 🏢 সরবরাহকারী তথ্য (Supplier Information)</span>
+                  <span>SECTION A: 🏢 Supplier Information</span>
                 </div>
 
                 <div className="relative">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    সরবরাহকারী / কোম্পানি নির্বাচন করুন *
+                    Select Supplier / Company *
                   </label>
                   <div className="relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -1404,7 +1404,7 @@ export function PurchasesPage() {
                         setShowSupplierDropdown(true);
                       }}
                       onFocus={() => setShowSupplierDropdown(true)}
-                      placeholder="কোম্পানি বা সরবরাহকারীর নাম লিখে খুঁজুন..."
+                      placeholder="Search company or supplier name..."
                       className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
                     />
                   </div>
@@ -1422,10 +1422,10 @@ export function PurchasesPage() {
                           >
                             <div>
                               <div className="font-bold text-slate-900">{c.name}</div>
-                              <div className="text-xs text-slate-400">আইডি: SUP-{c.id} • ফোন: {c.phone || 'N/A'}</div>
+                              <div className="text-xs text-slate-400">ID: SUP-{c.id} • Phone: {c.phone || 'N/A'}</div>
                             </div>
                             <span className="rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600">
-                              সিলেক্ট
+                              Select
                             </span>
                           </button>
                         ))}
@@ -1456,23 +1456,23 @@ export function PurchasesPage() {
                       }}
                       className="text-indigo-600 hover:text-indigo-800 font-bold self-start sm:self-auto"
                     >
-                      পরিবর্তন করুন
+                      Change Supplier
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* SECTION B — Payment Information (🏦 পেমেন্ট তথ্য) */}
+              {/* SECTION B — Payment Information */}
               <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
                 <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
                   <Landmark className="h-4 w-4 text-indigo-600" />
-                  <span>SECTION B: 🏦 পেমেন্ট তথ্য (Payment Information)</span>
+                  <span>SECTION B: 🏦 Payment Information</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      পেমেন্ট মেথড *
+                      Payment Method *
                     </label>
                     <select
                       value={paymentMethod}
@@ -1488,39 +1488,39 @@ export function PurchasesPage() {
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      ড্রাফট / রেফারেন্স নং *
+                      Draft / Reference No *
                     </label>
                     <input
                       type="text"
                       value={draftRefNo}
                       onChange={(e) => setDraftRefNo(e.target.value)}
-                      placeholder="যেমন: BD-10025"
+                      placeholder="e.g. BD-10025"
                       className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none shadow-sm font-mono"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      ব্যাংকের নাম
+                      Bank Name
                     </label>
                     <input
                       type="text"
                       value={bankName}
                       onChange={(e) => setBankName(e.target.value)}
-                      placeholder="যেমন: Sonali Bank"
+                      placeholder="e.g. Sonali Bank"
                       className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      শাখার নাম (Branch)
+                      Branch Name
                     </label>
                     <input
                       type="text"
                       value={branchName}
                       onChange={(e) => setBranchName(e.target.value)}
-                      placeholder="যেমন: Gazipur Branch"
+                      placeholder="e.g. Gazipur Branch"
                       className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
                     />
                   </div>
@@ -1529,7 +1529,7 @@ export function PurchasesPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      ড্রাফটের তারিখ *
+                      Draft Date *
                     </label>
                     <input
                       type="date"
@@ -1542,7 +1542,7 @@ export function PurchasesPage() {
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      ড্রাফটের মোট টাকা (Draft Amount ৳) *
+                      Draft Amount (৳) *
                     </label>
                     <input
                       type="number"
@@ -1551,19 +1551,19 @@ export function PurchasesPage() {
                       value={draftAmount}
                       onChange={(e) => setDraftAmount(e.target.value)}
                       required
-                      placeholder="যেমন: 100000"
+                      placeholder="e.g. 100000"
                       className="w-full rounded-2xl border border-emerald-300 bg-emerald-50/60 p-3 text-sm font-black text-emerald-900 focus:border-emerald-500 focus:bg-white focus:outline-none shadow-sm"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* SECTION C — PRE-ORDER PRODUCTS (📦 প্রি-অর্ডার পণ্য) */}
+              {/* SECTION C — PRE-ORDER PRODUCTS */}
               <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
                     <Package className="h-4 w-4 text-indigo-600" />
-                    <span>SECTION C: 📦 প্রি-অর্ডার পণ্য (Pre-Order Products)</span>
+                    <span>SECTION C: 📦 Pre-Order Products</span>
                   </div>
 
                   <button
@@ -1572,7 +1572,7 @@ export function PurchasesPage() {
                     className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-md transition-all hover:scale-105 active:scale-95"
                   >
                     <Plus className="h-4 w-4" />
-                    <span>+ পণ্য যোগ করুন</span>
+                    <span>+ Add Product</span>
                   </button>
                 </div>
 
@@ -1587,7 +1587,7 @@ export function PurchasesPage() {
                       <div className="relative sm:col-span-4">
                         <input
                           type="text"
-                          placeholder="পণ্য সিলেক্ট বা নাম লিখুন..."
+                          placeholder="Select product or type name..."
                           value={row.searchText !== undefined ? row.searchText : row.productName}
                           onFocus={() => handleUpdatePreOrderRow(idx, 'showResults', true)}
                           onChange={(e) => handleUpdatePreOrderRow(idx, 'searchText', e.target.value)}
@@ -1613,9 +1613,9 @@ export function PurchasesPage() {
                                 >
                                   <div>
                                     <div className="font-bold text-slate-900">{p.name}</div>
-                                    <div className="text-[10px] text-slate-400">SKU: {p.sku || 'N/A'} • দর: ৳{p.buyPrice || 0}</div>
+                                    <div className="text-[10px] text-slate-400">SKU: {p.sku || 'N/A'} • Price: ৳{p.buyPrice || 0}</div>
                                   </div>
-                                  <span className="text-indigo-600 font-bold">সিলেক্ট</span>
+                                  <span className="text-indigo-600 font-bold">Select</span>
                                 </button>
                               ))}
                           </div>
@@ -1641,8 +1641,8 @@ export function PurchasesPage() {
                           min="0"
                           value={row.quantity}
                           onChange={(e) => handleUpdatePreOrderRow(idx, 'quantity', e.target.value)}
-                          placeholder="পরিমাণ"
-                          title="অর্ডার সংখ্যা"
+                          placeholder="Quantity"
+                          title="Order Quantity"
                           className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-800 text-center focus:border-indigo-500 focus:bg-white focus:outline-none"
                         />
                       </div>
@@ -1655,7 +1655,7 @@ export function PurchasesPage() {
                           min="0"
                           value={row.unitPrice}
                           onChange={(e) => handleUpdatePreOrderRow(idx, 'unitPrice', e.target.value)}
-                          placeholder="ক্রয় দর (৳)"
+                          placeholder="Buy Price (৳)"
                           className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-800 text-right focus:border-indigo-500 focus:bg-white focus:outline-none"
                         />
                       </div>
@@ -1669,7 +1669,7 @@ export function PurchasesPage() {
                           type="button"
                           onClick={() => handleRemovePreOrderRow(idx)}
                           className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors shrink-0"
-                          title="সারি মুছুন"
+                          title="Remove Row"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -1683,28 +1683,28 @@ export function PurchasesPage() {
               <div className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-emerald-50 p-5 text-slate-900 shadow-sm">
                 <div className="flex items-center justify-between border-b border-indigo-200/60 pb-3 mb-3">
                   <span className="text-xs font-black uppercase tracking-wider text-indigo-900">
-                    SECTION D: 💰 পেমেন্ট সামারি (Payment Summary)
+                    SECTION D: 💰 Payment Summary
                   </span>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
-                    ● সম্পূর্ণ পরিশোধিত
+                    ● Fully Paid
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                   <div>
-                    <span className="text-slate-500">প্রি-অর্ডার মোট পণ্য:</span>
+                    <span className="text-slate-500">Pre-Order Total Items:</span>
                     <p className="text-base font-black text-slate-900 mt-0.5">{preOrderTotalQuantity} Pcs</p>
                   </div>
                   <div>
-                    <span className="text-slate-500">প্রি-অর্ডার মোট মূল্য:</span>
+                    <span className="text-slate-500">Pre-Order Total Amount:</span>
                     <p className="text-base font-black text-indigo-950 mt-0.5">{formatCurrency(preOrderTotalAmount)}</p>
                   </div>
                   <div>
-                    <span className="text-slate-500">ব্যাংক ড্রাফট টাকা:</span>
+                    <span className="text-slate-500">Bank Draft Amount:</span>
                     <p className="text-base font-black text-emerald-700 mt-0.5">{formatCurrency(effectiveDraftAmountNum)}</p>
                   </div>
                   <div>
-                    <span className="text-slate-500">অগ্রিম ব্যালেন্স:</span>
+                    <span className="text-slate-500">Advance Balance:</span>
                     <p className="text-base font-black text-sky-700 mt-0.5">{formatCurrency(draftAdvanceBalance)}</p>
                   </div>
                 </div>
@@ -1717,7 +1717,7 @@ export function PurchasesPage() {
                   onClick={() => setIsBankDraftModalOpen(false)}
                   className="rounded-2xl border border-slate-200 px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                 >
-                  বাতিল
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -1725,10 +1725,10 @@ export function PurchasesPage() {
                   className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 px-7 py-3 text-xs sm:text-sm font-black text-white shadow-xl shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                 >
                   {isSubmittingDraft ? (
-                    <span>সংরক্ষণ হচ্ছে...</span>
+                    <span>Saving...</span>
                   ) : (
                     <>
-                      <span>💾 অগ্রিম পেমেন্ট ও প্রি-অর্ডার সংরক্ষণ</span>
+                      <span>💾 Save Advance Payment & Pre-Order</span>
                     </>
                   )}
                 </button>
@@ -1749,9 +1749,9 @@ export function PurchasesPage() {
             </div>
 
             <div>
-              <h3 className="text-xl font-black text-slate-900">✅ প্রি-অর্ডার সফলভাবে সংরক্ষণ হয়েছে</h3>
+              <h3 className="text-xl font-black text-slate-900">✅ Pre-Order Saved Successfully</h3>
               <p className="text-xs text-slate-500 mt-1">
-                ব্যাংক ড্রাফট এবং প্রি-অর্ডারকৃত পণ্যের তালিকা সিস্টেমে রেকর্ড করা হয়েছে।
+                Bank draft and pre-ordered products have been recorded successfully.
               </p>
             </div>
 
@@ -1770,7 +1770,7 @@ export function PurchasesPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Products:</span>
-                <span className="font-bold text-indigo-700">{savedDraftResult.productCount} টি</span>
+                <span className="font-bold text-indigo-700">{savedDraftResult.productCount} Items</span>
               </div>
             </div>
 
@@ -1780,7 +1780,7 @@ export function PurchasesPage() {
                 onClick={() => setSavedDraftResult(null)}
                 className="w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-3 text-xs sm:text-sm font-black text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02]"
               >
-                📦 এখন চালান ইন করুন
+                📦 Receive Challan Now
               </Link>
 
               <button
@@ -1792,7 +1792,7 @@ export function PurchasesPage() {
                 }}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-2.5 text-xs font-bold text-slate-700 transition-colors"
               >
-                📑 সকল চালান দেখুন
+                📑 View All Invoices
               </button>
 
               <button
@@ -1803,7 +1803,7 @@ export function PurchasesPage() {
                 }}
                 className="text-xs font-semibold text-slate-400 hover:text-slate-600 pt-1"
               >
-                বন্ধ করুন
+                Close
               </button>
             </div>
           </div>
@@ -1815,14 +1815,14 @@ export function PurchasesPage() {
         isOpen={Boolean(deleteModal?.isOpen)}
         onClose={() => setDeleteModal(null)}
         onConfirm={handleConfirmDelete}
-        title={deleteModal?.title || 'মুছে ফেলতে চান?'}
+        title={deleteModal?.title || 'Confirm Delete?'}
         description={deleteModal?.description}
-        confirmText="হ্যাঁ, মুছে ফেলুন"
-        cancelText="বাতিল করুন"
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
         variant="danger"
         isLoading={isDeleting}
         details={deleteModal?.details || []}
-        warningNote="সতর্কতা: এটি মুছে ফেললে সম্পর্কিত খতিয়ান আপডেট হবে এবং তথ্য আর পুনরুদ্ধার করা যাবে না।"
+        warningNote="Warning: Deleting this will update ledger balances and cannot be undone."
       />
     </div>
   );

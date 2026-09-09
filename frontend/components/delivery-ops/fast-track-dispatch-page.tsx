@@ -122,7 +122,7 @@ export function FastTrackDispatchPage() {
         });
         setStockMap(map);
       } catch (e) {
-        showErrorToast('ডাটা লোড হতে সমস্যা হয়েছে');
+        showErrorToast('Failed to load initial data');
       } finally {
         setIsLoading(false);
       }
@@ -241,17 +241,17 @@ export function FastTrackDispatchPage() {
 
   const handleConfirmAndDispatch = async () => {
     if (!orderDate || !routeId || !assignedDeliveryManId) {
-      showErrorToast('তারিখ, রুট এবং ডেলিভারিম্যান নির্বাচন করুন');
+      showErrorToast('Please select dispatch date, route, and delivery person');
       return;
     }
 
     if (lines.length === 0) {
-      showErrorToast('অনুগ্রহ করে অন্তত একটি পণ্য যোগ করুন');
+      showErrorToast('Please add at least one product');
       return;
     }
 
     if (lines.some((l) => l.productId === 0)) {
-      showErrorToast('সকল সারিতে সঠিক পণ্য সিলেক্ট করুন');
+      showErrorToast('Please select a valid product for all rows');
       return;
     }
 
@@ -262,7 +262,7 @@ export function FastTrackDispatchPage() {
 
     if (insufficientStock) {
       showErrorToast(
-        `${insufficientStock.productName} এর পর্যাপ্ত স্টক নেই। গুদামে মজুদ আছে: ${
+        `Insufficient stock for ${insufficientStock.productName}. Available stock: ${
           stockMap[insufficientStock.productId] || 0
         }`,
       );
@@ -305,16 +305,16 @@ export function FastTrackDispatchPage() {
 
       const batch = await createDispatchBatch(batchPayload);
 
-      showSuccessToast('অর্ডার ও তাৎক্ষণিক ডেলিভারি চালান সফলভাবে তৈরি হয়েছে!');
+      showSuccessToast('Order and instant delivery challan created successfully!');
       router.push(`/delivery-ops/batches/${batch.id}`);
     } catch (e: any) {
-      showErrorToast(e.message || 'ডেলিভারি চালান তৈরিতে সমস্যা হয়েছে');
+      showErrorToast(e.message || 'Failed to create delivery challan');
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (isLoading) return <LoadingBlock label="ফাস্ট-ট্র্যাক ফর্ম লোড হচ্ছে..." />;
+  if (isLoading) return <LoadingBlock label="Loading fast-track dispatch form..." />;
 
   return (
     <div className="space-y-6 pb-24 max-w-[1600px] mx-auto">
@@ -333,11 +333,11 @@ export function FastTrackDispatchPage() {
                 <Zap className="h-3 w-3 fill-cyan-500 text-cyan-500" /> Fast-Track Dispatch
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold">
-                ⚡ তাৎক্ষণিক চালান
+                ⚡ Fast-Track Dispatch
               </span>
             </div>
             <h1 className="mt-1 text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              ইনস্ট্যান্ট অর্ডার ও ডেলিভারি চালান
+              Instant Order & Delivery Challan
             </h1>
           </div>
         </div>
@@ -345,7 +345,7 @@ export function FastTrackDispatchPage() {
         <div className="flex items-center gap-2 self-start sm:self-center">
           <div className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2 flex items-center gap-3">
             <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">আজকের তারিখ</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Today's Date</p>
               <p className="text-xs font-black text-slate-800">{orderDate}</p>
             </div>
             <div className="h-8 w-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
@@ -368,10 +368,10 @@ export function FastTrackDispatchPage() {
                 </div>
                 <div>
                   <h2 className="text-base font-black text-slate-900">
-                    ১. ডেলিভারি সেটআপ (Delivery Setup)
+                    1. Delivery Setup
                   </h2>
                   <p className="text-xs text-slate-500">
-                    ডেলিভারির তারিখ, নির্দিষ্ট রুট ও দায়িত্বপ্রাপ্ত ডেলিভারিম্যান নির্বাচন করুন
+                    Select delivery date, assigned route, and delivery personnel
                   </p>
                 </div>
               </div>
@@ -382,7 +382,7 @@ export function FastTrackDispatchPage() {
               <div className="space-y-1.5">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <Calendar className="w-3.5 h-3.5 text-cyan-600" />
-                  <span>চালানের তারিখ</span>
+                  <span>Dispatch Date</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
@@ -397,13 +397,13 @@ export function FastTrackDispatchPage() {
               <div className="relative space-y-1.5" ref={routeRef}>
                 <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <MapPin className="w-3.5 h-3.5 text-cyan-600" />
-                  <span>ডেলিভারি রুট</span>
+                  <span>Delivery Route</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="রুট খুঁজুন বা সিলেক্ট করুন..."
+                    placeholder="Search or select route..."
                     className={`w-full rounded-2xl border px-3.5 py-2.5 text-xs font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs pr-8 ${
                       routeId ? 'border-cyan-300 bg-cyan-50/30 text-cyan-900' : 'border-slate-200 bg-slate-50/70 text-slate-800 focus:bg-white'
                     }`}
@@ -421,7 +421,7 @@ export function FastTrackDispatchPage() {
                 {showRouteResults && (
                   <div className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1">
                     {routes.filter((r) => r.name.toLowerCase().includes(routeSearch.toLowerCase())).length === 0 ? (
-                      <div className="p-3 text-center text-xs text-slate-400 font-bold">কোনো রুট পাওয়া যায়নি</div>
+                      <div className="p-3 text-center text-xs text-slate-400 font-bold">No routes found</div>
                     ) : (
                       routes
                         .filter((r) => r.name.toLowerCase().includes(routeSearch.toLowerCase()))
@@ -456,7 +456,7 @@ export function FastTrackDispatchPage() {
               <div className="space-y-1.5">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <User className="w-3.5 h-3.5 text-cyan-600" />
-                  <span>ডেলিভারিম্যান</span>
+                  <span>Delivery Person</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <div className="relative">
@@ -467,7 +467,7 @@ export function FastTrackDispatchPage() {
                       assignedDeliveryManId ? 'border-cyan-300 bg-cyan-50/30 text-cyan-900' : 'border-slate-200 bg-slate-50/70 text-slate-800 focus:bg-white'
                     }`}
                   >
-                    <option value="">ডেলিভারিম্যান সিলেক্ট করুন</option>
+                    <option value="">Select Delivery Person</option>
                     {deliveryMen.map((person) => (
                       <option key={person.id} value={person.id}>
                         {person.name}
@@ -482,12 +482,12 @@ export function FastTrackDispatchPage() {
               <div className="relative space-y-1.5" ref={shopRef}>
                 <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <Store className="w-3.5 h-3.5 text-cyan-600" />
-                  <span>নির্দিষ্ট দোকান (ঐচ্ছিক)</span>
+                  <span>Specific Outlet / Shop (Optional)</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder={routeId ? 'দোকান সার্চ করুন...' : 'আগে রুট সিলেক্ট করুন'}
+                    placeholder={routeId ? 'Search shop / outlet...' : 'Select a route first'}
                     className={`w-full rounded-2xl border px-3.5 py-2.5 text-xs font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs pr-8 ${
                       !routeId
                         ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200'
@@ -510,7 +510,7 @@ export function FastTrackDispatchPage() {
                 {routeId && showShopResults && (
                   <div className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1">
                     {filteredShops.filter((s) => s.name.toLowerCase().includes(shopSearch.toLowerCase())).length === 0 ? (
-                      <div className="p-3 text-center text-xs text-slate-400 font-bold">এই রুটে কোনো দোকান পাওয়া যায়নি</div>
+                      <div className="p-3 text-center text-xs text-slate-400 font-bold">No shops found in this route</div>
                     ) : (
                       filteredShops
                         .filter((s) => s.name.toLowerCase().includes(shopSearch.toLowerCase()))
@@ -546,12 +546,12 @@ export function FastTrackDispatchPage() {
               <div className="space-y-1.5">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  <span>মার্কেট বা এলাকা (Market Area)</span>
+                  <span>Market Area / Location</span>
                 </label>
                 <input
                   value={marketArea}
                   onChange={(e) => setMarketArea(e.target.value)}
-                  placeholder="যেমন: চকবাজার, সদরঘাট..."
+                  placeholder="e.g. Chawkbazar, Sadarghat..."
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs"
                 />
               </div>
@@ -559,12 +559,12 @@ export function FastTrackDispatchPage() {
               <div className="space-y-1.5">
                 <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                   <FileText className="w-3.5 h-3.5 text-slate-400" />
-                  <span>চালানের বিশেষ নোট (Dispatch Note)</span>
+                  <span>Dispatch Note / Remarks</span>
                 </label>
                 <input
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="জরুরি কোনো নির্দেশ থাকলে লিখুন..."
+                  placeholder="Any special dispatch instructions..."
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs"
                 />
               </div>
@@ -580,10 +580,10 @@ export function FastTrackDispatchPage() {
                 </div>
                 <div>
                   <h2 className="text-base font-black text-slate-900">
-                    ২. চালানের পণ্যসমূহ (Dispatch Items)
+                    2. Dispatch Items
                   </h2>
                   <p className="text-xs text-slate-500">
-                    যেকোনো কোম্পানির পণ্য যুক্ত করে চালানের জন্য প্রস্তুত করুন
+                    Add products from any company and prepare for dispatch
                   </p>
                 </div>
               </div>
@@ -594,7 +594,7 @@ export function FastTrackDispatchPage() {
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black shadow-md shadow-indigo-600/20 hover:bg-indigo-700 active:scale-95 transition-all self-start sm:self-center cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                <span>পণ্য যোগ করুন</span>
+                <span>Add Item</span>
               </button>
             </div>
 
@@ -603,13 +603,13 @@ export function FastTrackDispatchPage() {
               <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200/80">
                   <tr>
-                    <th className="px-6 py-3.5 min-w-[280px]">পণ্য ও কোম্পানি (Product)</th>
-                    <th className="px-3 py-3.5 w-24 text-center">পরিমাণ (Qty)</th>
-                    <th className="px-3 py-3.5 w-24 text-center">ফ্রি (Free)</th>
-                    <th className="px-3 py-3.5 w-32 text-right">বিক্রয় দর (Price)</th>
-                    <th className="px-3 py-3.5 w-40 text-center">ছাড় (Discount)</th>
-                    <th className="px-4 py-3.5 w-36 text-right">মোট টাকা (Total)</th>
-                    <th className="px-4 py-3.5 w-12 text-center">মুছুন</th>
+                    <th className="px-6 py-3.5 min-w-[280px]">Product & Company</th>
+                    <th className="px-3 py-3.5 w-24 text-center">Qty</th>
+                    <th className="px-3 py-3.5 w-24 text-center">Free</th>
+                    <th className="px-3 py-3.5 w-32 text-right">Unit Price (৳)</th>
+                    <th className="px-3 py-3.5 w-40 text-center">Discount</th>
+                    <th className="px-4 py-3.5 w-36 text-right">Total (৳)</th>
+                    <th className="px-4 py-3.5 w-12 text-center">Remove</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -622,7 +622,7 @@ export function FastTrackDispatchPage() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input
                               type="text"
-                              placeholder="পণ্য খুঁজুন বা সিলেক্ট করুন..."
+                              placeholder="Search or select product..."
                               className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition shadow-2xs"
                               value={line.productId ? line.productName : line.searchText || ''}
                               onChange={(e) => {
@@ -651,7 +651,7 @@ export function FastTrackDispatchPage() {
                               </span>
                               <span className="text-[10px] text-slate-400">•</span>
                               <span className="text-[10px] font-bold text-slate-500">
-                                মজুদ: <strong className="text-emerald-600">{stockMap[line.productId] || 0}</strong>
+                                Stock: <strong className="text-emerald-600">{stockMap[line.productId] || 0}</strong>
                               </span>
                             </div>
                           )}
@@ -664,7 +664,7 @@ export function FastTrackDispatchPage() {
                                   p.sku?.toLowerCase().includes((line.searchText || '').toLowerCase()) ||
                                   p.company?.name.toLowerCase().includes((line.searchText || '').toLowerCase()),
                               ).length === 0 ? (
-                                <div className="p-3 text-center text-xs text-slate-400 font-bold">কোনো পণ্য পাওয়া যায়নি</div>
+                                <div className="p-3 text-center text-xs text-slate-400 font-bold">No products found</div>
                               ) : (
                                 allProducts
                                   .filter(
@@ -715,7 +715,7 @@ export function FastTrackDispatchPage() {
                                                   : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                               }`}
                                             >
-                                              স্টক: {stock}
+                                              Stock: {stock}
                                             </span>
                                           </div>
                                         </div>
@@ -807,7 +807,7 @@ export function FastTrackDispatchPage() {
                           type="button"
                           onClick={() => removeLine(idx)}
                           className="h-8 w-8 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center cursor-pointer active:scale-90"
-                          title="সারি মুছুন"
+                          title="Remove row"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -824,7 +824,7 @@ export function FastTrackDispatchPage() {
                 <div key={idx} className="p-4 space-y-3 bg-white">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                      আইটেম #{idx + 1}
+                      Item #{idx + 1}
                     </span>
                     <button
                       type="button"
@@ -840,7 +840,7 @@ export function FastTrackDispatchPage() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input
                         type="text"
-                        placeholder="পণ্য খুঁজুন..."
+                        placeholder="Search product..."
                         className="w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition"
                         value={line.productId ? line.productName : line.searchText || ''}
                         onChange={(e) => {
@@ -899,7 +899,7 @@ export function FastTrackDispatchPage() {
                             >
                               <div>
                                 <p className="text-xs font-bold text-slate-900">{p.name}</p>
-                                <p className="text-[10px] text-slate-400">{p.company?.name} • স্টক: {stock}</p>
+                                <p className="text-[10px] text-slate-400">{p.company?.name} • Stock: {stock}</p>
                               </div>
                               <p className="text-xs font-black text-slate-900">{formatCurrency(p.salePrice)}</p>
                             </button>
@@ -911,7 +911,7 @@ export function FastTrackDispatchPage() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500">পরিমাণ (Qty)</label>
+                      <label className="text-[10px] font-bold text-slate-500">Quantity (Qty)</label>
                       <input
                         type="number"
                         min="1"
@@ -921,7 +921,7 @@ export function FastTrackDispatchPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-emerald-600">ফ্রি পরিমাণ (Free)</label>
+                      <label className="text-[10px] font-bold text-emerald-600">Free Qty</label>
                       <input
                         type="number"
                         min="0"
@@ -934,13 +934,13 @@ export function FastTrackDispatchPage() {
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                     <div>
-                      <p className="text-[10px] text-slate-400 font-bold">মোট টাকা</p>
+                      <p className="text-[10px] text-slate-400 font-bold">Total Amount</p>
                       <p className="text-sm font-black text-indigo-700">{formatCurrency(line.lineTotal)}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        placeholder="ছাড়"
+                        placeholder="Discount"
                         value={line.discountValue || ''}
                         onChange={(e) => updateLine(idx, { discountValue: Number(e.target.value) })}
                         className="w-16 rounded-xl border border-slate-200 p-1.5 text-center text-xs font-bold"
@@ -966,8 +966,8 @@ export function FastTrackDispatchPage() {
                   <PackageOpen className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-black text-slate-700">চালানে এখনো কোনো পণ্য যোগ করা হয়নি</p>
-                  <p className="text-xs text-slate-400">নিচের বাটনে ক্লিক করে পণ্য যোগ করা শুরু করুন</p>
+                  <p className="text-sm font-black text-slate-700">No items added to dispatch yet</p>
+                  <p className="text-xs text-slate-400">Click the button below to add products</p>
                 </div>
               </div>
             )}
@@ -980,7 +980,7 @@ export function FastTrackDispatchPage() {
                 className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/30 py-3.5 text-xs font-black text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition-all active:scale-99 cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
-                <span>+ নতুন পণ্য সারি যোগ করুন (Add Product Row)</span>
+                <span>+ Add Product Row</span>
               </button>
             </div>
           </div>
@@ -1004,31 +1004,31 @@ export function FastTrackDispatchPage() {
                   <p className="text-xs font-black tracking-wide text-cyan-300 uppercase">
                     Immediate Dispatch Summary
                   </p>
-                  <p className="text-[11px] text-slate-400">চালানের সারসংক্ষেপ</p>
+                  <p className="text-[11px] text-slate-400">Dispatch Summary</p>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5">
-                <span className="text-xs font-bold text-slate-300">মোট আইটেম সংখ্যা</span>
-                <span className="text-base font-black text-white">{lines.length} টি</span>
+                <span className="text-xs font-bold text-slate-300">Total Items</span>
+                <span className="text-base font-black text-white">{lines.length} Items</span>
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5">
-                <span className="text-xs font-bold text-slate-300">মোট বিক্রি পরিমাণ</span>
+                <span className="text-xs font-bold text-slate-300">Total Sale Qty</span>
                 <span className="text-base font-black text-white">
-                  {totalQty} পিস
+                  {totalQty} Pcs
                   {totalFreeQty > 0 && (
                     <span className="ml-1.5 text-xs text-emerald-400 font-bold">
-                      (+{totalFreeQty} ফ্রি)
+                      (+{totalFreeQty} Free)
                     </span>
                   )}
                 </span>
               </div>
 
               <div className="p-4 rounded-2xl bg-white/10 border border-white/10 space-y-1 mt-2">
-                <span className="text-xs font-bold text-slate-300">সর্বমোট চালানের মূল্য</span>
+                <span className="text-xs font-bold text-slate-300">Grand Total Amount</span>
                 <div className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 truncate">
                   {formatCurrency(subtotal)}
                 </div>
@@ -1043,7 +1043,7 @@ export function FastTrackDispatchPage() {
                     <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
                   )}
                   <span className={routeId ? 'text-slate-300 font-semibold' : 'text-amber-300/90 font-bold'}>
-                    {routeId ? 'রুট সিলেক্ট করা হয়েছে' : 'রুট নির্বাচন বাকি আছে'}
+                    {routeId ? 'Route selected' : 'Select a route'}
                   </span>
                 </div>
 
@@ -1054,7 +1054,7 @@ export function FastTrackDispatchPage() {
                     <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
                   )}
                   <span className={assignedDeliveryManId ? 'text-slate-300 font-semibold' : 'text-amber-300/90 font-bold'}>
-                    {assignedDeliveryManId ? 'ডেলিভারিম্যান সিলেক্ট করা হয়েছে' : 'ডেলিভারিম্যান নির্বাচন বাকি আছে'}
+                    {assignedDeliveryManId ? 'Delivery person selected' : 'Select delivery person'}
                   </span>
                 </div>
 
@@ -1065,7 +1065,7 @@ export function FastTrackDispatchPage() {
                     <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
                   )}
                   <span className={lines.length > 0 && lines.every(l => l.productId > 0) ? 'text-slate-300 font-semibold' : 'text-amber-300/90 font-bold'}>
-                    {lines.length > 0 && lines.every(l => l.productId > 0) ? `${lines.length}টি পণ্য প্রস্তুত` : 'পণ্য নির্বাচন করুন'}
+                    {lines.length > 0 && lines.every(l => l.productId > 0) ? `${lines.length} items ready` : 'Select items'}
                   </span>
                 </div>
               </div>
@@ -1080,12 +1080,12 @@ export function FastTrackDispatchPage() {
                 {isSaving ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin text-slate-950" />
-                    <span>চালান তৈরি হচ্ছে...</span>
+                    <span>Creating dispatch...</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle className="h-4 w-4 text-slate-950" />
-                    <span>কনফার্ম ও ডেলিভারি চালান তৈরি</span>
+                    <span>Confirm & Create Delivery Challan</span>
                   </>
                 )}
               </button>
@@ -1097,35 +1097,35 @@ export function FastTrackDispatchPage() {
             <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
               <ShieldCheck className="w-4 h-4 text-indigo-600" />
               <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                সহজ কার্যপ্রণালী নির্দেশিকা (Workflow Guide)
+                Workflow Guide
               </h3>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-start gap-3">
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-xs font-black text-cyan-800">
-                  ১
+                  1
                 </div>
                 <p className="text-xs font-medium text-slate-600 leading-relaxed">
-                  তারিখ, ডেলিভারি রুট এবং দায়িত্বপ্রাপ্ত ডেলিভারিম্যান নির্বাচন করুন।
+                  Select delivery date, route, and assigned delivery person.
                 </p>
               </div>
 
               <div className="flex items-start gap-3">
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-xs font-black text-indigo-800">
-                  ২
+                  2
                 </div>
                 <p className="text-xs font-medium text-slate-600 leading-relaxed">
-                  পণ্য অনুসন্ধান করে পরিমাণ, ফ্রি ও ছাড় বসান (স্টক অনুযায়ী স্বয়ংক্রিয় যাচাই হবে)।
+                  Search products and enter quantity, free items, and discounts (stock is automatically checked).
                 </p>
               </div>
 
               <div className="flex items-start gap-3">
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-black text-emerald-800">
-                  ৩
+                  3
                 </div>
                 <p className="text-xs font-medium text-slate-600 leading-relaxed">
-                  কনফার্ম বাটনে চাপলে স্বয়ংক্রিয়ভাবে অর্ডার এবং ডেলিভারি চালান জেনারেট হয়ে যাবে।
+                  Click confirm to automatically generate orders and dispatch challans.
                 </p>
               </div>
             </div>
@@ -1137,7 +1137,7 @@ export function FastTrackDispatchPage() {
       <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-200 lg:hidden z-40 shadow-2xl">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[10px] font-bold text-slate-500">মোট চালানের মূল্য</p>
+            <p className="text-[10px] font-bold text-slate-500">Total Dispatch Value</p>
             <p className="text-base font-black text-slate-900">{formatCurrency(subtotal)}</p>
           </div>
           <button
@@ -1147,7 +1147,7 @@ export function FastTrackDispatchPage() {
             className="flex-1 max-w-[220px] py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md disabled:opacity-40"
           >
             {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            <span>{isSaving ? 'প্রসেসিং...' : 'চালান কনফার্ম করুন'}</span>
+            <span>{isSaving ? 'Processing...' : 'Confirm Dispatch'}</span>
           </button>
         </div>
       </div>

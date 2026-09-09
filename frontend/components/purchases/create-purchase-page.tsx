@@ -74,7 +74,7 @@ function formatDateInput(value: Date) {
 
 export function CreatePurchasePage() {
   return (
-    <Suspense fallback={<LoadingBlock label="লোড হচ্ছে..." />}>
+    <Suspense fallback={<LoadingBlock label="Loading..." />}>
       <CreatePurchaseContent />
     </Suspense>
   );
@@ -100,7 +100,7 @@ function CreatePurchaseContent() {
   );
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('');
   const [supplierName, setSupplierName] = useState('');
-  const [warehouseName, setWarehouseName] = useState('Main Godown (প্রধান গোডাউন)');
+  const [warehouseName, setWarehouseName] = useState('Main Godown');
   const [vehicleNo, setVehicleNo] = useState('');
   const [driverName, setDriverName] = useState('');
   const [note, setNote] = useState('');
@@ -117,7 +117,7 @@ function CreatePurchaseContent() {
 
   useToastNotification({
     message: toastMessage,
-    title: toastTone === 'success' ? 'সফল হয়েছে' : 'ত্রুটি',
+    title: toastTone === 'success' ? 'Success' : 'Error',
     tone: toastTone,
   });
 
@@ -139,7 +139,7 @@ function CreatePurchaseContent() {
         }
       } catch (err: any) {
         setToastTone('error');
-        setToastMessage(err.message || 'ফর্ম ডেটা লোড করা যায়নি');
+        setToastMessage(err.message || 'Failed to load form data');
       } finally {
         setIsLoading(false);
       }
@@ -228,7 +228,7 @@ function CreatePurchaseContent() {
     setPaidAmountInput(String(payment.amount));
 
     if (payment.note && !note) {
-      setNote(`পেমেন্ট #${payment.id} এর চালান সমন্বয়: ${payment.note}`);
+      setNote(`Challan adjustment for Payment #${payment.id}: ${payment.note}`);
     }
 
     let breakdownList = parseBreakdown(payment);
@@ -280,7 +280,7 @@ function CreatePurchaseContent() {
       if (newRows.length > 0) {
         setItems(newRows);
         setToastTone('success');
-        setToastMessage(`ড্রাফট #${payment.id} থেকে ${newRows.length} টি অর্ডারকৃত পণ্য লোড হয়েছে!`);
+        setToastMessage(`Loaded ${newRows.length} ordered items from Draft #${payment.id}!`);
         return;
       }
     }
@@ -288,7 +288,7 @@ function CreatePurchaseContent() {
     // If general payment without breakdown, provide a fresh clean row
     setItems([initialRow()]);
     setToastTone('success');
-    setToastMessage(`পেমেন্ট #${payment.id} (৳${payment.amount}) চালানের সাথে যুক্ত করা হয়েছে!`);
+    setToastMessage(`Payment #${payment.id} (৳${payment.amount}) linked with invoice!`);
   };
 
   // Deselect payment
@@ -296,7 +296,7 @@ function CreatePurchaseContent() {
     setSelectedPaymentId(null);
     setPaidAmountInput('0');
     setToastTone('success');
-    setToastMessage('পেমেন্ট সংযোগ বাতিল করা হয়েছে। ম্যানুয়াল চালান এন্ট্রি মোড সক্রিয়।');
+    setToastMessage('Payment unlinked. Manual invoice entry mode active.');
   };
 
   // Row Manipulation
@@ -423,7 +423,7 @@ function CreatePurchaseContent() {
 
     if (!companyId) {
       setToastTone('error');
-      setToastMessage('অনুগ্রহ করে কোম্পানি নির্বাচন করুন');
+      setToastMessage('Please select a company');
       return;
     }
 
@@ -433,7 +433,7 @@ function CreatePurchaseContent() {
 
     if (validItems.length === 0) {
       setToastTone('error');
-      setToastMessage('কমপক্ষে ১টি সঠিক পণ্য, প্রাপ্ত পরিমাণ এবং ক্রয় দর ইনপুট দিন');
+      setToastMessage('Please enter at least 1 valid product with received quantity and buy price');
       return;
     }
 
@@ -479,12 +479,12 @@ function CreatePurchaseContent() {
       setToastTone('success');
       setToastMessage(
         confirmStockIn
-          ? `চালান #${result.invoiceNo || result.id} সফলভাবে তৈরি ও গোডাউনে স্টক ইন সম্পন্ন হয়েছে!`
-          : `চালান #${result.invoiceNo || result.id} খসড়া হিসেবে সংরক্ষিত হয়েছে!`,
+          ? `Invoice #${result.invoiceNo || result.id} created and stock received successfully!`
+          : `Invoice #${result.invoiceNo || result.id} saved as draft!`,
       );
     } catch (err: any) {
       setToastTone('error');
-      setToastMessage(err.message || 'চালান সংরক্ষণ করতে সমস্যা হয়েছে');
+      setToastMessage(err.message || 'Failed to save challan');
     } finally {
       setIsSaving(false);
     }
@@ -501,7 +501,7 @@ function CreatePurchaseContent() {
               className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-indigo-200 backdrop-blur-md mb-3 hover:bg-white/20 transition-all"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>সকল চালানে ফিরুন</span>
+              <span>Back to Invoices</span>
             </Link>
             <div className="flex items-center gap-2 mb-1">
               <span className="rounded-lg bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider">
@@ -509,10 +509,10 @@ function CreatePurchaseContent() {
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white">
-              চালান ইন ও স্টক ইন (Challan & Stock Receiving)
+              Receive Challan & Stock In
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              কোম্পানির পূর্বের ব্যাংক ড্রাফট বা প্রি-অর্ডার সিলেক্ট করুন। অর্ডারকৃত সকল পণ্য স্বয়ংক্রিয়ভাবে লোড হবে এবং বাস্তবে প্রাপ্ত পরিমাণের সাথে মিলিয়ে গোডাউন স্টক ইন ও ব্যালেন্স সমন্বয় সম্পন্ন হবে।
+              Select a supplier's previous bank draft or pre-order to automatically load ordered products, reconcile actual received quantities, and update warehouse stock.
             </p>
           </div>
 
@@ -522,7 +522,7 @@ function CreatePurchaseContent() {
               onClick={() => router.push('/purchases')}
               className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-xs font-bold text-white hover:bg-white/20 transition-all"
             >
-              বাতিল
+              Cancel
             </button>
             <button
               onClick={handleInitiateSubmit}
@@ -530,7 +530,7 @@ function CreatePurchaseContent() {
               className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 px-6 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
             >
               <FileCheck className="h-4 w-4" />
-              <span>{isSaving ? 'সংরক্ষণ হচ্ছে...' : '💾 চালান সংরক্ষণ ও স্টক ইন'}</span>
+              <span>{isSaving ? 'Saving...' : '💾 Save Challan & Receive Stock'}</span>
             </button>
           </div>
         </div>
@@ -538,7 +538,7 @@ function CreatePurchaseContent() {
 
       {isLoading ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
-          <LoadingBlock label="চালান ও ব্যাংক ড্রাফটের তথ্য লোড হচ্ছে..." />
+          <LoadingBlock label="Loading challan and bank draft records..." />
         </div>
       ) : (
         <form onSubmit={handleInitiateSubmit} className="space-y-6">
@@ -552,10 +552,10 @@ function CreatePurchaseContent() {
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900">
-                    ১. অগ্রিম পেমেন্ট / প্রি-অর্ডার নির্বাচন করুন (Select Bank Draft)
+                    1. Select Bank Draft / Pre-Order
                   </h3>
                   <p className="text-xs text-slate-500">
-                    কোম্পানিকে পূর্বে দেওয়া ব্যাংক ড্রাফট সিলেক্ট করলেই সকল অর্ডারকৃত পণ্য স্বয়ংক্রিয়ভাবে লোড হবে
+                    Select a previously issued bank draft to auto-populate ordered items
                   </p>
                 </div>
               </div>
@@ -567,7 +567,7 @@ function CreatePurchaseContent() {
                   className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors self-start sm:self-auto"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  <span>পেমেন্ট সংযোগ বাতিল (সরাসরি মোড)</span>
+                  <span>Unlink Payment (Direct Mode)</span>
                 </button>
               )}
             </div>
@@ -576,7 +576,7 @@ function CreatePurchaseContent() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  কোম্পানি / সরবরাহকারী নির্বাচন <span className="text-rose-500">*</span>
+                  Select Supplier / Company <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={companyId}
@@ -589,10 +589,10 @@ function CreatePurchaseContent() {
                   required
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                 >
-                  <option value="">-- কোম্পানি সিলেক্ট করুন --</option>
+                  <option value="">-- Select Company --</option>
                   {companies.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} {c.code ? `(কোড: ${c.code})` : ''}
+                      {c.name} {c.code ? `(Code: ${c.code})` : ''}
                     </option>
                   ))}
                 </select>
@@ -604,16 +604,16 @@ function CreatePurchaseContent() {
                     <div>
                       <h4 className="font-bold text-slate-900 text-sm">{selectedCompany.name}</h4>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        কোড: <b>{selectedCompany.code || 'N/A'}</b> • ফোন: {selectedCompany.phone || 'N/A'}
+                        Code: <b>{selectedCompany.code || 'N/A'}</b> • Phone: {selectedCompany.phone || 'N/A'}
                       </p>
                     </div>
                     {companyPayments.length > 0 ? (
                       <span className="rounded-xl bg-indigo-100 text-indigo-800 px-3 py-1 text-xs font-bold">
-                        {companyPayments.length} টি ড্রাফট/পেমেন্ট এন্ট্রি আছে
+                        {companyPayments.length} Draft / Payment Records Available
                       </span>
                     ) : (
                       <span className="rounded-xl bg-amber-100 text-amber-800 px-3 py-1 text-xs font-bold">
-                        কোনো ড্রাফট পাওয়া যায়নি
+                        No draft records found
                       </span>
                     )}
                   </div>
@@ -625,7 +625,7 @@ function CreatePurchaseContent() {
             {companyPayments.length > 0 && (
               <div className="pt-3">
                 <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
-                  উপলব্ধ ব্যাংক ড্রাফট তালিকা (লোড করতে ক্লিক করুন):
+                  Available Bank Drafts (Click to load):
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {companyPayments.map((pay) => {
@@ -652,7 +652,7 @@ function CreatePurchaseContent() {
                                   : 'bg-emerald-100 text-emerald-800'
                               }`}
                             >
-                              ড্রাফট #{pay.id}
+                              Draft #{pay.id}
                             </span>
                             <span className="text-xs font-semibold text-slate-500">
                               {pay.paymentDate ? formatDate(pay.paymentDate) : ''}
@@ -670,14 +670,14 @@ function CreatePurchaseContent() {
                         )}
 
                         <p className="mt-1 text-xs text-slate-600 line-clamp-2 font-medium">
-                          {pay.note || `মেথড: ${pay.paymentMethod}`}
+                          {pay.note || `Method: ${pay.paymentMethod}`}
                         </p>
 
                         <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
                           <span className="text-[11px] font-bold text-indigo-700">
                             {hasBreakdown
-                              ? `📦 ${breakdown.length} টি পণ্যের প্রি-অর্ডার`
-                              : '💸 সাধারণ পরিশোধ'}
+                              ? `📦 ${breakdown.length} Pre-Ordered Items`
+                              : '💸 General Payment'}
                           </span>
                           <span
                             className={`font-bold text-xs ${
@@ -686,7 +686,7 @@ function CreatePurchaseContent() {
                                 : 'text-slate-600 group-hover:text-indigo-600'
                             }`}
                           >
-                            {isSelected ? '✓ লোড করা হয়েছে' : '👉 লোড করুন'}
+                            {isSelected ? '✓ Loaded' : '👉 Load'}
                           </span>
                         </div>
                       </div>
@@ -702,49 +702,49 @@ function CreatePurchaseContent() {
             <div className="rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-white to-indigo-50/40 p-5 sm:p-6 shadow-sm">
               <div className="flex items-center gap-2 text-indigo-900 font-black text-sm uppercase tracking-wider mb-3">
                 <CheckCircle2 className="h-4 w-4 text-indigo-600" />
-                <span>২. ব্যাংক ড্রাফট ও প্রি-অর্ডার সামারি (Pre-Order Summary)</span>
+                <span>2. Pre-Order & Draft Summary</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
                 <div className="rounded-xl bg-white p-3 border border-indigo-100">
-                  <span className="text-slate-500 font-medium block">ড্রাফট নং</span>
+                  <span className="text-slate-500 font-medium block">Draft No</span>
                   <b className="text-indigo-950 font-bold font-mono mt-0.5 block text-sm">
                     {selectedPayment.transactionRef || `#${selectedPayment.id}`}
                   </b>
                 </div>
 
                 <div className="rounded-xl bg-white p-3 border border-indigo-100">
-                  <span className="text-slate-500 font-medium block">সরবরাহকারী</span>
+                  <span className="text-slate-500 font-medium block">Supplier</span>
                   <b className="text-slate-900 font-bold mt-0.5 block truncate text-sm">
-                    {selectedCompany?.name || 'কোম্পানি'}
+                    {selectedCompany?.name || 'Company'}
                   </b>
                 </div>
 
                 <div className="rounded-xl bg-white p-3 border border-indigo-100">
-                  <span className="text-slate-500 font-medium block">ড্রাফটে পরিশোধ</span>
+                  <span className="text-slate-500 font-medium block">Draft Paid</span>
                   <b className="text-emerald-700 font-black mt-0.5 block text-sm">
                     {formatCurrency(selectedPayment.amount)}
                   </b>
                 </div>
 
                 <div className="rounded-xl bg-white p-3 border border-indigo-100">
-                  <span className="text-slate-500 font-medium block">অর্ডার মূল্য</span>
+                  <span className="text-slate-500 font-medium block">Order Value</span>
                   <b className="text-indigo-900 font-black mt-0.5 block text-sm">
                     {formatCurrency(orderedTotal > 0 ? orderedTotal : selectedPayment.amount)}
                   </b>
                 </div>
 
                 <div className="rounded-xl bg-white p-3 border border-indigo-100">
-                  <span className="text-slate-500 font-medium block">অর্ডার কোয়ান্টিটি</span>
+                  <span className="text-slate-500 font-medium block">Order Qty</span>
                   <b className="text-slate-800 font-black mt-0.5 block text-sm">
-                    {totalOrderedQtyCount} টি
+                    {totalOrderedQtyCount} Items
                   </b>
                 </div>
 
                 <div className="rounded-xl bg-emerald-50 p-3 border border-emerald-200">
-                  <span className="text-emerald-700 font-bold block">বর্তমান স্থিতি</span>
+                  <span className="text-emerald-700 font-bold block">Current Status</span>
                   <b className="text-emerald-900 font-black mt-0.5 block text-sm">
-                    {remainingAdvance > 0 ? `অগ্রিম: ৳${remainingAdvance}` : 'সমন্বয় প্রস্তুত'}
+                    {remainingAdvance > 0 ? `Advance: ৳${remainingAdvance}` : 'Ready to Reconcile'}
                   </b>
                 </div>
               </div>
@@ -755,13 +755,13 @@ function CreatePurchaseContent() {
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
             <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm">
               <FileText className="h-4 w-4" />
-              <span>৩. চালান ও পরিবহন তথ্য (Challan & Logistics Information)</span>
+              <span>3. Challan & Logistics Information</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  চালান / ইনভয়েস নং <span className="text-rose-500">*</span>
+                  Challan / Invoice No <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <Hash className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
@@ -778,7 +778,7 @@ function CreatePurchaseContent() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  চালানের তারিখ ও সময় <span className="text-rose-500">*</span>
+                  Challan Date & Time <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <Calendar className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
@@ -794,20 +794,20 @@ function CreatePurchaseContent() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  কোম্পানির নিজস্ব চালান/মেমো নং
+                  Supplier Invoice / Memo No
                 </label>
                 <input
                   type="text"
                   value={supplierInvoiceNo}
                   onChange={(e) => setSupplierInvoiceNo(e.target.value)}
-                  placeholder="যেমন: INV-88910"
+                  placeholder="e.g. INV-88910"
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  গোডাউন / ওয়্যারহাউস
+                  Warehouse / Godown
                 </label>
                 <div className="relative">
                   <Warehouse className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
@@ -822,39 +822,39 @@ function CreatePurchaseContent() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  গাড়ি / ট্রাক নম্বর (ঐচ্ছিক)
+                  Vehicle / Truck No (Optional)
                 </label>
                 <input
                   type="text"
                   value={vehicleNo}
                   onChange={(e) => setVehicleNo(e.target.value)}
-                  placeholder="যেমন: ঢাকা মেট্রো-ট-১২-৩৪৫৬"
+                  placeholder="e.g. DHAKA METRO-TA-12-3456"
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  ড্রাইভার / ডেলিভারিম্যান নাম (ঐচ্ছিক)
+                  Driver / Delivery Person (Optional)
                 </label>
                 <input
                   type="text"
                   value={driverName}
                   onChange={(e) => setDriverName(e.target.value)}
-                  placeholder="যেমন: মোঃ রফিকুল ইসলাম"
+                  placeholder="e.g. Rafiqul Islam"
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
 
               <div className="sm:col-span-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  চালান নোট / অতিরিক্ত বিবরণ
+                  Challan Notes / Remarks
                 </label>
                 <input
                   type="text"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="চালান সংক্রান্ত মন্তব্য..."
+                  placeholder="Additional notes about this challan..."
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
@@ -867,10 +867,10 @@ function CreatePurchaseContent() {
               <div>
                 <div className="flex items-center gap-2 text-indigo-600 font-bold text-base">
                   <Layers className="h-5 w-5" />
-                  <span>৪. পণ্যের তালিকা ও গোডাউন স্টক ইন (Ordered vs Received Table)</span>
+                  <span>4. Product Items & Stock Receiving</span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  অর্ডারকৃত সংখ্যার সাথে মিলিয়ে বাস্তবে কত পিস পেয়েছেন (Received Qty) তা এডিট করুন। বাকি কোয়ান্টিটি ও মূল্য স্বয়ংক্রিয় হিসাব হবে।
+                  Match ordered quantities with actual received counts. Remaining quantity and total values calculate automatically.
                 </p>
               </div>
 
@@ -880,22 +880,22 @@ function CreatePurchaseContent() {
                 className="inline-flex items-center gap-1.5 rounded-2xl bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-100 transition-all self-start sm:self-auto"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>+ বাড়তি পণ্য যোগ করুন</span>
+                <span>+ Add Extra Item</span>
               </button>
             </div>
 
             {/* Desktop Table Header */}
             <div className="hidden lg:grid grid-cols-12 gap-3 px-4 py-3 rounded-2xl bg-slate-100/90 text-xs font-black uppercase tracking-wider text-slate-700">
-              <div className="col-span-1 text-center w-8">ক্রম</div>
-              <div className="col-span-3">পণ্য ও SKU (PRODUCT)</div>
-              <div className="col-span-2 text-center">অর্ডার QTY (READ-ONLY)</div>
+              <div className="col-span-1 text-center w-8">SL</div>
+              <div className="col-span-3">PRODUCT & SKU</div>
+              <div className="col-span-2 text-center">ORDER QTY</div>
               <div className="col-span-2 text-center bg-indigo-100/70 text-indigo-900 rounded-lg py-0.5">
-                প্রাপ্ত QTY (EDITABLE) *
+                RECEIVED QTY *
               </div>
-              <div className="col-span-1 text-center">বাকি / ঘাটতি</div>
-              <div className="col-span-1 text-right">দর (৳) *</div>
-              <div className="col-span-1 text-right">প্রাপ্ত মূল্য (৳)</div>
-              <div className="col-span-1 text-center">স্ট্যাটাস</div>
+              <div className="col-span-1 text-center">SHORTAGE</div>
+              <div className="col-span-1 text-right">PRICE (৳) *</div>
+              <div className="col-span-1 text-right">TOTAL (৳)</div>
+              <div className="col-span-1 text-center">STATUS</div>
             </div>
 
             {/* Product Rows */}
@@ -930,7 +930,7 @@ function CreatePurchaseContent() {
                       {/* Product Selector / Search */}
                       <div className="lg:col-span-3 relative">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          পণ্য ও SKU
+                          Product & SKU
                         </label>
                         <div className="relative">
                           <input
@@ -938,7 +938,7 @@ function CreatePurchaseContent() {
                             value={row.searchText || row.productName}
                             onChange={(e) => handleUpdateRow(idx, 'searchText', e.target.value)}
                             onFocus={() => handleUpdateRow(idx, 'showResults', true)}
-                            placeholder="প্রোডাক্ট নাম বা কোড..."
+                            placeholder="Product name or SKU..."
                             className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                           />
                           <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -963,7 +963,7 @@ function CreatePurchaseContent() {
                                   <div>
                                     <p className="font-bold text-slate-800">{prod.name}</p>
                                     <p className="text-[10px] text-slate-400">
-                                      কোড: {prod.sku || 'N/A'} • {prod.unit || 'Pcs'}
+                                      SKU: {prod.sku || 'N/A'} • {prod.unit || 'Pcs'}
                                     </p>
                                   </div>
                                   <span className="font-bold text-indigo-600">
@@ -978,7 +978,7 @@ function CreatePurchaseContent() {
                       {/* Order Quantity Display (READ-ONLY) */}
                       <div className="lg:col-span-2 text-left lg:text-center">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          অর্ডার ছিল (Order Qty)
+                          Order Qty
                         </label>
                         {ordQ !== null ? (
                           <div className="inline-flex items-center gap-1 rounded-xl bg-slate-200/80 px-3 py-1.5 text-xs font-black text-slate-800 border border-slate-300">
@@ -986,14 +986,14 @@ function CreatePurchaseContent() {
                             <span className="text-[11px] font-semibold text-slate-600">{row.unit || 'PCS'}</span>
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-400 font-medium">— (সরাসরি এন্ট্রি)</span>
+                          <span className="text-xs text-slate-400 font-medium">— (Direct Entry)</span>
                         )}
                       </div>
 
                       {/* Actually Received Quantity (EDITABLE Input) */}
                       <div className="lg:col-span-2">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          বাস্তবে প্রাপ্ত পরিমাণ (Received Qty) *
+                          Actual Received Qty *
                         </label>
                         <div className="relative">
                           <input
@@ -1016,15 +1016,15 @@ function CreatePurchaseContent() {
                       {/* Remaining / Short Qty */}
                       <div className="lg:col-span-1 text-left lg:text-center">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          বাকি / শর্ট
+                          Shortage / Balance
                         </label>
                         {ordQ !== null ? (
                           diff === 0 ? (
-                            <span className="text-emerald-700 font-bold text-xs">০ (সম্পূর্ণ)</span>
+                            <span className="text-emerald-700 font-bold text-xs">0 (Full)</span>
                           ) : diff < 0 ? (
-                            <span className="text-rose-600 font-black text-xs">{Math.abs(diff)} কম</span>
+                            <span className="text-rose-600 font-black text-xs">{Math.abs(diff)} Short</span>
                           ) : (
-                            <span className="text-indigo-600 font-bold text-xs">+{diff} বেশি</span>
+                            <span className="text-indigo-600 font-bold text-xs">+{diff} Excess</span>
                           )
                         ) : (
                           <span className="text-slate-400 text-xs">—</span>
@@ -1034,7 +1034,7 @@ function CreatePurchaseContent() {
                       {/* Buy Rate ৳ */}
                       <div className="lg:col-span-1">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          ক্রয় দর (৳) *
+                          Purchase Price (৳) *
                         </label>
                         <input
                           type="number"
@@ -1050,7 +1050,7 @@ function CreatePurchaseContent() {
                       {/* Line Total ৳ */}
                       <div className="lg:col-span-1 text-left lg:text-right">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden mb-1">
-                          গৃহীত মূল্য (৳)
+                          Received Total (৳)
                         </label>
                         <span className="text-xs font-black text-slate-900">
                           {formatCurrency(lineTotal)}
@@ -1060,25 +1060,25 @@ function CreatePurchaseContent() {
                       {/* Status Badge & Delete */}
                       <div className="lg:col-span-1 flex items-center justify-between lg:justify-center gap-2">
                         <label className="block text-xs font-bold text-slate-500 lg:hidden">
-                          স্ট্যাটাস:
+                          Status:
                         </label>
                         {ordQ !== null ? (
                           q >= ordQ ? (
                             <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                              🟢 সম্পূর্ণ
+                              🟢 Complete
                             </span>
                           ) : q > 0 ? (
                             <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                              🟡 আংশিক
+                              🟡 Partial
                             </span>
                           ) : (
                             <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">
-                              🔴 অপেক্ষমান
+                              🔴 Pending
                             </span>
                           )
                         ) : (
                           <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
-                            সরাসরি
+                            Direct
                           </span>
                         )}
 
@@ -1086,7 +1086,7 @@ function CreatePurchaseContent() {
                           type="button"
                           onClick={() => handleRemoveRow(idx)}
                           className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all"
-                          title="সারি মুছুন"
+                          title="Remove item"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -1104,19 +1104,19 @@ function CreatePurchaseContent() {
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>+ আরও পণ্য যোগ করুন</span>
+                <span>+ Add More Items</span>
               </button>
 
               <div className="flex items-center gap-4 text-xs font-bold">
                 <span className="text-slate-600">
-                  মোট অর্ডার: <b className="text-slate-900">{totalOrderedQtyCount}</b> টি
+                  Total Ordered: <b className="text-slate-900">{totalOrderedQtyCount}</b>
                 </span>
                 <span className="text-indigo-700">
-                  মোট গ্রহণ: <b className="text-indigo-950 font-black">{totalReceivedQtyCount}</b> টি
+                  Total Received: <b className="text-indigo-950 font-black">{totalReceivedQtyCount}</b>
                 </span>
                 {totalShortQtyCount > 0 && (
                   <span className="text-rose-600 font-black bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100">
-                    ঘাটতি: {totalShortQtyCount} টি
+                    Shortage: {totalShortQtyCount} items
                   </span>
                 )}
               </div>
@@ -1128,7 +1128,7 @@ function CreatePurchaseContent() {
             <div className="lg:col-span-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
                 <Sparkles className="h-4 w-4 text-indigo-600" />
-                <span>৫. স্টক ইন ও ইনভেন্টরি কনফার্মেশন</span>
+                <span>5. Stock Receiving & Inventory Confirmation</span>
               </div>
 
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 flex items-start gap-3">
@@ -1141,17 +1141,17 @@ function CreatePurchaseContent() {
                 />
                 <label htmlFor="confirmStockIn" className="cursor-pointer text-xs">
                   <p className="font-black text-emerald-900">
-                    📦 চালানের পণ্য তাৎক্ষণিক গোডাউনে স্টক ইন করুন (Auto Stock-In)
+                    📦 Add received goods to warehouse stock immediately (Auto Stock-In)
                   </p>
                   <p className="text-emerald-700 font-medium mt-0.5">
-                    টিক দেওয়া থাকলে চালান সেভ করার সাথে সাথে প্রাপ্ত প্রতিটি পণ্যের গোডাউন স্টক সরাসরি বৃদ্ধি পাবে এবং ক্রয় দর আপডেট হবে।
+                    When checked, saving this invoice directly updates warehouse stock balances and purchase costs.
                   </p>
                 </label>
               </div>
 
               <div className="space-y-2 text-xs text-slate-500">
-                <p>• প্রতিটি প্রাপ্ত পণ্য ট্র্যাক করার জন্য স্টক মুভমেন্ট রেকর্ড তৈরি হবে।</p>
-                <p>• একটি ড্রাফটের অধীনে একাধিক চালানে আংশিক মাল আসলে বাকি মাল পরবর্তী চালানে ইন করতে পারবেন।</p>
+                <p>• A stock movement record will be logged for every received product.</p>
+                <p>• For partial deliveries under a bank draft, remaining items can be received in future challans.</p>
               </div>
             </div>
 
@@ -1159,38 +1159,38 @@ function CreatePurchaseContent() {
             <div className="lg:col-span-6 rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 to-indigo-950 p-6 text-white shadow-xl space-y-4">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <span className="text-xs font-black uppercase tracking-wider text-indigo-300">
-                  💰 আর্থিক সমন্বয় (Financial Reconciliation)
+                  💰 Financial Reconciliation
                 </span>
                 <span className="text-xs font-bold text-slate-300">
-                  {isExactMatch ? '✓ হিসাব সম্পূর্ণ সমতা' : 'চলতি রিকনসিলিয়েশন'}
+                  {isExactMatch ? '✓ Fully Balanced' : 'Ongoing Reconciliation'}
                 </span>
               </div>
 
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-300">১. অগ্রিম প্রদান (Advance Paid):</span>
+                  <span className="text-slate-300">1. Advance Paid:</span>
                   <span className="font-black text-indigo-300 text-sm">{formatCurrency(effectivePaid)}</span>
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-300">২. প্রি-অর্ডার মোট মূল্য (Order Value):</span>
+                  <span className="text-slate-300">2. Pre-Order Total Value:</span>
                   <span className="font-bold text-slate-200 text-sm">
                     {formatCurrency(orderedTotal > 0 ? orderedTotal : effectivePaid)}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center pt-2 border-t border-white/10">
-                  <span className="text-slate-300">৩. প্রাপ্ত মালামালের মূল্য (Received Goods Value):</span>
+                  <span className="text-slate-300">3. Received Goods Value:</span>
                   <span className="font-black text-emerald-400 text-base">{formatCurrency(invoiceTotal)}</span>
                 </div>
 
                 <div className="pt-3 border-t border-white/10 flex justify-between items-center">
                   <span className="text-xs font-bold text-white uppercase tracking-wider">
                     {remainingAdvance > 0
-                      ? '💎 অবশিষ্ট অগ্রিম জমা (Remaining Advance):'
+                      ? '💎 Remaining Advance Balance:'
                       : remainingDue > 0
-                      ? '⚠️ অতিরিক্ত পাওনা বকেয়া (Payable Due):'
-                      : '৪. স্থিতি (Status):'}
+                      ? '⚠️ Outstanding Due (Payable):'
+                      : '4. Status:'}
                   </span>
                   <span
                     className={`text-xl font-black ${
@@ -1205,7 +1205,7 @@ function CreatePurchaseContent() {
                       ? formatCurrency(remainingAdvance)
                       : remainingDue > 0
                       ? formatCurrency(remainingDue)
-                      : 'সম্পূর্ণ পরিশোধিত (০.০০)'}
+                      : 'Fully Paid (0.00)'}
                   </span>
                 </div>
               </div>
@@ -1217,15 +1217,15 @@ function CreatePurchaseContent() {
             <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-4 sm:gap-6 text-xs flex-wrap">
                 <div>
-                  <span className="text-slate-500 font-medium block">অগ্রিম ড্রাফট:</span>
+                  <span className="text-slate-500 font-medium block">Advance Draft:</span>
                   <b className="text-slate-900 font-black text-sm">{formatCurrency(effectivePaid)}</b>
                 </div>
                 <div>
-                  <span className="text-slate-500 font-medium block">প্রাপ্ত মালের মূল্য:</span>
+                  <span className="text-slate-500 font-medium block">Received Goods Value:</span>
                   <b className="text-indigo-900 font-black text-sm">{formatCurrency(invoiceTotal)}</b>
                 </div>
                 <div>
-                  <span className="text-slate-500 font-medium block">অবশিষ্ট অগ্রিম/বাকি:</span>
+                  <span className="text-slate-500 font-medium block">Remaining Advance / Due:</span>
                   <b
                     className={`font-black text-sm ${
                       remainingAdvance > 0 ? 'text-emerald-700' : remainingDue > 0 ? 'text-rose-600' : 'text-slate-800'
@@ -1235,7 +1235,7 @@ function CreatePurchaseContent() {
                       ? `+${formatCurrency(remainingAdvance)}`
                       : remainingDue > 0
                       ? `-${formatCurrency(remainingDue)}`
-                      : '০.০০ (সমন্বিত)'}
+                      : '0.00 (Balanced)'}
                   </b>
                 </div>
               </div>
@@ -1246,7 +1246,7 @@ function CreatePurchaseContent() {
                   onClick={() => router.push('/purchases')}
                   className="rounded-2xl border border-slate-200 hover:bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 transition-colors"
                 >
-                  বাতিল
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -1254,7 +1254,7 @@ function CreatePurchaseContent() {
                   className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                 >
                   <FileCheck className="h-4 w-4" />
-                  <span>{isSaving ? 'সংরক্ষণ হচ্ছে...' : '💾 চালান সংরক্ষণ ও স্টক ইন'}</span>
+                  <span>{isSaving ? 'Saving...' : '💾 Save Challan & Receive Stock'}</span>
                 </button>
               </div>
             </div>
@@ -1272,29 +1272,29 @@ function CreatePurchaseContent() {
               </div>
               <div>
                 <h3 className="text-base font-black text-slate-900">
-                  চালান ও স্টক ইন নিশ্চিতকরণ
+                  Confirm Challan & Stock Receiving
                 </h3>
                 <p className="text-xs text-slate-500">
-                  আপনি কি এই চালানটি গোডাউন স্টকে যোগ করতে চান?
+                  Do you want to confirm this invoice and receive stock into the warehouse?
                 </p>
               </div>
             </div>
 
             <div className="space-y-2.5 rounded-2xl bg-slate-50 p-4 border border-slate-100 text-xs my-4">
               <div className="flex justify-between text-slate-600">
-                <span>সরবরাহকারী:</span>
-                <span className="font-bold text-slate-900">{selectedCompany?.name || 'কোম্পানি'}</span>
+                <span>Supplier:</span>
+                <span className="font-bold text-slate-900">{selectedCompany?.name || 'Company'}</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>প্রাপ্ত পণ্যের কোয়ান্টিটি:</span>
+                <span>Received Quantity:</span>
                 <span className="font-black text-indigo-900">{totalReceivedQtyCount} Qty</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>মোট প্রাপ্ত মালের মূল্য:</span>
+                <span>Total Received Value:</span>
                 <span className="font-black text-slate-900">{formatCurrency(invoiceTotal)}</span>
               </div>
               <div className="pt-2 border-t border-slate-200 flex justify-between font-bold">
-                <span>অগ্রিম অবশিষ্ট ব্যালেন্স:</span>
+                <span>Remaining Advance Balance:</span>
                 <span className="text-emerald-700 font-black">{formatCurrency(remainingAdvance)}</span>
               </div>
             </div>
@@ -1305,7 +1305,7 @@ function CreatePurchaseContent() {
                 onClick={() => setShowConfirmModal(false)}
                 className="flex-1 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 py-2.5 text-xs font-bold text-slate-700 transition-colors"
               >
-                ফিরে যান
+                Back
               </button>
               <button
                 type="button"
@@ -1313,7 +1313,7 @@ function CreatePurchaseContent() {
                 disabled={isSaving}
                 className="flex-1 rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/20 transition-all disabled:opacity-50"
               >
-                {isSaving ? 'সংরক্ষণ হচ্ছে...' : 'হ্যাঁ, স্টক ইন করুন'}
+                {isSaving ? 'Saving...' : 'Yes, Receive Stock'}
               </button>
             </div>
           </div>
@@ -1331,41 +1331,41 @@ function CreatePurchaseContent() {
               </div>
               <h3 className="text-xl font-black text-slate-900">
                 {confirmStockIn
-                  ? 'চালান সফলভাবে সংরক্ষণ ও স্টক ইন সম্পন্ন হয়েছে!'
-                  : 'চালান খসড়া সংরক্ষণ সম্পন্ন হয়েছে!'}
+                  ? 'Invoice saved and stock received successfully!'
+                  : 'Invoice draft saved successfully!'}
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                চালান নং: <b className="text-indigo-900 font-mono font-bold">#{savedResult.invoiceNo || savedResult.id}</b>
+                Invoice No: <b className="text-indigo-900 font-mono font-bold">#{savedResult.invoiceNo || savedResult.id}</b>
               </p>
             </div>
 
             {/* Summary Breakdown */}
             <div className="my-6 space-y-3 rounded-2xl bg-slate-50 p-4 border border-slate-100 text-xs">
               <div className="flex justify-between items-center text-slate-600">
-                <span>সরবরাহকারী / কোম্পানি:</span>
-                <span className="font-bold text-slate-900">{selectedCompany?.name || 'কোম্পানি'}</span>
+                <span>Supplier / Company:</span>
+                <span className="font-bold text-slate-900">{selectedCompany?.name || 'Company'}</span>
               </div>
               <div className="flex justify-between items-center text-slate-600">
-                <span>প্রাপ্ত মালের মূল্য:</span>
+                <span>Received Goods Value:</span>
                 <span className="font-black text-slate-900 text-sm">{formatCurrency(invoiceTotal)}</span>
               </div>
               <div className="flex justify-between items-center text-slate-600">
-                <span>ব্যাংক ড্রাফটে প্রদত্ত টাকা:</span>
+                <span>Amount Paid via Bank Draft:</span>
                 <span className="font-black text-indigo-900 text-sm">{formatCurrency(effectivePaid)}</span>
               </div>
               <div className="pt-2 border-t border-slate-200 flex justify-between items-center font-bold">
-                <span>অবশিষ্ট অগ্রিম জমা:</span>
+                <span>Remaining Advance Balance:</span>
                 {remainingAdvance > 0 ? (
                   <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg font-black">
                     💎 {formatCurrency(remainingAdvance)}
                   </span>
                 ) : remainingDue > 0 ? (
                   <span className="text-rose-700 bg-rose-100 px-2.5 py-1 rounded-lg font-black">
-                    ⚠️ বকেয়া: {formatCurrency(remainingDue)}
+                    ⚠️ Due: {formatCurrency(remainingDue)}
                   </span>
                 ) : (
                   <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg font-black">
-                    ✅ সম্পূর্ণ সমন্বিত (০ বকেয়া)
+                    ✅ Fully Settled (Zero Due)
                   </span>
                 )}
               </div>
@@ -1379,7 +1379,7 @@ function CreatePurchaseContent() {
                 className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-98"
               >
                 <Printer className="h-4 w-4" />
-                <span>🖨️ চালান ভাউচার প্রিন্ট করুন</span>
+                <span>🖨️ Print Challan Voucher</span>
               </Link>
 
               <div className="flex items-center gap-2">
@@ -1388,14 +1388,14 @@ function CreatePurchaseContent() {
                   onClick={() => router.push('/purchases')}
                   className="flex-1 rounded-2xl bg-slate-100 hover:bg-slate-200 py-2.5 text-xs font-bold text-slate-700 transition-colors text-center"
                 >
-                  📑 সকল চালান
+                  📑 All Invoices
                 </button>
                 <button
                   type="button"
                   onClick={() => setSavedResult(null)}
                   className="flex-1 rounded-2xl border border-slate-200 hover:bg-slate-50 py-2.5 text-xs font-bold text-slate-600 transition-colors text-center"
                 >
-                  বন্ধ করুন
+                  Close
                 </button>
               </div>
             </div>

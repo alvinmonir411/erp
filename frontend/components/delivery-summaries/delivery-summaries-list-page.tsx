@@ -87,7 +87,7 @@ export function DeliverySummariesListPage() {
     setIsDeleting(true);
     try {
       await deleteDeliverySummary(deleteTarget.id);
-      showSuccessToast('ডেলিভারি সামারি সফলভাবে মুছে ফেলা হয়েছে');
+      showSuccessToast('Delivery summary deleted successfully');
       setDeleteTarget(null);
       fetchSummaries();
     } catch (e) {
@@ -264,17 +264,17 @@ export function DeliverySummariesListPage() {
         isOpen={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}
-        title="ডেলিভারি সামারি মুছে ফেলতে চান?"
-        description="এই সামারিটি তালিকা থেকে মুছে ফেলা হবে।"
-        confirmText="হ্যাঁ, মুছে ফেলুন"
-        cancelText="বাতিল"
+        title="Delete Delivery Summary?"
+        description="This summary record will be permanently deleted."
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
         variant="danger"
         isLoading={isDeleting}
         details={deleteTarget ? [
-          { label: 'তারিখ', value: formatDate(deleteTarget.summaryDate) },
-          { label: 'কোম্পানি', value: deleteTarget.company?.name || 'All' },
-          { label: 'রুট', value: deleteTarget.route?.name || 'All' },
-          { label: 'মোট পরিমাণ', value: formatCurrency(deleteTarget.totalAmount) },
+          { label: 'Date', value: formatDate(deleteTarget.summaryDate) },
+          { label: 'Company', value: deleteTarget.company?.name || 'All' },
+          { label: 'Route', value: deleteTarget.route?.name || 'All' },
+          { label: 'Total Amount', value: formatCurrency(deleteTarget.totalAmount) },
         ] : []}
       />
     </div>

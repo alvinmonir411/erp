@@ -437,16 +437,16 @@ export function UsersPage() {
         isOpen={Boolean(deleteUserTarget)}
         onClose={() => setDeleteUserTarget(null)}
         onConfirm={handleConfirmDeleteUser}
-        title="ইউজার মুছে ফেলতে চান?"
-        description="এই ইউজারকে মুছে ফেললে তিনি আর সিস্টেমে লগইন করতে পারবেন না।"
-        confirmText="হ্যাঁ, মুছে ফেলুন"
-        cancelText="বাতিল"
+        title="Delete User?"
+        description="Deleting this user will permanently revoke their access to the ERP system."
+        confirmText="Yes, Delete User"
+        cancelText="Cancel"
         variant="danger"
         isLoading={deleteMutation.isPending}
         details={deleteUserTarget ? [
-          { label: 'নাম', value: deleteUserTarget.name },
-          { label: 'ইউজারনেম', value: deleteUserTarget.username },
-          { label: 'রোল', value: deleteUserTarget.role },
+          { label: 'Name', value: deleteUserTarget.name },
+          { label: 'Username', value: deleteUserTarget.username },
+          { label: 'Role', value: deleteUserTarget.role },
         ] : []}
       />
     </div>

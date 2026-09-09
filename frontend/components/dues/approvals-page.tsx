@@ -44,10 +44,10 @@ export function ApprovalsPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['dues'] });
       queryClient.invalidateQueries({ queryKey: ['due-stats'] });
-      showSuccessToast('পেমেন্টটি সফলভাবে অনুমোদন করা হয়েছে এবং বাকি ব্যালেন্স আপডেট হয়েছে।');
+      showSuccessToast('Payment approved successfully and due balance updated.');
     },
     onError: (err: any) => {
-      showErrorToast(err.message || 'পেমেন্ট অনুমোদন করতে ব্যর্থ হয়েছে।');
+      showErrorToast(err.message || 'Failed to approve payment.');
     }
   });
 
@@ -57,10 +57,10 @@ export function ApprovalsPage() {
       queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
       setIsRejectModalOpen(false);
       setRejectReason('');
-      showSuccessToast('পেমেন্ট কালেকশনটি বাতিল করা হয়েছে।');
+      showSuccessToast('Payment collection request rejected.');
     },
     onError: (err: any) => {
-      showErrorToast(err.message || 'পেমেন্ট বাতিল করতে ব্যর্থ হয়েছে।');
+      showErrorToast(err.message || 'Failed to reject payment.');
     }
   });
 
@@ -73,8 +73,8 @@ export function ApprovalsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4 bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
         <AlertCircle className="w-12 h-12 text-rose-500" />
-        <h2 className="text-xl font-bold text-slate-900">অনুমতি নেই</h2>
-        <p className="text-sm text-slate-500 max-w-md">শুধুমাত্র সুপার অ্যাডমিন পেমেন্ট কালেকশন অনুমোদন বা বাতিল করতে পারবেন।</p>
+        <h2 className="text-xl font-bold text-slate-900">Access Denied</h2>
+        <p className="text-sm text-slate-500 max-w-md">Only Super Admin can approve or reject payment collections.</p>
       </div>
     );
   }
@@ -84,8 +84,8 @@ export function ApprovalsPage() {
       {/* Header & Tabs */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">বকেয়া ও কালেকশন ব্যবস্থাপনা</h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">দোকানের বাকি পাওনা, নগদ আদায় ও পেমেন্ট অনুমোদন</p>
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Due & Collection Management</h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Shop dues, cash collections, and payment approvals</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -93,14 +93,14 @@ export function ApprovalsPage() {
             className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
           >
             <DollarSign className="w-4 h-4 text-indigo-600" />
-            বকেয়া তালিকা
+            Due List
           </Link>
           <Link
             href="/dues/collections"
             className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
           >
             <Clock className="w-4 h-4 text-amber-500" />
-            আদায় হিস্ট্রি
+            Collection History
           </Link>
           {user?.role === Role.SUPER_ADMIN && (
             <Link
@@ -108,7 +108,7 @@ export function ApprovalsPage() {
               className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-black text-white shadow-md shadow-indigo-500/20"
             >
               <CheckCircle className="w-4 h-4" />
-              পেমেন্ট অনুমোদন
+              Payment Approvals
             </Link>
           )}
         </div>
@@ -120,7 +120,7 @@ export function ApprovalsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="দোকান বা এসআর নাম দিয়ে খুঁজুন..."
+              placeholder="Search by shop or SR name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
@@ -133,12 +133,12 @@ export function ApprovalsPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="px-5 py-3.5">দোকান ও অর্ডার</th>
-                <th className="px-5 py-3.5">আদায়কারী (SR)</th>
-                <th className="px-5 py-3.5">জমাকৃত টাকার পরিমাণ</th>
-                <th className="px-5 py-3.5">বাকি ব্যালেন্স পরিবর্তন</th>
-                <th className="px-5 py-3.5">তারিখ</th>
-                <th className="px-5 py-3.5 text-right">অ্যাকশন</th>
+                <th className="px-5 py-3.5">Shop & Order</th>
+                <th className="px-5 py-3.5">Collected By (SR)</th>
+                <th className="px-5 py-3.5">Collected Amount</th>
+                <th className="px-5 py-3.5">Due Balance Change</th>
+                <th className="px-5 py-3.5">Date</th>
+                <th className="px-5 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -146,13 +146,13 @@ export function ApprovalsPage() {
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                     <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto mb-2" />
-                    পেন্ডিং রিকোয়েস্ট লোড হচ্ছে...
+                    Loading pending requests...
                   </td>
                 </tr>
               ) : filteredPending.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm font-bold">
-                    অনুমোদনের অপেক্ষায় কোনো পেমেন্ট রিকোয়েস্ট নেই।
+                    No payment requests pending approval.
                   </td>
                 </tr>
               ) : (
@@ -165,7 +165,7 @@ export function ApprovalsPage() {
                         </div>
                         <div>
                           <p className="font-black text-slate-900 leading-none text-sm">{c.shop?.name}</p>
-                          <p className="text-[10px] font-black text-indigo-600 mt-1">অর্ডার #{c.orderId}</p>
+                          <p className="text-[10px] font-black text-indigo-600 mt-1">Order #{c.orderId}</p>
                         </div>
                       </div>
                     </td>
@@ -180,8 +180,8 @@ export function ApprovalsPage() {
                     </td>
                     <td className="px-5 py-3.5">
                        <div className="flex flex-col text-[11px]">
-                          <span className="text-rose-600 font-bold">পূর্বে: {formatCurrency(c.due?.remainingDue || 0)}</span>
-                          <span className="text-emerald-700 font-black">অনুমোদনের পর: {formatCurrency(Math.max(0, (c.due?.remainingDue || 0) - c.collectedAmount))}</span>
+                          <span className="text-rose-600 font-bold">Before: {formatCurrency(c.due?.remainingDue || 0)}</span>
+                          <span className="text-emerald-700 font-black">After Approval: {formatCurrency(Math.max(0, (c.due?.remainingDue || 0) - c.collectedAmount))}</span>
                        </div>
                     </td>
                     <td className="px-5 py-3.5 text-slate-600 text-xs font-semibold">
@@ -192,10 +192,10 @@ export function ApprovalsPage() {
                         <button
                           onClick={() => setApproveTarget(c)}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 text-xs font-bold hover:bg-emerald-100 transition-colors"
-                          title="অনুমোদন করুন"
+                          title="Approve Payment"
                         >
                           <CheckCircle className="w-3.5 h-3.5" />
-                          অনুমোদন
+                          Approve
                         </button>
                         <button
                           onClick={() => {
@@ -203,10 +203,10 @@ export function ApprovalsPage() {
                             setIsRejectModalOpen(true);
                           }}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1.5 text-xs font-bold hover:bg-rose-100 transition-colors"
-                          title="বাতিল করুন"
+                          title="Reject Payment"
                         >
                           <XCircle className="w-3.5 h-3.5" />
-                          বাতিল
+                          Reject
                         </button>
                       </div>
                     </td>
@@ -222,11 +222,11 @@ export function ApprovalsPage() {
           {isLoading ? (
             <div className="p-12 text-center">
               <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto" />
-              <p className="mt-2 text-xs text-slate-400 font-bold">রিকোয়েস্ট লোড হচ্ছে...</p>
+              <p className="mt-2 text-xs text-slate-400 font-bold">Loading requests...</p>
             </div>
           ) : filteredPending.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs font-bold">
-              অনুমোদনের অপেক্ষায় কোনো পেমেন্ট নেই।
+              No payments pending approval.
             </div>
           ) : (
             filteredPending.map((c: any) => (
@@ -234,19 +234,19 @@ export function ApprovalsPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-black text-slate-900 text-sm">{c.shop?.name}</p>
-                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">অর্ডার #{c.orderId} • এসআর: {c.srName}</p>
+                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">Order #{c.orderId} • SR: {c.srName}</p>
                   </div>
                   <span className="text-xs text-slate-500 font-bold">{new Date(c.collectionDate).toLocaleDateString()}</span>
                 </div>
                 
                 <div className="flex justify-between items-center bg-emerald-50/60 p-3 rounded-xl border border-emerald-100 mt-1">
                   <div>
-                    <p className="text-[10px] font-bold text-emerald-700 uppercase">জমার পরিমাণ</p>
+                    <p className="text-[10px] font-bold text-emerald-700 uppercase">Collected Amount</p>
                     <p className="font-black text-emerald-800 text-base">{formatCurrency(c.collectedAmount)}</p>
                   </div>
                   <div className="text-right flex flex-col text-[10px]">
-                    <span className="text-rose-600 font-bold">পূর্বে: {formatCurrency(c.due?.remainingDue || 0)}</span>
-                    <span className="text-emerald-700 font-black">পরে: {formatCurrency(Math.max(0, (c.due?.remainingDue || 0) - c.collectedAmount))}</span>
+                    <span className="text-rose-600 font-bold">Before: {formatCurrency(c.due?.remainingDue || 0)}</span>
+                    <span className="text-emerald-700 font-black">After: {formatCurrency(Math.max(0, (c.due?.remainingDue || 0) - c.collectedAmount))}</span>
                   </div>
                 </div>
 
@@ -259,14 +259,14 @@ export function ApprovalsPage() {
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
                   >
                     <XCircle className="w-4 h-4" />
-                    বাতিল
+                    Reject
                   </button>
                   <button
                     onClick={() => setApproveTarget(c)}
                     className="flex-[2] inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
                   >
                     <CheckCircle className="w-4 h-4" />
-                    অনুমোদন করুন
+                    Approve Payment
                   </button>
                 </div>
               </div>
@@ -280,15 +280,15 @@ export function ApprovalsPage() {
           <div className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in duration-200 mb-0 pb-safe pb-4 sm:pb-0">
             <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-rose-500" />
-              কালেকশন বাতিলের কারণ
+              Reason for Rejection
             </h3>
-            <p className="mt-1 text-xs text-slate-500">কেন এই পেমেন্ট কালেকশনটি বাতিল করছেন তা লিখুন।</p>
+            <p className="mt-1 text-xs text-slate-500">Please provide the reason why this payment collection is being rejected.</p>
             
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               className="mt-4 w-full rounded-xl border border-slate-200 p-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20"
-              placeholder="যেমন: টাকার পরিমাণ অমিল, ভুল এন্ট্রি..."
+              placeholder="e.g., Incorrect amount, duplicate entry, payment bounced..."
               rows={3}
             />
 
@@ -297,14 +297,14 @@ export function ApprovalsPage() {
                 onClick={() => setIsRejectModalOpen(false)}
                 className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs sm:text-sm font-bold hover:bg-slate-50"
               >
-                বাতিল
+                Cancel
               </button>
               <button
                 onClick={() => selectedId && rejectMutation.mutate({ id: selectedId, reason: rejectReason })}
                 disabled={!rejectReason || rejectMutation.isPending}
                 className="flex-[2] sm:flex-1 rounded-xl bg-rose-600 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50"
               >
-                বাতিল নিশ্চিত করুন
+                Confirm Rejection
               </button>
             </div>
           </div>
@@ -321,16 +321,16 @@ export function ApprovalsPage() {
             setApproveTarget(null);
           }
         }}
-        title="কালেকশন অনুমোদন করতে চান?"
-        description="অনুমোদন করার সাথে সাথে সংশ্লিষ্ট দোকানের বাকি হিসাব স্বয়ংক্রিয়ভাবে কমে যাবে।"
-        confirmText="অনুমোদন নিশ্চিত করুন"
-        cancelText="বাতিল"
+        title="Approve Payment Collection?"
+        description="Approving will automatically deduct the collected amount from the shop due ledger."
+        confirmText="Approve Payment"
+        cancelText="Cancel"
         variant="success"
         isLoading={approveMutation.isPending}
         details={approveTarget ? [
-          { label: 'দোকানের নাম', value: approveTarget.shop?.name || 'N/A' },
-          { label: 'এসআর (SR)', value: approveTarget.srName || 'N/A' },
-          { label: 'জমার পরিমাণ', value: formatCurrency(approveTarget.collectedAmount) },
+          { label: 'Shop Name', value: approveTarget.shop?.name || 'N/A' },
+          { label: 'SR Name', value: approveTarget.srName || 'N/A' },
+          { label: 'Amount', value: formatCurrency(approveTarget.collectedAmount) },
         ] : []}
       />
     </div>
