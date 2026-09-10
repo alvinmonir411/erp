@@ -42,11 +42,11 @@ export function Providers({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5 * 60 * 1000, // 5 minutes
-            gcTime: 10 * 60 * 1000,   // 10 minutes
+            staleTime: 3 * 60 * 1000, // 3 minutes fresh cache
+            gcTime: 15 * 60 * 1000,   // 15 minutes garbage collection time
             retry: 1,
-            refetchOnWindowFocus: false, // WebSockets handle live cache invalidation
-            refetchOnMount: true,
+            refetchOnWindowFocus: false, // Prevent background refetch on tab switch
+            refetchOnMount: false,       // Render instantly from cache on route navigation
             refetchOnReconnect: true,
           },
         },

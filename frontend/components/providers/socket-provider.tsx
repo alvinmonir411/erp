@@ -18,19 +18,19 @@ const SocketContext = createContext<SocketContextType>({
 
 export const useSocket = () => useContext(SocketContext);
 
-const POLLING_INTERVAL_MS = 15000;
+const POLLING_INTERVAL_MS = 60000; // 60 seconds gentle polling for background sync
 
 const getSocketUrl = () => {
   if (process.env.NEXT_PUBLIC_SOCKET_URL) {
     return process.env.NEXT_PUBLIC_SOCKET_URL;
   }
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5001/api';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
   try {
     const url = new URL(apiUrl);
     if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
       return `${url.protocol}//${url.hostname}:5003`;
     }
-    // Vercel Serverless does not support persistent WebSockets.
+    // Vercel Serverless does not support persistent WebSockets unless NEXT_PUBLIC_SOCKET_URL is provided.
     return null;
   } catch (e) {
     return null;
@@ -45,21 +45,19 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const refreshAll = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['sales'] });
-    queryClient.invalidateQueries({ queryKey: ['dues'] });
-    queryClient.invalidateQueries({ queryKey: ['delivery'] });
-    queryClient.invalidateQueries({ queryKey: ['stock'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    // Targeted background sync: only revalidate actively displayed summary data
+    queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'active' });
+    queryClient.invalidateQueries({ queryKey: ['delivery'], refetchType: 'active' });
   }, [queryClient]);
 
   const handleSocketEvent = useCallback((eventType: string, data?: any) => {
     if (eventType.startsWith('order')) {
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-      queryClient.invalidateQueries({ queryKey: ['dues'] });
-      queryClient.invalidateQueries({ queryKey: ['delivery'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['dues'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['delivery'], refetchType: 'active' });
     } else if (eventType.startsWith('batch')) {
-      queryClient.invalidateQueries({ queryKey: ['delivery'] });
-      queryClient.invalidateQueries({ queryKey: ['stock'] });
+      queryClient.invalidateQueries({ queryKey: ['delivery'], refetchType: 'active' });
+      queryClient.invalidateQueries({ queryKey: ['stock'], refetchType: 'active' });
     }
 
     if (typeof window !== 'undefined') {
@@ -75,22 +73,14 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     const socketUrl = getSocketUrl();
 
     if (!socketUrl) {
-      // Production (Vercel): Use silent HTTP polling instead of WebSocket
+      // Production (Vercel): Use gentle background polling for active screen
       setIsPolling(true);
 
-      // Immediate first refresh on mount
-      refreshAll();
-
-      // Poll every 15 seconds
+      // Poll every 60 seconds gently
       pollIntervalRef.current = setInterval(refreshAll, POLLING_INTERVAL_MS);
-
-      // Refresh when user switches back to this tab
-      const handleFocus = () => refreshAll();
-      window.addEventListener('focus', handleFocus);
 
       return () => {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        window.removeEventListener('focus', handleFocus);
         setIsPolling(false);
       };
     }

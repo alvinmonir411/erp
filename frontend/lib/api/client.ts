@@ -1,6 +1,8 @@
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  'https://ms-korim-traders.onrender.com/api';
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? `${window.location.origin}/api`
+    : 'http://localhost:3001/api');
 
 type ApiRequestOptions = RequestInit & {
   query?: Record<string, string | number | boolean | undefined | null>;

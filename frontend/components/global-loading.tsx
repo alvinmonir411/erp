@@ -1,15 +1,16 @@
 'use client';
 
-import { useIsFetching, useIsMutating } from '@tanstack/react-query';
+import { useIsMutating } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useGlobalLoading } from '@/lib/loading-context';
 
 export function GlobalLoading() {
-  const isFetching = useIsFetching();
   const isMutating = useIsMutating();
   const { isLoading: isManualLoading, message } = useGlobalLoading();
 
-  const isActive = isFetching > 0 || isMutating > 0 || isManualLoading;
+  // Only block UI for destructive/mutating user actions or explicit manual loading states,
+  // NEVER for passive background query fetching.
+  const isActive = isMutating > 0 || isManualLoading;
 
   // Small delay to avoid flickering on fast requests
   const [show, setShow] = useState(false);
