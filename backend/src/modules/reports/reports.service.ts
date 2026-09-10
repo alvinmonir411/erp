@@ -4,7 +4,7 @@ import { Repository, DataSource, Brackets } from 'typeorm';
 import { Order, OrderItem } from '../orders/entities/order.entity';
 import { DamageRecord } from '../delivery-ops/entities/damage-record.entity';
 import { OrderStatus } from '../orders/orders.constants';
-import { getBDDayRange, isTodayBDDate, getBDTodayString } from '../../common/utils/date.utils';
+import { getBDDayRange, isTodayBDDate, getBDTodayString, getBDMonthRange } from '../../common/utils/date.utils';
 import { Role } from '../../common/enums/role.enum';
 
 @Injectable()
@@ -37,10 +37,16 @@ export class ReportsService {
       });
     }
 
-    // Apply Filters
+    // Apply Date Filters
     if (filters.dateMode === 'Today') {
       qb.andWhere('order.orderDate = :today', {
         today: getBDTodayString(),
+      });
+    } else if (filters.dateMode === 'This Month') {
+      const { startDateStr, endDateStr } = getBDMonthRange();
+      qb.andWhere('order.orderDate BETWEEN :fromDate AND :toDate', {
+        fromDate: startDateStr,
+        toDate: endDateStr,
       });
     } else if (filters.dateMode === 'Selected Date' && filters.date) {
       qb.andWhere('order.orderDate = :date', { date: filters.date });
@@ -54,6 +60,7 @@ export class ReportsService {
         toDate: filters.toDate,
       });
     }
+    // If 'All Time' or 'All', no date filter is added
 
     if (filters.companyId) {
       qb.andWhere('product.companyId = :companyId', {
@@ -222,9 +229,15 @@ export class ReportsService {
       });
     }
 
-    // Apply Filters
+    // Apply Date Filters
     if (filters.dateMode === 'Today') {
       const { startUtc, endUtc } = getBDDayRange();
+      qb.andWhere('damage.createdAt BETWEEN :start AND :end', {
+        start: startUtc,
+        end: endUtc,
+      });
+    } else if (filters.dateMode === 'This Month') {
+      const { startUtc, endUtc } = getBDMonthRange();
       qb.andWhere('damage.createdAt BETWEEN :start AND :end', {
         start: startUtc,
         end: endUtc,
@@ -241,6 +254,7 @@ export class ReportsService {
         toDate: filters.toDate,
       });
     }
+    // If 'All Time' or 'All', no date filter is added
 
     if (filters.companyId) {
       qb.andWhere('(product.companyId = :companyId OR damage.companyId = :companyId)', {

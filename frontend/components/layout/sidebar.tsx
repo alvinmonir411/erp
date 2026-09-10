@@ -26,6 +26,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { getCompanies } from '@/lib/api/companies';
+import { getRoutes } from '@/lib/api/routes';
+import { getShops } from '@/lib/api/shops';
+import { getProducts } from '@/lib/api/products';
 
 const navigation = [
   {
@@ -109,6 +114,23 @@ const navigation = [
 export function Sidebar({ isOpen, onToggle, onClose }: { isOpen: boolean, onToggle: () => void, onClose: () => void }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const queryClient = useQueryClient();
+
+  const handlePrefetch = (href: string) => {
+    try {
+      if (href.startsWith('/products')) {
+        queryClient.prefetchQuery({ queryKey: ['products'], queryFn: () => getProducts(), staleTime: 10 * 60 * 1000 });
+      } else if (href.startsWith('/routes')) {
+        queryClient.prefetchQuery({ queryKey: ['routes'], queryFn: () => getRoutes(), staleTime: 10 * 60 * 1000 });
+      } else if (href.startsWith('/companies')) {
+        queryClient.prefetchQuery({ queryKey: ['companies'], queryFn: () => getCompanies(), staleTime: 10 * 60 * 1000 });
+      } else if (href.startsWith('/shops')) {
+        queryClient.prefetchQuery({ queryKey: ['shops', undefined], queryFn: () => getShops(), staleTime: 10 * 60 * 1000 });
+      }
+    } catch {
+      // Ignore prefetch errors silently
+    }
+  };
 
   const filteredNavigation = navigation
     .filter(group => !group.roles || (user && group.roles.includes(user.role)))
@@ -154,6 +176,7 @@ export function Sidebar({ isOpen, onToggle, onClose }: { isOpen: boolean, onTogg
                       key={item.href}
                       href={item.href}
                       onClick={() => onClose()}
+                      onMouseEnter={() => handlePrefetch(item.href)}
                       className={`flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${isActive
                         ? 'bg-primary text-white shadow-sm'
                         : 'text-muted hover:bg-secondary hover:text-foreground'

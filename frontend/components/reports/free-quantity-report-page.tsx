@@ -23,7 +23,7 @@ export function FreeQuantityReportPage() {
   
   // States
   const [filters, setFilters] = useState({
-    dateMode: 'Today',
+    dateMode: 'This Month',
     date: getTodayBDDate(),
     fromDate: getTodayBDDate(),
     toDate: getTodayBDDate(),
@@ -161,6 +161,8 @@ export function FreeQuantityReportPage() {
                 onChange={e => setFilters({...filters, dateMode: e.target.value})}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500/20 outline-none transition"
               >
+                <option value="This Month">This Month</option>
+                <option value="All Time">All Time</option>
                 <option value="Today">Today</option>
                 <option value="Selected Date">Selected Date</option>
                 <option value="Date Range">Date Range</option>
