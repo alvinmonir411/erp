@@ -237,7 +237,7 @@ export class ActivityLogsService {
             action: 'BATCH_SETTLED',
             title: `Batch ${b.batchNo} Settled & Closed`,
             description: `Batch for ${routeLabel} settled with final sold ৳${Number(b.finalSoldValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (Collected: ৳${Number(b.totalCollectedAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })})`,
-            timestamp: new Date(b.settledAt).toISOString(),
+            timestamp: this.toIsoString(b.settledAt),
             userName: driverLabel,
             userRole: b.deliveryManRole || 'DELIVERY_MAN',
             amount: Number(b.finalSoldValue || b.totalCollectedAmount || 0),
@@ -281,7 +281,7 @@ export class ActivityLogsService {
             action: 'RETURNS_RECORDED',
             title: `Returns Recorded for Batch ${b.batchNo}`,
             description: `Return products worth ৳${Number(b.returnAdjustedValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} recorded for route ${routeLabel}`,
-            timestamp: new Date(b.returnsRecordedAt).toISOString(),
+            timestamp: this.toIsoString(b.returnsRecordedAt),
             userName: driverLabel,
             userRole: b.deliveryManRole || 'DELIVERY_MAN',
             amount: Number(b.returnAdjustedValue || 0),
@@ -307,7 +307,7 @@ export class ActivityLogsService {
             action: 'BATCH_DISPATCHED',
             title: `Batch ${b.batchNo} Dispatched`,
             description: `Loaded goods worth ৳${Number(b.grossDispatchedValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} dispatched for route ${routeLabel} to ${driverLabel}`,
-            timestamp: new Date(b.dispatchedAt).toISOString(),
+            timestamp: this.toIsoString(b.dispatchedAt),
             userName: driverLabel,
             userRole: b.deliveryManRole || 'DELIVERY_MAN',
             amount: Number(b.grossDispatchedValue || 0),
@@ -342,7 +342,7 @@ export class ActivityLogsService {
             action: 'BATCH_CREATED',
             title: `Dispatch Batch ${b.batchNo} Created`,
             description: `Created dispatch batch for route ${routeLabel}`,
-            timestamp: new Date(b.createdAt).toISOString(),
+            timestamp: this.toIsoString(b.createdAt),
             userName: 'Admin',
             userRole: 'ADMIN',
             amount: Number(b.grossDispatchedValue || 0),
@@ -416,7 +416,7 @@ export class ActivityLogsService {
             action: 'ORDER_SETTLED',
             title: `Order #${o.id} Settled (${shopLabel})`,
             description: `Sold ৳${Number(o.actualSoldAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}, Collected ৳${Number(o.collectedAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}${Number(o.dueAmount) > 0 ? `, Due ৳${Number(o.dueAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : ''}`,
-            timestamp: new Date(o.settledAt).toISOString(),
+            timestamp: this.toIsoString(o.settledAt),
             userName: creator,
             userRole: role,
             amount: Number(o.actualSoldAmount || o.grandTotal || 0),
@@ -451,7 +451,7 @@ export class ActivityLogsService {
               ? `Manual Due Order #${o.id} Created (${shopLabel})`
               : `Order #${o.id} Created (${shopLabel})`,
             description: `Order created by ${creator} for ৳${Number(o.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}${routeLabel ? ` on route ${routeLabel}` : ''}`,
-            timestamp: new Date(o.createdAt).toISOString(),
+            timestamp: this.toIsoString(o.createdAt),
             userName: creator,
             userRole: role,
             amount: Number(o.grandTotal || 0),
@@ -523,7 +523,7 @@ export class ActivityLogsService {
             action: 'DUE_COLLECTION_APPROVED',
             title: `Due Collection Approved for ${shopLabel}`,
             description: `৳${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} collected by ${sr} was approved by ${dc.approvedBy || 'Admin'}`,
-            timestamp: new Date(dc.approvedAt).toISOString(),
+            timestamp: this.toIsoString(dc.approvedAt),
             userName: dc.approvedBy || 'Admin',
             userRole: 'ADMIN',
             amount: amount,
@@ -552,7 +552,7 @@ export class ActivityLogsService {
             action: 'DUE_COLLECTED',
             title: `Due Payment Collected from ${shopLabel}`,
             description: `৳${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} received by SR ${sr}${dc.note ? ` (Note: ${dc.note})` : ''}`,
-            timestamp: new Date(dc.createdAt).toISOString(),
+            timestamp: this.toIsoString(dc.createdAt),
             userName: sr,
             userRole: 'SR',
             amount: amount,
@@ -623,7 +623,7 @@ export class ActivityLogsService {
           description:
             sm.note ||
             `${sm.type} of ${qty} units. Balance after: ${sm.balanceAfter || 0}`,
-          timestamp: new Date(sm.createdAt).toISOString(),
+          timestamp: this.toIsoString(sm.createdAt),
           userName: sm.user || 'Admin',
           userRole: 'ADMIN',
           amount: null,
@@ -675,7 +675,7 @@ export class ActivityLogsService {
           action: 'PURCHASE_CREATED',
           title: `Purchase Invoice #${p.invoiceNo} (${p.companyName || 'Company'})`,
           description: `Total ৳${Number(p.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}, Paid ৳${Number(p.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}${p.supplierName ? `, Supplier: ${p.supplierName}` : ''}`,
-          timestamp: new Date(p.createdAt).toISOString(),
+          timestamp: this.toIsoString(p.createdAt),
           userName: 'Admin',
           userRole: 'ADMIN',
           amount: Number(p.totalAmount || 0),
@@ -722,7 +722,7 @@ export class ActivityLogsService {
           action: 'COMPANY_PAYMENT',
           title: `Company Payment Paid to ${cp.companyName || 'Partner'}`,
           description: `Paid ৳${Number(cp.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} via ${cp.paymentMethod || 'CASH'}${cp.transactionRef ? ` (Ref: ${cp.transactionRef})` : ''}`,
-          timestamp: new Date(cp.createdAt).toISOString(),
+          timestamp: this.toIsoString(cp.createdAt),
           userName: cp.createdByName || 'Admin',
           userRole: 'ADMIN',
           amount: Number(cp.amount || 0),
@@ -769,7 +769,7 @@ export class ActivityLogsService {
           action: log.action || 'CUSTOM_ACTION',
           title: log.title,
           description: log.description,
-          timestamp: new Date(log.createdAt).toISOString(),
+          timestamp: this.toIsoString(log.createdAt),
           userName: log.userName || 'System',
           userRole: log.userRole || 'SYSTEM',
           amount: log.details?.amount ? Number(log.details.amount) : null,
@@ -784,6 +784,28 @@ export class ActivityLogsService {
     }
 
     return events;
+  }
+
+  /**
+   * Helper to normalize database timestamp to true UTC ISO string.
+   * Since Postgres timestamp columns without timezone store Bangladesh local wall-clock time,
+   * subtracting 6 hours aligns it to UTC so frontend formatting in Asia/Dhaka is exact.
+   */
+  private toIsoString(dateVal: any): string {
+    if (!dateVal) return new Date().toISOString();
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return new Date().toISOString();
+
+    const trueUtcMs = Date.UTC(
+      d.getUTCFullYear(),
+      d.getUTCMonth(),
+      d.getUTCDate(),
+      d.getUTCHours() - 6,
+      d.getUTCMinutes(),
+      d.getUTCSeconds(),
+      d.getUTCMilliseconds(),
+    );
+    return new Date(trueUtcMs).toISOString();
   }
 
   /**
