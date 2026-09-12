@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Receipt,
   TrendingUp,
+  Activity,
 } from 'lucide-react';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
@@ -56,6 +57,7 @@ const navigation = [
     items: [
       { href: '/expenses', label: 'Business Analytics', icon: TrendingUp },
       { href: '/delivery-ops', label: 'Delivery Summary', icon: FileText },
+      { href: '/activity-logs', label: 'Activity & Audit Log', icon: Activity },
     ]
   },
   {

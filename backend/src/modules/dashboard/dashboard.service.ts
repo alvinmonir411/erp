@@ -1138,8 +1138,8 @@ export class DashboardService {
 
       if (!isAllTime && periodStartDateStr && periodEndDateStr) {
         qb.andWhere(
-          'order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr',
-          { periodStartDateStr, periodEndDateStr },
+          '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (order.createdAt >= :periodStartUtc AND order.createdAt <= :periodEndUtc))',
+          { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
         );
       }
       if (companyId) qb.andWhere('order.companyId = :companyId', { companyId });
@@ -1184,8 +1184,8 @@ export class DashboardService {
 
       if (!isAllTime && periodStartUtc && periodEndUtc) {
         qb.where(
-          'coll.createdAt >= :periodStartUtc AND coll.createdAt <= :periodEndUtc',
-          { periodStartUtc, periodEndUtc },
+          '(coll.createdAt >= :periodStartUtc AND coll.createdAt <= :periodEndUtc OR (coll.collectionDate >= :periodStartDateStr AND coll.collectionDate <= :periodEndDateStr))',
+          { periodStartUtc, periodEndUtc, periodStartDateStr, periodEndDateStr },
         );
       }
       if (companyId) {
@@ -1231,8 +1231,8 @@ export class DashboardService {
 
       if (!isAllTime && periodStartDateStr && periodEndDateStr) {
         qb.where(
-          'order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr',
-          { periodStartDateStr, periodEndDateStr },
+          '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (due.createdAt >= :periodStartUtc AND due.createdAt <= :periodEndUtc))',
+          { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
         );
       }
       if (companyId) {
@@ -1281,8 +1281,8 @@ export class DashboardService {
 
       if (!isAllTime && periodStartUtc && periodEndUtc) {
         qb.andWhere(
-          'batch.dispatchedAt >= :periodStartUtc AND batch.dispatchedAt <= :periodEndUtc',
-          { periodStartUtc, periodEndUtc },
+          '((batch.dispatchedAt >= :periodStartUtc AND batch.dispatchedAt <= :periodEndUtc) OR (batch.dispatchDate >= :periodStartDateStr AND batch.dispatchDate <= :periodEndDateStr) OR (batch.createdAt >= :periodStartUtc AND batch.createdAt <= :periodEndUtc))',
+          { periodStartUtc, periodEndUtc, periodStartDateStr, periodEndDateStr },
         );
       }
       if (companyId) qb.andWhere('batch.companyId = :companyId', { companyId });
@@ -1329,8 +1329,8 @@ export class DashboardService {
 
       if (!isAllTime && periodStartDateStr && periodEndDateStr) {
         qb.andWhere(
-          'order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr',
-          { periodStartDateStr, periodEndDateStr },
+          '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (order.updatedAt >= :periodStartUtc AND order.updatedAt <= :periodEndUtc) OR (order.createdAt >= :periodStartUtc AND order.createdAt <= :periodEndUtc))',
+          { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
         );
       }
       if (companyId) {

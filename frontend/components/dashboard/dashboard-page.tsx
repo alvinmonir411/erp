@@ -47,6 +47,7 @@ import { Role } from '@/types/api';
 import { OrderModal } from '@/components/orders/order-modal';
 import { getOrder } from '@/lib/api/orders';
 import { useToast } from '@/components/ui/toast-provider';
+import { DrilldownView, DrilldownType } from './drilldown-view';
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-xl bg-slate-200/80 ${className ?? ''}`} />;
@@ -67,8 +68,6 @@ const MONTH_NAMES_BN = [
   { en: 'December', bn: 'December' },
 ];
 
-type DrilldownType = 'sales' | 'orders' | 'collections' | 'dues' | 'dispatches' | 'cancelled' | null;
-
 export function DashboardPage() {
   const { user } = useAuth();
   const { error: showErrorToast } = useToast();
@@ -84,9 +83,13 @@ export function DashboardPage() {
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
 
-  // Drilldown filter state (which card is clicked)
+  // Drilldown filter state (Period overview cards)
   const [activeDrilldown, setActiveDrilldown] = useState<DrilldownType>(null);
   const [drilldownSearch, setDrilldownSearch] = useState('');
+
+  // Today Drilldown filter state (Today Instant Overview cards)
+  const [activeTodayDrilldown, setActiveTodayDrilldown] = useState<DrilldownType>(null);
+  const [todayDrilldownSearch, setTodayDrilldownSearch] = useState('');
 
   // Chart Hover & Active Tooltip State
   const [hoveredChartDay, setHoveredChartDay] = useState<any>(null);
@@ -121,11 +124,18 @@ export function DashboardPage() {
     refetchInterval: 30000,
   });
 
-  // Fetch Drilldown data when a card is clicked
+  // Fetch Drilldown data when a period card is clicked
   const { data: drilldownData, isLoading: isDrilldownLoading } = useQuery({
     queryKey: ['dashboard', 'drilldown', { ...queryParams, type: activeDrilldown }],
     queryFn: () => getDashboardDrilldown({ ...queryParams, type: activeDrilldown! }),
     enabled: !!activeDrilldown,
+  });
+
+  // Fetch Today Drilldown data when a today overview card is clicked
+  const { data: todayDrilldownData, isLoading: isTodayDrilldownLoading } = useQuery({
+    queryKey: ['dashboard', 'drilldown', { period: 'today', type: activeTodayDrilldown }],
+    queryFn: () => getDashboardDrilldown({ period: 'today', type: activeTodayDrilldown! }),
+    enabled: !!activeTodayDrilldown,
   });
 
   const handleViewOrder = async (orderId: number) => {
@@ -146,6 +156,15 @@ export function DashboardPage() {
     } else {
       setActiveDrilldown(type);
       setDrilldownSearch('');
+    }
+  };
+
+  const toggleTodayDrilldown = (type: DrilldownType) => {
+    if (activeTodayDrilldown === type) {
+      setActiveTodayDrilldown(null);
+    } else {
+      setActiveTodayDrilldown(type);
+      setTodayDrilldownSearch('');
     }
   };
 
@@ -201,17 +220,35 @@ export function DashboardPage() {
     period === 'all_time' ? 'All Time History' :
     `${activeMonthBn || periodInfo.monthName || ''} ${periodInfo.year || ''}`;
 
-  // Filter Drilldown items with search term
+  // Filter Drilldown items with search term (Period Overview)
   const drilldownItems = (drilldownData?.items || []).filter((item: any) => {
     if (!drilldownSearch.trim()) return true;
     const q = drilldownSearch.toLowerCase();
     return (
       item.id?.toString().includes(q) ||
+      item.orderId?.toString().includes(q) ||
       item.batchNumber?.toLowerCase().includes(q) ||
       item.shopName?.toLowerCase().includes(q) ||
       item.productName?.toLowerCase().includes(q) ||
       item.srName?.toLowerCase().includes(q) ||
-      item.deliveryManName?.toLowerCase().includes(q)
+      item.deliveryManName?.toLowerCase().includes(q) ||
+      item.deliveryPersonName?.toLowerCase().includes(q)
+    );
+  });
+
+  // Filter Today Drilldown items with search term (Today Instant Overview)
+  const todayDrilldownItems = (todayDrilldownData?.items || []).filter((item: any) => {
+    if (!todayDrilldownSearch.trim()) return true;
+    const q = todayDrilldownSearch.toLowerCase();
+    return (
+      item.id?.toString().includes(q) ||
+      item.orderId?.toString().includes(q) ||
+      item.batchNumber?.toLowerCase().includes(q) ||
+      item.shopName?.toLowerCase().includes(q) ||
+      item.productName?.toLowerCase().includes(q) ||
+      item.srName?.toLowerCase().includes(q) ||
+      item.deliveryManName?.toLowerCase().includes(q) ||
+      item.deliveryPersonName?.toLowerCase().includes(q)
     );
   });
 
@@ -414,61 +451,186 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* ⚡ 1. TODAY'S REAL-TIME PULSE */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <Activity className="h-5 w-5 text-rose-500 animate-pulse" />
-          <div>
-            <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-              {user?.role === Role.SR ? "Today Activity & Sales" : "Today Instant Overview"}
-            </h2>
-            <p className="text-[11px] font-semibold text-slate-400">Live order booking, dispatches, and cash collection for today</p>
+      {/* ⚡ 1. TODAY'S REAL-TIME PULSE (INTERACTIVE & CLICKABLE) */}
+      <section className="rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-bold shadow-md shadow-rose-500/20">
+              <Activity className="h-4 w-4 animate-pulse" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-black text-slate-900">
+                {user?.role === Role.SR ? "Today Activity & Sales" : "Today Instant Overview"}
+              </h2>
+              <p className="text-[11px] font-semibold text-slate-500">
+                👉 Click any card below to filter & view today's live transaction records
+              </p>
+            </div>
+          </div>
+          <span className="flex items-center gap-1.5 text-xs font-black text-rose-700 bg-rose-50 border border-rose-200 px-3.5 py-1.5 rounded-xl shadow-xs self-start sm:self-auto">
+            <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+            Live Today Pulse
+          </span>
+        </div>
+
+        {/* 6 Clickable Today Cards */}
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3 xl:gap-3">
+          
+          {/* Card 1: Today Orders */}
+          <div
+            onClick={() => toggleTodayDrilldown('orders')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeTodayDrilldown === 'orders'
+                ? 'ring-4 ring-cyan-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="Today Orders 👆"
+              value={formatNumber(today?.ordersCount ?? orders?.todayOrdersCount)}
+              description={
+                activeTodayDrilldown === 'orders'
+                  ? '🟢 Active filter (tap to close)'
+                  : `Value: ${formatCurrency(today?.orderValue ?? orders?.todayOrderValue)}`
+              }
+              icon={ShoppingCart}
+              colorTheme="cyan"
+            />
+          </div>
+
+          {/* Card 2: Today Dispatches */}
+          <div
+            onClick={() => toggleTodayDrilldown('dispatches')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeTodayDrilldown === 'dispatches'
+                ? 'ring-4 ring-amber-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="Today Dispatches 👆"
+              value={formatNumber(today?.dispatchCount ?? delivery?.todayDispatch)}
+              description={
+                activeTodayDrilldown === 'dispatches'
+                  ? '🟢 Active filter (tap to close)'
+                  : (today?.dispatchAmount ?? delivery?.todayDispatchAmount) > 0
+                  ? `Value: ${formatCurrency(today?.dispatchAmount ?? delivery?.todayDispatchAmount)}`
+                  : 'Click to view batches'
+              }
+              icon={Truck}
+              colorTheme="amber"
+            />
+          </div>
+
+          {/* Card 3: Today Delivered Sales */}
+          <div
+            onClick={() => toggleTodayDrilldown('sales')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeTodayDrilldown === 'sales'
+                ? 'ring-4 ring-indigo-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="Today Delivered Sales 👆"
+              value={formatCurrency(today?.settledValue ?? money?.todayFinalSold ?? 0)}
+              description={
+                activeTodayDrilldown === 'sales'
+                  ? '🟢 Active filter (tap to close)'
+                  : 'Actual settled sales'
+              }
+              icon={DollarSign}
+              colorTheme="indigo"
+            />
+          </div>
+
+          {/* Card 4: Today New Due */}
+          <div
+            onClick={() => toggleTodayDrilldown('dues')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeTodayDrilldown === 'dues'
+                ? 'ring-4 ring-rose-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="Today New Due 👆"
+              value={formatCurrency(today?.dueAmount ?? money?.todayDue ?? 0)}
+              description={
+                activeTodayDrilldown === 'dues'
+                  ? '🟢 Active filter (tap to close)'
+                  : 'Uncollected credit due'
+              }
+              icon={AlertCircle}
+              colorTheme="rose"
+            />
+          </div>
+
+          {/* Card 5: Today Cash Collected */}
+          <div
+            onClick={() => toggleTodayDrilldown('collections')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeTodayDrilldown === 'collections'
+                ? 'ring-4 ring-emerald-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="Today Cash Collected 👆"
+              value={formatCurrency(today?.dueCollection ?? money?.todayDueCollection ?? 0)}
+              description={
+                activeTodayDrilldown === 'collections'
+                  ? '🟢 Active filter (tap to close)'
+                  : 'Cash received from shops'
+              }
+              icon={CheckCircle}
+              colorTheme="emerald"
+            />
+          </div>
+
+          {/* Card 6: Today Cancelled Orders */}
+          <div
+            onClick={() => toggleTodayDrilldown('cancelled')}
+            className={`cursor-pointer transition-all duration-300 rounded-[18px] ${
+              activeTodayDrilldown === 'cancelled'
+                ? 'ring-4 ring-slate-500 ring-offset-2 scale-[1.03] shadow-xl'
+                : 'hover:scale-[1.02]'
+            }`}
+          >
+            <StatCard
+              label="Today Cancelled Orders 👆"
+              value={formatNumber(today?.cancelledOrders ?? orders?.todayCancelled ?? 0)}
+              description={
+                activeTodayDrilldown === 'cancelled'
+                  ? '🟢 Active filter (tap to close)'
+                  : 'Cancelled / rejected orders'
+              }
+              icon={XCircle}
+              colorTheme="slate"
+            />
           </div>
         </div>
-        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3 xl:gap-3">
-          <StatCard
-            label="Today Orders"
-            value={formatNumber(today?.ordersCount ?? orders?.todayOrdersCount)}
-            description={`Value: ${formatCurrency(today?.orderValue ?? orders?.todayOrderValue)}`}
-            icon={ShoppingCart}
-            colorTheme="cyan"
+
+        {/* 📋 TODAY DRILLDOWN FILTERED DATA LIST (SHOWS ON TODAY CARD CLICK) */}
+        {activeTodayDrilldown && (
+          <DrilldownView
+            type={activeTodayDrilldown}
+            periodTitle="Today (Live)"
+            items={todayDrilldownItems}
+            isLoading={isTodayDrilldownLoading}
+            search={todayDrilldownSearch}
+            onSearchChange={setTodayDrilldownSearch}
+            onClose={() => setActiveTodayDrilldown(null)}
+            onViewOrder={handleViewOrder}
+            accentColor={
+              activeTodayDrilldown === 'orders' ? 'cyan' :
+              activeTodayDrilldown === 'dispatches' ? 'amber' :
+              activeTodayDrilldown === 'sales' ? 'indigo' :
+              activeTodayDrilldown === 'dues' ? 'rose' :
+              activeTodayDrilldown === 'collections' ? 'emerald' : 'slate'
+            }
           />
-          <StatCard
-            label="Today Dispatches"
-            value={formatNumber(today?.dispatchCount ?? delivery?.todayDispatch)}
-            description={(today?.dispatchAmount ?? delivery?.todayDispatchAmount) > 0 ? `Value: ${formatCurrency(today?.dispatchAmount ?? delivery?.todayDispatchAmount)}` : undefined}
-            icon={Truck}
-            colorTheme="amber"
-          />
-          <StatCard
-            label="Today Delivered Sales"
-            value={formatCurrency(today?.settledValue ?? money?.todayFinalSold ?? 0)}
-            description="Actual settled sales"
-            icon={DollarSign}
-            colorTheme="indigo"
-          />
-          <StatCard
-            label="Today New Due"
-            value={formatCurrency(today?.dueAmount ?? money?.todayDue ?? 0)}
-            description="Uncollected credit due"
-            icon={AlertCircle}
-            colorTheme="rose"
-          />
-          <StatCard
-            label="Today Cash Collected"
-            value={formatCurrency(today?.dueCollection ?? money?.todayDueCollection ?? 0)}
-            description="Cash received from shops"
-            icon={CheckCircle}
-            colorTheme="emerald"
-          />
-          <StatCard
-            label="Today Cancelled Orders"
-            value={formatNumber(today?.cancelledOrders ?? orders?.todayCancelled ?? 0)}
-            description="Cancelled / rejected orders"
-            icon={XCircle}
-            colorTheme="slate"
-          />
-        </div>
+        )}
       </section>
 
       {/* 📊 2. MONTHLY PERFORMANCE CARDS (INTERACTIVE & CLICKABLE) */}
@@ -606,263 +768,23 @@ export function DashboardPage() {
 
         {/* 📋 DYNAMIC DRILLDOWN FILTERED DATA LIST (SHOWS ON CARD CLICK) */}
         {activeDrilldown && (
-          <div className="bg-white rounded-2xl border border-indigo-200 p-4 sm:p-6 shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-indigo-600 animate-ping" />
-                  <h3 className="text-base sm:text-lg font-black text-slate-900">
-                    {activeDrilldown === 'sales' && `Delivered Sales Breakdown (${drilldownItems.length} Invoices)`}
-                    {activeDrilldown === 'orders' && `Booked Orders List (${drilldownItems.length} Orders)`}
-                    {activeDrilldown === 'collections' && `Cash Collection Records (${drilldownItems.length} Collections)`}
-                    {activeDrilldown === 'dues' && `New Market Due Invoices (${drilldownItems.length} Invoices)`}
-                    {activeDrilldown === 'dispatches' && `Delivery Dispatch Batches (${drilldownItems.length} Batches)`}
-                    {activeDrilldown === 'cancelled' && `Cancelled Orders List (${drilldownItems.length} Cancelled)`}
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Period: <span className="font-bold text-indigo-700">{displayPeriodTitle}</span> • Click any order to view memo
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Filter this list..."
-                    value={drilldownSearch}
-                    onChange={(e) => setDrilldownSearch(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-slate-50"
-                  />
-                </div>
-                <button
-                  onClick={() => setActiveDrilldown(null)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5 text-rose-500" />
-                  Close Table
-                </button>
-              </div>
-            </div>
-
-            {/* Drilldown Table Content */}
-            <div className="mt-4 overflow-x-auto">
-              {isDrilldownLoading ? (
-                <div className="py-12 text-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
-                  <p className="mt-2 text-xs font-bold text-slate-400">Loading data...</p>
-                </div>
-              ) : drilldownItems.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs font-bold">
-                  No records found.
-                </div>
-              ) : (
-                <table className="w-full text-left text-xs min-w-[650px]">
-                  <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b border-slate-200">
-                    {activeDrilldown === 'sales' && (
-                      <tr>
-                        <th className="px-4 py-3">Order #</th>
-                        <th className="px-4 py-3">Shop Name</th>
-                        <th className="px-4 py-3">Route</th>
-                        <th className="px-4 py-3">Delivery Person</th>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3 text-right">Settled Sales</th>
-                        <th className="px-4 py-3 text-right">Due Amount</th>
-                        <th className="px-4 py-3 text-center">Action</th>
-                      </tr>
-                    )}
-                    {activeDrilldown === 'orders' && (
-                      <tr>
-                        <th className="px-4 py-3">Order #</th>
-                        <th className="px-4 py-3">Shop Name</th>
-                        <th className="px-4 py-3">Route</th>
-                        <th className="px-4 py-3">Sales Rep (SR)</th>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3 text-right">Order Value</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                        <th className="px-4 py-3 text-center">Action</th>
-                      </tr>
-                    )}
-                    {activeDrilldown === 'collections' && (
-                      <tr>
-                        <th className="px-4 py-3">Order #</th>
-                        <th className="px-4 py-3">Shop Name</th>
-                        <th className="px-4 py-3">Collected By (SR)</th>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3 text-right">Collected Amount</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                        <th className="px-4 py-3 text-center">Action</th>
-                      </tr>
-                    )}
-                    {activeDrilldown === 'dues' && (
-                      <tr>
-                        <th className="px-4 py-3">Order #</th>
-                        <th className="px-4 py-3">Shop Name</th>
-                        <th className="px-4 py-3">Route</th>
-                        <th className="px-4 py-3">Sales Rep (SR)</th>
-                        <th className="px-4 py-3 text-right">Original Due</th>
-                        <th className="px-4 py-3 text-right">Paid</th>
-                        <th className="px-4 py-3 text-right">Remaining Due</th>
-                        <th className="px-4 py-3 text-center">Action</th>
-                      </tr>
-                    )}
-                    {activeDrilldown === 'dispatches' && (
-                      <tr>
-                        <th className="px-4 py-3">Batch #</th>
-                        <th className="px-4 py-3">Delivery Person</th>
-                        <th className="px-4 py-3">Dispatch Date</th>
-                        <th className="px-4 py-3 text-center">Orders Count</th>
-                        <th className="px-4 py-3 text-right">Total Batch Value</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                      </tr>
-                    )}
-                    {activeDrilldown === 'cancelled' && (
-                      <tr>
-                        <th className="px-4 py-3">Order #</th>
-                        <th className="px-4 py-3">Shop Name</th>
-                        <th className="px-4 py-3">Route</th>
-                        <th className="px-4 py-3">Sales Rep (SR)</th>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3 text-right">Order Value</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                        <th className="px-4 py-3 text-center">Action</th>
-                      </tr>
-                    )}
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {drilldownItems.map((item: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                        {activeDrilldown === 'sales' && (
-                          <>
-                            <td className="px-4 py-3 font-black text-indigo-600">#{item.id}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.routeName || '—'}</td>
-                            <td className="px-4 py-3 font-semibold text-slate-700">{item.deliveryManName || '—'}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.orderDate}</td>
-                            <td className="px-4 py-3 text-right font-black text-emerald-600">{formatCurrency(item.soldAmount)}</td>
-                            <td className="px-4 py-3 text-right font-bold text-rose-600">{formatCurrency(item.dueAmount)}</td>
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => handleViewOrder(item.id)}
-                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> View Memo
-                              </button>
-                            </td>
-                          </>
-                        )}
-                        {activeDrilldown === 'orders' && (
-                          <>
-                            <td className="px-4 py-3 font-black text-indigo-600">#{item.id}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.routeName || '—'}</td>
-                            <td className="px-4 py-3 font-semibold text-slate-700">{item.srName || '—'}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.orderDate}</td>
-                            <td className="px-4 py-3 text-right font-black text-slate-900">{formatCurrency(item.grandTotal)}</td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-black">
-                                {item.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => handleViewOrder(item.id)}
-                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> View Memo
-                              </button>
-                            </td>
-                          </>
-                        )}
-                        {activeDrilldown === 'collections' && (
-                          <>
-                            <td className="px-4 py-3 font-black text-indigo-600">#{item.orderId}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
-                            <td className="px-4 py-3 font-semibold text-slate-700">{item.srName || '—'}</td>
-                            <td className="px-4 py-3 text-slate-500">{new Date(item.collectionDate).toLocaleDateString()}</td>
-                            <td className="px-4 py-3 text-right font-black text-emerald-600">{formatCurrency(item.collectedAmount)}</td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-md text-[9px] font-black border ${
-                                item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                item.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200'
-                              }`}>
-                                {item.status === 'APPROVED' ? 'Approved' : item.status === 'PENDING' ? 'Pending' : 'Cancelled'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => handleViewOrder(item.orderId)}
-                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> Memo
-                              </button>
-                            </td>
-                          </>
-                        )}
-                        {activeDrilldown === 'dues' && (
-                          <>
-                            <td className="px-4 py-3 font-black text-indigo-600">#{item.orderId}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.routeName || '—'}</td>
-                            <td className="px-4 py-3 font-semibold text-slate-700">{item.srName || '—'}</td>
-                            <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(item.dueAmount)}</td>
-                            <td className="px-4 py-3 text-right font-bold text-emerald-600">{formatCurrency(item.paidAmount)}</td>
-                            <td className="px-4 py-3 text-right font-black text-rose-600">{formatCurrency(item.remainingDue)}</td>
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => handleViewOrder(item.orderId)}
-                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> Memo
-                              </button>
-                            </td>
-                          </>
-                        )}
-                        {activeDrilldown === 'dispatches' && (
-                          <>
-                            <td className="px-4 py-3 font-black text-indigo-600">#{item.batchNumber}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900">{item.deliveryPersonName || '—'}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.dispatchDate}</td>
-                            <td className="px-4 py-3 text-center font-bold text-slate-800">{item.totalOrders} </td>
-                            <td className="px-4 py-3 text-right font-black text-slate-900">{formatCurrency(item.totalAmount)}</td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">
-                                {item.status}
-                              </span>
-                            </td>
-                          </>
-                        )}
-                        {activeDrilldown === 'cancelled' && (
-                          <>
-                            <td className="px-4 py-3 font-black text-rose-600">#{item.id}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900">{item.shopName}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.routeName || '—'}</td>
-                            <td className="px-4 py-3 font-semibold text-slate-700">{item.srName || '—'}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.orderDate}</td>
-                            <td className="px-4 py-3 text-right font-black text-slate-900">{formatCurrency(item.grandTotal)}</td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-black border border-rose-200">
-                                {item.status || 'CANCELLED'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => handleViewOrder(item.id)}
-                                className="inline-flex items-center gap-1 text-indigo-600 font-black hover:underline"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> View Memo
-                              </button>
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
+          <DrilldownView
+            type={activeDrilldown}
+            periodTitle={displayPeriodTitle}
+            items={drilldownItems}
+            isLoading={isDrilldownLoading}
+            search={drilldownSearch}
+            onSearchChange={setDrilldownSearch}
+            onClose={() => setActiveDrilldown(null)}
+            onViewOrder={handleViewOrder}
+            accentColor={
+              activeDrilldown === 'sales' ? 'emerald' :
+              activeDrilldown === 'orders' ? 'indigo' :
+              activeDrilldown === 'collections' ? 'cyan' :
+              activeDrilldown === 'dues' ? 'amber' :
+              activeDrilldown === 'dispatches' ? 'indigo' : 'rose'
+            }
+          />
         )}
       </section>
 

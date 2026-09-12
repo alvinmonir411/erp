@@ -314,10 +314,8 @@ export class DeliveryOpsService {
         .leftJoinAndSelect('batch.items', 'items');
     }
 
-    qb.orderBy('batch.dispatchDate', 'DESC').addOrderBy(
-      'batch.createdAt',
-      'DESC',
-    );
+    qb.orderBy('COALESCE(batch.dispatchedAt, batch.createdAt)', 'DESC')
+      .addOrderBy('batch.id', 'DESC');
 
     if (user && user.role === Role.SR) {
       const userId = user.id || user.sub;
@@ -347,14 +345,20 @@ export class DeliveryOpsService {
     if (query.routeId)
       qb.andWhere('batch.routeId = :routeId', { routeId: query.routeId });
     if (query.startDate && query.endDate) {
-      qb.andWhere('batch.dispatchDate BETWEEN :startDate AND :endDate', {
-        startDate: query.startDate,
-        endDate: query.endDate,
-      });
+      qb.andWhere(
+        '(batch.dispatchDate BETWEEN :startDate AND :endDate OR DATE(batch.dispatchedAt) BETWEEN :startDate AND :endDate OR DATE(batch.createdAt) BETWEEN :startDate AND :endDate)',
+        {
+          startDate: query.startDate,
+          endDate: query.endDate,
+        },
+      );
     } else if (query.dispatchDate) {
-      qb.andWhere('batch.dispatchDate = :dispatchDate', {
-        dispatchDate: query.dispatchDate,
-      });
+      qb.andWhere(
+        '(batch.dispatchDate = :dispatchDate OR DATE(batch.dispatchedAt) = :dispatchDate OR DATE(batch.createdAt) = :dispatchDate)',
+        {
+          dispatchDate: query.dispatchDate,
+        },
+      );
     }
     if (query.search) {
       qb.andWhere(

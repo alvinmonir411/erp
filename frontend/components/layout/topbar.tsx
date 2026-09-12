@@ -24,6 +24,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
     if (first === 'routes') return 'Route Management';
     if (first === 'shops') return 'Shop Directory';
     if (first === 'companies') return 'Partner Companies';
+    if (first === 'activity-logs') return 'Activity & Audit Log';
     
     return first.charAt(0).toUpperCase() + first.slice(1).replace(/-/g, ' ');
   };

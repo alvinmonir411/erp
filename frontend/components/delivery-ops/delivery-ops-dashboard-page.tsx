@@ -18,14 +18,26 @@ import { AlertCircle, ArrowUpRight, BarChart3, CheckCircle, CheckCircle2, CheckC
 
 const PAGE_SIZE = 10;
 
+const getTodayStr = () => {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date());
+};
+
+const getDaysAgoStr = (days: number) => {
+  const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(d);
+};
+
+const getMonthStartStr = () => {
+  const bdToday = getTodayStr();
+  const [year, month] = bdToday.split('-');
+  return `${year}-${month}-01`;
+};
+
 export function DeliveryOpsDashboardPage() {
   const { error: showErrorToast, success: showSuccessToast } = useToast();
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
-  });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [periodPreset, setPeriodPreset] = useState<'all' | 'today' | 'last_7_days' | 'this_month' | 'custom'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [routeId, setRouteId] = useState('');
   const [search, setSearch] = useState('');
@@ -43,14 +55,33 @@ export function DeliveryOpsDashboardPage() {
   const { data: companies = [] } = useCompanies();
   const { data: routes = [] } = useRoutes();
 
+  const handlePresetChange = (preset: 'all' | 'today' | 'last_7_days' | 'this_month') => {
+    setPeriodPreset(preset);
+    setPage(1);
+    if (preset === 'all') {
+      setStartDate('');
+      setEndDate('');
+    } else if (preset === 'today') {
+      const today = getTodayStr();
+      setStartDate(today);
+      setEndDate(today);
+    } else if (preset === 'last_7_days') {
+      setStartDate(getDaysAgoStr(6));
+      setEndDate(getTodayStr());
+    } else if (preset === 'this_month') {
+      setStartDate(getMonthStartStr());
+      setEndDate(getTodayStr());
+    }
+  };
+
   const fetchData = async () => {
     try {
       setIsLoading(true);
       const [dashboardData, batchData] = await Promise.all([
-        getDeliveryDashboard(endDate),
+        getDeliveryDashboard(endDate || getTodayStr()),
         getDispatchBatches({
-          startDate,
-          endDate,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
           companyId: companyId ? Number(companyId) : undefined,
           routeId: routeId ? Number(routeId) : undefined,
           search: search || undefined,
@@ -157,16 +188,70 @@ export function DeliveryOpsDashboardPage() {
       <div className="modern-card">
         <div className="flex flex-col border-b border-border">
           <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <History className="h-4 w-4 text-accent" /> Dispatch Queue
-            </h2>
-            <div className="flex items-center gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <History className="h-4 w-4 text-accent" /> Dispatch Queue
+              </h2>
+              <p className="text-[11px] font-semibold text-muted mt-0.5">
+                Sorted by most recent dispatches first
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Quick Period Presets */}
+              <div className="flex flex-wrap items-center gap-1 bg-secondary/60 p-1 rounded-xl border border-border">
+                <button
+                  onClick={() => handlePresetChange('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    periodPreset === 'all'
+                      ? 'bg-white text-primary font-black shadow-xs'
+                      : 'text-muted hover:text-foreground'
+                  }`}
+                >
+                  All Batches
+                </button>
+                <button
+                  onClick={() => handlePresetChange('today')}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    periodPreset === 'today'
+                      ? 'bg-white text-rose-600 font-black shadow-xs'
+                      : 'text-muted hover:text-foreground'
+                  }`}
+                >
+                  <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+                  Today (Live)
+                </button>
+                <button
+                  onClick={() => handlePresetChange('last_7_days')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    periodPreset === 'last_7_days'
+                      ? 'bg-white text-primary font-black shadow-xs'
+                      : 'text-muted hover:text-foreground'
+                  }`}
+                >
+                  7 Days
+                </button>
+                <button
+                  onClick={() => handlePresetChange('this_month')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    periodPreset === 'this_month'
+                      ? 'bg-white text-primary font-black shadow-xs'
+                      : 'text-muted hover:text-foreground'
+                  }`}
+                >
+                  This Month
+                </button>
+              </div>
+
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${showFilters ? 'bg-primary text-white border-primary' : 'bg-white text-muted border-border hover:bg-secondary'
-                  }`}
+                className={`flex items-center gap-2 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                  showFilters || periodPreset === 'custom'
+                    ? 'bg-primary text-white border-primary shadow-xs'
+                    : 'bg-white text-muted border-border hover:bg-secondary'
+                }`}
               >
-                <Filter className="h-3 w-3" /> Filters
+                <Filter className="h-3.5 w-3.5" /> Filters
               </button>
             </div>
           </div>
@@ -178,7 +263,11 @@ export function DeliveryOpsDashboardPage() {
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setPeriodPreset('custom');
+                    setPage(1);
+                  }}
                   className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm focus:bg-white outline-none transition"
                 />
               </div>
@@ -187,7 +276,11 @@ export function DeliveryOpsDashboardPage() {
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setPeriodPreset('custom');
+                    setPage(1);
+                  }}
                   className="w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm focus:bg-white outline-none transition"
                 />
               </div>
@@ -261,14 +354,26 @@ export function DeliveryOpsDashboardPage() {
               ) : (
                 batches.map((batch) => {
                   const config = batchStatusConfig[batch.status];
+                  const isDispatchedToday = batch.dispatchedAt ? new Date(batch.dispatchedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' }) === getTodayStr() : false;
                   return (
                     <tr key={batch.id} className="group hover:bg-secondary/30 transition-colors">
                       <td className="px-6 py-4">
-                        <Link href={`/delivery-ops/batches/${batch.id}`} className="text-sm font-bold text-foreground hover:text-accent transition-colors">
-                          {batch.batchNo}
-                        </Link>
-                        <p className="mt-1 text-[10px] font-bold text-muted uppercase tracking-tight">
-                          {batch.totalOrders} Order(s) · {formatDate(batch.dispatchDate)}
+                        <div className="flex items-center gap-2">
+                          <Link href={`/delivery-ops/batches/${batch.id}`} className="text-sm font-bold text-foreground hover:text-accent transition-colors">
+                            {batch.batchNo}
+                          </Link>
+                          {isDispatchedToday && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                              Today
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-[10px] font-bold text-muted uppercase tracking-tight flex items-center gap-1.5 flex-wrap">
+                          <span>{batch.totalOrders} Order(s)</span>
+                          <span>·</span>
+                          <span>
+                            {formatDate(batch.dispatchedAt || batch.dispatchDate || batch.createdAt)}
+                          </span>
                         </p>
                       </td>
                       <td className="px-6 py-4">
@@ -293,7 +398,7 @@ export function DeliveryOpsDashboardPage() {
                               e.stopPropagation();
                               handleDeleteClick(batch.id, batch.batchNo, batch.status === 'SETTLED' || batch.status === 'PARTIALLY_SETTLED');
                             }}
-                            className="text-red-500 hover:text-red-600 transition-colors"
+                            className="text-red-500 hover:text-red-600 transition-colors cursor-pointer"
                             title="Delete Batch"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -325,12 +430,20 @@ export function DeliveryOpsDashboardPage() {
           ) : (
             batches.map((batch) => {
               const config = batchStatusConfig[batch.status];
+              const isDispatchedToday = batch.dispatchedAt ? new Date(batch.dispatchedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' }) === getTodayStr() : false;
               return (
                 <div key={batch.id} className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <Link href={`/delivery-ops/batches/${batch.id}`} className="text-xs font-black text-primary">
-                      {batch.batchNo}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/delivery-ops/batches/${batch.id}`} className="text-xs font-black text-primary">
+                        {batch.batchNo}
+                      </Link>
+                      {isDispatchedToday && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                          Today
+                        </span>
+                      )}
+                    </div>
                     <StatusBadge {...config} />
                   </div>
 
@@ -353,14 +466,16 @@ export function DeliveryOpsDashboardPage() {
                   </div>
 
                   <div className="flex justify-between items-center pt-2">
-                    <span className="text-[10px] font-bold text-muted uppercase">{batch.totalOrders} Order(s) · {formatDate(batch.dispatchDate)}</span>
+                    <span className="text-[10px] font-bold text-muted uppercase">
+                      {batch.totalOrders} Order(s) · {formatDate(batch.dispatchedAt || batch.dispatchDate || batch.createdAt)}
+                    </span>
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteClick(batch.id, batch.batchNo, batch.status === 'SETTLED' || batch.status === 'PARTIALLY_SETTLED');
                         }}
-                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

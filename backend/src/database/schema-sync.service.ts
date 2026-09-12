@@ -541,9 +541,38 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       this.logger.error('Failed to sync purchases/company_payments tables:', e.message);
     }
 
+    // 16. Sync activity_logs table
+    try {
+      this.logger.log('Ensuring activity_logs table exists...');
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS "activity_logs" (
+          "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          "category" VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+          "action" VARCHAR(100) NOT NULL,
+          "entityType" VARCHAR(50),
+          "entityId" VARCHAR(100),
+          "title" VARCHAR(255) NOT NULL,
+          "description" TEXT,
+          "details" JSONB,
+          "userId" UUID,
+          "userName" VARCHAR(150),
+          "userRole" VARCHAR(50),
+          "ipAddress" VARCHAR(64),
+          "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS "idx_activity_logs_category_created" ON "activity_logs" ("category", "createdAt" DESC);
+        CREATE INDEX IF NOT EXISTS "idx_activity_logs_entity" ON "activity_logs" ("entityType", "entityId");
+        CREATE INDEX IF NOT EXISTS "idx_activity_logs_created" ON "activity_logs" ("createdAt" DESC);
+      `);
+    } catch (e) {
+      this.logger.error('Failed to sync activity_logs table:', e.message);
+    }
+
       this.logger.log('--- DEFENSIVE SCHEMA SYNC COMPLETED ---');
     } catch (globalErr: any) {
       this.logger.error('Unexpected error in schema sync:', globalErr?.message);
     }
   }
 }
+

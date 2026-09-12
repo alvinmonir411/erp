@@ -24,6 +24,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 
 import { PurchasesModule } from './modules/purchases/purchases.module';
+import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { PurchasesModule } from './modules/purchases/purchases.module';
     SalesModule,
     RealtimeModule,
     AnalyticsModule,
+    ActivityLogsModule,
   ],
 })
 export class AppModule {}
