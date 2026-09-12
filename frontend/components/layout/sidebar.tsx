@@ -57,7 +57,6 @@ const navigation = [
     items: [
       { href: '/expenses', label: 'Business Analytics', icon: TrendingUp },
       { href: '/delivery-ops', label: 'Delivery Summary', icon: FileText },
-      { href: '/activity-logs', label: 'Activity & Audit Log', icon: Activity },
     ]
   },
   {
@@ -95,11 +94,11 @@ const navigation = [
     ]
   },
   {
-    title: 'System',
-    roles: [Role.SUPER_ADMIN, Role.ADMIN],
+    title: 'System & Audit',
+    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
     items: [
-      { href: '/users', label: 'User Management', icon: Users },
-
+      { href: '/users', label: 'User Management', icon: Users, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+      { href: '/activity-logs', label: 'Activity & Audit Log', icon: Activity, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER], prefetch: false },
     ]
   },
   {
@@ -169,7 +168,7 @@ export function Sidebar({ isOpen, onToggle, onClose }: { isOpen: boolean, onTogg
                 {group.title}
               </h3>
               <div className="space-y-1">
-                {group.items.map((item) => {
+                {group.items.map((item: any) => {
                   const isActive = pathname === item.href;
                   const Icon = item.icon;
 
@@ -177,6 +176,7 @@ export function Sidebar({ isOpen, onToggle, onClose }: { isOpen: boolean, onTogg
                     <Link
                       key={item.href}
                       href={item.href}
+                      prefetch={item.prefetch ?? false}
                       onClick={() => onClose()}
                       onMouseEnter={() => handlePrefetch(item.href)}
                       className={`flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${isActive
