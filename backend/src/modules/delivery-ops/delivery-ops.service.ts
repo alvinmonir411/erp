@@ -314,8 +314,7 @@ export class DeliveryOpsService {
         .leftJoinAndSelect('batch.items', 'items');
     }
 
-    qb.orderBy('COALESCE(batch.dispatchedAt, batch.createdAt)', 'DESC')
-      .addOrderBy('batch.id', 'DESC');
+    qb.orderBy('batch.id', 'DESC');
 
     if (user && user.role === Role.SR) {
       const userId = user.id || user.sub;
@@ -345,18 +344,31 @@ export class DeliveryOpsService {
     if (query.routeId)
       qb.andWhere('batch.routeId = :routeId', { routeId: query.routeId });
     if (query.startDate && query.endDate) {
+      const [sy, sm, sd] = query.startDate.split('-').map(Number);
+      const [ey, em, ed] = query.endDate.split('-').map(Number);
+      const startUtc = new Date(Date.UTC(sy, sm - 1, sd, 0, 0, 0, 0) - 6 * 3600 * 1000);
+      const endUtc = new Date(Date.UTC(ey, em - 1, ed, 23, 59, 59, 999) - 6 * 3600 * 1000);
+
       qb.andWhere(
-        '(batch.dispatchDate BETWEEN :startDate AND :endDate OR DATE(batch.dispatchedAt) BETWEEN :startDate AND :endDate OR DATE(batch.createdAt) BETWEEN :startDate AND :endDate)',
+        '(batch.dispatchDate BETWEEN :startDate AND :endDate OR batch.dispatchedAt BETWEEN :startUtc AND :endUtc OR batch.createdAt BETWEEN :startUtc AND :endUtc)',
         {
           startDate: query.startDate,
           endDate: query.endDate,
+          startUtc: startUtc.toISOString(),
+          endUtc: endUtc.toISOString(),
         },
       );
     } else if (query.dispatchDate) {
+      const [y, m, d] = query.dispatchDate.split('-').map(Number);
+      const startUtc = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - 6 * 3600 * 1000);
+      const endUtc = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) - 6 * 3600 * 1000);
+
       qb.andWhere(
-        '(batch.dispatchDate = :dispatchDate OR DATE(batch.dispatchedAt) = :dispatchDate OR DATE(batch.createdAt) = :dispatchDate)',
+        '(batch.dispatchDate = :dispatchDate OR batch.dispatchedAt BETWEEN :startUtc AND :endUtc OR batch.createdAt BETWEEN :startUtc AND :endUtc)',
         {
           dispatchDate: query.dispatchDate,
+          startUtc: startUtc.toISOString(),
+          endUtc: endUtc.toISOString(),
         },
       );
     }
