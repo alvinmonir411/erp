@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   History,
   Search,
@@ -13,17 +13,26 @@ import {
   User as UserIcon,
   Store,
   Loader2,
-  DollarSign
+  DollarSign,
+  RotateCcw,
+  Edit2
 } from 'lucide-react';
 import { getCollections } from '@/lib/api/dues';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
 import Link from 'next/link';
+import { EditCollectionModal } from './edit-collection-modal';
+import { RevertCollectionModal } from './revert-collection-modal';
 
 export function CollectionsPage() {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modals for edit & recovery
+  const [editTarget, setEditTarget] = useState<any | null>(null);
+  const [revertTarget, setRevertTarget] = useState<any | null>(null);
 
   const { data: collections = [], isLoading } = useQuery({
     queryKey: ['due-collections'],
@@ -31,9 +40,20 @@ export function CollectionsPage() {
   });
 
   const filteredCollections = collections.filter((c: any) =>
-    c.shop?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.srName?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.shop?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.srName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.orderId?.toString().includes(searchTerm)
   );
+
+  const isSuperAdmin = user?.role === Role.SUPER_ADMIN || user?.role === Role.ADMIN;
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['due-collections'] });
+    queryClient.invalidateQueries({ queryKey: ['dues'] });
+    queryClient.invalidateQueries({ queryKey: ['due-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
+    queryClient.invalidateQueries({ queryKey: ['all-approvals-history'] });
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -51,7 +71,7 @@ export function CollectionsPage() {
   return (
     <div className="space-y-6">
       {/* Header & Tabs */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between no-print">
         <div>
           <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Due & Collection History</h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Shop due ledgers, cash collections, and payment history</p>
@@ -83,13 +103,13 @@ export function CollectionsPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden no-print">
         <div className="p-4 border-b border-slate-100 bg-slate-50/60">
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search history (shop or SR name)..."
+              placeholder="Search history (shop, SR name or order #)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
@@ -108,19 +128,20 @@ export function CollectionsPage() {
                 <th className="px-5 py-3.5">Date</th>
                 <th className="px-5 py-3.5">Status</th>
                 <th className="px-5 py-3.5">Notes / Reason</th>
+                {isSuperAdmin && <th className="px-5 py-3.5 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={isSuperAdmin ? 7 : 6} className="px-6 py-12 text-center">
                     <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto" />
                     <p className="mt-2 text-xs text-slate-400 font-bold">Loading collections...</p>
                   </td>
                 </tr>
               ) : filteredCollections.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm font-bold">
+                  <td colSpan={isSuperAdmin ? 7 : 6} className="px-6 py-12 text-center text-slate-400 text-sm font-bold">
                     No collection records found.
                   </td>
                 </tr>
@@ -131,7 +152,7 @@ export function CollectionsPage() {
                     <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="px-5 py-3.5">
                         <div>
-                          <p className="font-black text-slate-900 text-sm">{c.shop?.name}</p>
+                          <p className="font-black text-slate-900 text-sm">{c.shop?.name || 'Direct Sale'}</p>
                           <p className="text-[10px] font-black text-indigo-600 tracking-tight">Order #{c.orderId}</p>
                         </div>
                       </td>
@@ -143,19 +164,56 @@ export function CollectionsPage() {
                       </td>
                       <td className="px-5 py-3.5 font-black text-emerald-600 text-sm">{formatCurrency(c.collectedAmount)}</td>
                       <td className="px-5 py-3.5 text-slate-600 text-xs font-semibold">
-                        {new Date(c.collectionDate).toLocaleDateString()}
+                        {formatDate(c.collectionDate)}
                       </td>
                       <td className="px-5 py-3.5">
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${badge.cls}`}>
                           {badge.label}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-xs text-slate-600 max-w-xs truncate">
+                      <td className="px-5 py-3.5 text-xs text-slate-600 max-w-xs truncate" title={c.note || c.rejectedReason}>
                         {c.note || '-'}
                         {c.rejectedReason && (
                           <p className="text-rose-500 font-bold mt-0.5">Rejected Reason: {c.rejectedReason}</p>
                         )}
                       </td>
+                      {isSuperAdmin && (
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setEditTarget(c)}
+                              className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 text-xs font-bold hover:bg-indigo-100 transition-colors"
+                              title="Edit Collection"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              Edit
+                            </button>
+                            {c.status === 'APPROVED' && (
+                              <button
+                                type="button"
+                                onClick={() => setRevertTarget(c)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 text-xs font-black hover:bg-rose-100 transition-colors"
+                                title="Revert Approval & Recover"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                Revert
+                              </button>
+                            )}
+                            {c.status === 'REJECTED' && (
+                              <button
+                                type="button"
+                                onClick={() => setRevertTarget(c)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 text-xs font-bold hover:bg-amber-100 transition-colors"
+                                title="Re-open / Recover Request"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                Re-open
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -182,7 +240,7 @@ export function CollectionsPage() {
                 <div key={c.id} className="p-4 flex flex-col gap-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-black text-slate-900 text-sm">{c.shop?.name}</p>
+                      <p className="font-black text-slate-900 text-sm">{c.shop?.name || 'Direct Sale'}</p>
                       <p className="text-[10px] font-bold text-slate-400 mt-0.5">Order #{c.orderId} • SR: {c.srName}</p>
                     </div>
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${badge.cls}`}>
@@ -197,7 +255,7 @@ export function CollectionsPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Date</p>
-                      <p className="font-bold text-slate-700 text-xs">{new Date(c.collectionDate).toLocaleDateString()}</p>
+                      <p className="font-bold text-slate-700 text-xs">{formatDate(c.collectionDate)}</p>
                     </div>
                   </div>
 
@@ -207,12 +265,63 @@ export function CollectionsPage() {
                       {c.rejectedReason && <p className="text-rose-500 font-bold mt-0.5">Rejected Reason: {c.rejectedReason}</p>}
                     </div>
                   )}
+
+                  {isSuperAdmin && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditTarget(c)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-50 border border-indigo-200 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        Edit
+                      </button>
+                      {c.status === 'APPROVED' && (
+                        <button
+                          type="button"
+                          onClick={() => setRevertTarget(c)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs font-black text-rose-700 hover:bg-rose-100"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Revert / Recover
+                        </button>
+                      )}
+                      {c.status === 'REJECTED' && (
+                        <button
+                          type="button"
+                          onClick={() => setRevertTarget(c)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-100"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Re-open
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })
           )}
         </div>
       </div>
+
+      {/* Edit Collection Modal */}
+      {editTarget && (
+        <EditCollectionModal
+          collection={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSuccess={handleRefresh}
+        />
+      )}
+
+      {/* Revert / Recover Modal */}
+      {revertTarget && (
+        <RevertCollectionModal
+          collection={revertTarget}
+          onClose={() => setRevertTarget(null)}
+          onSuccess={handleRefresh}
+        />
+      )}
     </div>
   );
 }

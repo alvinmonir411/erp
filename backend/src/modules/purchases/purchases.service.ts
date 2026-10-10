@@ -16,6 +16,7 @@ import { Company } from '../companies/entities/company.entity';
 import { Product } from '../products/entities/product.entity';
 import { StockService } from '../stock/stock.service';
 import { StockMovementType } from '../stock/stock.constants';
+import { CloudinaryService } from './cloudinary.service';
 
 @Injectable()
 export class PurchasesService {
@@ -34,6 +35,7 @@ export class PurchasesService {
     private readonly productRepository: Repository<Product>,
     private readonly stockService: StockService,
     private readonly dataSource: DataSource,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   private safeNum(val: any): number {
@@ -130,8 +132,9 @@ export class PurchasesService {
         supplierName: dto.supplierName || null,
         warehouseName: dto.warehouseName || 'Main Godown',
         vehicleNo: dto.vehicleNo || null,
-        driverName: dto.driverName || null,
         supplierInvoiceNo: dto.supplierInvoiceNo || null,
+        invoiceImageUrl: dto.invoiceImageUrl || null,
+        invoiceImagePublicId: dto.invoiceImagePublicId || null,
         note: dto.note || null,
         status: isConfirmed ? PurchaseStatus.CONFIRMED : PurchaseStatus.DRAFT,
         paidAmount,
@@ -700,6 +703,8 @@ export class PurchasesService {
         branchName: dto.branchName || null,
         note: finalNote,
         productBreakdown: breakdownList.length > 0 ? breakdownList : null,
+        invoiceImageUrl: dto.invoiceImageUrl || null,
+        invoiceImagePublicId: dto.invoiceImagePublicId || null,
         createdByName: user?.name || user?.username || 'Admin',
         createdById: user?.id || null,
       });
@@ -832,5 +837,31 @@ export class PurchasesService {
     }
 
     return qb.getMany();
+  }
+
+  async updateInvoiceImage(id: number, imageUrl: string, publicId?: string) {
+    const purchase = await this.findOne(id);
+    if (!purchase) throw new NotFoundException(`Purchase #${id} not found`);
+
+    await this.purchaseRepository.update(id, {
+      invoiceImageUrl: imageUrl,
+      invoiceImagePublicId: publicId || null,
+    });
+    return this.findOne(id);
+  }
+
+  async deleteInvoiceImage(id: number) {
+    const purchase = await this.findOne(id);
+    if (!purchase) throw new NotFoundException(`Purchase #${id} not found`);
+
+    if (purchase.invoiceImagePublicId) {
+      await this.cloudinaryService.deleteInvoiceFile(purchase.invoiceImagePublicId);
+    }
+
+    await this.purchaseRepository.update(id, {
+      invoiceImageUrl: null,
+      invoiceImagePublicId: null,
+    });
+    return { success: true, message: 'Invoice image deleted' };
   }
 }

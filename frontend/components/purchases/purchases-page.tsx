@@ -1,32 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getCompanies } from '@/lib/api/companies';
-import { getProducts } from '@/lib/api/products';
 import {
   getCompanyWisePayableSummary,
   getPurchases,
-  getProductSupplySummary,
   getCompanyPayments,
   recordCompanyPayment,
-  confirmPurchase,
   deletePurchase,
   deleteCompanyPayment,
-  resetPurchasesDemoData,
+  uploadPurchaseInvoiceFile,
 } from '@/lib/api/purchases';
 import { LoadingBlock } from '@/components/ui/loading-block';
-import { PageCard } from '@/components/ui/page-card';
-import { Pagination } from '@/components/ui/pagination';
 import { StateMessage } from '@/components/ui/state-message';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useToastNotification } from '@/components/ui/toast-provider';
-import { formatCurrency, formatDate, formatDateTime, formatNumber, toNumber } from '@/lib/utils/format';
+import { formatCurrency, formatDate, toNumber } from '@/lib/utils/format';
 import type {
   Company,
   CompanyWisePayableSummary,
-  Product,
-  ProductSupplySummary,
   Purchase,
   PurchasePayment,
 } from '@/types/api';
@@ -36,36 +29,22 @@ import {
   Building2,
   Calendar,
   FilterX,
-  FileText,
-  DollarSign,
   Wallet,
-  AlertCircle,
-  CheckCircle2,
-  ChevronRight,
   TrendingDown,
   ArrowUpRight,
   Package,
-  Layers,
-  CreditCard,
   X,
-  Sparkles,
-  ChevronDown,
-  ChevronUp,
   Trash2,
-  User,
   Printer,
   Eye,
   CheckCircle,
   Phone,
-  MapPin,
+  FileText,
   Landmark,
-  ArrowRight,
-  Clock,
-  ShieldCheck,
-  RefreshCw,
+  Camera,
+  ExternalLink,
+  UploadCloud,
 } from 'lucide-react';
-
-const pageSize = 12;
 
 function formatDateInput(value: Date) {
   const year = value.getFullYear();
@@ -74,37 +53,22 @@ function formatDateInput(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
-export type PreOrderProductRow = {
-  productId: number | '';
-  productName: string;
-  sku: string;
-  unit: string;
-  quantity: string;
-  unitPrice: string;
-  amount: string;
-  note?: string;
-  searchText?: string;
-  showResults?: boolean;
-};
-
 export function PurchasesPage() {
-  // Main Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'all' | 'preorders' | 'challans' | 'partial' | 'completed' | 'companies' | 'products'>('all');
-  
+  // Main Navigation: 3 Simple Tabs (Invoices, Company Ledger, Payments)
+  const [activeTab, setActiveTab] = useState<'invoices' | 'companies' | 'payments'>('invoices');
+
   // Data Sources
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [payableSummary, setPayableSummary] = useState<CompanyWisePayableSummary[]>([]);
-  const [productSupplies, setProductSupplies] = useState<ProductSupplySummary[]>([]);
   const [payments, setPayments] = useState<PurchasePayment[]>([]);
 
   // Search & Filters
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'FULLY_RECEIVED' | 'PARTIAL'>('ALL');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
 
   // Loading & Notifications
   const [isLoading, setIsLoading] = useState(true);
@@ -112,43 +76,32 @@ export function PurchasesPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
 
-  // Expanded Invoices & Actions
-  const [expandedInvoiceId, setExpandedInvoiceId] = useState<number | null>(null);
-  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  // Simple "Pay Supplier / Bank Draft" Modal
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [payCompanyId, setPayCompanyId] = useState<number | ''>('');
+  const [payAmount, setPayAmount] = useState('');
+  const [payDate, setPayDate] = useState(formatDateInput(new Date()));
+  const [payMethod, setPayMethod] = useState('BANK_DRAFT');
+  const [payRef, setPayRef] = useState('');
+  const [payNote, setPayNote] = useState('');
+  const [payInvoiceImageUrl, setPayInvoiceImageUrl] = useState<string | null>(null);
+  const [payInvoicePublicId, setPayInvoicePublicId] = useState<string | null>(null);
+  const [isUploadingPaySlip, setIsUploadingPaySlip] = useState(false);
+  const [isSubmittingPay, setIsSubmittingPay] = useState(false);
 
-  // -------------------------------------------------------------
-  // 🏦 BUTTON 1: BANK DRAFT / ADVANCE PAYMENT MODAL STATE
-  // -------------------------------------------------------------
-  const [isBankDraftModalOpen, setIsBankDraftModalOpen] = useState(false);
-  const [supplierSearch, setSupplierSearch] = useState('');
-  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<Company | null>(null);
+  // Full-Screen Image Preview Modal
+  const [previewImageModal, setPreviewImageModal] = useState<string | null>(null);
 
-  // Section B: Payment Info
-  const [paymentMethod, setPaymentMethod] = useState<'BANK' | 'CHEQUE' | 'TRANSFER' | 'CASH'>('BANK');
-  const [draftRefNo, setDraftRefNo] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [branchName, setBranchName] = useState('');
-  const [draftDate, setDraftDate] = useState(formatDateInput(new Date()));
-  const [draftAmount, setDraftAmount] = useState('');
-  const [paymentNote, setPaymentNote] = useState('');
-
-  // Section C: Pre-Order Products
-  const [preOrderItems, setPreOrderItems] = useState<PreOrderProductRow[]>([]);
-  const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
-
-  // Post-Save Success Dialog State
-  const [savedDraftResult, setSavedDraftResult] = useState<{
+  // Delete Confirmation Modal
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    type: 'purchase' | 'payment';
     id: number;
-    companyId?: number;
-    draftNo: string;
-    supplierName: string;
-    amount: number;
-    productCount: number;
+    title: string;
+    description: string;
+    details: Array<{ label: string; value: React.ReactNode }>;
   } | null>(null);
-
-  // Full Details Modal for Selected Payment / Pre-Order
-  const [viewingPaymentDetails, setViewingPaymentDetails] = useState<PurchasePayment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useToastNotification({
     message: toastMessage,
@@ -161,9 +114,8 @@ export function PurchasesPage() {
       setIsLoading(true);
       setError(null);
 
-      const [compList, prods, purchaseList, summaryList, prodList, payList] = await Promise.all([
+      const [compList, purchaseList, summaryList, payList] = await Promise.all([
         getCompanies().catch(() => []),
-        getProducts().catch(() => []),
         getPurchases({
           companyId: selectedCompanyId ?? undefined,
           fromDate: fromDate || undefined,
@@ -174,7 +126,6 @@ export function PurchasesPage() {
           fromDate: fromDate || undefined,
           toDate: toDate || undefined,
         }).catch(() => []),
-        getProductSupplySummary(selectedCompanyId ?? undefined).catch(() => []),
         getCompanyPayments({
           companyId: selectedCompanyId ?? undefined,
           fromDate: fromDate || undefined,
@@ -183,10 +134,8 @@ export function PurchasesPage() {
       ]);
 
       setCompanies(compList);
-      setAllProducts(Array.isArray(prods) ? prods : prods?.data || []);
       setPurchases(purchaseList);
       setPayableSummary(summaryList);
-      setProductSupplies(prodList);
       setPayments(payList);
     } catch (err: any) {
       setError(err.message || 'Failed to load purchase data');
@@ -199,7 +148,7 @@ export function PurchasesPage() {
     loadData();
   }, [selectedCompanyId, fromDate, toDate, searchTerm]);
 
-  // Overall Financial KPI Metrics
+  // Financial KPI Metrics (3 Core Numbers)
   const kpiStats = useMemo(() => {
     const totalPurchases = payableSummary.reduce(
       (sum, c) => sum + toNumber(c.totalPurchaseAmount ?? c.totalAmount),
@@ -217,379 +166,180 @@ export function PurchasesPage() {
       (sum, c) => sum + toNumber(c.advanceAmount ?? c.advanceBalance),
       0,
     );
-    const totalInvoices = purchases.length;
-    const totalPreOrders = payments.filter((p) => p.productBreakdown && Array.isArray(p.productBreakdown) && p.productBreakdown.length > 0).length;
 
     return {
       totalPurchases,
       totalPaid,
       totalPayable,
       totalAdvance,
-      totalInvoices,
-      totalPreOrders,
-      totalCompanies: payableSummary.length,
     };
-  }, [payableSummary, purchases, payments]);
+  }, [payableSummary]);
 
-  // -------------------------------------------------------------
-  // 🔍 MODAL LOGIC: BANK DRAFT & PRE-ORDER
-  // -------------------------------------------------------------
-  const openBankDraftModal = (company?: Company) => {
-    if (company) {
-      setSelectedSupplier(company);
-      setSupplierSearch(company.name);
-    } else if (selectedCompanyId) {
-      const match = companies.find((c) => c.id === selectedCompanyId);
-      if (match) {
-        setSelectedSupplier(match);
-        setSupplierSearch(match.name);
-      } else {
-        setSelectedSupplier(null);
-        setSupplierSearch('');
-      }
-    } else {
-      setSelectedSupplier(null);
-      setSupplierSearch('');
-    }
-
-    setPaymentMethod('BANK');
-    setDraftRefNo('');
-    setBankName('Sonali Bank');
-    setBranchName('');
-    setDraftDate(formatDateInput(new Date()));
-    setDraftAmount('');
-    setPaymentNote('');
-    setPreOrderItems([
-      {
-        productId: '',
-        productName: '',
-        sku: '',
-        unit: 'Pcs',
-        quantity: '1',
-        unitPrice: '',
-        amount: '',
-        note: '',
-        searchText: '',
-        showResults: false,
-      },
-    ]);
-    setShowSupplierDropdown(false);
-    setSavedDraftResult(null);
-    setIsBankDraftModalOpen(true);
-  };
-
-  const handleSelectSupplier = (comp: Company) => {
-    setSelectedSupplier(comp);
-    setSupplierSearch(comp.name);
-    setShowSupplierDropdown(false);
-  };
-
-  const handleAddPreOrderRow = () => {
-    setPreOrderItems((prev) => [
-      ...prev,
-      {
-        productId: '',
-        productName: '',
-        sku: '',
-        unit: 'Pcs',
-        quantity: '1',
-        unitPrice: '',
-        amount: '',
-        note: '',
-        searchText: '',
-        showResults: false,
-      },
-    ]);
-  };
-
-  const handleRemovePreOrderRow = (index: number) => {
-    setPreOrderItems((prev) => {
-      const updated = prev.filter((_, i) => i !== index);
-      recalculateDraftAmount(updated);
-      return updated;
-    });
-  };
-
-  const handleSelectPreOrderProduct = (index: number, product: Product) => {
-    // If no supplier selected yet, auto-select product's supplier
-    if (!selectedSupplier && product.companyId) {
-      const comp = companies.find((c) => c.id === product.companyId);
-      if (comp) {
-        setSelectedSupplier(comp);
-        setSupplierSearch(comp.name);
-      }
-    }
-
-    setPreOrderItems((prev) => {
-      const updated = [...prev];
-      const target = { ...updated[index] };
-      target.productId = product.id;
-      target.productName = product.name;
-      target.sku = product.sku || '';
-      target.unit = product.unit || 'Pcs';
-      target.searchText = product.name;
-      target.showResults = false;
-      target.unitPrice =
-        product.buyPrice !== undefined && product.buyPrice !== null
-          ? String(toNumber(product.buyPrice))
-          : target.unitPrice || '';
-
-      if (!target.quantity || target.quantity === '0') {
-        target.quantity = '1';
-      }
-
-      const q = parseFloat(target.quantity || '0');
-      const p = parseFloat(target.unitPrice || '0');
-      if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
-        const total = q * p;
-        target.amount = total % 1 === 0 ? total.toString() : total.toFixed(2);
-      }
-
-      updated[index] = target;
-      recalculateDraftAmount(updated);
-      return updated;
-    });
-  };
-
-  const handleUpdatePreOrderRow = (
-    index: number,
-    field: keyof PreOrderProductRow,
-    value: any,
-  ) => {
-    setPreOrderItems((prev) => {
-      const updated = [...prev];
-      const target = { ...updated[index], [field]: value };
-
-      if (field === 'searchText') {
-        target.searchText = value;
-        target.showResults = true;
-        if (value && typeof value === 'string') {
-          const trimmed = value.trim().toLowerCase();
-          if (trimmed.length > 0) {
-            const matched = allProducts.find(
-              (p) =>
-                p.name?.toLowerCase().trim() === trimmed ||
-                p.sku?.toLowerCase().trim() === trimmed ||
-                p.name?.toLowerCase().trim().startsWith(trimmed),
-            );
-            if (matched) {
-              target.productId = matched.id;
-              target.productName = matched.name;
-              target.sku = matched.sku || '';
-              target.unit = matched.unit || 'Pcs';
-              if (matched.buyPrice !== undefined && matched.buyPrice !== null) {
-                target.unitPrice = String(toNumber(matched.buyPrice));
-              }
-              const q = parseFloat(target.quantity || '1');
-              const p = parseFloat(target.unitPrice || '0');
-              if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
-                const total = q * p;
-                target.amount = total % 1 === 0 ? total.toString() : total.toFixed(2);
-              }
-            }
-          }
-        }
-      } else if (field === 'quantity' || field === 'unitPrice') {
-        const q = parseFloat(field === 'quantity' ? value : target.quantity || '0');
-        const p = parseFloat(field === 'unitPrice' ? value : target.unitPrice || '0');
-        if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
-          const total = q * p;
-          target.amount = total % 1 === 0 ? total.toString() : total.toFixed(2);
-        } else {
-          target.amount = '';
-        }
-      }
-
-      updated[index] = target;
-      recalculateDraftAmount(updated);
-      return updated;
-    });
-  };
-
-  const recalculateDraftAmount = (rows: PreOrderProductRow[]) => {
-    const totalVal = rows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
-    if (totalVal > 0) {
-      setDraftAmount(totalVal % 1 === 0 ? totalVal.toString() : totalVal.toFixed(2));
-    }
-  };
-
-  // Section C/D Totals
-  const preOrderTotalAmount = useMemo(() => {
-    return preOrderItems.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
-  }, [preOrderItems]);
-
-  const preOrderTotalQuantity = useMemo(() => {
-    return preOrderItems.reduce((sum, row) => sum + (parseFloat(row.quantity || '0') || 0), 0);
-  }, [preOrderItems]);
-
-  const effectiveDraftAmountNum = parseFloat(draftAmount || '0') || 0;
-  const draftAdvanceBalance = Math.max(0, effectiveDraftAmountNum);
-
-  // Submit Bank Draft / Pre-Order
-  const handleSubmitBankDraft = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedSupplier) {
-      setToastTone('error');
-      setToastMessage('Please select a supplier / company');
-      return;
-    }
-
-    const amt = parseFloat(draftAmount);
-    if (isNaN(amt) || amt <= 0) {
-      setToastTone('error');
-      setToastMessage('Please enter a valid payment amount (1 or more)');
-      return;
-    }
-
-    const validBreakdown = preOrderItems
-      .filter((row) => (row.productId || row.productName || row.searchText) && parseFloat(row.quantity || '0') > 0)
-      .map((row) => {
-        const q = parseFloat(row.quantity || '1');
-        const p = parseFloat(row.unitPrice || '0');
-        const calculatedAmt = !isNaN(q) && !isNaN(p) && q > 0 && p >= 0 ? q * p : parseFloat(row.amount || '0') || 0;
-
-        return {
-          productId: row.productId ? Number(row.productId) : undefined,
-          productName: row.productName || row.searchText || 'Product',
-          sku: row.sku || undefined,
-          unit: row.unit || 'Pcs',
-          quantity: q,
-          unitPrice: p,
-          amount: calculatedAmt,
-          note: row.note?.trim() || undefined,
-        };
-      });
-
-    if (validBreakdown.length === 0) {
-      setToastTone('error');
-      setToastMessage('Please add at least 1 product with a valid quantity for pre-order');
-      return;
-    }
-
-    try {
-      setIsSubmittingDraft(true);
-      const res = await recordCompanyPayment(selectedSupplier.id, {
-        amount: amt,
-        paymentDate: draftDate,
-        paymentMethod,
-        bankName: paymentMethod === 'BANK' ? bankName.trim() : undefined,
-        branchName: paymentMethod === 'BANK' ? branchName.trim() : undefined,
-        transactionRef: draftRefNo.trim() || undefined,
-        note: paymentNote.trim() || undefined,
-        productBreakdown: validBreakdown,
-      });
-
-      setSavedDraftResult({
-        id: res.id,
-        companyId: selectedSupplier.id,
-        draftNo: draftRefNo.trim() || `BD-${res.id}`,
-        supplierName: selectedSupplier.name,
-        amount: amt,
-        productCount: validBreakdown.length,
-      });
-
-      setToastTone('success');
-      setToastMessage('✅ Bank draft and pre-order saved successfully!');
-      await loadData();
-    } catch (err: any) {
-      setToastTone('error');
-      setToastMessage(err.message || 'Failed to save bank draft');
-    } finally {
-      setIsSubmittingDraft(false);
-    }
-  };
-
-  // -------------------------------------------------------------
-  // 📋 TAB DATA FILTERING
-  // -------------------------------------------------------------
-  const filteredPurchasesList = useMemo(() => {
+  // Filtered Purchases List
+  const filteredPurchases = useMemo(() => {
     return purchases.filter((p) => {
       if (selectedCompanyId && p.companyId !== selectedCompanyId) return false;
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        const matchInv = p.invoiceNo?.toLowerCase().includes(term);
-        const matchRef = p.referenceNo?.toLowerCase().includes(term);
-        const matchSup = p.supplierName?.toLowerCase().includes(term);
-        const matchComp = p.company?.name?.toLowerCase().includes(term);
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        const matchInv = p.invoiceNo?.toLowerCase().includes(q);
+        const matchRef = p.referenceNo?.toLowerCase().includes(q);
+        const matchSup = p.supplierName?.toLowerCase().includes(q);
+        const matchComp = p.company?.name?.toLowerCase().includes(q);
         if (!matchInv && !matchRef && !matchSup && !matchComp) return false;
       }
 
       const totalVal = toNumber(p.totalAmount);
       const paidVal = toNumber(p.paidAmount);
+      const isComplete = p.status === 'CONFIRMED' || Math.abs(totalVal - paidVal) < 0.01;
 
-      if (activeTab === 'partial') {
-        // Partially received or has due/advance difference
-        return paidVal > totalVal || (paidVal > 0 && totalVal > paidVal);
-      }
-      if (activeTab === 'completed') {
-        // Fully received and settled
-        return p.status === 'CONFIRMED' || (totalVal > 0 && Math.abs(totalVal - paidVal) < 0.01);
-      }
+      if (statusFilter === 'FULLY_RECEIVED' && !isComplete) return false;
+      if (statusFilter === 'PARTIAL' && isComplete) return false;
+
       return true;
     });
-  }, [purchases, selectedCompanyId, searchTerm, activeTab]);
+  }, [purchases, selectedCompanyId, searchTerm, statusFilter]);
 
-  const filteredPreOrdersList = useMemo(() => {
+  // Filtered Payments List
+  const filteredPayments = useMemo(() => {
     return payments.filter((pay) => {
       if (selectedCompanyId && pay.companyId !== selectedCompanyId) return false;
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        const matchComp = pay.company?.name?.toLowerCase().includes(term);
-        const matchRef = pay.transactionRef?.toLowerCase().includes(term);
-        const matchNote = pay.note?.toLowerCase().includes(term);
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        const matchComp = pay.company?.name?.toLowerCase().includes(q);
+        const matchRef = pay.transactionRef?.toLowerCase().includes(q);
+        const matchNote = pay.note?.toLowerCase().includes(q);
         if (!matchComp && !matchRef && !matchNote) return false;
       }
       return true;
     });
   }, [payments, selectedCompanyId, searchTerm]);
 
-  // Delete Confirmation Modal State
-  const [deleteModal, setDeleteModal] = useState<{
-    isOpen: boolean;
-    type: 'purchase' | 'payment';
-    id: number;
-    title: string;
-    description: string;
-    details: Array<{ label: string; value: React.ReactNode }>;
-  } | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Filtered Companies Summary
+  const filteredCompanies = useMemo(() => {
+    return payableSummary.filter((c) => {
+      if (selectedCompanyId && c.companyId !== selectedCompanyId) return false;
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        const matchName = c.companyName?.toLowerCase().includes(q);
+        const matchCode = c.companyCode?.toLowerCase().includes(q);
+        if (!matchName && !matchCode) return false;
+      }
+      return true;
+    });
+  }, [payableSummary, selectedCompanyId, searchTerm]);
 
-  // Trigger Delete Purchase Modal
+  // Open Simple Payment Modal
+  const openPayModal = (companyId?: number, suggestedAmount?: number) => {
+    setPayCompanyId(companyId || (companies[0]?.id ?? ''));
+    if (suggestedAmount && suggestedAmount > 0) {
+      setPayAmount(String(suggestedAmount));
+    } else if (companyId) {
+      const comp = payableSummary.find((c) => c.companyId === companyId);
+      const due = toNumber(comp?.totalPayableAmount ?? comp?.totalPayable);
+      setPayAmount(due > 0 ? String(due) : '');
+    } else {
+      setPayAmount('');
+    }
+    setPayDate(formatDateInput(new Date()));
+    setPayMethod('BANK_DRAFT');
+    setPayRef('');
+    setPayNote('');
+    setPayInvoiceImageUrl(null);
+    setPayInvoicePublicId(null);
+    setIsPayModalOpen(true);
+  };
+
+  const handleUploadPaySlip = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingPaySlip(true);
+      const res = await uploadPurchaseInvoiceFile(file);
+      setPayInvoiceImageUrl(res.url);
+      setPayInvoicePublicId(res.publicId);
+      setToastTone('success');
+      setToastMessage('Bank slip photo uploaded to Cloudinary!');
+    } catch (err: any) {
+      setToastTone('error');
+      setToastMessage(err.message || 'Failed to upload bank slip');
+    } finally {
+      setIsUploadingPaySlip(false);
+    }
+  };
+
+  // Submit Simple Payment
+  const handleSavePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payCompanyId) {
+      setToastTone('error');
+      setToastMessage('Please select a supplier company.');
+      return;
+    }
+    const amt = parseFloat(payAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setToastTone('error');
+      setToastMessage('Please enter a valid payment amount greater than 0.');
+      return;
+    }
+
+    try {
+      setIsSubmittingPay(true);
+      await recordCompanyPayment(Number(payCompanyId), {
+        amount: amt,
+        paymentDate: payDate,
+        paymentMethod: payMethod,
+        transactionRef: payRef.trim() || undefined,
+        note: payNote.trim() || undefined,
+        invoiceImageUrl: payInvoiceImageUrl || undefined,
+        invoiceImagePublicId: payInvoicePublicId || undefined,
+      });
+
+      setToastTone('success');
+      setToastMessage(`Bank draft / advance of ${formatCurrency(amt)} recorded successfully.`);
+      setIsPayModalOpen(false);
+      await loadData();
+    } catch (err: any) {
+      setToastTone('error');
+      setToastMessage(err.message || 'Failed to record payment');
+    } finally {
+      setIsSubmittingPay(false);
+    }
+  };
+
+  // Delete Prompt
   const promptDeletePurchase = (p: Purchase) => {
     setDeleteModal({
       isOpen: true,
       type: 'purchase',
       id: p.id,
-      title: 'Are you sure you want to delete this invoice?',
-      description: 'Deleting this invoice will permanently remove it from purchase records and update stock.',
+      title: 'Delete this purchase invoice?',
+      description: 'This invoice will be removed from purchase records.',
       details: [
         { label: 'Challan / Invoice No', value: `#${p.invoiceNo || p.referenceNo || p.id}` },
-        { label: 'Company / Supplier', value: p.company?.name || p.supplierName || 'N/A' },
-        { label: 'Challan Date', value: formatDate(p.purchaseDate) },
+        { label: 'Supplier', value: p.company?.name || p.supplierName || 'N/A' },
+        { label: 'Date', value: formatDate(p.purchaseDate) },
         { label: 'Total Amount', value: formatCurrency(p.totalAmount) },
       ],
     });
   };
 
-  // Trigger Delete Payment Modal
   const promptDeletePayment = (pay: PurchasePayment) => {
     setDeleteModal({
       isOpen: true,
       type: 'payment',
       id: pay.id,
-      title: 'Delete Advance Payment / Draft Record?',
-      description: 'This bank draft or advance payment record will be permanently deleted.',
+      title: 'Delete payment record?',
+      description: 'This payment record will be permanently deleted.',
       details: [
-        { label: 'Draft / Transaction No', value: pay.transactionRef || `BD-${pay.id}` },
-        { label: 'Company', value: pay.company?.name || 'N/A' },
+        { label: 'Slip / Ref No', value: pay.transactionRef || `#PAY-${pay.id}` },
+        { label: 'Supplier', value: pay.company?.name || 'N/A' },
         { label: 'Date', value: formatDate(pay.paymentDate) },
         { label: 'Payment Amount', value: formatCurrency(pay.amount) },
       ],
     });
   };
 
-  // Execute Deletion
   const handleConfirmDelete = async () => {
     if (!deleteModal) return;
     try {
@@ -597,11 +347,11 @@ export function PurchasesPage() {
       if (deleteModal.type === 'purchase') {
         await deletePurchase(deleteModal.id);
         setToastTone('success');
-        setToastMessage('Challan deleted successfully');
+        setToastMessage('Purchase invoice deleted successfully.');
       } else {
         await deleteCompanyPayment(deleteModal.id);
         setToastTone('success');
-        setToastMessage('Draft record deleted successfully');
+        setToastMessage('Payment record deleted successfully.');
       }
       setDeleteModal(null);
       await loadData();
@@ -613,173 +363,205 @@ export function PurchasesPage() {
     }
   };
 
+  const hasActiveFilters = Boolean(searchTerm || selectedCompanyId || statusFilter !== 'ALL' || fromDate || toDate);
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCompanyId(null);
+    setStatusFilter('ALL');
+    setFromDate('');
+    setToDate('');
+  };
+
   return (
     <div className="space-y-6 pb-20 text-slate-800">
-      {/* ============================================================== */}
-      {/* 2. PURCHASE PAGE HEADER                                         */}
-      {/* ============================================================== */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white shadow-xl">
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 backdrop-blur-md">
-              <Building2 className="h-3.5 w-3.5" />
-              <span>Purchases & Supplier Reconciliation</span>
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-                <span>Purchase Management</span>
-                <span className="text-lg sm:text-xl font-normal text-indigo-300 font-sans tracking-normal">(Purchase Management)</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed font-medium">
-                Advance payments, pre-orders, invoice receipt and stock-in management
-              </p>
-            </div>
+      {/* 🌟 1. CLEAN, MODERN HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-1">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            Purchases & Suppliers
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Manage product deliveries, company bills, and payment records
+          </p>
+        </div>
 
-            {/* Quick Metrics Badges */}
-            <div className="flex items-center gap-2.5 pt-2 flex-wrap text-xs font-bold">
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-slate-200 backdrop-blur-md border border-white/10">
-                <FileText className="h-3.5 w-3.5 text-amber-400" />
-                <span>Total Invoices: <b className="text-white">{kpiStats.totalInvoices}</b></span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-slate-200 backdrop-blur-md border border-white/10">
-                <Wallet className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Pre-Order Drafts: <b className="text-white">{kpiStats.totalPreOrders}</b></span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-slate-200 backdrop-blur-md border border-white/10">
-                <Building2 className="h-3.5 w-3.5 text-indigo-400" />
-                <span>Companies: <b className="text-white">{kpiStats.totalCompanies}</b></span>
-              </span>
-            </div>
-          </div>
-
-          {/* PRIMARY ACTION BUTTON */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-            {/* Money Goes to Supplier: Bank Draft / Advance Payment */}
-            <button
-              onClick={() => openBankDraftModal()}
-              className="group relative inline-flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-6 py-4 text-xs sm:text-sm font-black text-white shadow-xl shadow-emerald-950/40 transition-all hover:scale-[1.02] active:scale-95 border border-emerald-400/30"
-            >
-              <div className="rounded-xl bg-white/20 p-1.5">
-                <Wallet className="h-5 w-5 text-white" />
-              </div>
-              <div className="text-left">
-                <div className="font-black text-white leading-tight">🏦 Bank Draft / Advance Payment</div>
-                <div className="text-[11px] font-semibold text-emerald-100">Pre-orders & advance booking</div>
-              </div>
-            </button>
-          </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => openPayModal()}
+            className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95"
+            title="Pay company first via bank draft before receiving product"
+          >
+            <Landmark className="h-4 w-4" />
+            <span>Bank Draft / Pay Advance</span>
+          </button>
+          <Link
+            href="/purchases/create"
+            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95"
+            title="Receive product delivery against bank draft"
+          >
+            <Package className="h-4 w-4" />
+            <span>Receive Products</span>
+          </Link>
         </div>
       </div>
 
-      {/* ============================================================== */}
-      {/* 📊 4 TOP FINANCIAL KPI CARDS                                   */}
-      {/* ============================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Goods Received */}
+      {/* 📊 2. THE 3 CORE FINANCIAL CARDS (Products Received | Money Paid | Net Balance) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Card 1: Products Received */}
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Total Goods Received
+              Products Received
             </span>
-            <div className="rounded-2xl bg-indigo-50 p-2.5 text-indigo-600 shrink-0">
+            <div className="rounded-2xl bg-indigo-50 p-2.5 text-indigo-600">
               <Package className="h-5 w-5" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-black text-slate-900">
+          <p className="mt-3 text-2xl sm:text-3xl font-black text-slate-900">
             {formatCurrency(kpiStats.totalPurchases)}
           </p>
-          <p className="mt-1 text-xs text-slate-400 font-medium">
-            Total received goods value across all invoices
+          <p className="mt-1 text-xs text-slate-500 font-medium">
+            Total goods value delivered by suppliers
           </p>
         </div>
 
-        {/* Card 2: Total Advance / Paid */}
+        {/* Card 2: Money Paid */}
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Total Paid Drafts
+              Money Paid
             </span>
-            <div className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-600 shrink-0">
-              <CheckCircle2 className="h-5 w-5" />
+            <div className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-600">
+              <CheckCircle className="h-5 w-5" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-black text-emerald-600">
+          <p className="mt-3 text-2xl sm:text-3xl font-black text-emerald-600">
             {formatCurrency(kpiStats.totalPaid)}
           </p>
-          <p className="mt-1 text-xs text-slate-400 font-medium">
-            Total advance drafts and payments to suppliers
+          <p className="mt-1 text-xs text-slate-500 font-medium">
+            Total money paid to suppliers to date
           </p>
         </div>
 
-        {/* Card 3: Our Advance Balance */}
-        <div className="rounded-3xl border border-sky-200 bg-sky-50/50 p-5 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-sky-700">
-              Supplier Advance Balance
-            </span>
-            <div className="rounded-2xl bg-sky-100 p-2.5 text-sky-600 shrink-0">
-              <Wallet className="h-5 w-5" />
+        {/* Card 3: Net Balance */}
+        {kpiStats.totalAdvance > 0 ? (
+          <div className="rounded-3xl border border-sky-300 bg-gradient-to-br from-sky-50 to-white p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-sky-800">
+                Supplier Advance Balance
+              </span>
+              <div className="rounded-2xl bg-sky-100 p-2.5 text-sky-700">
+                <Wallet className="h-5 w-5" />
+              </div>
             </div>
+            <p className="mt-3 text-2xl sm:text-3xl font-black text-sky-700">
+              {formatCurrency(kpiStats.totalAdvance)}
+            </p>
+            <p className="mt-1 text-xs text-sky-700 font-medium">
+              We paid extra; suppliers owe us products or refund
+            </p>
           </div>
-          <p className="mt-3 text-2xl font-black text-sky-700">
-            {formatCurrency(kpiStats.totalAdvance)}
-          </p>
-          <p className="mt-1 text-xs text-sky-700/80 font-medium">
-            Advance credit balance remaining with suppliers
-          </p>
-        </div>
-
-        {/* Card 4: Supplier Payable */}
-        <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-5 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
-              Company Outstanding Due
-            </span>
-            <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-600 shrink-0">
-              <TrendingDown className="h-5 w-5" />
+        ) : kpiStats.totalPayable > 0 ? (
+          <div className="rounded-3xl border border-rose-300 bg-gradient-to-br from-rose-50 to-white p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
+                Supplier Due (Payable)
+              </span>
+              <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-600">
+                <TrendingDown className="h-5 w-5" />
+              </div>
             </div>
+            <p className="mt-3 text-2xl sm:text-3xl font-black text-rose-600">
+              {formatCurrency(kpiStats.totalPayable)}
+            </p>
+            <p className="mt-1 text-xs text-rose-600/90 font-medium">
+              Outstanding payable balance to pay to suppliers
+            </p>
           </div>
-          <p className="mt-3 text-2xl font-black text-rose-600">
-            {formatCurrency(kpiStats.totalPayable)}
-          </p>
-          <p className="mt-1 text-xs text-rose-600/80 font-medium">
-            Outstanding balance payable to suppliers
-          </p>
-        </div>
+        ) : (
+          <div className="rounded-3xl border border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                All Suppliers Settled
+              </span>
+              <div className="rounded-2xl bg-emerald-100 p-2.5 text-emerald-700">
+                <CheckCircle className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-3 text-2xl sm:text-3xl font-black text-emerald-700">
+              ৳0
+            </p>
+            <p className="mt-1 text-xs text-emerald-600 font-medium">
+              No outstanding due or advance with any company
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* ============================================================== */}
-      {/* 🔍 SEARCH & FILTERS BAR                                         */}
-      {/* ============================================================== */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+      {/* 🧭 3. THREE SIMPLE TABS */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('invoices')}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'invoices'
+              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Package className="h-4 w-4" />
+          <span>Purchases & Invoices ({purchases.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('companies')}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'companies'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Building2 className="h-4 w-4" />
+          <span>Company Ledger ({payableSummary.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('payments')}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
+            activeTab === 'payments'
+              ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Wallet className="h-4 w-4" />
+          <span>Payment History ({payments.length})</span>
+        </button>
+      </div>
+
+      {/* 🔍 4. CLEAN, COMPACT FILTER BAR */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-3.5 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5">
           {/* Search */}
           <div className="sm:col-span-2 lg:col-span-4 relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Search (company, draft no, challan no, product)..."
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search supplier, challan no, note..."
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all"
             />
           </div>
 
           {/* Supplier Dropdown */}
-          <div className="sm:col-span-1 lg:col-span-4 relative">
-            <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <div className="sm:col-span-1 lg:col-span-3 relative">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <select
               value={selectedCompanyId ?? ''}
-              onChange={(e) => {
-                setSelectedCompanyId(e.target.value ? Number(e.target.value) : null);
-                setCurrentPage(1);
-              }}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all truncate"
+              onChange={(e) => setSelectedCompanyId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all truncate"
             >
-              <option value="">🏢 All Suppliers / Companies</option>
+              <option value="">All Suppliers</option>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} {c.code ? `(${c.code})` : ''}
@@ -788,39 +570,42 @@ export function PurchasesPage() {
             </select>
           </div>
 
+          {/* Status Filter (When on Invoices Tab) */}
+          {activeTab === 'invoices' && (
+            <div className="sm:col-span-1 lg:col-span-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+              >
+                <option value="ALL">All Status</option>
+                <option value="FULLY_RECEIVED">Fully Received</option>
+                <option value="PARTIAL">Partially Received</option>
+              </select>
+            </div>
+          )}
+
           {/* Date Range */}
-          <div className="sm:col-span-1 lg:col-span-4 flex items-center gap-2">
+          <div className={`sm:col-span-2 ${activeTab === 'invoices' ? 'lg:col-span-3' : 'lg:col-span-5'} flex items-center gap-1.5`}>
             <input
               type="date"
               value={fromDate}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2 px-2.5 text-xs font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
               title="Start Date"
             />
-            <span className="text-slate-400 text-xs font-bold">to</span>
+            <span className="text-slate-400 text-xs">to</span>
             <input
               type="date"
               value={toDate}
-              onChange={(e) => {
-                setToDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2 px-2.5 text-xs font-medium focus:border-indigo-500 focus:bg-white focus:outline-none"
               title="End Date"
             />
-            {(selectedCompanyId || fromDate || toDate || searchTerm) && (
+            {hasActiveFilters && (
               <button
-                onClick={() => {
-                  setSelectedCompanyId(null);
-                  setFromDate('');
-                  setToDate('');
-                  setSearchTerm('');
-                  setCurrentPage(1);
-                }}
-                className="rounded-2xl border border-rose-200 bg-rose-50 p-2.5 text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
+                onClick={clearFilters}
+                className="rounded-2xl border border-rose-200 bg-rose-50 p-2 text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
                 title="Clear filters"
               >
                 <FilterX className="h-4 w-4" />
@@ -830,418 +615,184 @@ export function PurchasesPage() {
         </div>
       </div>
 
-      {/* ============================================================== */}
-      {/* 15. FILTER TABS (EXACT MATCH FOR USER PROMPT)                   */}
-      {/* ============================================================== */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-        <button
-          onClick={() => {
-            setActiveTab('all');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
-            activeTab === 'all'
-              ? 'bg-slate-900 text-white shadow-md'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <span>All Records</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('preorders');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
-            activeTab === 'preorders'
-              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Wallet className="h-4 w-4 text-emerald-500" />
-          <span>🏦 Pre-Orders ({filteredPreOrdersList.length})</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('challans');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
-            activeTab === 'challans'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Package className="h-4 w-4 text-indigo-500" />
-          <span>📦 Invoices ({filteredPurchasesList.length})</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('partial');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
-            activeTab === 'partial'
-              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
-          <span>🟡 Partially Received</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('completed');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
-            activeTab === 'completed'
-              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
-          <span>🟢 Fully Received</span>
-        </button>
-
-        <div className="h-6 w-px bg-slate-300 mx-1 shrink-0"></div>
-
-        <button
-          onClick={() => {
-            setActiveTab('companies');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
-            activeTab === 'companies'
-              ? 'bg-slate-800 text-white shadow-md'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Building2 className="h-4 w-4 text-slate-500" />
-          <span>🏢 Company Ledger</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('products');
-            setCurrentPage(1);
-          }}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all shrink-0 ${
-            activeTab === 'products'
-              ? 'bg-slate-800 text-white shadow-md'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Layers className="h-4 w-4 text-slate-500" />
-          <span>📊 Product Breakdown</span>
-        </button>
-      </div>
-
-      {/* ============================================================== */}
-      {/* 📑 MAIN DATA TABLES (EXACT REQUIREMENTS)                       */}
-      {/* ============================================================== */}
+      {/* 📋 5. MAIN CONTENT AREA */}
       {isLoading ? (
         <LoadingBlock
-          label="Loading purchases and invoices..."
-          subLabel="Please wait, loading ledger entries and stock reconciliation data..."
+          label="Loading Purchases..."
+          subLabel="Fetching invoices and supplier records..."
         />
       ) : (
         <>
-          {/* TAB 1: ALL / CHALLANS / PARTIAL / COMPLETED PURCHASES TABLE */}
-          {(activeTab === 'all' || activeTab === 'challans' || activeTab === 'partial' || activeTab === 'completed') && (
-            <div className="space-y-4">
-              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
-                    <thead className="bg-slate-50/80 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
-                      <tr>
-                        <th className="py-3.5 px-4 text-left">Date</th>
-                        <th className="py-3.5 px-4 text-left">Supplier / Company</th>
-                        <th className="py-3.5 px-4 text-left">Draft / Challan No</th>
-                        <th className="py-3.5 px-4 text-right">Order Value</th>
-                        <th className="py-3.5 px-4 text-right">Received Value</th>
-                        <th className="py-3.5 px-4 text-right">Advance Remaining</th>
-                        <th className="py-3.5 px-4 text-center">Status</th>
-                        <th className="py-3.5 px-4 text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {filteredPurchasesList.map((p) => {
-                        const totalReceived = toNumber(p.totalAmount);
-                        const totalPaid = toNumber(p.paidAmount);
-                        const advanceRemaining = Math.max(0, totalPaid - totalReceived);
-                        const dueRemaining = Math.max(0, totalReceived - totalPaid);
-                        const isConfirmed = p.status === 'CONFIRMED';
-                        const isFullyReceived = Math.abs(totalReceived - totalPaid) < 0.01 && totalReceived > 0;
+          {/* TAB 1: PURCHASES & INVOICES */}
+          {activeTab === 'invoices' && (
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-100 text-xs sm:text-sm">
+                  <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Date</th>
+                      <th className="py-3 px-4 text-left">Supplier</th>
+                      <th className="py-3 px-4 text-left">Challan / Invoice</th>
+                      <th className="py-3 px-4 text-right text-indigo-900">Bill Amount</th>
+                      <th className="py-3 px-4 text-right text-emerald-700">Paid Amount</th>
+                      <th className="py-3 px-4 text-right">Balance</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-4 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {filteredPurchases.map((p) => {
+                      const totalBill = toNumber(p.totalAmount);
+                      const paidAmt = toNumber(p.paidAmount);
+                      const dueAmt = Math.max(0, totalBill - paidAmt);
+                      const advanceAmt = Math.max(0, paidAmt - totalBill);
+                      const isComplete = p.status === 'CONFIRMED' || Math.abs(totalBill - paidAmt) < 0.01;
 
-                        return (
-                          <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
-                            {/* Date */}
-                            <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
-                              {formatDate(p.purchaseDate)}
-                              <div className="text-[10px] text-slate-400 font-normal">
-                                {formatDateTime(p.createdAt)}
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                          {/* Date */}
+                          <td className="py-3.5 px-4 font-semibold text-slate-800 whitespace-nowrap">
+                            {formatDate(p.purchaseDate)}
+                          </td>
+
+                          {/* Supplier */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900">
+                              {p.company?.name || p.supplierName || 'Company'}
+                            </div>
+                            {p.company?.phone && (
+                              <div className="text-[11px] text-slate-400">
+                                {p.company.phone}
                               </div>
-                            </td>
+                            )}
+                          </td>
 
-                            {/* Supplier */}
-                            <td className="py-3.5 px-4">
-                              <div className="font-bold text-slate-900">
-                                {p.company?.name || p.supplierName || 'Company'}
-                              </div>
-                              {p.company?.phone && (
-                                <div className="text-[11px] text-slate-400">
-                                  📞 {p.company.phone}
-                                </div>
-                              )}
-                            </td>
-
-                            {/* Draft / Challan No */}
-                            <td className="py-3.5 px-4">
-                              <span className="font-mono font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md">
+                          {/* Challan No & Document Badge */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-indigo-900">
                                 #{p.invoiceNo || p.referenceNo || p.id}
                               </span>
-                              {p.supplierInvoiceNo && (
-                                <div className="text-[10px] text-slate-500 mt-0.5">
-                                  Invoice: {p.supplierInvoiceNo}
-                                </div>
-                              )}
-                            </td>
-
-                            {/* Order Value */}
-                            <td className="py-3.5 px-4 text-right font-bold text-slate-700 whitespace-nowrap">
-                              {formatCurrency(totalPaid > 0 ? totalPaid : totalReceived)}
-                            </td>
-
-                            {/* Received Value */}
-                            <td className="py-3.5 px-4 text-right font-black text-indigo-950 whitespace-nowrap">
-                              {formatCurrency(totalReceived)}
-                            </td>
-
-                            {/* Advance Remaining */}
-                            <td className="py-3.5 px-4 text-right font-black whitespace-nowrap">
-                              {advanceRemaining > 0 ? (
-                                <span className="text-sky-700 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200">
-                                  {formatCurrency(advanceRemaining)}
-                                </span>
-                              ) : dueRemaining > 0 ? (
-                                <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
-                                  Due: {formatCurrency(dueRemaining)}
-                                </span>
-                              ) : (
-                                <span className="text-emerald-700 font-bold">0.00</span>
-                              )}
-                            </td>
-
-                            {/* Receiving Status */}
-                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                              {isFullyReceived || (isConfirmed && advanceRemaining === 0) ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
-                                  <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                                  <span>🟢 Fully Received</span>
-                                </span>
-                              ) : advanceRemaining > 0 ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-200">
-                                  <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-                                  <span>🟡 Partially Received</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                                  <span>Stock In Complete</span>
-                                </span>
-                              )}
-                            </td>
-
-                            {/* Actions */}
-                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <Link
-                                  href={`/purchases/${p.id}`}
-                                  className="inline-flex items-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 transition-colors"
-                                  title="View challan details"
-                                >
-                                  <Eye className="h-3.5 w-3.5" />
-                                  <span>👁️ View</span>
-                                </Link>
-
-                                <Link
-                                  href={`/purchases/${p.id}/print-challan`}
-                                  target="_blank"
-                                  className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:scale-105"
-                                  title="Print A4 Challan Voucher"
-                                >
-                                  <Printer className="h-3.5 w-3.5" />
-                                  <span>🖨️ Print</span>
-                                </Link>
-
+                              {p.invoiceImageUrl && (
                                 <button
                                   type="button"
-                                  onClick={() => promptDeletePurchase(p)}
-                                  className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                  title="Delete challan"
+                                  onClick={() => setPreviewImageModal(p.invoiceImageUrl!)}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
+                                  title="View uploaded company memo / invoice"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <Camera className="h-3 w-3" />
+                                  <span>Memo</span>
                                 </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {filteredPurchasesList.length === 0 && (
-                  <div className="p-12 text-center">
-                    <StateMessage
-                      title="No challans found"
-                      description="Click 'Receive Challan & Stock In' above to add a new challan."
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: 🏦 PRE-ORDERS & ADVANCE PAYMENTS LIST */}
-          {activeTab === 'preorders' && (
-            <div className="space-y-4">
-              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
-                    <thead className="bg-slate-50/80 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
-                      <tr>
-                        <th className="py-3.5 px-4 text-left">Date</th>
-                        <th className="py-3.5 px-4 text-left">Company / Supplier</th>
-                        <th className="py-3.5 px-4 text-left">Payment / Ref No</th>
-                        <th className="py-3.5 px-4 text-left">Method / Bank</th>
-                        <th className="py-3.5 px-4 text-center">Pre-Ordered Products</th>
-                        <th className="py-3.5 px-4 text-right">Advance Paid (৳)</th>
-                        <th className="py-3.5 px-4 text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {filteredPreOrdersList.map((pay) => {
-                        const breakdown = Array.isArray(pay.productBreakdown)
-                          ? pay.productBreakdown
-                          : typeof pay.productBreakdown === 'string'
-                          ? JSON.parse(pay.productBreakdown || '[]')
-                          : [];
-
-                        const totalUnits = breakdown.reduce(
-                          (sum: number, it: any) => sum + (Number(it.quantity) || 0),
-                          0,
-                        );
-
-                        return (
-                          <tr
-                            key={pay.id}
-                            className="hover:bg-indigo-50/40 transition-colors cursor-pointer group"
-                            onClick={() => setViewingPaymentDetails(pay)}
-                          >
-                            <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
-                              {formatDate(pay.paymentDate)}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                                {pay.company?.name || 'Company'}
-                              </div>
-                              {pay.company?.phone && (
-                                <div className="text-[11px] text-slate-400">📞 {pay.company.phone}</div>
                               )}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <span className="font-mono font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md">
-                                {pay.transactionRef || `BD-${pay.id}`}
+                            </div>
+                          </td>
+
+                          {/* Bill Amount */}
+                          <td className="py-3.5 px-4 text-right font-black text-slate-900 whitespace-nowrap">
+                            {formatCurrency(totalBill)}
+                          </td>
+
+                          {/* Paid Amount */}
+                          <td className="py-3.5 px-4 text-right font-black text-emerald-600 whitespace-nowrap">
+                            {formatCurrency(paidAmt)}
+                          </td>
+
+                          {/* Balance */}
+                          <td className="py-3.5 px-4 text-right font-black whitespace-nowrap">
+                            {dueAmt > 0 ? (
+                              <span className="text-rose-600">
+                                Due: {formatCurrency(dueAmt)}
                               </span>
-                              <div className="text-[10px] text-slate-500 mt-0.5 uppercase font-semibold">
-                                {pay.paymentMethod || 'BANK DRAFT'}
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div className="font-semibold text-slate-800">
-                                {pay.bankName || 'Advance Payment'}
-                              </div>
-                              {pay.branchName && (
-                                <div className="text-[11px] text-slate-500">Branch: {pay.branchName}</div>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-4 text-center">
-                              {breakdown.length > 0 ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold text-xs px-3 py-1 shadow-sm">
-                                  <Package className="h-3.5 w-3.5 text-indigo-600" />
-                                  <span>{breakdown.length} Products • Total {totalUnits} Pcs</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold text-xs px-3 py-1">
-                                  <span>💸 Advance Payment</span>
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-black text-emerald-600 text-sm whitespace-nowrap">
-                              {formatCurrency(pay.amount)}
-                            </td>
-                            <td
-                              className="py-3.5 px-4 text-center whitespace-nowrap"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div className="flex items-center justify-center gap-1.5">
+                            ) : advanceAmt > 0 ? (
+                              <span className="text-sky-600">
+                                Adv: {formatCurrency(advanceAmt)}
+                              </span>
+                            ) : (
+                              <span className="text-emerald-700 font-bold">✓ Settled</span>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {isComplete ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                <span>Fully Received</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-800 border border-amber-200">
+                                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                                <span>Partially Received</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {p.invoiceImageUrl && (
                                 <button
                                   type="button"
-                                  onClick={() => setViewingPaymentDetails(pay)}
-                                  className="inline-flex items-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 transition-colors"
-                                  title="View full pre-order & payment details"
+                                  onClick={() => setPreviewImageModal(p.invoiceImageUrl!)}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 text-xs font-bold text-indigo-700 transition-colors"
+                                  title="View company invoice photo"
                                 >
-                                  <Eye className="h-3.5 w-3.5 text-indigo-600" />
-                                  <span>👁️ View</span>
+                                  <Camera className="h-3.5 w-3.5" />
+                                  <span>Memo</span>
                                 </button>
+                              )}
 
-                                <Link
-                                  href={`/purchases/create?paymentId=${pay.id}&companyId=${pay.companyId}`}
-                                  className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:scale-105"
-                                  title="Receive Challan against this advance payment"
-                                >
-                                  <Package className="h-3.5 w-3.5" />
-                                  <span>📦 Receive Challan</span>
-                                </Link>
+                              <Link
+                                href={`/purchases/${p.id}`}
+                                className="inline-flex items-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 transition-colors"
+                                title="View challan details"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                <span>View</span>
+                              </Link>
 
-                                <button
-                                  type="button"
-                                  onClick={() => promptDeletePayment(pay)}
-                                  className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                  title="Delete payment"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              <Link
+                                href={`/purchases/${p.id}/print-challan`}
+                                target="_blank"
+                                className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm transition-all"
+                                title="Print Challan"
+                              >
+                                <Printer className="h-3.5 w-3.5" />
+                                <span>Print</span>
+                              </Link>
 
-                {filteredPreOrdersList.length === 0 && (
-                  <div className="p-12 text-center">
-                    <StateMessage
-                      title="No advance payments or pre-orders found"
-                      description="Click 'Bank Draft / Advance Payment' above to create a new advance payment."
-                    />
-                  </div>
-                )}
+                              <button
+                                type="button"
+                                onClick={() => promptDeletePurchase(p)}
+                                className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                title="Delete invoice"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+
+              {filteredPurchases.length === 0 && (
+                <div className="p-12 text-center">
+                  <StateMessage
+                    title="No purchases found"
+                    description="No invoices match your current search or filters."
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          {/* TAB 3: 🏢 COMPANY LEDGER & PAYABLE SUMMARY */}
+          {/* TAB 2: COMPANY LEDGER */}
           {activeTab === 'companies' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {payableSummary.map((c) => {
+              {filteredCompanies.map((c) => {
                 const payable = toNumber(c.totalPayableAmount ?? c.totalPayable);
                 const advance = toNumber(c.advanceAmount ?? c.advanceBalance);
                 const totalGoods = toNumber(c.totalPurchaseAmount ?? c.totalAmount);
@@ -1256,7 +807,9 @@ export function PurchasesPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <h3 className="font-black text-slate-900 text-base">{c.companyName}</h3>
-                          <p className="text-xs text-slate-400 font-mono">ID: #{c.companyId} {c.companyCode ? `• Code: ${c.companyCode}` : ''}</p>
+                          <p className="text-xs text-slate-400 font-mono">
+                            ID: #{c.companyId} {c.companyCode ? `• Code: ${c.companyCode}` : ''}
+                          </p>
                         </div>
                         {advance > 0 ? (
                           <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 border border-sky-200">
@@ -1264,7 +817,7 @@ export function PurchasesPage() {
                           </span>
                         ) : payable > 0 ? (
                           <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200">
-                            Payable: {formatCurrency(payable)}
+                            Due: {formatCurrency(payable)}
                           </span>
                         ) : (
                           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
@@ -1275,11 +828,11 @@ export function PurchasesPage() {
 
                       <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs">
                         <div>
-                          <span className="text-slate-400 font-medium">Total Goods Received</span>
+                          <span className="text-slate-400 font-medium">Products Received</span>
                           <p className="font-bold text-slate-800 text-sm mt-0.5">{formatCurrency(totalGoods)}</p>
                         </div>
                         <div>
-                          <span className="text-slate-400 font-medium">Total Paid</span>
+                          <span className="text-slate-400 font-medium">Money Paid</span>
                           <p className="font-black text-emerald-600 text-sm mt-0.5">{formatCurrency(totalPaid)}</p>
                         </div>
                       </div>
@@ -1287,22 +840,21 @@ export function PurchasesPage() {
 
                     <div className="flex items-center gap-2 mt-5 pt-3 border-t border-slate-100">
                       <button
-                        onClick={() => {
-                          const comp = companies.find((x) => x.id === c.companyId);
-                          openBankDraftModal(comp);
-                        }}
+                        onClick={() => openPayModal(c.companyId, payable)}
                         className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-2 text-xs font-bold transition-colors"
+                        title="Send money/draft to company"
                       >
-                        <Wallet className="h-3.5 w-3.5" />
-                        <span>Pay Draft</span>
+                        <Landmark className="h-3.5 w-3.5" />
+                        <span>Bank Draft</span>
                       </button>
 
                       <Link
                         href={`/purchases/create?companyId=${c.companyId}`}
                         className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 text-xs font-bold transition-colors"
+                        title="Receive products against bank draft"
                       >
                         <Package className="h-3.5 w-3.5" />
-                        <span>Receive Stock</span>
+                        <span>Receive Products</span>
                       </Link>
 
                       <Link
@@ -1316,565 +868,328 @@ export function PurchasesPage() {
                   </div>
                 );
               })}
+
+              {filteredCompanies.length === 0 && (
+                <div className="col-span-full p-12 text-center bg-white rounded-3xl border border-slate-200">
+                  <StateMessage
+                    title="No companies found"
+                    description="No supplier company records match your search."
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          {/* TAB 4: 📊 PRODUCT-WISE SUPPLIES */}
-          {activeTab === 'products' && (
+          {/* TAB 3: PAYMENT HISTORY */}
+          {activeTab === 'payments' && (
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 text-xs sm:text-sm">
-                  <thead className="bg-slate-50/80 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                <table className="min-w-full divide-y divide-slate-100 text-xs sm:text-sm">
+                  <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                     <tr>
-                      <th className="py-3.5 px-4 text-left">Product & SKU</th>
-                      <th className="py-3.5 px-4 text-left">Supplier Company</th>
-                      <th className="py-3.5 px-4 text-right">Total Received Qty</th>
-                      <th className="py-3.5 px-4 text-right">Total Received Value</th>
-                      <th className="py-3.5 px-4 text-right">Avg Buy Price</th>
-                      <th className="py-3.5 px-4 text-right">Current Stock</th>
-                      <th className="py-3.5 px-4 text-center">Invoice Count</th>
+                      <th className="py-3 px-4 text-left">Date</th>
+                      <th className="py-3 px-4 text-left">Supplier</th>
+                      <th className="py-3 px-4 text-right text-emerald-700">Draft / Paid Amount</th>
+                      <th className="py-3 px-4 text-center">Method</th>
+                      <th className="py-3 px-4 text-left">Slip / Ref No</th>
+                      <th className="py-3 px-4 text-left">Note / Remarks</th>
+                      <th className="py-3 px-4 text-center">Document</th>
+                      <th className="py-3 px-4 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {productSupplies.map((p) => (
-                      <tr key={p.productId} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900">{p.productName}</div>
-                          <div className="text-[11px] text-slate-400">#{p.productId} • {p.unit || 'Pcs'}</div>
+                    {filteredPayments.map((pay) => (
+                      <tr key={pay.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-slate-800 whitespace-nowrap">
+                          {formatDate(pay.paymentDate)}
                         </td>
-                        <td className="py-3.5 px-4">
-                          <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                            🏢 {p.companyName}
-                          </span>
+                        <td className="py-3.5 px-4 font-bold text-slate-900">
+                          {pay.company?.name || 'Company'}
                         </td>
-                        <td className="py-3.5 px-4 text-right font-black text-slate-900">
-                          {p.totalQuantityReceived ?? p.totalQuantity} {p.unit}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-black text-indigo-950">
-                          {formatCurrency(p.totalCostValue ?? p.totalCost ?? 0)}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-semibold text-slate-700">
-                          ৳{p.avgUnitCost || p.latestBuyPrice || 0}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-black text-emerald-600">
-                          {p.currentStock || 0} {p.unit}
+                        <td className="py-3.5 px-4 text-right font-black text-emerald-600 whitespace-nowrap">
+                          {formatCurrency(pay.amount)}
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                            {p.purchaseCount} times
+                          <span className={`rounded-lg px-2 py-0.5 text-xs font-bold uppercase ${
+                            pay.paymentMethod === 'BANK_DRAFT'
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {pay.paymentMethod === 'BANK_DRAFT' ? '🏦 Bank Draft' : pay.paymentMethod || 'CASH'}
                           </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-xs text-slate-600">
+                          {pay.transactionRef || '-'}
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-slate-500 max-w-xs truncate">
+                          {pay.note || '-'}
+                        </td>
+                        {/* Slip / Document */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          {pay.invoiceImageUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewImageModal(pay.invoiceImageUrl!)}
+                              className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100"
+                              title="View slip photo"
+                            >
+                              <Camera className="h-3 w-3" />
+                              <span>Slip</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-2">
+                            <Link
+                              href={`/purchases/create?companyId=${pay.companyId}&paymentId=${pay.id}`}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 text-xs font-bold text-indigo-700 transition-colors"
+                              title="Receive product delivery against this bank draft"
+                            >
+                              <Package className="h-3.5 w-3.5" />
+                              <span>Receive Products</span>
+                            </Link>
+
+                            <button
+                              type="button"
+                              onClick={() => promptDeletePayment(pay)}
+                              className="rounded-xl p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                              title="Delete payment record"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+
+              {filteredPayments.length === 0 && (
+                <div className="p-12 text-center">
+                  <StateMessage
+                    title="No payments found"
+                    description="No payment records found for the selected filter."
+                  />
+                </div>
+              )}
             </div>
           )}
         </>
       )}
 
-      {/* ============================================================== */}
-      {/* 3. BUTTON 1 MODAL: BANK DRAFT / ADVANCE PAYMENT & PRE-ORDER     */}
-      {/* ============================================================== */}
-      {isBankDraftModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-4xl max-h-[88vh] flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden">
-            {/* Modal Header (Sticky / Fixed) */}
-            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 bg-white shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl bg-emerald-50 p-2.5 text-emerald-600">
-                  <Wallet className="h-6 w-6" />
+      {/* 💳 6. SIMPLE & FAST "BANK DRAFT / ADVANCE PAYMENT" MODAL */}
+      {isPayModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600">
+                  <Landmark className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                    🏦 Bank Draft / Advance Payment (Pre-Order)
-                  </h2>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Record advance bank draft payments to supplier companies and pre-order products
-                  </p>
+                  <h3 className="text-base font-bold text-slate-900">Record Bank Draft / Advance</h3>
+                  <p className="text-xs text-slate-500">Pay company first via bank draft before receiving products</p>
                 </div>
               </div>
               <button
-                type="button"
-                onClick={() => setIsBankDraftModalOpen(false)}
-                className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                onClick={() => setIsPayModalOpen(false)}
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Scrollable Form Content */}
-            <form id="bankDraftModalForm" onSubmit={handleSubmitBankDraft} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
-              {/* SECTION A — Supplier Information */}
-              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
-                <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
-                  <Building2 className="h-4 w-4 text-indigo-600" />
-                  <span>SECTION A: 🏢 Supplier Information</span>
-                </div>
+            <form onSubmit={handleSavePayment} className="p-6 space-y-4">
+              {/* Supplier Selection */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Select Supplier Company *
+                </label>
+                <select
+                  required
+                  value={payCompanyId}
+                  onChange={(e) => {
+                    const cid = Number(e.target.value);
+                    setPayCompanyId(cid);
+                    const comp = payableSummary.find((c) => c.companyId === cid);
+                    const due = toNumber(comp?.totalPayableAmount ?? comp?.totalPayable);
+                    if (due > 0) setPayAmount(String(due));
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-800 focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">Select a supplier...</option>
+                  {companies.map((c) => {
+                    const sum = payableSummary.find((x) => x.companyId === c.id);
+                    const due = toNumber(sum?.totalPayableAmount ?? sum?.totalPayable);
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {due > 0 ? `(Due: ৳${due})` : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
 
+              {/* Payment Amount */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Draft / Payment Amount (৳) *
+                </label>
                 <div className="relative">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    Select Supplier / Company *
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      type="text"
-                      value={supplierSearch}
-                      onChange={(e) => {
-                        setSupplierSearch(e.target.value);
-                        setShowSupplierDropdown(true);
-                      }}
-                      onFocus={() => setShowSupplierDropdown(true)}
-                      placeholder="Search company or supplier name..."
-                      className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
-                    />
-                  </div>
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                    ৳
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    required
+                    placeholder="Enter amount (e.g. 100000)..."
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-8 pr-4 text-base font-black text-slate-900 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
 
-                  {showSupplierDropdown && (
-                    <div className="absolute left-0 top-full z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl ring-1 ring-black/5">
-                      {companies
-                        .filter((c) => !supplierSearch || c.name.toLowerCase().includes(supplierSearch.toLowerCase()))
-                        .map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => handleSelectSupplier(c)}
-                            className="w-full flex items-center justify-between rounded-xl p-2.5 text-left text-xs sm:text-sm hover:bg-slate-50 transition-colors font-medium text-slate-800"
-                          >
-                            <div>
-                              <div className="font-bold text-slate-900">{c.name}</div>
-                              <div className="text-xs text-slate-400">ID: SUP-{c.id} • Phone: {c.phone || 'N/A'}</div>
-                            </div>
-                            <span className="rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600">
-                              Select
-                            </span>
-                          </button>
-                        ))}
-                    </div>
-                  )}
+              {/* Date & Method */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={payDate}
+                    onChange={(e) => setPayDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-800 focus:border-emerald-500 focus:outline-none"
+                  />
                 </div>
 
-                {/* Compact Supplier Summary Card */}
-                {selectedSupplier && (
-                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-indigo-950 text-sm">{selectedSupplier.name}</span>
-                        <span className="rounded-md bg-indigo-200/60 text-indigo-900 px-2 py-0.5 font-mono font-bold text-[11px]">
-                          SUP-{selectedSupplier.id}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-slate-600 flex-wrap">
-                        {selectedSupplier.phone && <span>📞 {selectedSupplier.phone}</span>}
-                        {selectedSupplier.address && <span>📍 {selectedSupplier.address}</span>}
-                      </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Payment Method *
+                  </label>
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-800 focus:border-emerald-500 focus:outline-none"
+                  >
+                    <option value="BANK_DRAFT">Bank Draft (Advance)</option>
+                    <option value="BANK">Bank Transfer</option>
+                    <option value="CHEQUE">Cheque</option>
+                    <option value="CASH">Cash</option>
+                    <option value="BKASH">bKash</option>
+                    <option value="NAGAD">Nagad</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Ref & Note */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Draft # / Ref No
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Draft #98124 or Chq #55"
+                    value={payRef}
+                    onChange={(e) => setPayRef(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Note / Remarks
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Advance for product batch"
+                    value={payNote}
+                    onChange={(e) => setPayNote(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* 📸 Cloudinary Bank Slip / Draft Photo Upload */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Bank Draft Slip / Deposit Receipt (Cloudinary)
+                </label>
+                {payInvoiceImageUrl ? (
+                  <div className="flex items-center gap-3 p-2.5 rounded-2xl border border-emerald-200 bg-emerald-50/50">
+                    <img
+                      src={payInvoiceImageUrl}
+                      alt="Bank Draft Slip"
+                      className="h-12 w-16 object-cover rounded-xl border border-emerald-200 bg-white shrink-0 cursor-pointer"
+                      onClick={() => setPreviewImageModal(payInvoiceImageUrl)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-bold text-emerald-800 block">✓ Slip Attached</span>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImageModal(payInvoiceImageUrl)}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
+                      >
+                        Enlarge Preview
+                      </button>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedSupplier(null);
-                        setSupplierSearch('');
+                        setPayInvoiceImageUrl(null);
+                        setPayInvoicePublicId(null);
                       }}
-                      className="text-indigo-600 hover:text-indigo-800 font-bold self-start sm:self-auto"
+                      className="text-xs font-bold text-rose-600 hover:text-rose-800 px-2 py-1"
                     >
-                      Change Supplier
+                      Remove
                     </button>
                   </div>
+                ) : (
+                  <label className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 hover:bg-slate-100/80 hover:border-indigo-300 py-3 px-4 text-xs font-bold text-slate-700 cursor-pointer transition-colors">
+                    <UploadCloud className="h-4 w-4 text-indigo-600" />
+                    <span>{isUploadingPaySlip ? 'Uploading to Cloudinary...' : 'Upload Bank Draft Slip / Photo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      disabled={isUploadingPaySlip}
+                      onChange={handleUploadPaySlip}
+                      className="hidden"
+                    />
+                  </label>
                 )}
               </div>
 
-              {/* SECTION B — Payment Information */}
-              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
-                <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
-                  <Landmark className="h-4 w-4 text-indigo-600" />
-                  <span>SECTION B: 🏦 Payment Information</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      Payment Method *
-                    </label>
-                    <select
-                      value={paymentMethod}
-                      onChange={(e: any) => setPaymentMethod(e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
-                    >
-                      <option value="BANK">🏦 Bank Draft (Default)</option>
-                      <option value="CHEQUE">📝 Cheque</option>
-                      <option value="TRANSFER">💳 Bank Transfer</option>
-                      <option value="CASH">💵 Cash</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      Draft / Reference No *
-                    </label>
-                    <input
-                      type="text"
-                      value={draftRefNo}
-                      onChange={(e) => setDraftRefNo(e.target.value)}
-                      placeholder="e.g. BD-10025"
-                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-bold text-slate-900 focus:border-indigo-500 focus:outline-none shadow-sm font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      Bank Name
-                    </label>
-                    <input
-                      type="text"
-                      value={bankName}
-                      onChange={(e) => setBankName(e.target.value)}
-                      placeholder="e.g. Sonali Bank"
-                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      Branch Name
-                    </label>
-                    <input
-                      type="text"
-                      value={branchName}
-                      onChange={(e) => setBranchName(e.target.value)}
-                      placeholder="e.g. Gazipur Branch"
-                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      Draft Date *
-                    </label>
-                    <input
-                      type="date"
-                      value={draftDate}
-                      onChange={(e) => setDraftDate(e.target.value)}
-                      required
-                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-xs sm:text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:outline-none shadow-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                      Draft Amount (৳) *
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="1"
-                      value={draftAmount}
-                      onChange={(e) => setDraftAmount(e.target.value)}
-                      required
-                      placeholder="e.g. 100000"
-                      className="w-full rounded-2xl border border-emerald-300 bg-emerald-50/60 p-3 text-sm font-black text-emerald-900 focus:border-emerald-500 focus:bg-white focus:outline-none shadow-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION C — PRE-ORDER PRODUCTS */}
-              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
-                      <Package className="h-4 w-4 text-indigo-600" />
-                      <span>SECTION C: 📦 Pre-Order Products & Quantities</span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Specify ordered products, exact quantities, and unit purchase prices for this draft.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddPreOrderRow}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 text-xs font-bold shadow-md transition-all hover:scale-105 active:scale-95 self-start sm:self-auto"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>+ Add Product</span>
-                  </button>
-                </div>
-
-                {/* Table Header with Clear Column Titles */}
-                <div className="hidden sm:grid grid-cols-12 gap-2.5 px-3 py-2 rounded-xl bg-slate-200/80 text-[11px] font-black uppercase tracking-wider text-slate-700">
-                  <div className="col-span-4">Product Name & Search</div>
-                  <div className="col-span-2 text-center">SKU / Code</div>
-                  <div className="col-span-2 text-center bg-indigo-100/80 text-indigo-900 rounded py-0.5">
-                    Order Qty
-                  </div>
-                  <div className="col-span-2 text-right">Buy Price (৳)</div>
-                  <div className="col-span-2 text-right">Line Total (৳)</div>
-                </div>
-
-                {/* Pre-Order Product Table */}
-                <div className="space-y-3">
-                  {preOrderItems.map((row, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm items-center hover:border-slate-300 transition-all"
-                    >
-                      {/* Product Search & Dropdown */}
-                      <div className="relative sm:col-span-4">
-                        <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden mb-1">
-                          Product Name
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="Select product or search..."
-                            value={row.searchText !== undefined ? row.searchText : row.productName}
-                            onFocus={() => handleUpdatePreOrderRow(idx, 'showResults', true)}
-                            onChange={(e) => handleUpdatePreOrderRow(idx, 'searchText', e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-xs font-bold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none"
-                          />
-                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                        </div>
-
-                        {row.showResults && (
-                          <div className="absolute left-0 top-full z-50 mt-1 max-h-52 w-full min-w-[260px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl">
-                            {allProducts
-                              .filter((p) => {
-                                const q = (row.searchText || '').toLowerCase();
-                                return !q || p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q);
-                              })
-                              .map((p) => (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    handleSelectPreOrderProduct(idx, p);
-                                  }}
-                                  className="w-full flex items-center justify-between p-2 text-left text-xs hover:bg-slate-50 rounded-lg"
-                                >
-                                  <div>
-                                    <div className="font-bold text-slate-900">{p.name}</div>
-                                    <div className="text-[10px] text-slate-400">SKU: {p.sku || 'N/A'} • Price: ৳{p.buyPrice || 0}</div>
-                                  </div>
-                                  <span className="text-indigo-600 font-bold">Select</span>
-                                </button>
-                              ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* SKU (Readonly display) */}
-                      <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden mb-1">
-                          SKU / Code
-                        </label>
-                        <div className="flex items-center justify-center rounded-xl bg-slate-100 border border-slate-200 px-2 py-2 text-xs font-mono font-bold text-slate-700">
-                          <span>{row.sku ? `SKU: ${row.sku}` : 'SKU: —'}</span>
-                        </div>
-                      </div>
-
-                      {/* Order Quantity */}
-                      <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden mb-1">
-                          Order Qty (Pcs)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={row.quantity}
-                            onChange={(e) => handleUpdatePreOrderRow(idx, 'quantity', e.target.value)}
-                            placeholder="Qty"
-                            title="Order Quantity"
-                            className="w-full rounded-xl border border-indigo-300 bg-indigo-50/50 py-2 px-3 text-xs font-black text-indigo-950 text-center focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Buy Rate */}
-                      <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden mb-1">
-                          Buy Price (৳)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={row.unitPrice}
-                            onChange={(e) => handleUpdatePreOrderRow(idx, 'unitPrice', e.target.value)}
-                            placeholder="0.00"
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-2.5 text-xs font-bold text-slate-800 text-right focus:border-indigo-500 focus:bg-white focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Line Total & Remove */}
-                      <div className="sm:col-span-2 flex items-center justify-between gap-2">
-                        <div className="text-right flex-1 min-w-0">
-                          <label className="block text-[10px] font-bold uppercase text-slate-500 sm:hidden">
-                            Total
-                          </label>
-                          <span className="font-black text-emerald-700 text-xs truncate block">
-                            {formatCurrency(parseFloat(row.amount) || 0)}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePreOrderRow(idx)}
-                          className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors shrink-0"
-                          title="Remove Product"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* SECTION D — PAYMENT SUMMARY (Highlighted Summary Card) */}
-              <div className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-emerald-50 p-5 text-slate-900 shadow-sm">
-                <div className="flex items-center justify-between border-b border-indigo-200/60 pb-3 mb-3">
-                  <span className="text-xs font-black uppercase tracking-wider text-indigo-900">
-                    SECTION D: 💰 Payment Summary
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
-                    ● Fully Paid
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                  <div>
-                    <span className="text-slate-500">Pre-Order Total Items:</span>
-                    <p className="text-base font-black text-slate-900 mt-0.5">{preOrderTotalQuantity} Pcs</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Pre-Order Total Amount:</span>
-                    <p className="text-base font-black text-indigo-950 mt-0.5">{formatCurrency(preOrderTotalAmount)}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Bank Draft Amount:</span>
-                    <p className="text-base font-black text-emerald-700 mt-0.5">{formatCurrency(effectiveDraftAmountNum)}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Advance Balance:</span>
-                    <p className="text-base font-black text-sky-700 mt-0.5">{formatCurrency(draftAdvanceBalance)}</p>
-                  </div>
-                </div>
+              {/* Action Buttons */}
+              <div className="pt-3 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPayModalOpen(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingPay}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50"
+                >
+                  {isSubmittingPay ? 'Saving...' : 'Confirm & Save Bank Draft'}
+                </button>
               </div>
             </form>
-
-            {/* Modal Footer (Sticky / Fixed at Bottom) */}
-            <div className="flex items-center justify-end gap-3 p-4 sm:p-5 border-t border-slate-100 bg-slate-50/90 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsBankDraftModalOpen(false)}
-                className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                form="bankDraftModalForm"
-                type="submit"
-                disabled={isSubmittingDraft}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 px-7 py-2.5 text-xs sm:text-sm font-black text-white shadow-xl shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-              >
-                {isSubmittingDraft ? (
-                  <span>Saving...</span>
-                ) : (
-                  <>
-                    <span>💾 Save Advance Payment & Pre-Order</span>
-                  </>
-                )}
-              </button>
-            </div>
           </div>
         </div>
       )}
 
-      {/* ============================================================== */}
-      {/* 14. SUCCESS DIALOG AFTER SAVING PRE-ORDER / BANK DRAFT         */}
-      {/* ============================================================== */}
-      {savedDraftResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-slate-100 text-center space-y-5">
-            <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-              <CheckCircle className="h-9 w-9" />
-            </div>
-
-            <div>
-              <h3 className="text-xl font-black text-slate-900">✅ Pre-Order Saved Successfully</h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Bank draft and pre-ordered products have been recorded successfully.
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-xs space-y-2 text-left">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Draft:</span>
-                <span className="font-mono font-bold text-slate-900">{savedDraftResult.draftNo}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Supplier:</span>
-                <span className="font-bold text-slate-900">{savedDraftResult.supplierName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Amount:</span>
-                <span className="font-black text-emerald-700 text-sm">{formatCurrency(savedDraftResult.amount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Products:</span>
-                <span className="font-bold text-indigo-700">{savedDraftResult.productCount} Items</span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2.5 pt-2">
-              <Link
-                href={
-                  savedDraftResult
-                    ? `/purchases/create?paymentId=${savedDraftResult.id}&companyId=${savedDraftResult.companyId || ''}`
-                    : '/purchases/create'
-                }
-                onClick={() => setSavedDraftResult(null)}
-                className="w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 py-3 text-xs sm:text-sm font-black text-white shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] text-center"
-              >
-                📦 Receive Challan Now
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSavedDraftResult(null);
-                  setIsBankDraftModalOpen(false);
-                  setActiveTab('challans');
-                }}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-2.5 text-xs font-bold text-slate-700 transition-colors"
-              >
-                📑 View All Invoices
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSavedDraftResult(null);
-                  setIsBankDraftModalOpen(false);
-                }}
-                className="text-xs font-semibold text-slate-400 hover:text-slate-600 pt-1"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modern Confirmation Modal for Delete */}
+      {/* 🗑️ 7. CONFIRM DELETE MODAL */}
       <ConfirmModal
         isOpen={Boolean(deleteModal?.isOpen)}
         onClose={() => setDeleteModal(null)}
@@ -1889,200 +1204,39 @@ export function PurchasesPage() {
         warningNote="Warning: Deleting this will update ledger balances and cannot be undone."
       />
 
-      {/* 🌟 FULL DETAILS MODAL: PRE-ORDER & ADVANCE PAYMENT DETAILS */}
-      {viewingPaymentDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-3xl max-h-[88vh] flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden">
-            {/* Header (Sticky / Fixed) */}
-            <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6 bg-white shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 shadow-inner shrink-0">
-                  <Package className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg sm:text-xl font-black text-slate-900">
-                    Advance Payment & Pre-Order Details
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Payment Ref: <b className="font-mono text-indigo-900 font-bold">{viewingPaymentDetails.transactionRef || `BD-${viewingPaymentDetails.id}`}</b> • ID #{viewingPaymentDetails.id}
-                  </p>
-                </div>
+      {/* 🖼️ 8. FULL-SCREEN INVOICE DOCUMENT / SLIP PREVIEW MODAL */}
+      {previewImageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-white">
+              <span className="text-sm font-bold text-slate-800">
+                Attached Document (Cloudinary)
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewImageModal}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded-lg hover:bg-indigo-50"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Open Full Size</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewImageModal(null)}
+                  className="p-1 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setViewingPaymentDetails(null)}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
-
-            {/* Scrollable Body */}
-            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
-              {/* Info Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
-                  <span className="text-slate-400 font-semibold block">Supplier Company</span>
-                  <b className="text-slate-900 text-sm font-bold block mt-0.5 truncate">
-                    {viewingPaymentDetails.company?.name || 'Company'}
-                  </b>
-                  {viewingPaymentDetails.company?.phone && (
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">📞 {viewingPaymentDetails.company.phone}</span>
-                  )}
-                </div>
-
-                <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
-                  <span className="text-slate-400 font-semibold block">Payment Date</span>
-                  <b className="text-slate-900 text-sm font-bold block mt-0.5">
-                    {formatDate(viewingPaymentDetails.paymentDate)}
-                  </b>
-                </div>
-
-                <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
-                  <span className="text-slate-400 font-semibold block">Method & Bank</span>
-                  <b className="text-slate-900 text-xs font-bold block mt-0.5 uppercase">
-                    {viewingPaymentDetails.paymentMethod} {viewingPaymentDetails.bankName ? `• ${viewingPaymentDetails.bankName}` : ''}
-                  </b>
-                  {viewingPaymentDetails.branchName && (
-                    <span className="text-[10px] text-slate-500 block">Branch: {viewingPaymentDetails.branchName}</span>
-                  )}
-                </div>
-
-                <div className="rounded-2xl bg-emerald-50 p-3.5 border border-emerald-200">
-                  <span className="text-emerald-700 font-semibold block">Advance Paid</span>
-                  <b className="text-emerald-800 text-base font-black block mt-0.5">
-                    {formatCurrency(viewingPaymentDetails.amount)}
-                  </b>
-                </div>
-              </div>
-
-              {/* Itemized Products Table */}
-              <div>
-                <div className="flex items-center justify-between mb-2.5">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Pre-Ordered Products Breakdown:
-                  </h4>
-                  {(() => {
-                    const bd = Array.isArray(viewingPaymentDetails.productBreakdown)
-                      ? viewingPaymentDetails.productBreakdown
-                      : typeof viewingPaymentDetails.productBreakdown === 'string'
-                      ? JSON.parse(viewingPaymentDetails.productBreakdown || '[]')
-                      : [];
-                    if (bd.length > 0) {
-                      const totalQty = bd.reduce((sum: number, it: any) => sum + (Number(it.quantity) || 0), 0);
-                      return (
-                        <span className="rounded-full bg-indigo-50 border border-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
-                          📦 {bd.length} Products • Total {totalQty} Units
-                        </span>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
-
-                {(() => {
-                  const bd = Array.isArray(viewingPaymentDetails.productBreakdown)
-                    ? viewingPaymentDetails.productBreakdown
-                    : typeof viewingPaymentDetails.productBreakdown === 'string'
-                    ? JSON.parse(viewingPaymentDetails.productBreakdown || '[]')
-                    : [];
-
-                  if (bd.length === 0) {
-                    return (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">
-                        <p className="font-semibold text-slate-700">💸 General Advance Payment (No itemized pre-order)</p>
-                        <p className="text-slate-400 mt-1">
-                          Products were not pre-listed during payment. Clicking "Receive Challan" will allow you to receive any stock from this company against this <b>{formatCurrency(viewingPaymentDetails.amount)}</b> advance balance.
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  const totalVal = bd.reduce(
-                    (sum: number, it: any) => sum + (Number(it.amount) || (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0)),
-                    0,
-                  );
-
-                  return (
-                    <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                      <table className="min-w-full divide-y divide-slate-200 text-xs">
-                        <thead className="bg-slate-100/90 font-bold uppercase text-slate-700 text-[10px] tracking-wider">
-                          <tr>
-                            <th className="py-2.5 px-3 text-center w-8">SL</th>
-                            <th className="py-2.5 px-3 text-left">Product Name</th>
-                            <th className="py-2.5 px-3 text-center">SKU</th>
-                            <th className="py-2.5 px-3 text-center bg-indigo-50 text-indigo-900 font-black">Order Qty</th>
-                            <th className="py-2.5 px-3 text-right">Unit Price (৳)</th>
-                            <th className="py-2.5 px-3 text-right font-black">Total (৳)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 bg-white">
-                          {bd.map((item: any, i: number) => {
-                            const qty = Number(item.quantity) || 1;
-                            const rate = Number(item.unitPrice) || 0;
-                            const total = Number(item.amount) || qty * rate;
-                            return (
-                              <tr key={i} className="hover:bg-slate-50">
-                                <td className="py-2.5 px-3 text-center font-mono text-slate-400">{i + 1}</td>
-                                <td className="py-2.5 px-3 font-bold text-slate-900">{item.productName || item.searchText || 'Product'}</td>
-                                <td className="py-2.5 px-3 text-center font-mono text-slate-500">{item.sku || '—'}</td>
-                                <td className="py-2.5 px-3 text-center font-black text-indigo-950 bg-indigo-50/50">
-                                  📦 {qty} <span className="text-[10px] font-normal text-indigo-600 uppercase">{item.unit || 'PCS'}</span>
-                                </td>
-                                <td className="py-2.5 px-3 text-right font-semibold text-slate-700">
-                                  {formatCurrency(rate)}
-                                </td>
-                                <td className="py-2.5 px-3 text-right font-black text-emerald-700">
-                                  {formatCurrency(total)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot className="bg-slate-50/90 border-t border-slate-200 font-bold text-xs">
-                          <tr>
-                            <td colSpan={3} className="py-2.5 px-3 text-right font-black text-slate-700">
-                              Total Pre-Order Value:
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-black text-indigo-900">
-                              {bd.reduce((sum: number, it: any) => sum + (Number(it.quantity) || 0), 0)} Units
-                            </td>
-                            <td colSpan={2} className="py-2.5 px-3 text-right font-black text-emerald-800 text-sm">
-                              {formatCurrency(totalVal > 0 ? totalVal : viewingPaymentDetails.amount)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {viewingPaymentDetails.note && (
-                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-700">
-                  <span className="font-bold text-slate-900 block mb-0.5">Remarks / Notes:</span>
-                  <p>{viewingPaymentDetails.note}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer (Sticky / Fixed at Bottom) */}
-            <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-t border-slate-100 bg-slate-50/90 shrink-0">
-              <button
-                type="button"
-                onClick={() => setViewingPaymentDetails(null)}
-                className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                Close
-              </button>
-
-              <Link
-                href={`/purchases/create?paymentId=${viewingPaymentDetails.id}&companyId=${viewingPaymentDetails.companyId}`}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-xs font-black text-white shadow-lg shadow-emerald-600/30 transition-all hover:scale-105"
-              >
-                <Package className="h-4 w-4" />
-                <span>📦 Receive Challan Now</span>
-              </Link>
+            <div className="p-4 overflow-auto flex-1 flex items-center justify-center bg-slate-900/5">
+              <img
+                src={previewImageModal}
+                alt="Document Preview"
+                className="max-h-[75vh] w-auto object-contain rounded-xl shadow-md"
+              />
             </div>
           </div>
         </div>

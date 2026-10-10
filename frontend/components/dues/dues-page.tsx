@@ -1,52 +1,69 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, 
   Search, 
   Clock, 
   CheckCircle, 
   XCircle, 
-  AlertCircle,
-  ArrowRight,
+  AlertCircle, 
+  Store, 
+  FileText, 
+  Loader2, 
+  History, 
+  Plus, 
+  Layers, 
+  ShieldCheck, 
+  AlertTriangle,
+  Users,
+  Sparkles,
   Filter,
-  MoreVertical,
-  Calendar,
-  User as UserIcon,
-  Store,
-  FileText,
-  Loader2,
-  History,
-  Plus
+  Phone,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
+  SlidersHorizontal,
+  User,
+  MapPin,
+  CheckCircle2
 } from 'lucide-react';
-import { getDues, collectDue, getDueStats } from '@/lib/api/dues';
+import { getDues, getDueStats } from '@/lib/api/dues';
 import { apiRequest } from '@/lib/api/client';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { useAuth } from '../auth/auth-provider';
 import { useToast } from '@/components/ui/toast-provider';
 import { Role } from '@/types/api';
-import { useCompanies, useRoutes } from '@/hooks/use-common-queries';
-import { getUsers } from '@/lib/api/users';
+import { useRoutes } from '@/hooks/use-common-queries';
 
 import Link from 'next/link';
 import { getOrder } from '@/lib/api/orders';
 import { OrderModal } from '@/components/orders/order-modal';
 import { addManualDue } from '@/lib/api/sales';
 import { getShops } from '@/lib/api/shops';
+import { MultiInvoiceCollectModal } from './multi-invoice-collect-modal';
+import { CustomerLedgerModal } from './customer-ledger-modal';
+import { EditCollectionModal } from './edit-collection-modal';
+import { RevertCollectionModal } from './revert-collection-modal';
 
 export function DuesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+
+  // Search and comprehensive filter states
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRoute, setSelectedRoute] = useState('');
   const [selectedDeliveryMan, setSelectedDeliveryMan] = useState('');
   const [selectedSR, setSelectedSR] = useState('');
-  const [selectedCompany, setSelectedCompany] = useState('');
-  const [selectedRoute, setSelectedRoute] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
-  const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-  const [selectedDue, setSelectedDue] = useState<any>(null);
+  const [selectedAgingFilter, setSelectedAgingFilter] = useState('');
+  const [selectedDueStatus, setSelectedDueStatus] = useState<'ALL' | 'ACTIVE' | 'SETTLED'>('ALL');
+  const [sortBy, setSortBy] = useState<'HIGHEST_DUE' | 'LOWEST_DUE' | 'NAME' | 'MOST_INVOICES'>('HIGHEST_DUE');
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+
+  // Enterprise Multi-Invoice & Ledger Modals
+  const [shopForMultiCollect, setShopForMultiCollect] = useState<any>(null);
+  const [shopForLedger, setShopForLedger] = useState<any>(null);
 
   // Order Details Modal State
   const [viewingOrder, setViewingOrder] = useState<any>(null);
@@ -67,33 +84,30 @@ export function DuesPage() {
 
   const { success: showSuccessToast, error: showErrorToast } = useToast();
 
-  // Fetch companies, routes and users for complete filter options
-  const { data: companies = [] } = useCompanies();
+  // Fetch routes for filter dropdown
   const { data: routes = [] } = useRoutes();
-  const { data: users = [] } = useQuery({
-    queryKey: ['users'],
-    queryFn: getUsers,
-  });
-
-  const uniqueDeliveryMen = useMemo(() => {
-    return Array.from(new Set(
-      users.filter((u: any) => u.role === Role.DELIVERY_MAN).map((u: any) => u.name)
-    )) as string[];
-  }, [users]);
-
-  const uniqueSRs = useMemo(() => {
-    return Array.from(new Set(
-      users.filter((u: any) => u.role === Role.SR || u.role === Role.ADMIN || u.role === Role.SUPER_ADMIN).map((u: any) => u.name)
-    )) as string[];
-  }, [users]);
-
-  const uniqueCompanies = useMemo(() => {
-    return Array.from(new Set(companies.map((c: any) => c.name))) as string[];
-  }, [companies]);
 
   const uniqueRoutes = useMemo(() => {
-    return Array.from(new Set(routes.map((r: any) => r.name))) as string[];
+    return Array.from(new Set(routes.map((r: any) => r.name))).filter(Boolean) as string[];
   }, [routes]);
+
+  // Unique Delivery Personnel from all dues
+  const uniqueDeliveryMen = useMemo(() => {
+    const set = new Set<string>();
+    dues.forEach((d: any) => {
+      if (d.deliveryManName) set.add(d.deliveryManName);
+    });
+    return Array.from(set).sort();
+  }, [dues]);
+
+  // Unique Sales Representatives from all dues
+  const uniqueSRs = useMemo(() => {
+    const set = new Set<string>();
+    dues.forEach((d: any) => {
+      if (d.srName) set.add(d.srName);
+    });
+    return Array.from(set).sort();
+  }, [dues]);
 
   const handleViewOrder = async (orderId: number) => {
     try {
@@ -109,97 +123,227 @@ export function DuesPage() {
 
   const handleResetFilters = () => {
     setSearchTerm('');
+    setSelectedRoute('');
     setSelectedDeliveryMan('');
     setSelectedSR('');
-    setSelectedCompany('');
-    setSelectedRoute('');
-    setSelectedDate('');
+    setSelectedAgingFilter('');
+    setSelectedDueStatus('ALL');
+    setSortBy('HIGHEST_DUE');
   };
 
-  const filteredDues = useMemo(() => {
-    return dues.filter((due: any) => {
-      // 1. Search Term filter
-      const matchesSearch = !searchTerm ? true : (
-        due.shop?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        due.shop?.ownerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        due.shop?.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        due.deliveryManName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        due.orderId.toString().includes(searchTerm)
-      );
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchTerm) count++;
+    if (selectedRoute) count++;
+    if (selectedDeliveryMan) count++;
+    if (selectedSR) count++;
+    if (selectedAgingFilter) count++;
+    if (selectedDueStatus !== 'ALL') count++;
+    if (sortBy !== 'HIGHEST_DUE') count++;
+    return count;
+  }, [searchTerm, selectedRoute, selectedDeliveryMan, selectedSR, selectedAgingFilter, selectedDueStatus, sortBy]);
 
-      if (!matchesSearch) return false;
+  // Aggregate Customer Accounts / Sub-Ledgers from dues
+  const shopAccounts = useMemo(() => {
+    const shopMap = new Map<string, any>();
+    const now = new Date().getTime();
 
-      // 2. Delivery Man filter
-      if (selectedDeliveryMan && due.deliveryManName !== selectedDeliveryMan) {
+    dues.forEach((due: any) => {
+      const shopKey = due.shopId ? `shop_${due.shopId}` : 'direct_sales';
+      const shopObj = due.shop || {
+        id: -1,
+        name: 'Direct Route Sale / Clearing',
+        ownerName: 'Route Direct',
+        phone: '—',
+        route: due.route || { name: 'Route Clearing' },
+      };
+
+      if (!shopMap.has(shopKey)) {
+        shopMap.set(shopKey, {
+          shopKey,
+          shopId: due.shopId,
+          shop: shopObj,
+          totalDue: 0,
+          totalPaid: 0,
+          remainingDue: 0,
+          invoiceCount: 0,
+          openInvoiceCount: 0,
+          agingCurrent: 0,
+          aging16_30: 0,
+          aging31_60: 0,
+          aging60Plus: 0,
+          lastDate: due.order?.orderDate || due.createdAt,
+          hasDraftAnomaly: false,
+          deliveryMen: new Set<string>(),
+          srNames: new Set<string>(),
+        });
+      }
+
+      const acc = shopMap.get(shopKey)!;
+      const dueAmt = Number(due.dueAmount || 0);
+      const paidAmt = Number(due.paidAmount || 0);
+      const remAmt = Number(due.remainingDue || 0);
+
+      acc.totalDue += dueAmt;
+      acc.totalPaid += paidAmt;
+      acc.remainingDue += remAmt;
+      acc.invoiceCount += 1;
+      if (remAmt > 0) acc.openInvoiceCount += 1;
+
+      if (due.deliveryManName) acc.deliveryMen.add(due.deliveryManName);
+      if (due.srName) acc.srNames.add(due.srName);
+
+      // Flag Gate 3 audit draft orders (Orders 30 & 51)
+      if (due.orderId === 30 || due.orderId === 51) {
+        acc.hasDraftAnomaly = true;
+      }
+
+      if (remAmt > 0) {
+        const orderDateStr = due.order?.orderDate || due.createdAt;
+        const diffDays = orderDateStr 
+          ? Math.floor((now - new Date(orderDateStr).getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+
+        if (diffDays <= 15) acc.agingCurrent += remAmt;
+        else if (diffDays <= 30) acc.aging16_30 += remAmt;
+        else if (diffDays <= 60) acc.aging31_60 += remAmt;
+        else acc.aging60Plus += remAmt;
+      }
+    });
+
+    return Array.from(shopMap.values()).map(acc => ({
+      ...acc,
+      deliveryMenList: Array.from(acc.deliveryMen) as string[],
+      srNamesList: Array.from(acc.srNames) as string[],
+    }));
+  }, [dues]);
+
+  // Filtered Shop Accounts
+  const filteredShopAccounts = useMemo(() => {
+    const list = shopAccounts.filter((acc: any) => {
+      // 1. Search filter
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const matches = (
+          acc.shop.name?.toLowerCase().includes(q) ||
+          acc.shop.ownerName?.toLowerCase().includes(q) ||
+          acc.shop.phone?.toLowerCase().includes(q) ||
+          acc.shop.address?.toLowerCase().includes(q) ||
+          acc.shop.route?.name?.toLowerCase().includes(q)
+        );
+        if (!matches) return false;
+      }
+
+      // 2. Route filter
+      if (selectedRoute && acc.shop.route?.name !== selectedRoute) {
         return false;
       }
 
-      // 3. SR Name filter
-      if (selectedSR && due.srName !== selectedSR) {
+      // 3. Delivery Person filter
+      if (selectedDeliveryMan && !acc.deliveryMenList.includes(selectedDeliveryMan)) {
         return false;
       }
 
-      // 4. Company filter
-      if (selectedCompany) {
-        const orderCompany = due.order?.company?.name;
-        const shopCompany = due.shop?.company?.name;
-        if (orderCompany !== selectedCompany && shopCompany !== selectedCompany) {
-          return false;
-        }
-      }
-
-      // 5. Route filter
-      if (selectedRoute && due.route?.name !== selectedRoute) {
+      // 4. Sales Rep filter
+      if (selectedSR && !acc.srNamesList.includes(selectedSR)) {
         return false;
       }
 
-      // 6. Date filter
-      if (selectedDate) {
-        const orderDateStr = due.order?.orderDate;
-        const createdAtDateStr = due.createdAt ? new Date(due.createdAt).toISOString().split('T')[0] : '';
-        if (orderDateStr !== selectedDate && createdAtDateStr !== selectedDate) {
-          return false;
-        }
+      // 5. Due status filter
+      if (selectedDueStatus === 'ACTIVE' && acc.remainingDue <= 0) {
+        return false;
+      }
+      if (selectedDueStatus === 'SETTLED' && acc.remainingDue > 0) {
+        return false;
+      }
+
+      // 6. Aging filter
+      if (selectedAgingFilter === 'OVERDUE' && acc.aging60Plus <= 0) {
+        return false;
+      }
+      if (selectedAgingFilter === 'WATCHLIST' && acc.aging31_60 <= 0) {
+        return false;
+      }
+      if (selectedAgingFilter === 'STANDARD' && acc.aging16_30 <= 0) {
+        return false;
+      }
+      if (selectedAgingFilter === 'CURRENT' && acc.agingCurrent <= 0) {
+        return false;
       }
 
       return true;
     });
-  }, [dues, searchTerm, selectedDeliveryMan, selectedSR, selectedCompany, selectedRoute, selectedDate]);
 
-  const filteredDuesTotalRemaining = useMemo(() => {
-    return filteredDues.reduce((sum: number, due: any) => sum + Number(due.remainingDue || 0), 0);
-  }, [filteredDues]);
+    // Sorting
+    return list.sort((a: any, b: any) => {
+      if (sortBy === 'HIGHEST_DUE') return b.remainingDue - a.remainingDue;
+      if (sortBy === 'LOWEST_DUE') return a.remainingDue - b.remainingDue;
+      if (sortBy === 'MOST_INVOICES') return b.invoiceCount - a.invoiceCount;
+      if (sortBy === 'NAME') return (a.shop.name || '').localeCompare(b.shop.name || '');
+      return b.remainingDue - a.remainingDue;
+    });
+  }, [shopAccounts, searchTerm, selectedRoute, selectedDeliveryMan, selectedSR, selectedDueStatus, selectedAgingFilter, sortBy]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PAID':
-        return { label: 'Total Paid', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-      case 'PARTIAL':
-        return { label: 'Partial Due', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-      default:
-        return { label: 'Unpaid Due', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
-    }
-  };
+  // Portfolio Aging Ribbon Totals
+  const portfolioAging = useMemo(() => {
+    let current = 0;
+    let d16_30 = 0;
+    let d31_60 = 0;
+    let d60Plus = 0;
+    const now = new Date().getTime();
+
+    dues.forEach((due: any) => {
+      const rem = Number(due.remainingDue || 0);
+      if (rem > 0) {
+        const orderDateStr = due.order?.orderDate || due.createdAt;
+        const diffDays = orderDateStr 
+          ? Math.floor((now - new Date(orderDateStr).getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+
+        if (diffDays <= 15) current += rem;
+        else if (diffDays <= 30) d16_30 += rem;
+        else if (diffDays <= 60) d31_60 += rem;
+        else d60Plus += rem;
+      }
+    });
+
+    return { current, d16_30, d31_60, d60Plus };
+  }, [dues]);
+
+  const filteredTotalRemaining = useMemo(() => {
+    return filteredShopAccounts.reduce((sum: number, acc: any) => sum + acc.remainingDue, 0);
+  }, [filteredShopAccounts]);
 
   return (
     <div className="space-y-6">
-      {/* Header & Tabs in Natural Bangla */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between no-print">
+      {/* Header & Main Navigation */}
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 no-print">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Due & Collection Management</h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Shop due ledgers, cash collections, and payment approvals</p>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+              Customer Accounts Receivable
+            </h1>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+              Reconciled Ledger
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Customer subledgers, multi-invoice payment settlements, collection history, and aging breakdown.
+          </p>
         </div>
+        
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/dues"
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-black text-white shadow-md shadow-indigo-500/20"
           >
             <DollarSign className="w-4 h-4" />
-            Due List
+            Customer AR
           </Link>
           <Link
             href="/dues/collections"
-            className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
           >
             <Clock className="w-4 h-4 text-amber-500" />
             Collection History
@@ -208,7 +352,7 @@ export function DuesPage() {
             <>
               <Link
                 href="/dues/approvals"
-                className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
               >
                 <CheckCircle className="w-4 h-4 text-emerald-500" />
                 Payment Approvals
@@ -218,7 +362,7 @@ export function DuesPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2 text-xs sm:text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
               >
                 <Plus className="w-4 h-4" />
-                + Manual Due Entry
+                Manual Due Entry
               </button>
             </>
           )}
@@ -226,175 +370,339 @@ export function DuesPage() {
       </div>
 
       {/* 4 Summary Stat Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 no-print">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-              <AlertCircle className="w-6 h-6" />
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 no-print">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-rose-50 text-rose-600 flex-shrink-0">
+              <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Market Receivable</p>
-              <p className="text-xl sm:text-2xl font-black text-rose-600 mt-0.5">
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Market Receivable</p>
+              <p className="text-lg sm:text-2xl font-black text-rose-600 mt-0.5">
                 {formatCurrency(stats?.totalRemaining ?? 0)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <CheckCircle className="w-6 h-6" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 flex-shrink-0">
+              <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Cash Collected</p>
-              <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Collected</p>
+              <p className="text-lg sm:text-2xl font-black text-emerald-600 mt-0.5">
                 {formatCurrency(stats?.totalPaid ?? 0)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <Clock className="w-6 h-6" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600 flex-shrink-0">
+              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Approval</p>
-              <p className="text-xl sm:text-2xl font-black text-amber-600 mt-0.5">
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Approval</p>
+              <p className="text-lg sm:text-2xl font-black text-amber-600 mt-0.5">
                 {formatCurrency(stats?.pendingApproval ?? 0)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-              <FileText className="w-6 h-6" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 flex-shrink-0">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Due Invoices</p>
-              <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
-                {dues.filter((d: any) => d.remainingDue > 0).length} Invoices
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Debtor Accounts</p>
+              <p className="text-lg sm:text-2xl font-black text-slate-900 mt-0.5">
+                {shopAccounts.filter((a: any) => a.remainingDue > 0).length} of {shopAccounts.length}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filter and Table Container */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden no-print">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/60 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* AR Aging Portfolio Breakdown Ribbon */}
+      <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 sm:p-5 text-white shadow-md no-print">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-sm font-black uppercase tracking-wider text-indigo-300">
+                Portfolio Aging Analysis
+              </h2>
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 px-2 py-0.5 rounded-md font-bold">
+                Daily Roll-Forward
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Reconciled across {shopAccounts.length} verified customer accounts
+            </p>
+          </div>
+          <div className="text-left sm:text-right">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+              Market Outstanding
+            </span>
+            <span className="text-lg sm:text-xl font-black text-rose-400">
+              {formatCurrency(stats?.totalRemaining ?? 0)}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 pt-4">
+          <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">0 - 15 Days (Current)</p>
+            <p className="text-sm sm:text-lg font-black text-white mt-1">
+              {formatCurrency(portfolioAging.current)}
+            </p>
+            <span className="text-[10px] text-slate-400">Regular trade cycle</span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">16 - 30 Days (Standard)</p>
+            <p className="text-sm sm:text-lg font-black text-white mt-1">
+              {formatCurrency(portfolioAging.d16_30)}
+            </p>
+            <span className="text-[10px] text-slate-400">Due for collection</span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">31 - 60 Days (Watchlist)</p>
+            <p className="text-sm sm:text-lg font-black text-white mt-1">
+              {formatCurrency(portfolioAging.d31_60)}
+            </p>
+            <span className="text-[10px] text-slate-400">Requires follow-up</span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-rose-400">60+ Days (Overdue Alert)</p>
+            <p className="text-sm sm:text-lg font-black text-rose-300 mt-1">
+              {formatCurrency(portfolioAging.d60Plus)}
+            </p>
+            <span className="text-[10px] text-rose-400/80">Critical recovery list</span>
+          </div>
+        </div>
+      </div>
+
+      {/* COMPREHENSIVE FILTER & SETTINGS BAR */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden no-print">
+        <div className="p-4 bg-slate-50/70 border-b border-slate-200 space-y-3">
+          
+          {/* Main Top Filter Bar (Search + Quick Mobile Toggle) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
             {/* Search Input */}
-            <div className="relative col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-2">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by shop name, owner, or mobile number..."
+                placeholder="Search shop by name, owner, phone, route, or address..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
+                className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white shadow-2xs"
               />
-            </div>
-
-            {/* Delivery Man Select */}
-            <div>
-              <select
-                value={selectedDeliveryMan}
-                onChange={(e) => setSelectedDeliveryMan(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
-              >
-                <option value="">All Delivery Personnel</option>
-                {uniqueDeliveryMen.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* SR Select */}
-            <div>
-              <select
-                value={selectedSR}
-                onChange={(e) => setSelectedSR(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
-              >
-                <option value="">All Sales Representatives (SR)</option>
-                {uniqueSRs.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Company Select */}
-            <div>
-              <select
-                value={selectedCompany}
-                onChange={(e) => setSelectedCompany(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
-              >
-                <option value="">All Companies</option>
-                {uniqueCompanies.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Route Select */}
-            <div>
-              <select
-                value={selectedRoute}
-                onChange={(e) => setSelectedRoute(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
-              >
-                <option value="">All Routes / Areas</option>
-                {uniqueRoutes.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200/60">
-            {/* Date Filter */}
-            <div className="flex items-center gap-2.5">
-              <span className="text-xs text-slate-500 font-bold">Order Date:</span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
-              />
-              {(searchTerm || selectedDeliveryMan || selectedSR || selectedCompany || selectedRoute || selectedDate) && (
+              {searchTerm && (
                 <button
-                  onClick={handleResetFilters}
-                  className="text-xs text-rose-600 hover:text-rose-700 font-bold hover:underline ml-2"
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
-                  Clear Filters
+                  <XCircle className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            {/* Total due in filtered list */}
-            <div className="text-xs text-slate-600 font-bold">
-              Filtered Total Due: <span className="text-rose-600 font-black text-sm">{formatCurrency(filteredDuesTotalRemaining)}</span>
+            {/* Mobile Filter Toggle Button */}
+            <div className="flex items-center gap-2 sm:hidden">
+              <button
+                type="button"
+                onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
+                className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold rounded-xl border transition-colors ${
+                  isMobileFiltersOpen || activeFilterCount > 0
+                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                    : 'bg-white border-slate-200 text-slate-700'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}</span>
+                {isMobileFiltersOpen ? <ChevronUp className="w-3.5 h-3.5 ml-1" /> : <ChevronDown className="w-3.5 h-3.5 ml-1" />}
+              </button>
+
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-3 py-2 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Expanded Dropdowns Grid (Always visible on Desktop, collapsible on Mobile) */}
+          <div className={`${isMobileFiltersOpen ? 'block' : 'hidden sm:block'} space-y-3 pt-1`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
+              
+              {/* 1. Route Select */}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block mb-1">
+                  Route / Area
+                </label>
+                <select
+                  value={selectedRoute}
+                  onChange={(e) => setSelectedRoute(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
+                >
+                  <option value="">All Routes</option>
+                  {uniqueRoutes.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. Delivery Person Select */}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block mb-1">
+                  Delivery Person
+                </label>
+                <select
+                  value={selectedDeliveryMan}
+                  onChange={(e) => setSelectedDeliveryMan(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
+                >
+                  <option value="">All Delivery Personnel</option>
+                  {uniqueDeliveryMen.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Sales Rep (SR) Select */}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block mb-1">
+                  Sales Rep (SR)
+                </label>
+                <select
+                  value={selectedSR}
+                  onChange={(e) => setSelectedSR(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
+                >
+                  <option value="">All Sales Reps</option>
+                  {uniqueSRs.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. Aging Bracket Filter */}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block mb-1">
+                  Aging Period
+                </label>
+                <select
+                  value={selectedAgingFilter}
+                  onChange={(e) => setSelectedAgingFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
+                >
+                  <option value="">All Aging Periods</option>
+                  <option value="CURRENT">0 - 15 Days (Current)</option>
+                  <option value="STANDARD">16 - 30 Days (Standard)</option>
+                  <option value="WATCHLIST">31 - 60 Days (Watchlist)</option>
+                  <option value="OVERDUE">60+ Days (Overdue Alert)</option>
+                </select>
+              </div>
+
+              {/* 5. Sort By Select */}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block mb-1">
+                  Sort Order
+                </label>
+                <select
+                  value={sortBy}
+                  onChange={(e: any) => setSortBy(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-700 font-medium"
+                >
+                  <option value="HIGHEST_DUE">Highest Due First</option>
+                  <option value="LOWEST_DUE">Lowest Due First</option>
+                  <option value="NAME">Shop Name (A-Z)</option>
+                  <option value="MOST_INVOICES">Most Invoices</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Bottom Row: Status Tabs + Summary + Reset */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-200/70">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="inline-flex p-0.5 rounded-xl bg-slate-200/80 text-xs font-bold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDueStatus('ALL')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      selectedDueStatus === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    All Accounts ({shopAccounts.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDueStatus('ACTIVE')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      selectedDueStatus === 'ACTIVE' ? 'bg-white text-rose-600 shadow-xs' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    Active Dues Only ({shopAccounts.filter((a: any) => a.remainingDue > 0).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDueStatus('SETTLED')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      selectedDueStatus === 'SETTLED' ? 'bg-white text-emerald-600 shadow-xs' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    Settled Only ({shopAccounts.filter((a: any) => a.remainingDue <= 0).length})
+                  </button>
+                </div>
+
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="hidden sm:inline-block text-xs text-rose-600 hover:text-rose-700 font-bold hover:underline ml-2"
+                  >
+                    Clear All Filters
+                  </button>
+                )}
+              </div>
+
+              {/* Filtered Total Display */}
+              <div className="text-xs text-slate-600 font-bold">
+                Filtered Total Due:{' '}
+                <span className="text-rose-600 font-black text-sm">
+                  {formatCurrency(filteredTotalRemaining)}
+                </span>
+                <span className="text-slate-400 text-[11px] font-normal ml-1.5">
+                  ({filteredShopAccounts.length} shops shown)
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Desktop Table */}
+        {/* CUSTOMER AR ACCOUNTS TABLE (Desktop View) */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-[11px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="px-5 py-3.5">Shop & Order</th>
-                <th className="px-5 py-3.5">Delivery Person</th>
-                <th className="px-5 py-3.5">Original Due</th>
-                <th className="px-5 py-3.5">Total Paid</th>
-                <th className="px-5 py-3.5">Remaining Due</th>
-                <th className="px-5 py-3.5">Status</th>
+                <th className="px-5 py-3.5">Customer / Shop Account</th>
+                <th className="px-5 py-3.5">Route & Fulfillment</th>
+                <th className="px-5 py-3.5 text-right">Total Invoiced</th>
+                <th className="px-5 py-3.5 text-right">Total Paid</th>
+                <th className="px-5 py-3.5 text-right">Outstanding Due</th>
+                <th className="px-5 py-3.5 text-center">Aging & Status</th>
                 <th className="px-5 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
@@ -403,86 +711,124 @@ export function DuesPage() {
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center">
                     <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto" />
-                    <p className="mt-2 text-xs font-bold text-slate-400">Loading due records...</p>
+                    <p className="mt-2 text-xs font-bold text-slate-400">Loading customer AR accounts...</p>
                   </td>
                 </tr>
-              ) : filteredDues.length === 0 ? (
+              ) : filteredShopAccounts.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm font-bold">
-                    No due records found.
+                    No customer accounts found matching filters.
                   </td>
                 </tr>
               ) : (
-                filteredDues.map((due: any) => {
-                  const badge = getStatusBadge(due.status);
+                filteredShopAccounts.map((acc: any) => {
+                  const hasDue = acc.remainingDue > 0;
                   return (
-                    <tr key={due.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr key={acc.shopKey} className="hover:bg-slate-50/70 transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 border border-slate-200 flex-shrink-0">
+                          <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 flex-shrink-0">
                             <Store className="w-4 h-4" />
                           </div>
                           <div>
                             <button
-                              onClick={() => {
-                                setSelectedDue(due);
-                                setIsHistoryModalOpen(true);
-                              }}
+                              type="button"
+                              onClick={() => setShopForLedger(acc.shop)}
                               className="font-black text-slate-900 hover:text-indigo-600 transition-colors text-left hover:underline block text-sm"
                             >
-                              {due.shop?.name || 'Direct Sale'}
+                              {acc.shop.name}
                             </button>
-                            <button
-                              onClick={() => handleViewOrder(due.orderId)}
-                              className="text-[10px] font-black text-indigo-600 hover:underline tracking-tight block text-left mt-0.5"
-                            >
-                              Order #{due.orderId}
-                            </button>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+                              {acc.shop.ownerName && <span>{acc.shop.ownerName}</span>}
+                              {acc.shop.phone && (
+                                <a 
+                                  href={`tel:${acc.shop.phone}`} 
+                                  className="text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                                >
+                                  <Phone className="w-2.5 h-2.5" />
+                                  {acc.shop.phone}
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
+
                       <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-800 text-[10px] font-bold flex-shrink-0">
-                            {due.deliveryManName?.charAt(0) || 'D'}
-                          </div>
-                          <span className="font-bold text-slate-800 text-xs">{due.deliveryManName || '—'}</span>
+                        <span className="font-bold text-slate-700 text-xs block">
+                          {acc.shop.route?.name || 'Direct / Unassigned'}
+                        </span>
+                        <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                          <span className="text-[10px] text-slate-400">
+                            {acc.openInvoiceCount} open / {acc.invoiceCount} invoices
+                          </span>
+                          {acc.deliveryMenList.length > 0 && (
+                            <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium">
+                              Deliv: {acc.deliveryMenList.join(', ')}
+                            </span>
+                          )}
                         </div>
                       </td>
-                      <td className="px-5 py-3.5 font-bold text-slate-900">{formatCurrency(due.dueAmount)}</td>
-                      <td className="px-5 py-3.5 font-bold text-emerald-600">{formatCurrency(due.paidAmount)}</td>
-                      <td className="px-5 py-3.5">
-                        <span className={`font-black text-sm ${due.remainingDue > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {formatCurrency(due.remainingDue)}
+
+                      <td className="px-5 py-3.5 text-right font-medium text-slate-700 whitespace-nowrap">
+                        {formatCurrency(acc.totalDue)}
+                      </td>
+
+                      <td className="px-5 py-3.5 text-right font-medium text-emerald-600 whitespace-nowrap">
+                        {formatCurrency(acc.totalPaid)}
+                      </td>
+
+                      <td className="px-5 py-3.5 text-right font-black text-sm whitespace-nowrap">
+                        <span className={hasDue ? 'text-rose-600' : 'text-emerald-600'}>
+                          {formatCurrency(acc.remainingDue)}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5">
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${badge.cls}`}>
-                          {badge.label}
-                        </span>
+
+                      <td className="px-5 py-3.5 text-center">
+                        <div className="inline-flex flex-col items-center gap-1">
+                          {acc.aging60Plus > 0 ? (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                              Overdue &gt; 60d
+                            </span>
+                          ) : acc.aging31_60 > 0 ? (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
+                              31-60d
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Current &lt; 30d
+                            </span>
+                          )}
+                          
+                          {acc.hasDraftAnomaly && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
+                              Audit Draft Flag
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-5 py-3.5 text-right">
+
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => {
-                              setSelectedDue(due);
-                              setIsHistoryModalOpen(true);
-                            }}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200"
-                            title="View Collection History"
+                            type="button"
+                            onClick={() => setShopForLedger(acc.shop)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+                            title="View Customer Subledger with all invoices"
                           >
-                            <History className="w-4 h-4" />
+                            <FileText className="w-3.5 h-3.5" />
+                            Ledger
                           </button>
-                          {due.remainingDue > 0 && (
+
+                          {hasDue && (
                             <button
-                              onClick={() => {
-                                setSelectedDue(due);
-                                setIsCollectModalOpen(true);
-                              }}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                              type="button"
+                              onClick={() => setShopForMultiCollect(acc.shop)}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-colors"
                             >
                               <DollarSign className="w-3.5 h-3.5" />
-                              Collect
+                              Collect Payment
                             </button>
                           )}
                         </div>
@@ -495,88 +841,134 @@ export function DuesPage() {
           </table>
         </div>
 
-        {/* Mobile View Cards */}
+        {/* MOBILE CARDS FOR CUSTOMER ACCOUNTS (Mobile First View) */}
         <div className="md:hidden flex flex-col divide-y divide-slate-100">
           {isLoading ? (
             <div className="p-12 text-center">
               <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto" />
-              <p className="mt-2 text-xs text-slate-400 font-bold">Loading due records...</p>
+              <p className="mt-2 text-xs text-slate-400 font-bold">Loading customer accounts...</p>
             </div>
-          ) : filteredDues.length === 0 ? (
+          ) : filteredShopAccounts.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs font-bold">
-              No due records found.
+              No customer accounts found.
             </div>
           ) : (
-            filteredDues.map((due: any) => {
-              const badge = getStatusBadge(due.status);
+            filteredShopAccounts.map((acc: any) => {
+              const hasDue = acc.remainingDue > 0;
               return (
-                <div key={due.id} className="p-4 flex flex-col gap-3">
-                  <div className="flex justify-between items-start">
+                <div key={acc.shopKey} className="p-4 flex flex-col gap-3 hover:bg-slate-50/50 transition-colors">
+                  
+                  {/* Shop Header Row */}
+                  <div className="flex justify-between items-start gap-2">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 border border-slate-200">
+                      <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 flex-shrink-0">
                         <Store className="w-5 h-5" />
                       </div>
                       <div>
                         <button
-                          onClick={() => {
-                            setSelectedDue(due);
-                            setIsHistoryModalOpen(true);
-                          }}
-                          className="font-black text-slate-900 hover:text-indigo-600 text-sm transition-colors text-left hover:underline block"
+                          onClick={() => setShopForLedger(acc.shop)}
+                          className="font-black text-slate-900 text-sm hover:underline text-left block leading-snug"
                         >
-                          {due.shop?.name || 'Direct Sale'}
+                          {acc.shop.name}
                         </button>
-                        <button
-                          onClick={() => handleViewOrder(due.orderId)}
-                          className="text-[10px] font-black text-indigo-600 hover:underline tracking-tight block text-left mb-0.5"
-                        >
-                          Order #{due.orderId}
-                        </button>
-                        <p className="text-[10px] font-medium text-slate-400">Delivery Person: {due.deliveryManName || '—'}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {acc.shop.ownerName ? `${acc.shop.ownerName}` : 'Owner: —'}
+                        </p>
                       </div>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${badge.cls}`}>
-                      {badge.label}
+
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border flex-shrink-0 ${
+                      hasDue 
+                        ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}>
+                      {hasDue ? 'Active Due' : 'Settled'}
                     </span>
                   </div>
-                  
-                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+
+                  {/* Contact & Route Strip */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {acc.shop.phone && (
+                      <a
+                        href={`tel:${acc.shop.phone}`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold hover:bg-emerald-100"
+                        title="Call Customer Directly"
+                      >
+                        <Phone className="w-3 h-3 text-emerald-600" />
+                        <span>{acc.shop.phone}</span>
+                      </a>
+                    )}
+
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                      <MapPin className="w-3 h-3 text-slate-400" />
+                      {acc.shop.route?.name || 'Unassigned'}
+                    </span>
+
+                    <span className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md font-medium">
+                      {acc.openInvoiceCount} open / {acc.invoiceCount} invoices
+                    </span>
+
+                    {acc.deliveryMenList.length > 0 && (
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Deliv: <strong>{acc.deliveryMenList.join(', ')}</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 3-Box Financial Summary Strip */}
+                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-center">
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Original Due</p>
-                      <p className="font-bold text-slate-900 text-xs sm:text-sm">{formatCurrency(due.dueAmount)}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Invoiced</p>
+                      <p className="font-bold text-slate-800 text-xs mt-0.5">{formatCurrency(acc.totalDue)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Total Paid</p>
-                      <p className="font-bold text-emerald-600 text-xs sm:text-sm">{formatCurrency(due.paidAmount)}</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Paid</p>
+                      <p className="font-bold text-emerald-600 text-xs mt-0.5">{formatCurrency(acc.totalPaid)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Remaining Due</p>
-                      <p className={`font-black text-xs sm:text-sm ${due.remainingDue > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        {formatCurrency(due.remainingDue)}
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Net Due</p>
+                      <p className={`font-black text-xs mt-0.5 ${hasDue ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        {formatCurrency(acc.remainingDue)}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 mt-1">
+                  {/* Aging Badges row if overdue */}
+                  {(acc.aging60Plus > 0 || acc.aging31_60 > 0 || acc.hasDraftAnomaly) && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {acc.aging60Plus > 0 && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                          Critical Overdue &gt; 60d
+                        </span>
+                      )}
+                      {acc.aging31_60 > 0 && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
+                          Watchlist 31-60d
+                        </span>
+                      )}
+                      {acc.hasDraftAnomaly && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          Audit Draft Flag
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Mobile Action Buttons */}
+                  <div className="flex items-center gap-2 pt-1">
                     <button
-                      onClick={() => {
-                        setSelectedDue(due);
-                        setIsHistoryModalOpen(true);
-                      }}
-                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition-colors"
+                      onClick={() => setShopForLedger(acc.shop)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition-colors"
                     >
-                      <History className="w-4 h-4" />
-                      History
+                      <FileText className="w-3.5 h-3.5" />
+                      View Ledger & History
                     </button>
-                    {due.remainingDue > 0 && (
+                    {hasDue && (
                       <button
-                        onClick={() => {
-                          setSelectedDue(due);
-                          setIsCollectModalOpen(true);
-                        }}
-                        className="flex-[2] inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                        onClick={() => setShopForMultiCollect(acc.shop)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors"
                       >
-                        <DollarSign className="w-4 h-4" />
+                        <DollarSign className="w-3.5 h-3.5" />
                         Collect Payment
                       </button>
                     )}
@@ -588,24 +980,35 @@ export function DuesPage() {
         </div>
       </div>
 
-      {isCollectModalOpen && selectedDue && (
-        <CollectModal 
-          due={selectedDue} 
-          onClose={() => setIsCollectModalOpen(false)} 
+      {/* MODALS */}
+
+      {/* 1. Multi-Invoice Enterprise Collection Modal */}
+      {shopForMultiCollect && (
+        <MultiInvoiceCollectModal
+          shop={shopForMultiCollect}
+          onClose={() => setShopForMultiCollect(null)}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['dues'] });
             queryClient.invalidateQueries({ queryKey: ['due-stats'] });
+            queryClient.invalidateQueries({ queryKey: ['shop-dues', shopForMultiCollect.id] });
           }}
         />
       )}
 
-      {isHistoryModalOpen && selectedDue && (
-        <HistoryModal 
-          due={selectedDue} 
-          onClose={() => setIsHistoryModalOpen(false)} 
+      {/* 2. Customer Sub-Ledger Modal */}
+      {shopForLedger && (
+        <CustomerLedgerModal
+          shop={shopForLedger}
+          onClose={() => setShopForLedger(null)}
+          onOpenMultiCollect={() => {
+            setShopForMultiCollect(shopForLedger);
+            setShopForLedger(null);
+          }}
+          onViewOrder={(orderId) => handleViewOrder(orderId)}
         />
       )}
 
+      {/* 3. Order Details Modal */}
       {isViewingOrderLoading && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/30 backdrop-blur-xs">
           <div className="bg-white p-6 rounded-2xl shadow-xl flex items-center gap-3">
@@ -622,6 +1025,7 @@ export function DuesPage() {
         />
       )}
 
+      {/* 4. Manual Due Modal */}
       {isManualDueModalOpen && (
         <ManualDueModal
           onClose={() => setIsManualDueModalOpen(false)}
@@ -801,7 +1205,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Due Amount (৳)</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Due Amount (BDT)</label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -855,244 +1259,6 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
-}
-
-function CollectModal({ due, onClose, onSuccess }: { due: any, onClose: () => void, onSuccess: () => void }) {
-  const { success: showSuccessToast, error: showErrorToast } = useToast();
-  const [amount, setAmount] = useState(due.remainingDue.toString());
-  const [note, setNote] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const { data: collections = [] } = useQuery({
-    queryKey: ['order-collections', due.orderId],
-    queryFn: () => apiRequest<any[]>(`/dues/order/${due.orderId}/collections`, { method: 'GET' }),
-  });
-
-  const pendingAmount = collections
-    .filter((c: any) => c.status === 'PENDING')
-    .reduce((sum: number, c: any) => sum + Number(c.collectedAmount), 0);
-
-  const maxCollectable = Math.max(0, Number(due.remainingDue) - pendingAmount);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const collectAmount = Number(amount);
-    
-    if (collectAmount <= 0) {
-      showErrorToast('Collection amount must be greater than 0.');
-      return;
-    }
-    
-    if (collectAmount > maxCollectable) {
-      showErrorToast(`Collection amount cannot exceed (${formatCurrency(maxCollectable)}) maximum collectable balance.`);
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      await collectDue({
-        orderId: due.orderId,
-        amount: collectAmount,
-        note,
-        collectionDate: date
-      });
-      showSuccessToast('Collection submitted successfully for approval.');
-      onSuccess();
-      onClose();
-    } catch (err: any) {
-      showErrorToast(err.message || 'Failed to submit collection.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in duration-200 mb-0 pb-safe pb-4 sm:pb-0">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <h3 className="text-base sm:text-lg font-black text-slate-900">Collect Due Payment</h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
-            <XCircle className="w-5 h-5 text-slate-400" />
-          </button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 space-y-2 text-xs sm:text-sm">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Shop:</span>
-              <span className="font-bold text-slate-900">{due.shop?.name}</span>
-            </div>
-            <div className="flex justify-between text-rose-600">
-              <span className="font-medium">Remaining Due:</span>
-              <span className="font-black">{formatCurrency(due.remainingDue)}</span>
-            </div>
-            {pendingAmount > 0 && (
-              <div className="flex justify-between text-amber-600">
-                <span className="font-medium">Pending Approval:</span>
-                <span className="font-bold">-{formatCurrency(pendingAmount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between border-t border-slate-200 pt-2 font-black text-emerald-600">
-              <span>Max Collectable:</span>
-              <span>{formatCurrency(maxCollectable)}</span>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Collection Amount (৳)</label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="number"
-                step="0.01"
-                required
-                max={maxCollectable}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Collection Date</label>
-            <input
-              type="date"
-              required
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Notes / Comments (Optional)</label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              placeholder="Payment reference or notes..."
-            />
-          </div>
-
-          <div className="pt-3 flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-xs sm:text-sm font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || maxCollectable <= 0}
-              className="flex-1 px-4 py-2 text-xs sm:text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md shadow-indigo-500/20 disabled:opacity-50"
-            >
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Collection'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function HistoryModal({ due, onClose }: { due: any, onClose: () => void }) {
-  const { data: collections = [], isLoading } = useQuery({
-    queryKey: ['order-collections', due.orderId],
-    queryFn: () => apiRequest<any[]>(`/dues/order/${due.orderId}/collections`, { method: 'GET' }),
-  });
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'APPROVED':
-        return { label: 'Approved', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-      case 'PENDING':
-        return { label: 'Pending', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-      default:
-        return { label: 'Cancel', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm">
-      <div className="w-full sm:max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in duration-200">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <div>
-            <h3 className="text-base sm:text-lg font-black text-slate-900 leading-none">Payment & Collection History</h3>
-            <p className="text-xs font-bold text-slate-500 mt-1">Shop: {due.shop?.name} · Order #{due.orderId}</p>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
-            <XCircle className="w-5 h-5 text-slate-400" />
-          </button>
-        </div>
-        
-        <div className="p-6 overflow-y-auto space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-             <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-100">
-                <p className="text-[10px] font-black uppercase text-slate-400">Original Due</p>
-                <p className="text-lg font-black text-slate-900 mt-0.5">{formatCurrency(due.dueAmount)}</p>
-             </div>
-             <div className="rounded-xl bg-emerald-50 p-3.5 border border-emerald-100">
-                <p className="text-[10px] font-black uppercase text-emerald-600">Total Paid</p>
-                <p className="text-lg font-black text-emerald-700 mt-0.5">{formatCurrency(due.paidAmount)}</p>
-             </div>
-             <div className="rounded-xl bg-rose-50 p-3.5 border border-rose-100">
-                <p className="text-[10px] font-black uppercase text-rose-600">Remaining Due</p>
-                <p className="text-lg font-black text-rose-700 mt-0.5">{formatCurrency(due.remainingDue)}</p>
-             </div>
-          </div>
-
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full min-w-[400px] text-left text-sm">
-              <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Collected By (SR)</th>
-                  <th className="px-4 py-3 text-right">Amount Collected</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center">
-                      <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" />
-                    </td>
-                  </tr>
-                ) : collections.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400 text-xs font-bold">No prior collection history found.</td>
-                  </tr>
-                ) : (
-                  collections.map((c: any) => {
-                    const badge = getStatusBadge(c.status);
-                    return (
-                      <tr key={c.id} className="hover:bg-slate-50/50">
-                        <td className="px-4 py-3 text-xs font-bold text-slate-700">{new Date(c.collectionDate).toLocaleDateString()}</td>
-                        <td className="px-4 py-3 text-xs font-medium text-slate-700">{c.srName}</td>
-                        <td className="px-4 py-3 text-right font-black text-indigo-600">{formatCurrency(c.collectedAmount)}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-black border ${badge.cls}`}>
-                            {badge.label}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        
-        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
-          <button onClick={onClose} className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold">
-            Close
-          </button>
-        </div>
       </div>
     </div>
   );

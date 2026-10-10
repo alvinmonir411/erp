@@ -12,6 +12,7 @@ import {
   CollectionStatus,
 } from './entities/due-collection.entity';
 import { Order } from '../orders/entities/order.entity';
+import { OrderStatus } from '../orders/orders.constants';
 import { Role } from '../../common/enums/role.enum';
 import { User } from '../users/entities/user.entity';
 
@@ -452,6 +453,218 @@ export class DuesService {
     collection.status = CollectionStatus.REJECTED;
     collection.rejectedReason = data.reason;
     return this.collectionsRepository.save(collection);
+  }
+
+  async revertCollection(
+    id: number,
+    data: { reason?: string },
+    adminUser: any,
+  ) {
+    const collection = await this.collectionsRepository.findOne({
+      where: { id },
+      relations: ['due'],
+    });
+
+    if (!collection) {
+      throw new NotFoundException('Collection request not found');
+    }
+
+    if (collection.status === CollectionStatus.PENDING) {
+      throw new ConflictException('Collection request is already pending');
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const amountToReverse = Number(collection.collectedAmount || 0);
+
+      // If it was APPROVED, reverse the financial effects on Due and Order
+      if (collection.status === CollectionStatus.APPROVED && amountToReverse > 0) {
+        const due =
+          collection.due ||
+          (await queryRunner.manager.findOne(Due, {
+            where: { id: collection.dueId },
+          }));
+
+        if (due) {
+          due.paidAmount = Math.max(0, Number(due.paidAmount || 0) - amountToReverse);
+          due.remainingDue = Math.max(0, Number(due.dueAmount || 0) - due.paidAmount);
+
+          if (due.paidAmount <= 0) {
+            due.status = DueStatus.DUE;
+          } else if (due.remainingDue > 0) {
+            due.status = DueStatus.PARTIAL;
+          } else {
+            due.status = DueStatus.PAID;
+          }
+
+          await queryRunner.manager.save(due);
+        }
+
+        const order = await queryRunner.manager.findOne(Order, {
+          where: { id: collection.orderId },
+        });
+
+        if (order) {
+          order.collectedAmount = Math.max(
+            0,
+            Number(order.collectedAmount || 0) - amountToReverse,
+          );
+          const finalAmt = Number(order.actualSoldAmount || order.grandTotal || 0);
+          const adv = Number(order.advancePaid || 0);
+          order.dueAmount = Math.max(
+            0,
+            finalAmt - adv - Number(order.collectedAmount || 0),
+          );
+
+          if (order.dueAmount > 0.01) {
+            order.status = OrderStatus.PARTIAL_DUE;
+          } else {
+            order.status = OrderStatus.SETTLED;
+          }
+
+          await queryRunner.manager.save(order);
+        }
+      }
+
+      // Reset collection status back to PENDING for review, correction, or rejection
+      const previousStatus = collection.status;
+      collection.status = CollectionStatus.PENDING;
+      collection.approvedBy = null as any;
+      collection.approvedAt = null as any;
+      collection.rejectedReason = null as any;
+
+      const auditMsg = ` [REVERTED: Reverted from ${previousStatus} by ${adminUser.name || adminUser.username || 'Admin'} on ${new Date().toISOString()}${data?.reason ? ` - Reason: ${data.reason}` : ''}]`;
+      collection.note = (collection.note || '') + auditMsg;
+
+      const saved = await queryRunner.manager.save(collection);
+      await queryRunner.commitTransaction();
+      return saved;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async editCollection(
+    id: number,
+    data: {
+      collectedAmount?: number;
+      collectionDate?: string;
+      note?: string;
+    },
+    adminUser: any,
+  ) {
+    const collection = await this.collectionsRepository.findOne({
+      where: { id },
+      relations: ['due'],
+    });
+
+    if (!collection) {
+      throw new NotFoundException('Collection request not found');
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const oldAmount = Number(collection.collectedAmount || 0);
+      const newAmount =
+        data.collectedAmount !== undefined
+          ? Number(data.collectedAmount)
+          : oldAmount;
+
+      if (newAmount <= 0) {
+        throw new BadRequestException('Collection amount must be greater than 0');
+      }
+
+      const diff = newAmount - oldAmount;
+
+      // If already APPROVED, adjust due and order balance by the diff
+      if (collection.status === CollectionStatus.APPROVED && diff !== 0) {
+        const due =
+          collection.due ||
+          (await queryRunner.manager.findOne(Due, {
+            where: { id: collection.dueId },
+          }));
+
+        if (due) {
+          const newDuePaid = Number(due.paidAmount || 0) + diff;
+          if (newDuePaid < 0) {
+            throw new BadRequestException(
+              'Adjustment would result in negative paid amount on Due',
+            );
+          }
+          due.paidAmount = newDuePaid;
+          due.remainingDue = Math.max(0, Number(due.dueAmount || 0) - due.paidAmount);
+
+          if (due.remainingDue <= 0) {
+            due.status = DueStatus.PAID;
+            due.remainingDue = 0;
+          } else if (due.paidAmount > 0) {
+            due.status = DueStatus.PARTIAL;
+          } else {
+            due.status = DueStatus.DUE;
+          }
+
+          await queryRunner.manager.save(due);
+        }
+
+        const order = await queryRunner.manager.findOne(Order, {
+          where: { id: collection.orderId },
+        });
+
+        if (order) {
+          order.collectedAmount = Math.max(
+            0,
+            Number(order.collectedAmount || 0) + diff,
+          );
+          const finalAmt = Number(order.actualSoldAmount || order.grandTotal || 0);
+          const adv = Number(order.advancePaid || 0);
+          order.dueAmount = Math.max(
+            0,
+            finalAmt - adv - Number(order.collectedAmount || 0),
+          );
+
+          if (order.dueAmount <= 0.01) {
+            order.dueAmount = 0;
+            order.status = OrderStatus.SETTLED;
+          } else {
+            order.status = OrderStatus.PARTIAL_DUE;
+          }
+
+          await queryRunner.manager.save(order);
+        }
+      }
+
+      // Update collection fields
+      collection.collectedAmount = newAmount;
+      if (data.collectionDate) {
+        collection.collectionDate = new Date(data.collectionDate);
+      }
+      if (data.note !== undefined) {
+        collection.note = data.note;
+      }
+
+      const auditNote = ` [EDITED by ${adminUser.name || adminUser.username || 'Admin'} on ${new Date().toISOString()}]`;
+      if (!collection.note?.includes('EDITED by')) {
+        collection.note = (collection.note || '') + auditNote;
+      }
+
+      const saved = await queryRunner.manager.save(collection);
+      await queryRunner.commitTransaction();
+      return saved;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async getSRDueSummary() {

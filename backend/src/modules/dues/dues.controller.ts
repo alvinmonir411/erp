@@ -80,6 +80,26 @@ export class DuesController {
     return this.duesService.rejectCollection(+id, data, user);
   }
 
+  @Patch('revert/:id')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  revert(
+    @Param('id') id: string,
+    @Body() data: { reason?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.duesService.revertCollection(+id, data, user);
+  }
+
+  @Patch('collection/:id')
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  editCollection(
+    @Param('id') id: string,
+    @Body() data: { collectedAmount?: number; collectionDate?: string; note?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.duesService.editCollection(+id, data, user);
+  }
+
   @Get('sr-summary')
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   getSRSummary() {

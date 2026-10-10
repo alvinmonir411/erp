@@ -7,6 +7,7 @@ import { Purchase, PurchaseItem } from './entities/purchase.entity';
 import { CompanyPayment } from './entities/company-payment.entity';
 import { PurchasesController } from './purchases.controller';
 import { PurchasesService } from './purchases.service';
+import { CloudinaryService } from './cloudinary.service';
 import { StockModule } from '../stock/stock.module';
 
 @Module({
@@ -22,7 +23,7 @@ import { StockModule } from '../stock/stock.module';
     StockModule,
   ],
   controllers: [PurchasesController],
-  providers: [PurchasesService],
-  exports: [PurchasesService],
+  providers: [PurchasesService, CloudinaryService],
+  exports: [PurchasesService, CloudinaryService],
 })
 export class PurchasesModule {}

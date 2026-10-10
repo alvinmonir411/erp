@@ -54,6 +54,8 @@ export function recordCompanyPayment(
     branchName?: string;
     note?: string;
     purchaseId?: number;
+    invoiceImageUrl?: string;
+    invoiceImagePublicId?: string;
     productBreakdown?: Array<{
       productId?: number;
       productName?: string;
@@ -112,6 +114,72 @@ export function deleteCompanyPayment(paymentId: number) {
 
 export function resetPurchasesDemoData() {
   return apiRequest<{ success: boolean; message: string }>('purchases/reset-demo-data', {
+    method: 'DELETE',
+  });
+}
+
+export async function uploadPurchaseInvoiceFile(file: File): Promise<{ url: string; publicId: string }> {
+  // If client-side Cloudinary preset is configured, upload directly to Cloudinary
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+  if (cloudName && uploadPreset) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { url: data.secure_url, publicId: data.public_id };
+      }
+    } catch {
+      // Fallback to backend upload
+    }
+  }
+
+  // Upload through backend endpoint (which handles backend Cloudinary credentials or local storage)
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') || sessionStorage.getItem('token') : null;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+  const res = await fetch(`${apiUrl}/purchases/upload-invoice`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let errMessage = 'Failed to upload invoice document';
+    try {
+      const errJson = await res.json();
+      errMessage = errJson.message || errMessage;
+    } catch {
+      const text = await res.text();
+      if (text) errMessage = text;
+    }
+    throw new Error(errMessage);
+  }
+
+  return res.json();
+}
+
+export function updatePurchaseInvoiceImage(id: number, imageUrl: string, publicId?: string) {
+  return apiRequest<Purchase>(`purchases/${id}/invoice-image`, {
+    method: 'PATCH',
+    body: JSON.stringify({ imageUrl, publicId }),
+  });
+}
+
+export function deletePurchaseInvoiceImage(id: number) {
+  return apiRequest<{ success: boolean; message: string }>(`purchases/${id}/invoice-image`, {
     method: 'DELETE',
   });
 }

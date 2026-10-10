@@ -530,6 +530,10 @@ export class SchemaSyncService implements OnApplicationBootstrap {
         ALTER TABLE "purchases" ADD COLUMN IF NOT EXISTS "vehicleNo" VARCHAR(100);
         ALTER TABLE "purchases" ADD COLUMN IF NOT EXISTS "driverName" VARCHAR(150);
         ALTER TABLE "purchases" ADD COLUMN IF NOT EXISTS "supplierInvoiceNo" VARCHAR(100);
+        ALTER TABLE "purchases" ADD COLUMN IF NOT EXISTS "invoiceImageUrl" TEXT;
+        ALTER TABLE "purchases" ADD COLUMN IF NOT EXISTS "invoiceImagePublicId" VARCHAR(255);
+        ALTER TABLE "company_payments" ADD COLUMN IF NOT EXISTS "invoiceImageUrl" TEXT;
+        ALTER TABLE "company_payments" ADD COLUMN IF NOT EXISTS "invoiceImagePublicId" VARCHAR(255);
 
         CREATE INDEX IF NOT EXISTS "idx_purchases_company_date" ON "purchases" ("companyId", "purchaseDate" DESC);
         CREATE INDEX IF NOT EXISTS "idx_purchases_payment_id" ON "purchases" ("paymentId");

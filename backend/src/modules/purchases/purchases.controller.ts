@@ -8,8 +8,13 @@ import {
   Delete,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { PurchasesService } from './purchases.service';
+import { CloudinaryService } from './cloudinary.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -19,7 +24,35 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('purchases')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PurchasesController {
-  constructor(private readonly purchasesService: PurchasesService) {}
+  constructor(
+    private readonly purchasesService: PurchasesService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Post('upload-invoice')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadInvoice(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file provided for upload');
+    }
+    return this.cloudinaryService.uploadInvoiceFile(file);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Patch(':id/invoice-image')
+  updateInvoiceImage(
+    @Param('id') id: string,
+    @Body() body: { imageUrl: string; publicId?: string },
+  ) {
+    return this.purchasesService.updateInvoiceImage(+id, body.imageUrl, body.publicId);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Delete(':id/invoice-image')
+  deleteInvoiceImage(@Param('id') id: string) {
+    return this.purchasesService.deleteInvoiceImage(+id);
+  }
 
   @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
   @Get('summary/company-wise-payable')

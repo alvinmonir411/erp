@@ -2,7 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect, useState, useMemo } from 'react';
-import { getPurchase, receivePurchasePayment } from '@/lib/api/purchases';
+import {
+  getPurchase,
+  receivePurchasePayment,
+  uploadPurchaseInvoiceFile,
+  updatePurchaseInvoiceImage,
+  deletePurchaseInvoiceImage,
+} from '@/lib/api/purchases';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
@@ -31,6 +37,12 @@ import {
   ShieldCheck,
   TrendingDown,
   Sparkles,
+  Camera,
+  UploadCloud,
+  Trash2,
+  X,
+  ExternalLink,
+  Eye,
 } from 'lucide-react';
 
 export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
@@ -46,11 +58,52 @@ export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
 
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isDeletingImage, setIsDeletingImage] = useState(false);
+  const [previewImageModal, setPreviewImageModal] = useState<string | null>(null);
+
   useToastNotification({
     message: toastMessage,
     title: toastTone === 'success' ? 'Success' : 'Error',
     tone: toastTone,
   });
+
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingImage(true);
+      const res = await uploadPurchaseInvoiceFile(file);
+      const updated = await updatePurchaseInvoiceImage(purchaseId, res.url, res.publicId);
+      setPurchase(updated);
+      setToastTone('success');
+      setToastMessage('Invoice document uploaded to Cloudinary successfully!');
+    } catch (err: any) {
+      setToastTone('error');
+      setToastMessage(err.message || 'Failed to upload invoice document');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleDeleteImage = async () => {
+    if (!confirm('Are you sure you want to delete this invoice document?')) return;
+    try {
+      setIsDeletingImage(true);
+      await deletePurchaseInvoiceImage(purchaseId);
+      setPurchase((prev) =>
+        prev ? { ...prev, invoiceImageUrl: null, invoiceImagePublicId: null } : null,
+      );
+      setToastTone('success');
+      setToastMessage('Invoice document deleted successfully.');
+    } catch (err: any) {
+      setToastTone('error');
+      setToastMessage(err.message || 'Failed to delete invoice document');
+    } finally {
+      setIsDeletingImage(false);
+    }
+  };
 
   const loadPurchase = async () => {
     try {
@@ -277,6 +330,95 @@ export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
         </div>
       </div>
 
+      {/* 📸 Company Invoice / Challan Document (Cloudinary) */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-600 shrink-0">
+              <Camera className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">
+                Company Invoice / Challan Memo Document
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Physical paper challan copy uploaded to Cloudinary
+              </p>
+            </div>
+          </div>
+
+          <div>
+            {purchase.invoiceImageUrl ? (
+              <div className="flex items-center gap-3">
+                <div
+                  onClick={() => setPreviewImageModal(purchase.invoiceImageUrl!)}
+                  className="cursor-pointer relative group rounded-2xl border border-slate-200 overflow-hidden h-16 w-24 bg-slate-50 shadow-sm shrink-0"
+                  title="Click to view full image"
+                >
+                  <img
+                    src={purchase.invoiceImageUrl}
+                    alt="Invoice Document"
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[11px] font-bold">
+                    Enlarge
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>Cloudinary Attached</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewImageModal(purchase.invoiceImageUrl!)}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                    >
+                      <Eye className="h-3 w-3" />
+                      <span>View</span>
+                    </button>
+                    <span className="text-slate-300">•</span>
+                    <label className="text-xs font-bold text-slate-600 hover:text-slate-800 cursor-pointer">
+                      <span>{isUploadingImage ? 'Uploading...' : 'Replace'}</span>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        disabled={isUploadingImage}
+                        onChange={handleUploadImage}
+                        className="hidden"
+                      />
+                    </label>
+                    <span className="text-slate-300">•</span>
+                    <button
+                      type="button"
+                      onClick={handleDeleteImage}
+                      disabled={isDeletingImage}
+                      className="text-xs font-bold text-rose-600 hover:text-rose-800"
+                    >
+                      {isDeletingImage ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <label className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 cursor-pointer transition-all hover:scale-105 active:scale-95">
+                <UploadCloud className="h-4 w-4" />
+                <span>{isUploadingImage ? 'Uploading to Cloudinary...' : 'Upload Challan Document'}</span>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  disabled={isUploadingImage}
+                  onChange={handleUploadImage}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* 📦 Ordered vs Received Products Reconciliation Table */}
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -421,6 +563,44 @@ export function PurchaseDetailsPage({ purchaseId }: { purchaseId: number }) {
           </div>
         </div>
       </div>
+
+      {/* 🖼️ Full-Res Invoice Document Preview Modal */}
+      {previewImageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-white">
+              <span className="text-sm font-bold text-slate-800">
+                Company Invoice / Memo Document (#{purchase.invoiceNo || purchase.id})
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewImageModal}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded-lg hover:bg-indigo-50"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Open Full Size</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewImageModal(null)}
+                  className="p-1 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 overflow-auto flex-1 flex items-center justify-center bg-slate-900/5">
+              <img
+                src={previewImageModal}
+                alt="Invoice Document Full View"
+                className="max-h-[75vh] w-auto object-contain rounded-xl shadow-md"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

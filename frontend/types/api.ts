@@ -287,6 +287,8 @@ export type CreatePurchasePayload = {
   vehicleNo?: string;
   driverName?: string;
   supplierInvoiceNo?: string;
+  invoiceImageUrl?: string | null;
+  invoiceImagePublicId?: string | null;
   note?: string;
   paymentId?: number;
   paidAmount?: number;
@@ -493,6 +495,8 @@ export type Purchase = {
   vehicleNo?: string | null;
   driverName?: string | null;
   supplierInvoiceNo?: string | null;
+  invoiceImageUrl?: string | null;
+  invoiceImagePublicId?: string | null;
   totalAmount: number | string;
   paidAmount: number | string;
   dueAmount?: number | string;
@@ -531,6 +535,8 @@ export type PurchasePayment = {
   bankName?: string | null;
   branchName?: string | null;
   note?: string | null;
+  invoiceImageUrl?: string | null;
+  invoiceImagePublicId?: string | null;
   productBreakdown?: Array<{
     productId?: number;
     productName?: string;

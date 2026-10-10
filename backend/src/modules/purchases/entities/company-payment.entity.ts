@@ -70,6 +70,12 @@ export class CompanyPayment {
   @Column({ type: 'text', nullable: true })
   note?: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  invoiceImageUrl?: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  invoiceImagePublicId?: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   productBreakdown?: any;
 

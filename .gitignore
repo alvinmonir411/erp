@@ -45,3 +45,10 @@ temp/
 Thumbs.db
 .idea/
 .vscode/
+
+# Scratch and uploads
+scratch/
+backend/scratch/
+uploads/
+backend/uploads/
+

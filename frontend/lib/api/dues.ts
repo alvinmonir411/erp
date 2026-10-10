@@ -55,6 +55,24 @@ export async function rejectCollection(id: number, reason: string) {
   });
 }
 
+export async function revertCollection(id: number, reason?: string) {
+  return apiRequest<DueCollection>(`/dues/revert/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function editCollection(id: number, data: {
+  collectedAmount?: number;
+  collectionDate?: string;
+  note?: string;
+}) {
+  return apiRequest<DueCollection>(`/dues/collection/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function getSRDueSummary() {
   return apiRequest<any>('/dues/sr-summary', {
     method: 'GET',
