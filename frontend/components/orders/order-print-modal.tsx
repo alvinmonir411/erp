@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { 
-  Printer, X, Copy, Check, Plus
+  Printer, X, Copy, Check, Plus, Receipt, FileText
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 
@@ -11,6 +11,7 @@ interface OrderPrintModalProps {
   onClose: () => void;
   onNewOrder?: () => void;
   isSuccessModal?: boolean;
+  initialLayout?: 'POS' | 'A4';
 }
 
 export function OrderPrintModal({
@@ -18,9 +19,10 @@ export function OrderPrintModal({
   onClose,
   onNewOrder,
   isSuccessModal = false,
+  initialLayout = 'POS',
 }: OrderPrintModalProps) {
-  // Default to POS Slip (THERMAL 80mm) as requested
-  const [printLayout, setPrintLayout] = useState<'THERMAL' | 'STANDARD'>('THERMAL');
+  // 2 Options: 'POS' (POS System) and 'A4' (A4 Page)
+  const [printLayout, setPrintLayout] = useState<'POS' | 'A4'>(initialLayout);
   const [copied, setCopied] = useState(false);
 
   React.useEffect(() => {
@@ -53,7 +55,7 @@ export function OrderPrintModal({
     ? Number(order.dueAmount)
     : (order.status === 'SETTLED' ? 0 : Math.max(0, grandTotal - paidAmount));
 
-  // Amount formatter without repeating currency label inside tight columns (e.g. "3,798")
+  // Compact amount formatter (e.g. "3,798")
   const formatAmount = (val: number | string) => {
     const num = typeof val === 'string' ? parseFloat(val) : Number(val);
     if (isNaN(num)) return '0';
@@ -67,7 +69,7 @@ export function OrderPrintModal({
 
   return (
     <div className="fixed inset-0 z-[10005] flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150 print:p-0 print:bg-white print:static">
-      {/* Dynamic Print CSS */}
+      {/* Dynamic Print CSS for A4 Page vs POS System */}
       <style>{`
         @media print {
           body * {
@@ -80,17 +82,17 @@ export function OrderPrintModal({
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: ${printLayout === 'THERMAL' ? '72mm' : '100%'} !important;
-            max-width: ${printLayout === 'THERMAL' ? '72mm' : '135mm'} !important;
+            width: ${printLayout === 'POS' ? '72mm' : '100%'} !important;
+            max-width: ${printLayout === 'POS' ? '72mm' : '190mm'} !important;
             margin: 0 auto !important;
-            padding: ${printLayout === 'THERMAL' ? '2mm 1mm' : '4mm 6mm'} !important;
+            padding: ${printLayout === 'POS' ? '2mm 1mm' : '10mm 12mm'} !important;
             background: #ffffff !important;
             color: #000000 !important;
             box-shadow: none !important;
             border: none !important;
             display: block !important;
-            font-size: ${printLayout === 'THERMAL' ? '10px' : '11px'} !important;
-            line-height: 1.25 !important;
+            font-size: ${printLayout === 'POS' ? '10px' : '12px'} !important;
+            line-height: ${printLayout === 'POS' ? '1.25' : '1.35'} !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -98,21 +100,19 @@ export function OrderPrintModal({
             display: none !important;
           }
           @page {
-            size: ${printLayout === 'THERMAL' ? '80mm auto' : 'auto'};
-            margin: ${printLayout === 'THERMAL' ? '1mm' : '5mm 6mm'};
+            size: ${printLayout === 'POS' ? '80mm auto' : 'A4 portrait'};
+            margin: ${printLayout === 'POS' ? '1mm' : '10mm 12mm'};
           }
         }
       `}</style>
 
       {/* Main Modal Card */}
-      <div className={`w-full ${printLayout === 'THERMAL' ? 'max-w-sm' : 'max-w-md'} bg-slate-100 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-300 flex flex-col max-h-[96vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:bg-white transition-all`}>
+      <div className={`w-full ${printLayout === 'POS' ? 'max-w-sm' : 'max-w-2xl'} bg-slate-100 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-300 flex flex-col max-h-[96vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:bg-white transition-all duration-200`}>
         
-        {/* Top Control Bar */}
+        {/* Top Control Bar with 2 Clear Options: POS System & A4 Page */}
         <div className="no-print bg-slate-900 text-white px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <h2 className="text-xs sm:text-sm font-bold truncate">
-              {printLayout === 'THERMAL' ? 'POS Receipt' : 'Invoice Memo'}
-            </h2>
+            <h2 className="text-xs sm:text-sm font-bold truncate">Print Preview</h2>
             <button
               type="button"
               onClick={handleCopyInvoiceNumber}
@@ -124,26 +124,32 @@ export function OrderPrintModal({
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Format Toggle: POS Slip vs Standard */}
-            <div className="inline-flex p-0.5 rounded-lg bg-slate-800 text-[10px] font-bold border border-slate-700">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* The 2 Primary Options: POS System vs A4 Page */}
+            <div className="inline-flex p-0.5 rounded-xl bg-slate-800 border border-slate-700 shadow-inner">
               <button
                 type="button"
-                onClick={() => setPrintLayout('THERMAL')}
-                className={`px-2.5 py-1 rounded transition-all ${
-                  printLayout === 'THERMAL' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                onClick={() => setPrintLayout('POS')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  printLayout === 'POS'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                POS Slip (80mm)
+                <Receipt className="w-3.5 h-3.5" />
+                <span>POS System</span>
               </button>
               <button
                 type="button"
-                onClick={() => setPrintLayout('STANDARD')}
-                className={`px-2.5 py-1 rounded transition-all ${
-                  printLayout === 'STANDARD' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                onClick={() => setPrintLayout('A4')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  printLayout === 'A4'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Standard
+                <FileText className="w-3.5 h-3.5" />
+                <span>A4 Page</span>
               </button>
             </div>
 
@@ -159,17 +165,17 @@ export function OrderPrintModal({
         </div>
 
         {/* Scrollable Canvas Preview Area */}
-        <div className="flex-1 overflow-y-auto p-2 sm:p-3 bg-slate-200/80 flex justify-center print:p-0 print:bg-white print:overflow-visible">
+        <div className="flex-1 overflow-y-auto p-2 sm:p-4 bg-slate-200/80 flex justify-center print:p-0 print:bg-white print:overflow-visible">
           
           {/* ========================================================================= */}
-          {/* 1. TRUE POS SLIP (80mm) LAYOUT: ONLY NAME | QTY | PRICE, ZERO FLUFF */}
+          {/* OPTION 1: POS SYSTEM (80mm Thermal Slip - Only Name, Qty, Price) */}
           {/* ========================================================================= */}
-          {printLayout === 'THERMAL' ? (
+          {printLayout === 'POS' ? (
             <div 
               id="order-print-canvas"
               className="w-full max-w-[310px] bg-white shadow-md rounded-xl p-3.5 text-slate-900 text-[10.5px] leading-tight font-sans"
             >
-              {/* POS Header */}
+              {/* POS Minimal Header */}
               <div className="text-center pb-2 mb-2 border-b border-dashed border-slate-400">
                 <h1 className="text-sm font-black uppercase tracking-tight text-slate-900 leading-tight">
                   M/S KARIM TRADERS
@@ -276,7 +282,7 @@ export function OrderPrintModal({
                 </div>
               </div>
 
-              {/* Clean POS Footer */}
+              {/* POS Footer */}
               <div className="text-center text-[9px] text-slate-500 mt-3 pt-2 border-t border-dashed border-slate-300">
                 Thank you! Please visit again.
               </div>
@@ -285,70 +291,93 @@ export function OrderPrintModal({
           ) : (
 
             /* ========================================================================= */
-            /* 2. STANDARD INVOICE (A4 / MEMO) LAYOUT */
+            /* OPTION 2: A4 PAGE (Full Standard A4 Invoice / Cash Memo) */
             /* ========================================================================= */
             <div 
               id="order-print-canvas"
-              className="w-full max-w-[390px] bg-white shadow-md rounded-xl p-3.5 sm:p-4 text-slate-900 text-[11px] leading-tight"
+              className="w-full max-w-xl bg-white shadow-lg rounded-xl p-5 sm:p-7 text-slate-900 text-xs leading-normal"
             >
-              {/* Header */}
-              <div className="text-center border-b border-slate-800 pb-1.5 mb-2">
-                <h1 className="text-base font-black uppercase tracking-wide text-slate-900 leading-tight">
-                  M/S KARIM TRADERS
-                </h1>
-                <p className="text-[10px] text-slate-500 font-medium">
-                  Ghorashal / Borodarga · Mob: 01763-088369
-                </p>
-                <span className="inline-block px-2 py-0.5 mt-1 bg-slate-900 text-white text-[9px] font-bold uppercase tracking-wider rounded">
-                  Cash Memo / Invoice
-                </span>
+              {/* A4 Header */}
+              <div className="border-b-2 border-slate-900 pb-3 mb-4 flex justify-between items-start">
+                <div>
+                  <h1 className="text-xl font-black uppercase tracking-tight text-slate-900">
+                    M/S KARIM TRADERS
+                  </h1>
+                  <p className="text-xs text-slate-600 font-medium mt-0.5">
+                    Authorized Wholesale Distributor & Dealer
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Ghorashal / Borodarga · Phone: <strong className="font-mono text-slate-700">01763-088369</strong>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="inline-block px-3 py-1 bg-slate-900 text-white text-xs font-black uppercase tracking-wider rounded-md">
+                    Sales Invoice
+                  </span>
+                  <p className="font-mono font-bold text-sm text-slate-900 mt-1.5">
+                    #{order.id.toString().padStart(6, '0')}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Date: {formatDate(order.orderDate || order.createdAt)}
+                  </p>
+                </div>
               </div>
 
-              {/* Customer Box */}
-              <div className="border border-slate-300 rounded-md p-2 mb-2 text-[10.5px] leading-snug bg-slate-50/50 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>Invoice: <strong className="font-mono text-slate-900 font-bold">#{order.id.toString().padStart(6, '0')}</strong></span>
-                  <span className="text-slate-600">Date: {formatDate(order.orderDate || order.createdAt)}</span>
-                </div>
-                <div className="border-t border-slate-200 pt-1 flex items-center justify-between">
-                  <span className="truncate">Customer: <strong className="text-slate-900 font-bold">{order.shop?.name || 'Direct Customer'}</strong></span>
+              {/* A4 Customer & Order Details Card */}
+              <div className="grid grid-cols-2 gap-4 border border-slate-300 rounded-lg p-3 mb-4 bg-slate-50/50 text-xs">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Billed To</p>
+                  <h3 className="font-black text-slate-900 text-sm">
+                    {order.shop?.name || 'Direct Customer'}
+                  </h3>
                   {order.shop?.phone && (
-                    <span className="text-slate-600 font-mono text-[10px] shrink-0 ml-2">{order.shop.phone}</span>
+                    <p className="text-slate-600 font-mono mt-0.5">Phone: {order.shop.phone}</p>
+                  )}
+                  {order.shop?.address && (
+                    <p className="text-slate-500 mt-0.5">{order.shop.address}</p>
                   )}
                 </div>
-                {(order.route?.name || order.shop?.address) && (
-                  <div className="text-[10px] text-slate-500 truncate pt-0.5 border-t border-slate-100">
-                    {order.route?.name && <span>Route: {order.route.name}</span>}
-                    {order.route?.name && order.shop?.address && <span> · </span>}
-                    {order.shop?.address && <span>{order.shop.address}</span>}
-                  </div>
-                )}
+
+                <div className="text-right border-l border-slate-200 pl-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Logistics & Order Info</p>
+                  {order.route?.name && (
+                    <p className="text-slate-700 font-medium">Route: <strong>{order.route.name}</strong></p>
+                  )}
+                  <p className="text-slate-600 mt-0.5">
+                    Status: <strong className="text-slate-900">{order.status || 'Confirmed'}</strong>
+                  </p>
+                  {cleanedNote && (
+                    <p className="text-slate-500 text-[11px] mt-1 italic">
+                      Note: {cleanedNote}
+                    </p>
+                  )}
+                </div>
               </div>
 
-              {/* Standard Table (Item, Qty, Rate, Total) */}
-              <table className="w-full text-left text-[10.5px] border border-slate-400 border-collapse mb-2">
+              {/* A4 Items Table: #, Description, Qty, Rate, Total */}
+              <table className="w-full text-left text-xs border border-slate-300 border-collapse mb-4">
                 <thead>
-                  <tr className="bg-slate-100 border-b border-slate-400 text-[9.5px] font-black uppercase text-slate-700">
-                    <th className="py-1 px-1.5 border-r border-slate-300">Name</th>
-                    <th className="py-1 px-1 text-center w-10 border-r border-slate-300">Qty</th>
-                    <th className="py-1 px-1 text-right w-12 border-r border-slate-300">Rate</th>
-                    <th className="py-1 px-1 text-right w-14">Total</th>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-[11px] font-black uppercase text-slate-700">
+                    <th className="py-2 px-2 text-center w-8 border-r border-slate-300">#</th>
+                    <th className="py-2 px-3 border-r border-slate-300">Description</th>
+                    <th className="py-2 px-2 text-center w-14 border-r border-slate-300">Qty</th>
+                    <th className="py-2 px-3 text-right w-24 border-r border-slate-300">Unit Rate</th>
+                    <th className="py-2 px-3 text-right w-28">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {isManualDue ? (
                     <tr>
-                      <td className="py-1.5 px-1.5 border-r border-slate-200">
-                        <p className="font-bold text-slate-900">Due Settlement</p>
+                      <td className="py-2.5 px-2 text-center font-bold text-slate-400 border-r border-slate-200">1</td>
+                      <td className="py-2.5 px-3 border-r border-slate-200">
+                        <p className="font-bold text-slate-900">Direct Due Settlement Record</p>
                         {cleanedNote && (
-                          <p className="text-[9.5px] text-amber-900 font-medium leading-tight mt-0.5">
-                            Note: {cleanedNote}
-                          </p>
+                          <p className="text-[11px] text-amber-900 font-medium mt-0.5">Note: {cleanedNote}</p>
                         )}
                       </td>
-                      <td className="py-1.5 px-1 text-center font-bold border-r border-slate-200">1</td>
-                      <td className="py-1.5 px-1 text-right font-mono border-r border-slate-200">{formatAmount(grandTotal)}</td>
-                      <td className="py-1.5 px-1 text-right font-mono font-bold text-slate-900">{formatAmount(grandTotal)}</td>
+                      <td className="py-2.5 px-2 text-center font-bold border-r border-slate-200">1</td>
+                      <td className="py-2.5 px-3 text-right font-mono border-r border-slate-200">{formatCurrency(grandTotal)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">{formatCurrency(grandTotal)}</td>
                     </tr>
                   ) : (
                     items.map((item: any, idx: number) => {
@@ -359,75 +388,79 @@ export function OrderPrintModal({
 
                       return (
                         <tr key={idx}>
-                          <td className="py-1 px-1.5 font-bold text-slate-900 border-r border-slate-200 truncate max-w-[150px]">
+                          <td className="py-2 px-2 text-center text-slate-400 border-r border-slate-200">{idx + 1}</td>
+                          <td className="py-2 px-3 font-semibold text-slate-900 border-r border-slate-200">
                             {item.product?.name || 'Item'}
+                            {item.product?.sku && <span className="text-[10px] text-slate-400 font-normal ml-1.5">({item.product.sku})</span>}
                           </td>
-                          <td className="py-1 px-1 text-center font-mono border-r border-slate-200">
-                            {qPaid}{qFree > 0 && <span className="text-emerald-600 font-bold ml-0.5">+{qFree}f</span>}
+                          <td className="py-2 px-2 text-center font-mono border-r border-slate-200">
+                            {qPaid}{qFree > 0 && <span className="text-emerald-700 font-bold ml-1">+{qFree}f</span>}
                           </td>
-                          <td className="py-1 px-1 text-right font-mono text-slate-600 border-r border-slate-200">{formatAmount(price)}</td>
-                          <td className="py-1 px-1 text-right font-mono font-bold text-slate-900">{formatAmount(lineTotal)}</td>
+                          <td className="py-2 px-3 text-right font-mono text-slate-600 border-r border-slate-200">{formatCurrency(price)}</td>
+                          <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">{formatCurrency(lineTotal)}</td>
                         </tr>
                       );
                     })
                   )}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-slate-400 bg-slate-50 font-bold text-[9.5px]">
-                    <td className="py-1 px-1.5 text-right uppercase text-slate-500 border-r border-slate-300">
-                      Total Qty:
+                  <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold text-xs">
+                    <td colSpan={2} className="py-2 px-3 text-right uppercase text-slate-600 border-r border-slate-300">
+                      Total Quantity:
                     </td>
-                    <td className="py-1 px-1 text-center font-mono text-slate-900 border-r border-slate-300">
+                    <td className="py-2 px-2 text-center font-mono text-slate-900 border-r border-slate-300">
                       {isManualDue ? '1' : totalQty}
                     </td>
-                    <td colSpan={2} className="py-1 px-1 text-right font-mono text-slate-900">
+                    <td colSpan={2} className="py-2 px-3 text-right font-mono text-slate-900">
                       {formatCurrency(subtotal)}
                     </td>
                   </tr>
                 </tfoot>
               </table>
 
-              {/* Standard Financial Summary */}
-              <div className="border border-slate-300 rounded-md overflow-hidden mb-2 text-[10.5px] bg-white">
-                <div className="p-2 space-y-1">
-                  <div className="flex items-center justify-between text-slate-600">
-                    <span>Subtotal:</span>
-                    <span className="font-mono font-bold text-slate-900">{formatCurrency(subtotal)}</span>
-                  </div>
-
-                  {discountAmount > 0 && (
-                    <div className="flex items-center justify-between text-rose-600 font-medium">
-                      <span>Discount:</span>
-                      <span className="font-mono font-bold">-{formatCurrency(discountAmount)}</span>
+              {/* A4 Financial Summary */}
+              <div className="flex justify-end mb-8">
+                <div className="w-64 border border-slate-300 rounded-lg overflow-hidden bg-white text-xs">
+                  <div className="p-3 space-y-1.5">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Subtotal:</span>
+                      <span className="font-mono font-bold text-slate-900">{formatCurrency(subtotal)}</span>
                     </div>
-                  )}
 
-                  <div className="flex items-center justify-between font-bold text-slate-900 border-t border-slate-200 pt-1">
-                    <span>Net Total:</span>
-                    <span className="font-mono">{formatCurrency(grandTotal)}</span>
-                  </div>
+                    {discountAmount > 0 && (
+                      <div className="flex justify-between text-rose-600">
+                        <span>Discount:</span>
+                        <span className="font-mono font-bold">-{formatCurrency(discountAmount)}</span>
+                      </div>
+                    )}
 
-                  <div className="flex items-center justify-between text-emerald-700 font-bold border-t border-slate-200 pt-1">
-                    <span>Paid Amount:</span>
-                    <span className="font-mono">{formatCurrency(paidAmount)}</span>
-                  </div>
+                    <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1.5 text-sm">
+                      <span>Net Total:</span>
+                      <span className="font-mono">{formatCurrency(grandTotal)}</span>
+                    </div>
 
-                  <div className="flex items-center justify-between text-rose-700 font-black border-t-2 border-slate-900 pt-1 bg-rose-50/80 -mx-2 -mb-2 p-1.5">
-                    <span>Remaining Due:</span>
-                    <span className="font-mono text-xs">{formatCurrency(dueAmount)}</span>
+                    <div className="flex justify-between text-emerald-700 font-bold">
+                      <span>Paid Amount:</span>
+                      <span className="font-mono">{formatCurrency(paidAmount)}</span>
+                    </div>
+
+                    <div className="flex justify-between text-rose-700 font-black border-t-2 border-slate-900 pt-1.5 text-sm bg-rose-50 -mx-3 -mb-3 p-2.5">
+                      <span>Remaining Due:</span>
+                      <span className="font-mono">{formatCurrency(dueAmount)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Signatures */}
-              <div className="grid grid-cols-2 gap-4 pt-5 pb-1 text-center text-[9.5px]">
+              {/* A4 Signatures */}
+              <div className="grid grid-cols-2 gap-12 pt-10 text-center text-xs">
                 <div>
-                  <div className="border-t border-slate-700 mx-auto w-20 mb-1"></div>
-                  <p className="font-bold text-slate-600 uppercase tracking-wider">Customer Signature</p>
+                  <div className="border-t border-slate-800 mx-auto w-36 mb-1.5"></div>
+                  <p className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Customer Signature</p>
                 </div>
                 <div>
-                  <div className="border-t border-slate-700 mx-auto w-20 mb-1"></div>
-                  <p className="font-bold text-slate-600 uppercase tracking-wider">Authorized Signature</p>
+                  <div className="border-t border-slate-800 mx-auto w-36 mb-1.5"></div>
+                  <p className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Authorized Signature</p>
                 </div>
               </div>
             </div>
@@ -460,10 +493,10 @@ export function OrderPrintModal({
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
+            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
           >
             <Printer className="w-4 h-4" />
-            <span>Print {printLayout === 'THERMAL' ? 'Slip' : 'Invoice'}</span>
+            <span>Print {printLayout === 'POS' ? 'POS Slip' : 'A4 Invoice'}</span>
           </button>
         </div>
 

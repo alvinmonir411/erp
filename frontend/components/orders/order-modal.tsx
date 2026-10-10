@@ -5,7 +5,7 @@ import {
   X, Printer, Info, Clock, CheckCircle, 
   MapPin, Store, Building2, DollarSign, 
   ShieldAlert, Package, Calendar, Trash2,
-  AlertCircle, RefreshCw
+  AlertCircle, RefreshCw, FileText
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { useAuth } from '../auth/auth-provider';
@@ -25,6 +25,7 @@ export function OrderModal({ order, onClose, onDeleteSuccess }: OrderModalProps)
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printLayout, setPrintLayout] = useState<'POS' | 'A4'>('POS');
 
   const handleDelete = () => {
     setShowDeleteConfirm(true);
@@ -378,15 +379,29 @@ export function OrderModal({ order, onClose, onDeleteSuccess }: OrderModalProps)
             )}
             <button 
               type="button"
-              onClick={() => setIsPrintModalOpen(true)} 
-              className="flex-1 rounded-xl border border-indigo-200 bg-indigo-50 py-3 text-xs font-black uppercase tracking-wider text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2 shadow-2xs"
+              onClick={() => {
+                setPrintLayout('POS');
+                setIsPrintModalOpen(true);
+              }} 
+              className="flex-1 rounded-xl border border-indigo-200 bg-indigo-50 py-3 text-xs font-black uppercase tracking-wider text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
             >
               <Printer className="h-4 w-4 text-indigo-600" />
-              <span>Print Invoice / Memo</span>
+              <span>POS Slip</span>
+            </button>
+            <button 
+              type="button"
+              onClick={() => {
+                setPrintLayout('A4');
+                setIsPrintModalOpen(true);
+              }} 
+              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 py-3 text-xs font-black uppercase tracking-wider text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+            >
+              <FileText className="h-4 w-4 text-slate-600" />
+              <span>A4 Invoice</span>
             </button>
             <button 
               onClick={onClose} 
-              className="flex-1 rounded-xl bg-slate-900 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800 transition-colors"
+              className="px-5 rounded-xl bg-slate-900 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800 transition-colors"
             >
               Close
             </button>
@@ -435,6 +450,7 @@ export function OrderModal({ order, onClose, onDeleteSuccess }: OrderModalProps)
       {isPrintModalOpen && (
         <OrderPrintModal
           order={order}
+          initialLayout={printLayout}
           onClose={() => setIsPrintModalOpen(false)}
         />
       )}
