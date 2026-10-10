@@ -400,12 +400,20 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const totalExpensesVal = vanRentVal + salaryVal + customExpensesTotalVal;
   const netExpectedCashFromDeliveryMan = Math.max(0, currentCashCollectable - totalExpensesVal);
 
-  // Auto-fill actual cash received ONCE when the batch first loads — never overwrites user-typed value
+  // Auto-fill actual cash received dynamically whenever netExpectedCashFromDeliveryMan updates,
+  // unless admin has explicitly typed a custom amount manually.
   useEffect(() => {
-    if (netExpectedCashFromDeliveryMan > 0 && !cashManuallyEdited.current && actualCashReceived === '') {
+    if (!cashManuallyEdited.current && netExpectedCashFromDeliveryMan >= 0) {
       setActualCashReceived(String(netExpectedCashFromDeliveryMan));
     }
   }, [netExpectedCashFromDeliveryMan]);
+
+  // When viewing an already settled batch, sync actualCashReceived from batch record
+  useEffect(() => {
+    if (isBatchSettled && batch && batch.totalCollectedAmount !== undefined && batch.totalCollectedAmount !== null) {
+      setActualCashReceived(String(batch.totalCollectedAmount));
+    }
+  }, [isBatchSettled, batch]);
 
   const getDueForProductRow = (batchOrder: DispatchBatchOrder, productId: number) => {
     if (isBatchSettled) {
