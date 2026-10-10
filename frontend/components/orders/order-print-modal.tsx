@@ -112,6 +112,81 @@ export function OrderPrintModal({
     }
   })();
 
+  const formattedDateSlash = (() => {
+    try {
+      const d = new Date(order.orderDate || order.createdAt || new Date());
+      if (isNaN(d.getTime())) return formatDate(order.orderDate || order.createdAt);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return formatDate(order.orderDate || order.createdAt);
+    }
+  })();
+
+  const formattedTime = (() => {
+    try {
+      const d = new Date(order.createdAt || order.orderDate || new Date());
+      if (isNaN(d.getTime())) return '12:00';
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    } catch {
+      return '12:00';
+    }
+  })();
+
+  const numberToWords = (num: number): string => {
+    const n = Math.round(Number(num) || 0);
+    if (n <= 0) return 'ZERO ONLY';
+
+    const ones = [
+      '', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
+      'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN',
+      'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'
+    ];
+    const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+
+    const convertLessThanOneThousand = (val: number): string => {
+      let s = '';
+      if (val >= 100) {
+        s += ones[Math.floor(val / 100)] + ' HUNDRED ';
+        val %= 100;
+      }
+      if (val >= 20) {
+        s += tens[Math.floor(val / 10)] + (val % 10 !== 0 ? ' ' + ones[val % 10] : '');
+      } else if (val > 0) {
+        s += ones[val];
+      }
+      return s.trim();
+    };
+
+    const convert = (val: number): string => {
+      if (val === 0) return '';
+      let res = '';
+      if (val >= 10000000) {
+        res += convert(Math.floor(val / 10000000)) + ' CRORE ';
+        val %= 10000000;
+      }
+      if (val >= 100000) {
+        res += convert(Math.floor(val / 100000)) + ' LAKH ';
+        val %= 100000;
+      }
+      if (val >= 1000) {
+        res += convert(Math.floor(val / 1000)) + ' THOUSAND ';
+        val %= 1000;
+      }
+      if (val > 0) {
+        res += convertLessThanOneThousand(val);
+      }
+      return res.trim();
+    };
+
+    const words = convert(n);
+    return `${words} ONLY`;
+  };
+
   return (
     <div className="fixed inset-0 z-[10005] flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150 print:p-0 print:bg-white print:static">
       {/* Dynamic Print CSS for A4 Page vs POS System */}
@@ -298,114 +373,144 @@ export function OrderPrintModal({
           ) : printLayout === 'POS' ? (
             <div 
               id="order-print-canvas"
-              className="w-full max-w-[310px] bg-white shadow-md rounded-xl p-3.5 text-slate-900 text-[10.5px] leading-tight font-sans"
+              className="w-full max-w-[310px] bg-white shadow-md rounded-xl p-3.5 text-slate-900 text-[10px] leading-tight font-sans"
             >
-              {/* POS Minimal Header */}
-              <div className="text-center pb-2 mb-2 border-b border-dashed border-slate-400">
-                <h1 className="text-sm font-black uppercase tracking-tight text-slate-900 leading-tight">
-                  M/S KARIM TRADERS
+              {/* POS Thermal Header (Matching Reference) */}
+              <div className="text-center pb-2 mb-1.5">
+                <h1 className="text-sm font-bold text-slate-900 tracking-tight leading-tight">
+                  M/S Karim Traders
                 </h1>
-                <p className="text-[10px] text-slate-600 mt-0.5">
+                <p className="text-[10px] text-slate-700 mt-0.5">
                   Pirgacha
                 </p>
-                <p className="text-[10px] text-slate-600 font-medium tabular-nums">
-                  Mob: 01763-088369
+                <p className="text-[10px] text-slate-700 tabular-nums">
+                  Cell No.: 01763-088369
                 </p>
-                <div className="text-[9px] font-black uppercase tracking-wider text-slate-700 mt-1">
-                  POS Sales Receipt
-                </div>
+                <p className="text-[9px] text-slate-600 mt-1">
+                  Mushak Challan -6.3
+                </p>
               </div>
 
-              {/* Minimal Customer & Invoice Info */}
-              <div className="pb-2 mb-2 border-b border-dashed border-slate-400 text-[10px] space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>Inv: <strong className="text-slate-900 font-bold tabular-nums">#{order.id.toString().padStart(6, '0')}</strong></span>
-                  <span className="text-slate-600">{formatDate(order.orderDate || order.createdAt)}</span>
+              {/* Bill & Customer Metadata Box */}
+              <div className="py-1.5 border-t border-b border-dashed border-slate-400 text-[10px] space-y-1">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-slate-800">BILL NO. :</span>
+                    <span className="font-bold tabular-nums text-slate-900">{order.id}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-slate-800">DATE :</span>
+                    <span className="tabular-nums text-slate-900">{formattedDateSlash}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="truncate">Customer: <strong className="text-slate-900 font-bold">{order.shop?.name || 'Walk-in'}</strong></span>
-                  {order.shop?.phone && (
-                    <span className="text-slate-600 tabular-nums text-[9.5px] shrink-0 ml-1">{order.shop.phone}</span>
-                  )}
+                <div className="flex justify-between items-center">
+                  <div className="truncate max-w-[170px]">
+                    <span className="font-bold text-slate-800">Customer :</span>
+                    <span className="font-semibold text-slate-900 ml-1">{order.shop?.name || 'Walk-in'}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-slate-800">TIME :</span>
+                    <span className="tabular-nums text-slate-900">{formattedTime}</span>
+                  </div>
                 </div>
+                {(order.route?.name || order.shop?.phone) && (
+                  <div className="flex justify-between items-center text-[9.5px]">
+                    <div className="truncate max-w-[170px]">
+                      {order.route?.name && (
+                        <span><span className="font-bold text-slate-800">Route :</span> {order.route.name}</span>
+                      )}
+                    </div>
+                    <div>
+                      {order.shop?.phone && (
+                        <span className="tabular-nums text-slate-700">{order.shop.phone}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* ONLY 3 COLUMNS: NAME | QTY | PRICE */}
-              <table className="w-full text-left text-[10.5px] mb-2 border-collapse">
+              {/* EXACT 4 COLUMNS FROM PHOTO: Item Name | Qty. | Rate | Amount */}
+              <table className="w-full text-left text-[10px] my-1 border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-slate-900 text-[9.5px] font-black uppercase text-slate-800">
-                    <th className="py-1 pr-1 text-left">Name</th>
-                    <th className="py-1 px-1 text-center w-12">Qty</th>
-                    <th className="py-1 pl-1 text-right w-16">Price</th>
+                  <tr className="border-b border-dashed border-slate-400 text-[9.5px] font-bold text-slate-800">
+                    <th className="py-1 pr-1 text-left">Item Name</th>
+                    <th className="py-1 px-1 text-right w-10">Qty.</th>
+                    <th className="py-1 px-1 text-right w-14">Rate</th>
+                    <th className="py-1 pl-1 text-right w-16">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {isManualDue ? (
-                    <tr className="border-b border-slate-100">
-                      <td className="py-1 pr-1 font-bold text-slate-900 leading-tight">
-                        Due Settlement
-                        {cleanedNote && (
-                          <p className="text-[9px] text-slate-500 font-normal mt-0.5">{cleanedNote}</p>
+                  {visibleItemRows.map((item: any, idx: number) => (
+                    <tr key={idx} className="border-none">
+                      <td className="py-0.5 pr-1 text-left font-normal text-slate-900 leading-tight">
+                        <div>{item.product?.name || 'Item'}</div>
+                        {item.qFree > 0 && (
+                          <span className="text-[8px] text-slate-500 font-bold">(+{item.qFree} free)</span>
                         )}
                       </td>
-                      <td className="py-1 px-1 text-center font-bold tabular-nums">1</td>
-                      <td className="py-1 pl-1 text-right tabular-nums font-bold text-slate-900">{formatAmount(grandTotal)}</td>
+                      <td className="py-0.5 px-1 text-right tabular-nums text-slate-800 font-medium">
+                        {formatAmount(item.qPaid)}
+                      </td>
+                      <td className="py-0.5 px-1 text-right tabular-nums text-slate-800">
+                        {formatAmount(item.price)}
+                      </td>
+                      <td className="py-0.5 pl-1 text-right tabular-nums font-bold text-slate-900">
+                        {formatAmount(item.lineTotal)}
+                      </td>
                     </tr>
-                  ) : (
-                    visibleItemRows.map((item: any, idx: number) => {
-                      return (
-                        <tr key={idx} className="border-b border-slate-100/60 last:border-none">
-                          <td className="py-1 pr-1 font-semibold text-slate-900 leading-tight">
-                            {item.product?.name || 'Item'}
-                            {item.qFree > 0 && <span className="text-[8.5px] text-slate-500 font-bold ml-1">(+{item.qFree} free)</span>}
-                          </td>
-                          <td className="py-1 px-1 text-center tabular-nums font-semibold text-slate-800">
-                            {formatAmount(item.qPaid)}
-                          </td>
-                          <td className="py-1 pl-1 text-right tabular-nums font-bold text-slate-900">
-                            {formatAmount(item.lineTotal)}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                  ))}
                 </tbody>
               </table>
 
-              {/* POS Financial Summary */}
-              <div className="border-t border-slate-400 pt-1.5 space-y-1 text-[10.5px]">
-                <div className="flex justify-between text-slate-600">
-                  <span>Total Qty:</span>
-                  <span className="tabular-nums font-bold text-slate-900">
-                    {isManualDue ? '1' : formatAmount(totalDeliveredQty)}
-                  </span>
+              {/* Sub-Total & Financial Totals (Excluding Service Charge SC as Instructed) */}
+              <div className="border-t border-dashed border-slate-400 pt-1.5 space-y-1 text-[10px]">
+                <div className="flex justify-between text-slate-700">
+                  <span className="font-medium">Sub-Total ::</span>
+                  <span className="tabular-nums font-bold text-slate-900">{formatAmount(subtotal)}</span>
+                </div>
+
+                <div className="flex justify-between items-center text-slate-700">
+                  <span>Items ({visibleItemRows.length})</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">Bill Total :</span>
+                    <span className="tabular-nums font-bold text-slate-900">{formatAmount(grandTotal)}</span>
+                  </div>
                 </div>
 
                 {discountAmount > 0 && (
-                  <div className="flex justify-between text-slate-600 font-medium">
-                    <span>Discount:</span>
-                    <span className="tabular-nums font-bold">-{formatAmount(discountAmount)}</span>
+                  <div className="flex justify-between text-slate-700 font-medium">
+                    <span>Discount :</span>
+                    <span className="tabular-nums font-bold text-slate-900">-{formatAmount(discountAmount)}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1 text-[11px]">
-                  <span>Total Bill:</span>
-                  <span className="tabular-nums font-black">{formatCurrency(grandTotal)}</span>
+                {paidAmount > 0 && (
+                  <div className="flex justify-between text-slate-700 font-medium">
+                    <span>Paid :</span>
+                    <span className="tabular-nums font-bold text-slate-900">{formatAmount(paidAmount)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between font-bold text-slate-900 border-t border-dashed border-slate-300 pt-1">
+                  <span>Net To Pay :</span>
+                  <span className="tabular-nums font-black text-slate-900">{formatAmount(dueAmount > 0 ? dueAmount : grandTotal)}</span>
                 </div>
 
-                <div className="flex justify-between text-slate-700 font-medium">
-                  <span>Paid:</span>
-                  <span className="tabular-nums font-semibold">{formatCurrency(paidAmount)}</span>
-                </div>
-
-                <div className="flex justify-between font-black text-slate-900 border-t border-slate-400 pt-1 text-[11.5px]">
-                  <span>Due Amount:</span>
-                  <span className="tabular-nums">{formatCurrency(dueAmount)}</span>
-                </div>
+                {dueAmount > 0 && paidAmount > 0 && (
+                  <div className="flex justify-between font-black text-slate-900">
+                    <span>Due Amount :</span>
+                    <span className="tabular-nums">{formatAmount(dueAmount)}</span>
+                  </div>
+                )}
               </div>
 
-              {/* POS Footer */}
-              <div className="text-center text-[9.5px] text-slate-800 mt-2.5 pt-2 border-t border-dashed border-slate-300 space-y-0.5">
+              {/* In-Word Row (Exact from Photo) */}
+              <div className="border-t border-b border-dashed border-slate-400 py-1.5 mt-2 text-[9px] text-slate-800 font-bold uppercase tracking-tight leading-tight">
+                IN-WORD: {numberToWords(dueAmount > 0 ? dueAmount : grandTotal)}
+              </div>
+
+              {/* POS Footer (Bengali Disclaimer & Greeting) */}
+              <div className="text-center text-[9.5px] text-slate-800 mt-2.5 pt-1 space-y-0.5">
                 <p className="font-bold">বিক্রিত পণ্য ফেরত নেওয়া হয় না</p>
                 <p className="text-[8px] text-slate-500">Thank you! Please visit again.</p>
               </div>
