@@ -76,28 +76,28 @@ export function CollectionsPage() {
           <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Due & Collection History</h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Shop due ledgers, cash collections, and payment history</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
           <Link
             href="/dues"
-            className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-white border border-slate-200 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs shrink-0 whitespace-nowrap"
           >
-            <DollarSign className="w-4 h-4 text-indigo-600" />
-            Due List
+            <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
+            <span>Customer AR</span>
           </Link>
           <Link
             href="/dues/collections"
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-black text-white shadow-md shadow-indigo-500/20"
+            className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-indigo-600 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-black text-white shadow-md shadow-indigo-500/20 shrink-0 whitespace-nowrap"
           >
-            <Clock className="w-4 h-4" />
-            Collection History
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Collection History</span>
           </Link>
           {user?.role === Role.SUPER_ADMIN && (
             <Link
               href="/dues/approvals"
-              className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-white border border-slate-200 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs shrink-0 whitespace-nowrap"
             >
-              <CheckCircle className="w-4 h-4 text-emerald-500" />
-              Payment Approvals
+              <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+              <span>Payment Approvals</span>
             </Link>
           )}
         </div>

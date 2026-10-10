@@ -317,52 +317,53 @@ export function DuesPage() {
   return (
     <div className="space-y-6">
       {/* Header & Main Navigation */}
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 no-print">
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 sm:gap-4 no-print">
         <div>
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
               Customer Accounts Receivable
             </h1>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600" />
               Reconciled Ledger
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Customer subledgers, multi-invoice payment settlements, collection history, and aging breakdown.
+            Customer subledgers, multi-invoice payment settlements, and aging breakdown.
           </p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Sleek Horizontal Navigation Pill Bar */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
           <Link
             href="/dues"
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs sm:text-sm font-black text-white shadow-md shadow-indigo-500/20"
+            className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-indigo-600 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-black text-white shadow-md shadow-indigo-500/20 shrink-0 whitespace-nowrap"
           >
-            <DollarSign className="w-4 h-4" />
-            Customer AR
+            <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Customer AR</span>
           </Link>
           <Link
             href="/dues/collections"
-            className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-white border border-slate-200 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs shrink-0 whitespace-nowrap"
           >
-            <Clock className="w-4 h-4 text-amber-500" />
-            Collection History
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
+            <span>Collection History</span>
           </Link>
           {user?.role === Role.SUPER_ADMIN && (
             <>
               <Link
                 href="/dues/approvals"
-                className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
+                className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-white border border-slate-200 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs shrink-0 whitespace-nowrap"
               >
-                <CheckCircle className="w-4 h-4 text-emerald-500" />
-                Payment Approvals
+                <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+                <span>Payment Approvals</span>
               </Link>
               <button
                 onClick={() => setIsManualDueModalOpen(true)}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2 text-xs sm:text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-slate-900 text-white px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm shrink-0 whitespace-nowrap"
               >
-                <Plus className="w-4 h-4" />
-                Manual Due Entry
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Manual Due Entry</span>
               </button>
             </>
           )}
@@ -370,121 +371,158 @@ export function DuesPage() {
       </div>
 
       {/* 4 Summary Stat Cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 no-print">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-rose-50 text-rose-600 flex-shrink-0">
-              <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+      <div className="grid gap-2 sm:gap-4 grid-cols-2 lg:grid-cols-4 no-print">
+        {/* 1. Market Receivable */}
+        <div className="rounded-2xl sm:rounded-3xl border border-rose-100 sm:border-slate-200 bg-white p-3 sm:p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 sm:text-slate-500 truncate">
+              <span className="sm:hidden">Total Due</span>
+              <span className="hidden sm:inline">Market Receivable</span>
+            </span>
+            <div className="flex h-7 w-7 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-2xl bg-rose-50 text-rose-600 shrink-0">
+              <AlertCircle className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Market Receivable</p>
-              <p className="text-lg sm:text-2xl font-black text-rose-600 mt-0.5">
-                {formatCurrency(stats?.totalRemaining ?? 0)}
-              </p>
-            </div>
+          </div>
+          <div className="mt-2 sm:mt-3">
+            <p className="text-[15px] sm:text-2xl font-black text-rose-600 tracking-tight truncate" title={formatCurrency(stats?.totalRemaining ?? 0)}>
+              {formatCurrency(stats?.totalRemaining ?? 0)}
+            </p>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-medium mt-0.5 hidden sm:block">
+              Total active market balance
+            </p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 flex-shrink-0">
-              <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+        {/* 2. Total Collected */}
+        <div className="rounded-2xl sm:rounded-3xl border border-emerald-100 sm:border-slate-200 bg-white p-3 sm:p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 sm:text-slate-500 truncate">
+              <span className="sm:hidden">Collected</span>
+              <span className="hidden sm:inline">Total Collected</span>
+            </span>
+            <div className="flex h-7 w-7 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-2xl bg-emerald-50 text-emerald-600 shrink-0">
+              <CheckCircle className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Collected</p>
-              <p className="text-lg sm:text-2xl font-black text-emerald-600 mt-0.5">
-                {formatCurrency(stats?.totalPaid ?? 0)}
-              </p>
-            </div>
+          </div>
+          <div className="mt-2 sm:mt-3">
+            <p className="text-[15px] sm:text-2xl font-black text-emerald-600 tracking-tight truncate" title={formatCurrency(stats?.totalPaid ?? 0)}>
+              {formatCurrency(stats?.totalPaid ?? 0)}
+            </p>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-medium mt-0.5 hidden sm:block">
+              Collected customer payments
+            </p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600 flex-shrink-0">
-              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+        {/* 3. Pending Approval */}
+        <div className="rounded-2xl sm:rounded-3xl border border-amber-100 sm:border-slate-200 bg-white p-3 sm:p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 sm:text-slate-500 truncate">
+              <span className="sm:hidden">Pending</span>
+              <span className="hidden sm:inline">Pending Approval</span>
+            </span>
+            <div className="flex h-7 w-7 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-2xl bg-amber-50 text-amber-600 shrink-0">
+              <Clock className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Approval</p>
-              <p className="text-lg sm:text-2xl font-black text-amber-600 mt-0.5">
-                {formatCurrency(stats?.pendingApproval ?? 0)}
-              </p>
-            </div>
+          </div>
+          <div className="mt-2 sm:mt-3">
+            <p className="text-[15px] sm:text-2xl font-black text-amber-600 tracking-tight truncate" title={formatCurrency(stats?.pendingApproval ?? 0)}>
+              {formatCurrency(stats?.pendingApproval ?? 0)}
+            </p>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-medium mt-0.5 hidden sm:block">
+              Awaiting manager approval
+            </p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 flex-shrink-0">
-              <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+        {/* 4. Active Debtor Accounts */}
+        <div className="rounded-2xl sm:rounded-3xl border border-indigo-100 sm:border-slate-200 bg-white p-3 sm:p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 sm:text-slate-500 truncate">
+              <span className="sm:hidden">Debtors</span>
+              <span className="hidden sm:inline">Debtor Accounts</span>
+            </span>
+            <div className="flex h-7 w-7 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-2xl bg-indigo-50 text-indigo-600 shrink-0">
+              <Users className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Debtor Accounts</p>
-              <p className="text-lg sm:text-2xl font-black text-slate-900 mt-0.5">
-                {shopAccounts.filter((a: any) => a.remainingDue > 0).length} of {shopAccounts.length}
-              </p>
-            </div>
+          </div>
+          <div className="mt-2 sm:mt-3">
+            <p className="text-[15px] sm:text-2xl font-black text-slate-900 tracking-tight truncate">
+              <span>{shopAccounts.filter((a: any) => a.remainingDue > 0).length}</span>
+              <span className="text-xs sm:text-sm font-semibold text-slate-400 ml-1.5">of {shopAccounts.length}</span>
+            </p>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-medium mt-0.5 hidden sm:block">
+              Shops with active balances
+            </p>
           </div>
         </div>
       </div>
 
       {/* AR Aging Portfolio Breakdown Ribbon */}
-      <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 sm:p-5 text-white shadow-md no-print">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+      <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 sm:p-5 text-white shadow-md no-print">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-white/10">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm font-black uppercase tracking-wider text-indigo-300">
+              <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-indigo-300">
                 Portfolio Aging Analysis
               </h2>
               <span className="text-[10px] bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 px-2 py-0.5 rounded-md font-bold">
                 Daily Roll-Forward
               </span>
             </div>
-            <p className="text-xs text-slate-300 mt-0.5">
+            <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5">
               Reconciled across {shopAccounts.length} verified customer accounts
             </p>
           </div>
-          <div className="text-left sm:text-right">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+          <div className="flex sm:flex-col justify-between items-center sm:items-end">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
               Market Outstanding
             </span>
-            <span className="text-lg sm:text-xl font-black text-rose-400">
+            <span className="text-base sm:text-xl font-black text-rose-400">
               {formatCurrency(stats?.totalRemaining ?? 0)}
             </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 pt-4">
-          <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">0 - 15 Days (Current)</p>
-            <p className="text-sm sm:text-lg font-black text-white mt-1">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 pt-3.5">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">0 - 15 Days</p>
+              <span className="text-[9px] text-slate-400 block leading-tight">Current</span>
+            </div>
+            <p className="text-xs sm:text-base font-black text-white mt-1.5 truncate">
               {formatCurrency(portfolioAging.current)}
             </p>
-            <span className="text-[10px] text-slate-400">Regular trade cycle</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">16 - 30 Days (Standard)</p>
-            <p className="text-sm sm:text-lg font-black text-white mt-1">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">16 - 30 Days</p>
+              <span className="text-[9px] text-slate-400 block leading-tight">Standard</span>
+            </div>
+            <p className="text-xs sm:text-base font-black text-white mt-1.5 truncate">
               {formatCurrency(portfolioAging.d16_30)}
             </p>
-            <span className="text-[10px] text-slate-400">Due for collection</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">31 - 60 Days (Watchlist)</p>
-            <p className="text-sm sm:text-lg font-black text-white mt-1">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">31 - 60 Days</p>
+              <span className="text-[9px] text-slate-400 block leading-tight">Watchlist</span>
+            </div>
+            <p className="text-xs sm:text-base font-black text-white mt-1.5 truncate">
               {formatCurrency(portfolioAging.d31_60)}
             </p>
-            <span className="text-[10px] text-slate-400">Requires follow-up</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-rose-400">60+ Days (Overdue Alert)</p>
-            <p className="text-sm sm:text-lg font-black text-rose-300 mt-1">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-400">60+ Days</p>
+              <span className="text-[9px] text-rose-400/80 block leading-tight">Overdue Alert</span>
+            </div>
+            <p className="text-xs sm:text-base font-black text-rose-300 mt-1.5 truncate">
               {formatCurrency(portfolioAging.d60Plus)}
             </p>
-            <span className="text-[10px] text-rose-400/80">Critical recovery list</span>
           </div>
         </div>
       </div>
@@ -636,56 +674,56 @@ export function DuesPage() {
             </div>
 
             {/* Bottom Row: Status Tabs + Summary + Reset */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-200/70">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="inline-flex p-0.5 rounded-xl bg-slate-200/80 text-xs font-bold text-slate-600">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200/70">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
+                <div className="inline-flex p-0.5 rounded-xl bg-slate-200/80 text-xs font-bold text-slate-600 shrink-0">
                   <button
                     type="button"
                     onClick={() => setSelectedDueStatus('ALL')}
-                    className={`px-3 py-1 rounded-lg transition-all ${
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg transition-all whitespace-nowrap ${
                       selectedDueStatus === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
                     }`}
                   >
-                    All Accounts ({shopAccounts.length})
+                    All ({shopAccounts.length})
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedDueStatus('ACTIVE')}
-                    className={`px-3 py-1 rounded-lg transition-all ${
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg transition-all whitespace-nowrap ${
                       selectedDueStatus === 'ACTIVE' ? 'bg-white text-rose-600 shadow-xs' : 'hover:text-slate-900'
                     }`}
                   >
-                    Active Dues Only ({shopAccounts.filter((a: any) => a.remainingDue > 0).length})
+                    Active Dues ({shopAccounts.filter((a: any) => a.remainingDue > 0).length})
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedDueStatus('SETTLED')}
-                    className={`px-3 py-1 rounded-lg transition-all ${
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg transition-all whitespace-nowrap ${
                       selectedDueStatus === 'SETTLED' ? 'bg-white text-emerald-600 shadow-xs' : 'hover:text-slate-900'
                     }`}
                   >
-                    Settled Only ({shopAccounts.filter((a: any) => a.remainingDue <= 0).length})
+                    Settled ({shopAccounts.filter((a: any) => a.remainingDue <= 0).length})
                   </button>
                 </div>
 
                 {activeFilterCount > 0 && (
                   <button
                     onClick={handleResetFilters}
-                    className="hidden sm:inline-block text-xs text-rose-600 hover:text-rose-700 font-bold hover:underline ml-2"
+                    className="text-xs text-rose-600 hover:text-rose-700 font-bold hover:underline shrink-0 whitespace-nowrap ml-1"
                   >
-                    Clear All Filters
+                    Clear Filters
                   </button>
                 )}
               </div>
 
               {/* Filtered Total Display */}
-              <div className="text-xs text-slate-600 font-bold">
-                Filtered Total Due:{' '}
+              <div className="text-xs text-slate-600 font-bold flex items-center justify-between sm:justify-end gap-1.5 pt-1 sm:pt-0">
+                <span className="text-slate-500">Filtered Total:</span>
                 <span className="text-rose-600 font-black text-sm">
                   {formatCurrency(filteredTotalRemaining)}
                 </span>
-                <span className="text-slate-400 text-[11px] font-normal ml-1.5">
-                  ({filteredShopAccounts.length} shops shown)
+                <span className="text-slate-400 text-[11px] font-normal">
+                  ({filteredShopAccounts.length} shops)
                 </span>
               </div>
             </div>
@@ -860,24 +898,24 @@ export function DuesPage() {
                   
                   {/* Shop Header Row */}
                   <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 flex-shrink-0">
-                        <Store className="w-5 h-5" />
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
+                        <Store className="w-4 h-4" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <button
                           onClick={() => setShopForLedger(acc.shop)}
-                          className="font-black text-slate-900 text-sm hover:underline text-left block leading-snug"
+                          className="font-black text-slate-900 text-sm hover:underline text-left block leading-snug truncate"
                         >
                           {acc.shop.name}
                         </button>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
+                        <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                           {acc.shop.ownerName ? `${acc.shop.ownerName}` : 'Owner: —'}
                         </p>
                       </div>
                     </div>
 
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border flex-shrink-0 ${
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border shrink-0 ${
                       hasDue 
                         ? 'bg-rose-50 text-rose-700 border-rose-200' 
                         : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -887,11 +925,11 @@ export function DuesPage() {
                   </div>
 
                   {/* Contact & Route Strip */}
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
                     {acc.shop.phone && (
                       <a
                         href={`tel:${acc.shop.phone}`}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold hover:bg-emerald-100"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold hover:bg-emerald-100"
                         title="Call Customer Directly"
                       >
                         <Phone className="w-3 h-3 text-emerald-600" />
@@ -916,18 +954,18 @@ export function DuesPage() {
                   </div>
 
                   {/* 3-Box Financial Summary Strip */}
-                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-center">
-                    <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">Invoiced</p>
-                      <p className="font-bold text-slate-800 text-xs mt-0.5">{formatCurrency(acc.totalDue)}</p>
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 bg-slate-50 p-2 sm:p-2.5 rounded-xl border border-slate-200/80 text-center">
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase truncate">Invoiced</p>
+                      <p className="font-bold text-slate-800 text-xs mt-0.5 truncate">{formatCurrency(acc.totalDue)}</p>
                     </div>
-                    <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">Paid</p>
-                      <p className="font-bold text-emerald-600 text-xs mt-0.5">{formatCurrency(acc.totalPaid)}</p>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase truncate">Paid</p>
+                      <p className="font-bold text-emerald-600 text-xs mt-0.5 truncate">{formatCurrency(acc.totalPaid)}</p>
                     </div>
-                    <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">Net Due</p>
-                      <p className={`font-black text-xs mt-0.5 ${hasDue ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase truncate">Net Due</p>
+                      <p className={`font-black text-xs mt-0.5 truncate ${hasDue ? 'text-rose-600' : 'text-emerald-600'}`}>
                         {formatCurrency(acc.remainingDue)}
                       </p>
                     </div>
