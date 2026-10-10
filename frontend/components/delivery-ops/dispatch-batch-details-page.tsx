@@ -1759,10 +1759,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           </div>
         </div>
 
-        {/* Bottom Disclaimer */}
-        <div className="text-center pt-2 mt-1.5 border-t border-slate-300">
-          <p className="text-[8px] font-black text-black tracking-wide uppercase">
-            বিড়ি পণ্য ফেরত নেওয়া হয় না (Biri ponno ferot neoya hoy na)
+        {/* Page End Footer Disclaimer */}
+        <div className="text-center pt-2.5 mt-2 border-t border-slate-300">
+          <p className="text-[9px] font-bold text-slate-900 tracking-wide">
+            * বিক্রিত পণ্য ফেরত নেওয়া হয় না *
           </p>
         </div>
       </div>

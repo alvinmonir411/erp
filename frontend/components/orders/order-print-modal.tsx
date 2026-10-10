@@ -405,8 +405,8 @@ export function OrderPrintModal({
               </div>
 
               {/* POS Footer */}
-              <div className="text-center text-[9px] text-slate-700 mt-2.5 pt-2 border-t border-dashed border-slate-300 space-y-0.5">
-                <p className="font-bold">বিড়ি পণ্য ফেরত নেওয়া হয় না</p>
+              <div className="text-center text-[9.5px] text-slate-800 mt-2.5 pt-2 border-t border-dashed border-slate-300 space-y-0.5">
+                <p className="font-bold">বিক্রিত পণ্য ফেরত নেওয়া হয় না</p>
                 <p className="text-[8px] text-slate-500">Thank you! Please visit again.</p>
               </div>
             </div>
@@ -584,9 +584,9 @@ export function OrderPrintModal({
               </div>
 
               {/* A4 Footer Disclaimer */}
-              <div className="text-center pt-4 border-t border-slate-200 mt-4">
-                <p className="text-[9px] font-bold text-slate-700 uppercase tracking-wider">
-                  বিড়ি পণ্য ফেরত নেওয়া হয় না (Biri ponno ferot neoya hoy na)
+              <div className="text-center pt-4 border-t border-slate-200 mt-5">
+                <p className="text-[10px] font-bold text-slate-800 tracking-wide">
+                  * বিক্রিত পণ্য ফেরত নেওয়া হয় না *
                 </p>
               </div>
             </div>
