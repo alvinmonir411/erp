@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
   Printer, X, FileText, CheckCircle2, 
   Store, Phone, MapPin, Calendar, 
   Building2, Sparkles, Plus, ArrowRight, 
-  Copy, Check, UserCheck, ShieldCheck
+  Copy, Check, UserCheck, ShieldCheck, DollarSign
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 
@@ -47,26 +47,29 @@ export function OrderPrintModal({
   };
 
   const items = order.items || [];
+  const isManualDue = order.status === 'MANUAL_DUE' || items.length === 0;
   const totalQty = items.reduce((sum: number, i: any) => sum + Number(i.quantity || 0), 0);
   const totalFree = items.reduce((sum: number, i: any) => sum + Number(i.freeQuantity || 0), 0);
   const grandTotal = Number(order.actualSoldAmount || order.grandTotal || 0);
+  const subtotal = Number(order.subtotal || grandTotal);
+  const discountAmount = Number(order.discountAmount || 0);
   const paidAmount = Number(order.advancePaid || order.collectedAmount || 0);
   const dueAmount = order.dueAmount !== undefined && order.dueAmount !== null
     ? Number(order.dueAmount)
-    : Math.max(0, grandTotal - paidAmount);
+    : (order.status === 'SETTLED' ? 0 : Math.max(0, grandTotal - paidAmount));
   const deliveryPersonName = order.assignedDeliveryMan?.name || order.deliveryPerson?.name;
 
   return (
-    <div className="fixed inset-0 z-[10005] flex items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200 print:p-0 print:bg-white print:static">
+    <div className="fixed inset-0 z-[10005] flex items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200 print:p-0 print:bg-white print:static">
       {/* Dynamic Print CSS */}
       <style>{`
         @media print {
-          /* Hide EVERYTHING in normal page */
+          /* Hide EVERYTHING else on page */
           body * {
             visibility: hidden !important;
           }
           
-          /* Only show our print canvas */
+          /* Only display our printable canvas */
           #order-print-canvas, #order-print-canvas * {
             visibility: visible !important;
           }
@@ -77,7 +80,7 @@ export function OrderPrintModal({
             top: 0 !important;
             width: ${printLayout === 'THERMAL' ? '80mm' : '100%'} !important;
             margin: 0 !important;
-            padding: ${printLayout === 'THERMAL' ? '4mm' : '8mm'} !important;
+            padding: ${printLayout === 'THERMAL' ? '4mm' : '6mm'} !important;
             background: #ffffff !important;
             color: #000000 !important;
             box-shadow: none !important;
@@ -93,49 +96,49 @@ export function OrderPrintModal({
 
           @page {
             size: ${printLayout === 'THERMAL' ? '80mm auto' : 'portrait'};
-            margin: ${printLayout === 'THERMAL' ? '2mm' : '8mm 10mm'};
+            margin: ${printLayout === 'THERMAL' ? '2mm' : '6mm 8mm'};
           }
         }
       `}</style>
 
       {/* Main Modal Card */}
-      <div className="w-full max-w-4xl bg-slate-100 sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-300 flex flex-col h-full sm:h-auto max-h-screen sm:max-h-[94vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:bg-white">
+      <div className="w-full max-w-4xl bg-slate-100 sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-300 flex flex-col h-full sm:h-[94vh] max-h-screen print:max-h-none print:h-auto print:border-none print:shadow-none print:bg-white">
         
-        {/* Top Control Bar (Screen Only) */}
-        <div className="no-print bg-slate-900 text-white px-5 sm:px-6 py-3.5 flex items-center justify-between gap-3 shrink-0 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/30">
-              <Printer className="w-5 h-5" />
+        {/* Top Control Bar (Screen Only - Always visible) */}
+        <div className="no-print bg-slate-900 text-white px-4 sm:px-6 py-3 flex items-center justify-between gap-2 shrink-0 shadow-md">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/30 shrink-0">
+              <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm sm:text-base font-black tracking-tight">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h2 className="text-xs sm:text-base font-black tracking-tight truncate">
                   Invoice & Cash Memo
                 </h2>
                 <button
                   type="button"
                   onClick={handleCopyInvoiceNumber}
-                  className="inline-flex items-center gap-1 text-[11px] font-bold bg-white/10 hover:bg-white/20 text-indigo-200 px-2 py-0.5 rounded-md transition-colors"
+                  className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold bg-white/10 hover:bg-white/20 text-indigo-200 px-2 py-0.5 rounded transition-colors"
                   title="Click to copy invoice ID"
                 >
                   <span>#{order.id.toString().padStart(6, '0')}</span>
                   {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-300" />}
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400">
-                {order.shop?.name || 'Direct Sale'} · {formatDate(order.createdAt || order.orderDate)}
+              <p className="text-[10px] text-slate-400 truncate">
+                {order.shop?.name || 'Direct Sale'} · {formatDate(order.orderDate || order.createdAt)}
               </p>
             </div>
           </div>
 
           {/* Controls: Layout Toggle, Print, Close */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Paper Type Toggle */}
-            <div className="hidden sm:inline-flex p-0.5 rounded-xl bg-slate-800 text-xs font-bold border border-slate-700">
+            <div className="inline-flex p-0.5 rounded-xl bg-slate-800 text-[10px] sm:text-xs font-bold border border-slate-700">
               <button
                 type="button"
                 onClick={() => setPrintLayout('STANDARD')}
-                className={`px-3 py-1 rounded-lg transition-all ${
+                className={`px-2 sm:px-3 py-1 rounded-lg transition-all ${
                   printLayout === 'STANDARD'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'
@@ -146,7 +149,7 @@ export function OrderPrintModal({
               <button
                 type="button"
                 onClick={() => setPrintLayout('THERMAL')}
-                className={`px-3 py-1 rounded-lg transition-all ${
+                className={`px-2 sm:px-3 py-1 rounded-lg transition-all ${
                   printLayout === 'THERMAL'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'
@@ -159,26 +162,26 @@ export function OrderPrintModal({
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-black shadow-md shadow-indigo-600/30 transition-all active:scale-95"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-black shadow-md shadow-indigo-600/30 transition-all active:scale-95"
             >
               <Printer className="w-4 h-4" />
-              <span>Print Invoice</span>
+              <span>Print</span>
             </button>
 
             <button
               type="button"
               onClick={onClose}
-              className="h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+              className="h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors shrink-0"
               title="Close"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
 
         {/* Success Banner if opened right after cutting an order */}
         {isSuccessModal && (
-          <div className="no-print bg-emerald-50 border-b border-emerald-200 px-5 py-2.5 flex items-center justify-between gap-3 text-emerald-900 shrink-0">
+          <div className="no-print bg-emerald-50 border-b border-emerald-200 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-2 text-emerald-900 shrink-0">
             <div className="flex items-center gap-2 text-xs font-bold">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>Order placed successfully! Ready for printing and distribution.</span>
@@ -197,7 +200,7 @@ export function OrderPrintModal({
         )}
 
         {/* Scrollable Preview Area */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-200/70 flex justify-center print:p-0 print:bg-white print:overflow-visible">
+        <div className="flex-1 overflow-y-auto p-2 sm:p-6 bg-slate-200/80 flex justify-center print:p-0 print:bg-white print:overflow-visible">
           
           {/* ========================================================================= */}
           {/* PRINTABLE CANVAS CONTAINER */}
@@ -206,108 +209,146 @@ export function OrderPrintModal({
             id="order-print-canvas"
             className={`bg-white shadow-xl rounded-2xl text-slate-900 transition-all ${
               printLayout === 'THERMAL' 
-                ? 'w-full max-w-[340px] p-4 text-xs' 
-                : 'w-full max-w-3xl p-6 sm:p-8 text-sm'
+                ? 'w-full max-w-[360px] p-3.5 text-xs' 
+                : 'w-full max-w-3xl p-4 sm:p-8 text-xs sm:text-sm'
             }`}
           >
             
             {/* ── 1. COMPANY HEADER ── */}
-            <div className="text-center border-b-2 border-slate-900 pb-3 mb-4">
-              <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-slate-900">
+            <div className="text-center border-b-2 border-slate-900 pb-3 mb-3">
+              <h1 className="text-xl sm:text-3xl font-black uppercase tracking-tight text-slate-900 leading-none">
                 M/S KARIM TRADERS
               </h1>
-              <p className="text-xs font-bold text-slate-700 tracking-wider mt-0.5">
+              <p className="text-xs font-bold text-slate-700 tracking-wider mt-1">
                 মেসার্স করিম ট্রেডার্স · Authorized Wholesale Distributor & Dealer
               </p>
               <p className="text-[11px] font-semibold text-slate-600 mt-0.5">
                 Proprietor: Md. Karim · Mobile: 01763-088369 · Ghorashal / Borodarga
               </p>
-              <div className="inline-block mt-2 px-3 py-0.5 bg-slate-900 text-white rounded text-[11px] font-black uppercase tracking-widest">
+              <div className="inline-block mt-2 px-3 py-1 bg-slate-900 text-white rounded text-[11px] font-black uppercase tracking-widest">
                 Sales Invoice / Cash Memo (বিক্রয় চালান ও ক্যাশ মেমো)
               </div>
             </div>
 
             {/* ── 2. INVOICE META & CUSTOMER DETAILS ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 border border-slate-300 rounded-xl p-3 bg-slate-50/50 text-xs">
-              {/* Customer Info */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                  Billed To / Customer (ক্রেতার বিবরণ)
-                </span>
-                <p className="font-black text-slate-900 text-sm">
-                  {order.shop?.name || 'Walk-in Direct Customer'}
-                </p>
-                {order.shop?.ownerName && (
-                  <p className="text-slate-700">
-                    Proprietor: <strong>{order.shop.ownerName}</strong>
-                  </p>
-                )}
-                {order.shop?.phone && (
-                  <p className="text-slate-700">
-                    Phone: <strong>{order.shop.phone}</strong>
-                  </p>
-                )}
-                {order.shop?.address && (
-                  <p className="text-slate-600">
-                    Address: {order.shop.address}
-                  </p>
-                )}
+            <div className="border border-slate-800 rounded-xl overflow-hidden mb-3 text-xs bg-white">
+              {/* Top Banner Row */}
+              <div className="bg-slate-100 px-3 py-1.5 border-b border-slate-300 flex items-center justify-between font-bold text-[11px]">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 uppercase text-[10px]">চালান নং / Invoice:</span>
+                  <span className="font-mono font-black text-slate-900 text-xs sm:text-sm">
+                    #{order.id.toString().padStart(6, '0')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 text-[10px]">তারিখ / Date:</span>
+                  <span className="font-bold text-slate-800">
+                    {formatDate(order.orderDate || order.createdAt)}
+                  </span>
+                </div>
               </div>
 
-              {/* Order Logistics Info */}
-              <div className="space-y-1 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
-                  Invoice Info & Logistics (চালান তথ্য)
-                </span>
-                <p className="font-black text-slate-900 text-sm">
-                  Invoice: #{order.id.toString().padStart(6, '0')}
-                </p>
-                <p className="text-slate-700">
-                  Date: <strong>{formatDate(order.orderDate || order.createdAt)}</strong>
-                </p>
-                <p className="text-slate-700">
-                  Route: <strong>{order.route?.name || 'Direct Route'}</strong>
-                </p>
-                {order.company?.name && (
-                  <p className="text-slate-700">
-                    Company: <strong>{order.company.name}</strong>
+              {/* Info Grid */}
+              <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Left: Customer Info */}
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    ক্রেতার বিবরণ (Billed To):
                   </p>
-                )}
-                <p className="text-[11px] text-slate-600">
-                  Sales Rep (SR): <strong>{order.createdBy || 'Office'}</strong>
-                  {deliveryPersonName && ` · Delivery: ${deliveryPersonName}`}
-                </p>
+                  <p className="font-black text-slate-900 text-sm">
+                    {order.shop?.name || 'Walk-in Direct Customer (সাধারণ কাস্টমার)'}
+                  </p>
+                  {order.shop?.ownerName && (
+                    <p className="text-slate-700 text-[11px]">
+                      মালিক: <strong>{order.shop.ownerName}</strong>
+                    </p>
+                  )}
+                  {order.shop?.phone && (
+                    <p className="text-slate-700 text-[11px]">
+                      মোবাইল: <strong>{order.shop.phone}</strong>
+                    </p>
+                  )}
+                  {order.shop?.address && (
+                    <p className="text-slate-500 text-[10px] leading-tight">
+                      ঠিকানা: {order.shop.address}
+                    </p>
+                  )}
+                </div>
+
+                {/* Right: Logistics Info */}
+                <div className="space-y-0.5 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    চালান ও লজিস্টিকস (Logistics):
+                  </p>
+                  <p className="text-slate-800 text-[11px]">
+                    রুট (Route): <strong>{order.route?.name || 'Direct Route'}</strong>
+                  </p>
+                  {order.company?.name && (
+                    <p className="text-slate-800 text-[11px]">
+                      কোম্পানি (Company): <strong>{order.company.name}</strong>
+                    </p>
+                  )}
+                  <p className="text-slate-600 text-[10px]">
+                    সেলস রিপ্রেজেন্টেটিভ (SR): <strong>{order.createdBy || 'Office'}</strong>
+                  </p>
+                  {deliveryPersonName && (
+                    <p className="text-slate-600 text-[10px]">
+                      ডেলিভারি ম্যান: <strong>{deliveryPersonName}</strong>
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* ── 3. REMARKS NOTE IF ANY ── */}
-            {order.note && (
-              <div className="mb-3 p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
-                <strong className="font-bold">Remarks: </strong>
-                <span>{order.note}</span>
-              </div>
-            )}
-
-            {/* ── 4. ITEM TABLE ── */}
+            {/* ── 3. PARTICULARS / PRODUCT ITEMS TABLE ── */}
             <div className="mb-4">
-              {!items || items.length === 0 ? (
-                <div className="p-4 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-500 bg-slate-50 font-bold">
-                  Manual Due Record / বকেয়া সমন্বয় চালান (No itemized physical products)
-                </div>
-              ) : (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100 border-y-2 border-slate-800 text-[10px] font-black uppercase text-slate-800 tracking-wider">
-                      <th className="py-2 px-2 text-center w-8 border-r border-slate-300">SL</th>
-                      <th className="py-2 px-2.5">Item Description (পণ্যের বিবরণ)</th>
-                      <th className="py-2 px-2 text-right border-l border-slate-300">Rate</th>
-                      <th className="py-2 px-2 text-center border-l border-slate-300">Qty</th>
-                      <th className="py-2 px-2 text-center border-l border-slate-300">Free</th>
-                      <th className="py-2 px-2.5 text-right border-l border-slate-300">Amount (৳)</th>
+              <table className="w-full text-left text-xs border border-slate-800 border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b-2 border-slate-800 text-[10px] sm:text-[11px] font-black uppercase text-slate-800 tracking-wider">
+                    <th className="py-2 px-1.5 text-center w-8 border-r border-slate-300">ক্র.নং</th>
+                    <th className="py-2 px-2.5 border-r border-slate-300">পণ্যের বিবরণ (Particulars)</th>
+                    <th className="py-2 px-2 text-right w-16 border-r border-slate-300">দর (Rate)</th>
+                    <th className="py-2 px-2 text-center w-12 border-r border-slate-300">সংখ্যা</th>
+                    <th className="py-2 px-1.5 text-center w-12 border-r border-slate-300">ফ্রী</th>
+                    <th className="py-2 px-2.5 text-right w-24">মোট টাকা (৳)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-medium">
+                  {isManualDue ? (
+                    /* Clean official line item for Manual Due Record */
+                    <tr className="bg-rose-50/20">
+                      <td className="py-3 px-1.5 text-center font-bold text-slate-500 border-r border-slate-200">
+                        ১
+                      </td>
+                      <td className="py-3 px-2.5 border-r border-slate-200">
+                        <p className="font-black text-slate-900 text-xs sm:text-sm">
+                          পূর্বের বকেয়া হিসাব সমন্বয় (Manual Due Record / Baki)
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          সরাসরি বকেয়া এন্ট্রি — কোনো প্রডাক্ট আইটেম অন্তর্ভুক্ত নয়
+                        </p>
+                        {order.note && (
+                          <div className="mt-1.5 p-1.5 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-900 font-semibold leading-relaxed">
+                            <strong>রিমার্কস নোট:</strong> {order.note}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-2 text-right font-medium text-slate-700 border-r border-slate-200 font-mono">
+                        {formatCurrency(grandTotal)}
+                      </td>
+                      <td className="py-3 px-2 text-center font-black text-slate-800 border-r border-slate-200">
+                        ১
+                      </td>
+                      <td className="py-3 px-1.5 text-center font-bold text-slate-400 border-r border-slate-200">
+                        —
+                      </td>
+                      <td className="py-3 px-2.5 text-right font-black text-slate-900 text-sm font-mono">
+                        {formatCurrency(grandTotal)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {items.map((item: any, idx: number) => {
+                  ) : (
+                    /* Regular physical product items */
+                    items.map((item: any, idx: number) => {
                       const price = Number(item.unitPrice || 0);
                       const qPaid = Number(item.quantity || 0);
                       const qFree = Number(item.freeQuantity || 0);
@@ -315,138 +356,144 @@ export function OrderPrintModal({
 
                       return (
                         <tr key={idx} className="hover:bg-slate-50/50">
-                          <td className="py-2 px-2 text-center font-bold text-slate-500 border-r border-slate-200">
+                          <td className="py-2 px-1.5 text-center font-bold text-slate-500 border-r border-slate-200">
                             {idx + 1}
                           </td>
-                          <td className="py-2 px-2.5 font-bold text-slate-900">
-                            {item.product?.name || 'Product Item'}
+                          <td className="py-2 px-2.5 font-bold text-slate-900 border-r border-slate-200">
+                            <span>{item.product?.name || 'Product Item'}</span>
                             {item.product?.sku && (
                               <span className="text-[10px] text-slate-400 font-normal ml-1">
                                 ({item.product.sku})
                               </span>
                             )}
                           </td>
-                          <td className="py-2 px-2 text-right font-medium text-slate-700 border-l border-slate-200">
+                          <td className="py-2 px-2 text-right font-medium text-slate-700 border-r border-slate-200 font-mono">
                             {formatCurrency(price)}
                           </td>
-                          <td className="py-2 px-2 text-center font-black text-slate-900 border-l border-slate-200">
+                          <td className="py-2 px-2 text-center font-black text-slate-900 border-r border-slate-200 font-mono">
                             {qPaid}
                           </td>
-                          <td className="py-2 px-2 text-center font-bold text-emerald-700 border-l border-slate-200">
+                          <td className="py-2 px-1.5 text-center font-bold text-emerald-700 border-r border-slate-200 font-mono">
                             {qFree > 0 ? `+${qFree}` : '—'}
                           </td>
-                          <td className="py-2 px-2.5 text-right font-black text-slate-900 border-l border-slate-200">
+                          <td className="py-2 px-2.5 text-right font-black text-slate-900 border-slate-200 font-mono">
                             {formatCurrency(lineTotal)}
                           </td>
                         </tr>
                       );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-slate-800 bg-slate-50 font-black text-xs">
-                      <td colSpan={3} className="py-2 px-2 text-right uppercase text-[10px] text-slate-600">
-                        Total Quantity:
-                      </td>
-                      <td className="py-2 px-2 text-center font-black text-slate-900 border-l border-slate-300">
-                        {totalQty}
-                      </td>
-                      <td className="py-2 px-2 text-center font-black text-emerald-700 border-l border-slate-300">
-                        {totalFree > 0 ? `+${totalFree}` : '0'}
-                      </td>
-                      <td className="py-2 px-2.5 text-right font-black text-slate-900 border-l border-slate-300">
-                        {formatCurrency(Number(order.subtotal || grandTotal))}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              )}
+                    })
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-slate-800 bg-slate-50 font-black text-xs">
+                    <td colSpan={3} className="py-2 px-2 text-right uppercase text-[10px] text-slate-600 border-r border-slate-300">
+                      Total Quantity (মোট সংখ্যা):
+                    </td>
+                    <td className="py-2 px-2 text-center font-black text-slate-900 border-r border-slate-300 font-mono">
+                      {isManualDue ? '১' : totalQty}
+                    </td>
+                    <td className="py-2 px-1.5 text-center font-black text-emerald-700 border-r border-slate-300 font-mono">
+                      {isManualDue ? '০' : (totalFree > 0 ? `+${totalFree}` : '0')}
+                    </td>
+                    <td className="py-2 px-2.5 text-right font-black text-slate-900 font-mono text-sm">
+                      {formatCurrency(subtotal)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
 
-            {/* ── 5. FINANCIAL LEDGER & SUMMARY ── */}
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-              {/* Words/Terms Note */}
-              <div className="w-full sm:flex-1 space-y-2 text-xs">
-                <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] text-slate-600">
-                  <p className="font-bold text-slate-800">শর্তাবলী / Terms:</p>
-                  <p className="mt-0.5">১. বিক্রিত মাল ফেরত নেওয়া হয় না।</p>
-                  <p>২. চালানের পণ্য বুঝিয়া গ্রহণ করার পর কোনো অভিযোগ গ্রহণযোগ্য হইবে না।</p>
-                </div>
+            {/* Remarks box if normal order with note */}
+            {!isManualDue && order.note && (
+              <div className="mb-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                <strong className="font-bold">Remarks (মন্তব্য): </strong>
+                <span>{order.note}</span>
               </div>
+            )}
 
-              {/* Financial Box */}
-              <div className="w-full sm:w-72 border-2 border-slate-800 rounded-xl overflow-hidden text-xs">
-                <div className="bg-slate-100 px-3 py-1.5 border-b border-slate-300 font-black uppercase text-[10px] text-slate-700 text-center tracking-wider">
+            {/* ── 4. FINANCIAL LEDGER & SUMMARY ── */}
+            <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-start gap-3 mb-4">
+              {/* Payment Summary Box - Robust with whitespace-nowrap and never breaking */}
+              <div className="w-full sm:w-80 ml-auto border-2 border-slate-900 rounded-xl overflow-hidden text-xs bg-white shadow-2xs">
+                <div className="bg-slate-900 text-white px-3 py-1.5 font-black uppercase text-[10px] tracking-wider text-center">
                   Payment Summary (হিসাব বিবরণী)
                 </div>
-                <div className="p-2.5 space-y-1.5 bg-white">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal (উপ-মোট):</span>
-                    <span className="font-bold">{formatCurrency(Number(order.subtotal || grandTotal))}</span>
+                <div className="p-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span className="whitespace-nowrap">Subtotal (উপ-মোট):</span>
+                    <span className="font-bold font-mono text-slate-900">{formatCurrency(subtotal)}</span>
                   </div>
 
-                  {Number(order.discountAmount) > 0 && (
-                    <div className="flex justify-between text-rose-600">
-                      <span>Discount (ছাড়):</span>
-                      <span className="font-bold">-{formatCurrency(Number(order.discountAmount))}</span>
+                  {discountAmount > 0 && (
+                    <div className="flex items-center justify-between text-rose-600">
+                      <span className="whitespace-nowrap">Discount (ছাড়):</span>
+                      <span className="font-bold font-mono">-{formatCurrency(discountAmount)}</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between font-black text-slate-900 text-sm border-t border-slate-200 pt-1">
-                    <span>Net Total (মোট বিল):</span>
-                    <span>{formatCurrency(grandTotal)}</span>
+                  <div className="flex items-center justify-between font-black text-slate-900 text-sm border-t border-slate-200 pt-1.5">
+                    <span className="whitespace-nowrap">মোট বিল (Net Bill):</span>
+                    <span className="font-mono">{formatCurrency(grandTotal)}</span>
                   </div>
 
-                  <div className="flex justify-between text-emerald-700 font-black border-t border-slate-200 pt-1">
-                    <span>Cash Paid (নগদ গ্রহণ):</span>
-                    <span>{formatCurrency(paidAmount)}</span>
+                  <div className="flex items-center justify-between text-emerald-700 font-bold border-t border-slate-200 pt-1.5">
+                    <span className="whitespace-nowrap">নগদ গ্রহণ (Paid):</span>
+                    <span className="font-mono font-black">{formatCurrency(paidAmount)}</span>
                   </div>
 
-                  <div className="flex justify-between text-rose-600 font-black text-sm border-t-2 border-slate-800 pt-1 bg-rose-50/50 -mx-2.5 -mb-2.5 p-2.5">
-                    <span>Due Amount (বকেয়া):</span>
-                    <span>{formatCurrency(dueAmount)}</span>
+                  <div className="flex items-center justify-between text-rose-700 font-black text-sm border-t-2 border-slate-900 pt-1.5 bg-rose-50 -mx-3 -mb-3 p-3">
+                    <span className="whitespace-nowrap">অবশিষ্ট বকেয়া (Due):</span>
+                    <span className="font-mono text-base">{formatCurrency(dueAmount)}</span>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* ── 5. TERMS AND CONDITIONS (Full width underneath) ── */}
+            <div className="mb-4 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] text-slate-600 leading-relaxed">
+              <p className="font-bold text-slate-800">শর্তাবলী / Terms & Conditions:</p>
+              <p className="mt-0.5">১. চালানের পণ্য বুঝিয়া গ্রহণ করার পর কোনো অভিযোগ গ্রহণযোগ্য হইবে না।</p>
+              <p>২. বিক্রিত পণ্য ফেরত নেওয়া হয় না। বকেয়া থাকিলে অবিলম্বে পরিশোধ করার জন্য অনুরোধ করা হইল।</p>
+            </div>
+
             {/* ── 6. SIGNATURE STRIP ── */}
-            <div className={`grid ${printLayout === 'THERMAL' ? 'grid-cols-2 gap-4 pt-6 mt-4' : 'grid-cols-3 gap-6 pt-10 mt-6'} border-t border-dashed border-slate-300 text-center text-xs`}>
+            <div className={`grid ${printLayout === 'THERMAL' ? 'grid-cols-2 gap-4 pt-6 mt-4' : 'grid-cols-3 gap-4 pt-8 mt-4'} border-t border-dashed border-slate-300 text-center text-xs`}>
               <div>
-                <div className={`border-t border-slate-800 mx-auto ${printLayout === 'THERMAL' ? 'w-20' : 'w-28'} mb-1`}></div>
-                <p className="font-bold text-slate-700 text-[10px]">ক্রেতার স্বাক্ষর</p>
-                <p className="text-[9px] text-slate-400">Customer Signature</p>
+                <div className="border-t border-slate-800 mx-auto w-24 sm:w-28 mb-1"></div>
+                <p className="font-bold text-slate-800 text-[10px]">ক্রেতার স্বাক্ষর</p>
+                <p className="text-[9px] text-slate-400">Customer</p>
               </div>
               {printLayout !== 'THERMAL' && (
                 <div>
-                  <div className="border-t border-slate-800 mx-auto w-28 mb-1"></div>
-                  <p className="font-bold text-slate-700 text-[10px]">ডেলিভারি ম্যানের স্বাক্ষর</p>
+                  <div className="border-t border-slate-800 mx-auto w-24 sm:w-28 mb-1"></div>
+                  <p className="font-bold text-slate-800 text-[10px]">ডেলিভারি ম্যানের স্বাক্ষর</p>
                   <p className="text-[9px] text-slate-400">Delivery Staff</p>
                 </div>
               )}
               <div>
-                <div className={`border-t border-slate-800 mx-auto ${printLayout === 'THERMAL' ? 'w-20' : 'w-28'} mb-1`}></div>
-                <p className="font-bold text-slate-700 text-[10px]">কর্তৃপক্ষের স্বাক্ষর</p>
-                <p className="text-[9px] text-slate-400">Authorized Signature</p>
+                <div className="border-t border-slate-800 mx-auto w-24 sm:w-28 mb-1"></div>
+                <p className="font-bold text-slate-800 text-[10px]">কর্তৃপক্ষের স্বাক্ষর</p>
+                <p className="text-[9px] text-slate-400">Authorized</p>
               </div>
             </div>
 
             {/* Micro footer */}
-            <div className="mt-6 pt-2 border-t border-slate-100 text-center text-[9px] text-slate-400">
+            <div className="mt-4 pt-2 border-t border-slate-100 text-center text-[9px] text-slate-400">
               Generated by ERP System · Thank you for doing business with M/S Karim Traders!
             </div>
           </div>
         </div>
 
-        {/* Bottom Actions Bar (Screen Only) */}
-        <div className="no-print bg-white px-5 sm:px-6 py-3 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+        {/* Bottom Actions Bar (Screen Only - Always Visible on Mobile) */}
+        <div className="no-print bg-white px-4 sm:px-6 py-3 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0 shadow-lg">
           <div className="flex items-center gap-2">
             {onNewOrder && (
               <button
                 type="button"
                 onClick={onNewOrder}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>New Order</span>
               </button>
             )}
@@ -466,7 +513,7 @@ export function OrderPrintModal({
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-black shadow-md shadow-indigo-600/30 transition-all active:scale-95"
             >
               <Printer className="w-4 h-4" />
-              <span>Print Now (Ctrl + P)</span>
+              <span>Print Invoice (Ctrl + P)</span>
             </button>
           </div>
         </div>
