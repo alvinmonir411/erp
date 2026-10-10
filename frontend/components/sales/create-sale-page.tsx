@@ -1365,8 +1365,8 @@ export function CreateSalePage({ saleId }: { saleId?: string }) {
                                 </span>
                                 <input
                                   type="number"
-                                  min="0.01"
-                                  step="0.01"
+                                  min="0"
+                                  step="any"
                                   value={item.unitPrice}
                                   onChange={(event) =>
                                     updateSaleItem(item.id, (currentItem) => ({

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { 
   Printer, X, Copy, Check, Plus, Receipt, FileText
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatUnitPrice } from '@/lib/utils/format';
 
 interface OrderPrintModalProps {
   order: any;
@@ -60,7 +60,7 @@ export function OrderPrintModal({
     const qPaid = isItemSettled ? Number(item.deliveredPaidQuantity || 0) : Number(item.quantity || 0);
     const qFree = isItemSettled ? Number(item.deliveredFreeQuantity || 0) : Number(item.freeQuantity || 0);
     const price = Number(item.unitPrice || 0);
-    const lineTotal = Number(qPaid * price);
+    const lineTotal = Math.round(Number(qPaid * price) * 100) / 100;
 
     return {
       ...item,
@@ -452,7 +452,7 @@ export function OrderPrintModal({
                         {formatAmount(item.qPaid)}
                       </td>
                       <td className="py-0.5 px-1 text-right tabular-nums text-slate-800">
-                        {formatAmount(item.price)}
+                        {formatUnitPrice(item.price)}
                       </td>
                       <td className="py-0.5 pl-1 text-right tabular-nums font-bold text-slate-900">
                         {formatAmount(item.lineTotal)}
@@ -620,7 +620,7 @@ export function OrderPrintModal({
                             <span className="font-bold text-slate-900">{formatAmount(item.qPaid)}</span>
                             {item.qFree > 0 && <span className="text-slate-500 font-bold ml-1">+{item.qFree}f</span>}
                           </td>
-                          <td className="py-2 px-3 text-right tabular-nums text-slate-600 border-r border-slate-200">{formatCurrency(item.price)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums text-slate-600 border-r border-slate-200">{formatUnitPrice(item.price)}</td>
                           <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900">{formatCurrency(item.lineTotal)}</td>
                         </tr>
                       );

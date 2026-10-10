@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { getSale } from '@/lib/api/sales';
-import { formatCurrency, formatNumber, formatDate, toNumber } from '@/lib/utils/format';
+import { formatCurrency, formatNumber, formatDate, toNumber, formatUnitPrice } from '@/lib/utils/format';
 import type { Sale } from '@/types/api';
 
 export default function SaleInvoicePage({
@@ -81,7 +81,7 @@ export default function SaleInvoicePage({
                 </td>
                 <td className="py-4 text-right font-medium text-slate-800">{formatNumber(item.quantity)} {item.product?.unit}</td>
                 <td className="py-4 text-right font-medium text-slate-500">{freeQuantity > 0 ? `${formatNumber(freeQuantity)} ${item.product?.unit}` : '-'}</td>
-                <td className="py-4 text-right font-medium text-slate-800">{formatCurrency(item.unitPrice)}</td>
+                <td className="py-4 text-right font-medium text-slate-800">{formatUnitPrice(item.unitPrice)}</td>
                 <td className="py-4 text-right font-medium text-slate-500">
                   {discountAmount > 0 ? formatCurrency(discountAmount) : '-'}
                 </td>

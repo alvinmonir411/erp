@@ -27,6 +27,9 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       await this.dataSource.query(`
         ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "currentStock" DECIMAL(12,2) DEFAULT 0;
         ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "version" INTEGER DEFAULT 1;
+        ALTER TABLE "products" ALTER COLUMN "buyPrice" TYPE NUMERIC(14, 5);
+        ALTER TABLE "products" ALTER COLUMN "salePrice" TYPE NUMERIC(14, 5);
+        ALTER TABLE "order_items" ALTER COLUMN "unitPrice" TYPE NUMERIC(14, 5);
       `);
     } catch (e) {
       if (!e.message.includes('does not exist')) {

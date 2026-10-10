@@ -961,7 +961,8 @@ export class OrdersService {
           ? grossAmount * (Number(itemDto.discountValue) / 100)
           : Number(itemDto.discountValue || 0);
 
-      const lineTotal = Math.max(0, grossAmount - discAmt);
+      const lineTotal =
+        Math.round(Math.max(0, grossAmount - discAmt) * 100) / 100;
       subtotal += lineTotal;
 
       items.push(

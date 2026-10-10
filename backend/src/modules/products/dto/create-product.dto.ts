@@ -32,12 +32,12 @@ export class CreateProductDto {
   unit: ProductUnit;
 
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber({ maxDecimalPlaces: 5 })
   @IsPositive()
   buyPrice: number;
 
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber({ maxDecimalPlaces: 5 })
   @IsPositive()
   salePrice: number;
 

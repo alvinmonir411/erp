@@ -29,7 +29,7 @@ import {
   settleDispatchBatch,
   deleteDispatchBatch,
 } from '@/lib/api/delivery-ops';
-import { formatCurrency, formatDate, formatNumber } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatNumber, formatUnitPrice } from '@/lib/utils/format';
 import type { DispatchBatch, DispatchBatchOrder } from '@/types/api';
 import { batchStatusConfig, orderStatusConfig, StatusBadge } from './delivery-ops-ui';
 import { PrintSummary } from './print-summary';
@@ -259,7 +259,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         returned += Number(item.returnedPaidQuantity || 0);
         damaged += Number(item.damagedPaidQuantity || 0);
         finalSold += Number(item.deliveredPaidQuantity || 0);
-        grossDispatchedValue += orderPaid * Number(item.unitPrice || 0);
+        grossDispatchedValue += Math.round(orderPaid * Number(item.unitPrice || 0) * 100) / 100;
       });
     });
 
@@ -908,7 +908,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                       </td>
                       <td className="px-6 py-4"></td>
                       <td className="px-6 py-4"></td>
-                      <td className="px-6 py-4 text-center font-medium text-slate-400">{formatCurrency(item.price)}</td>
+                      <td className="px-6 py-4 text-center font-medium text-slate-400">{formatUnitPrice(item.price)}</td>
                       <td className="px-6 py-4"></td>
                     </tr>
                   ))}
@@ -935,7 +935,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   </div>
                   <div className="text-right">
                     <p className="text-[8px] font-black uppercase text-slate-400">Unit Price</p>
-                    <p className="text-sm font-bold text-slate-600">{formatCurrency(item.price)}</p>
+                    <p className="text-sm font-bold text-slate-600">{formatUnitPrice(item.price)}</p>
                   </div>
                 </div>
               </div>
@@ -995,7 +995,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   const d = Number(state.damaged || 0);
 
                   const sold = Math.max(0, item.totalPaidQty - r - d);
-                  const itemCashValue = sold * item.price;
+                  const itemCashValue = Math.round(sold * item.price * 100) / 100;
                   const itemDraftDue = isBatchSettled
                     ? batch.orders
                       .reduce((sum, bo) => sum + getDueForProductRow(bo, item.productId), 0)
@@ -1145,7 +1145,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               const d = Number(state.damaged || 0);
 
               const sold = Math.max(0, q - r - d);
-              const itemCashValue = sold * item.price;
+              const itemCashValue = Math.round(sold * item.price * 100) / 100;
               const itemDraftDue = isBatchSettled
                 ? batch.orders
                     .reduce((sum, bo) => sum + getDueForProductRow(bo, item.productId), 0)
@@ -1628,7 +1628,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                     : 0;
                   return sum + Math.max(0, itemSold - invoiceDiscountApplied);
                 }, 0);
-                return calc > 0 ? calc : finalSold * item.price;
+                return Math.round((calc > 0 ? calc : finalSold * item.price) * 100) / 100;
               })();
 
               const itemDue = dynamicOrders
@@ -1647,7 +1647,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                   <td className="border-r border-black px-1 py-0.5 text-center text-amber-600 tabular-nums">{dPaid > 0 ? formatNumber(dPaid) : '—'}</td>
                   <td className="border-r border-black px-1 py-0.5 text-center text-blue-700 font-bold tabular-nums">{formatNumber(finalSold)}</td>
                   <td className="border-r border-black px-1 py-0.5 text-center text-emerald-700 font-bold tabular-nums">{formatNumber(deliveredFree)}</td>
-                  <td className="border-r border-black px-1 py-0.5 text-right font-bold text-slate-600 tabular-nums">{formatCurrency(item.price)}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-right font-bold text-slate-600 tabular-nums">{formatUnitPrice(item.price)}</td>
                   <td className="border-r border-black px-1 py-0.5 text-right font-black tabular-nums">{formatCurrency(itemFinalSoldAmount)}</td>
                   <td className={`px-1 py-0.5 text-right font-black tabular-nums ${itemDue > 0 ? 'text-rose-700 bg-rose-50/70' : 'text-slate-300'}`}>
                     {itemDue > 0 ? formatCurrency(itemDue) : '—'}

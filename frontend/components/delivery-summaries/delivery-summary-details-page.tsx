@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { PageCard } from '@/components/ui/page-card';
 import { useToast } from '@/components/ui/toast-provider';
-import { formatCurrency, formatNumber, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatNumber, formatDate, formatUnitPrice } from '@/lib/utils/format';
 import { 
   getDeliverySummary, updateDeliveryReturns, markDeliveryAsPrinted 
 } from '@/lib/api/delivery-summaries';
@@ -140,7 +140,8 @@ export function DeliverySummaryDetailsPage({ id }: { id: string }) {
                   {summary.items.map((item: any) => {
                     const currentReturn = Number(returns[item.productId] || 0);
                     const currentSold = item.orderedQuantity - currentReturn;
-                    const currentTotal = currentSold * item.unitPrice;
+                    const currentTotal =
+                      Math.round(currentSold * Number(item.unitPrice || 0) * 100) / 100;
 
                     return (
                       <tr key={item.id} className="group hover:bg-slate-50/30 transition-colors">
@@ -165,7 +166,7 @@ export function DeliverySummaryDetailsPage({ id }: { id: string }) {
                           {formatNumber(currentSold)}
                         </td>
                         <td className="px-6 py-4 text-right font-medium text-slate-500">
-                          {formatCurrency(item.unitPrice)}
+                          {formatUnitPrice(item.unitPrice)}
                         </td>
                         <td className="px-6 py-4 text-right font-black text-slate-900">
                           {formatCurrency(currentTotal)}

@@ -7,7 +7,7 @@ import {
   ShieldAlert, Package, Calendar, Trash2,
   AlertCircle, RefreshCw, FileText
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatUnitPrice } from '@/lib/utils/format';
 import { useAuth } from '../auth/auth-provider';
 import { useToast } from '@/components/ui/toast-provider';
 import { deleteOrder } from '@/lib/api/orders';
@@ -238,12 +238,12 @@ export function OrderModal({ order, onClose, onDeleteSuccess }: OrderModalProps)
                         const dmgPaid = Number(item.damagedPaidQuantity || 0);
                         const dmgFree = Number(item.damagedFreeQuantity || 0);
 
-                        const lineTotal = Number(item.lineTotal || (qPaid * price));
+                        const lineTotal = Math.round(Number(item.lineTotal || (qPaid * price)) * 100) / 100;
 
                         return (
                           <tr key={idx} className="hover:bg-slate-50/40">
                             <td className="px-4 py-3 font-bold text-slate-900">{item.product?.name || 'Unknown Product'}</td>
-                            <td className="px-4 py-3 text-center text-slate-500 font-bold">{formatCurrency(price)}</td>
+                            <td className="px-4 py-3 text-center text-slate-500 font-bold">{formatUnitPrice(price)}</td>
                             {/* DISPATCHED */}
                             <td className="px-4 py-3 text-center">
                               <span className="font-bold text-slate-700">{qPaid}</span>

@@ -245,7 +245,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
     } else {
       disc = line.discountValue;
     }
-    return gross - disc;
+    return Math.round(Math.max(0, gross - disc) * 100) / 100;
   };
 
   const addLine = () => {
@@ -737,6 +737,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                         <td className="px-3 py-4">
                           <input
                             type="number"
+                            step="any"
                             placeholder="0.00"
                             value={line.unitPrice || ''}
                             onChange={e => updateLine(idx, { unitPrice: Number(e.target.value) })}
@@ -857,6 +858,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
                           <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Price</label>
                           <input
                             type="number"
+                            step="any"
                             placeholder="0.00"
                             value={line.unitPrice || ''}
                             onChange={e => updateLine(idx, { unitPrice: Number(e.target.value) })}

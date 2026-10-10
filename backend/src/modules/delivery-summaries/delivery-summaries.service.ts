@@ -144,16 +144,17 @@ export class DeliverySummariesService {
             returnedQuantity: 0,
             soldQuantity: data.ordered,
             unitPrice: data.price,
-            lineTotal: data.ordered * data.price,
+            lineTotal: Math.round(data.ordered * Number(data.price) * 100) / 100,
           });
         } else {
           item.orderedQuantity = data.ordered;
           item.soldQuantity = item.orderedQuantity - item.returnedQuantity;
           item.unitPrice = data.price;
-          item.lineTotal = item.soldQuantity * item.unitPrice;
+          item.lineTotal =
+            Math.round(item.soldQuantity * Number(item.unitPrice) * 100) / 100;
         }
 
-        totalAmount += item.lineTotal;
+        totalAmount = Math.round((totalAmount + item.lineTotal) * 100) / 100;
         summaryItems.push(item);
       }
 
@@ -184,9 +185,10 @@ export class DeliverySummariesService {
 
           item.returnedQuantity = newReturned;
           item.soldQuantity = item.orderedQuantity - item.returnedQuantity;
-          item.lineTotal = item.soldQuantity * item.unitPrice;
+          item.lineTotal =
+            Math.round(item.soldQuantity * Number(item.unitPrice) * 100) / 100;
 
-          totalAmount += item.lineTotal;
+          totalAmount = Math.round((totalAmount + item.lineTotal) * 100) / 100;
           await manager.save(item);
 
           // Stock Integration: Record the return
@@ -299,11 +301,12 @@ export class DeliverySummariesService {
         productName: p.name,
         quantitySold: p.qty,
         unitPrice: p.price,
-        totalAmount: p.qty * p.price,
+        totalAmount: Math.round(p.qty * Number(p.price) * 100) / 100,
       }));
 
       const subtotalQuantity = items.reduce((s, i) => s + i.quantitySold, 0);
-      const subtotalAmount = items.reduce((s, i) => s + i.totalAmount, 0);
+      const subtotalAmount =
+        Math.round(items.reduce((s, i) => s + i.totalAmount, 0) * 100) / 100;
 
       return {
         companyId: coId,

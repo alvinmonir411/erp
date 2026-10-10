@@ -34,13 +34,13 @@ export class UpdateProductDto {
 
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber({ maxDecimalPlaces: 5 })
   @IsPositive()
   buyPrice?: number;
 
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber({ maxDecimalPlaces: 5 })
   @IsPositive()
   salePrice?: number;
 

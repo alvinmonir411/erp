@@ -13,7 +13,7 @@ export class CreatePurchaseItemDto {
   quantity: number;
 
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber({ maxDecimalPlaces: 5 })
   @IsPositive()
   unitCost: number;
 }

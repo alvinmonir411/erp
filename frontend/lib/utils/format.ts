@@ -10,6 +10,16 @@ export function formatCurrency(value: number | string) {
   }).format(num);
 }
 
+export function formatUnitPrice(value: number | string) {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '0';
+  const rounded5 = Number(num.toFixed(5));
+  return new Intl.NumberFormat('en-BD', {
+    minimumFractionDigits: Math.abs(rounded5 % 1) >= 0.01 ? 2 : 0,
+    maximumFractionDigits: 5,
+  }).format(rounded5);
+}
+
 export const toNumber = (value: string | number | null | undefined): number => {
   const num = Number(value ?? 0);
   return Number.isFinite(num) ? num : 0;

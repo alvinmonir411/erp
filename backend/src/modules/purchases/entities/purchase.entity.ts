@@ -148,8 +148,8 @@ export class PurchaseItem {
 
   @Column({
     type: 'decimal',
-    precision: 12,
-    scale: 2,
+    precision: 14,
+    scale: 5,
     transformer: numericColumnTransformer,
   })
   unitCost: number;

@@ -38,16 +38,16 @@ export class Product {
 
   @Column({
     type: 'decimal',
-    precision: 12,
-    scale: 2,
+    precision: 14,
+    scale: 5,
     transformer: numericColumnTransformer,
   })
   buyPrice: number;
 
   @Column({
     type: 'decimal',
-    precision: 12,
-    scale: 2,
+    precision: 14,
+    scale: 5,
     transformer: numericColumnTransformer,
   })
   salePrice: number;

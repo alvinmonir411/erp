@@ -8,7 +8,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { PageCard } from '@/components/ui/page-card';
 import { StateMessage } from '@/components/ui/state-message';
 import { useToastNotification } from '@/components/ui/toast-provider';
-import { formatCurrency, formatNumber } from '@/lib/utils/format';
+import { formatCurrency, formatNumber, formatUnitPrice } from '@/lib/utils/format';
 import type { Company, Product, ProductUnit } from '@/types/api';
 import { AlertCircle, Package, Layers, AlertTriangle, Wallet, Search, CheckCircle2 } from 'lucide-react';
 
@@ -454,8 +454,8 @@ export function ProductsPage() {
                       </span>
                       <span className="text-[10px] ml-1 text-slate-400">{product.unit}</span>
                     </td>
-                    <td className="px-3 py-4 text-right">{formatCurrency(product.buyPrice)}</td>
-                    <td className="px-3 py-4 text-right">{formatCurrency(product.salePrice)}</td>
+                    <td className="px-3 py-4 text-right tabular-nums text-slate-700">{formatUnitPrice(product.buyPrice)}</td>
+                    <td className="px-3 py-4 text-right tabular-nums font-semibold text-slate-900">{formatUnitPrice(product.salePrice)}</td>
                     <td className="px-3 py-4">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -527,11 +527,11 @@ export function ProductsPage() {
                   </div>
                   <div>
                     <div className="text-[10px] font-black uppercase text-slate-400">Buy</div>
-                    <div className="font-bold text-slate-700">{formatCurrency(product.buyPrice)}</div>
+                    <div className="font-bold text-slate-700">{formatUnitPrice(product.buyPrice)}</div>
                   </div>
                   <div>
                     <div className="text-[10px] font-black uppercase text-slate-400">Sale</div>
-                    <div className="font-bold text-slate-900">{formatCurrency(product.salePrice)}</div>
+                    <div className="font-bold text-slate-900">{formatUnitPrice(product.salePrice)}</div>
                   </div>
                 </div>
 
@@ -652,7 +652,7 @@ export function ProductsPage() {
               <input
                 type="number"
                 min="0"
-                step="0.01"
+                step="any"
                 value={formState.buyPrice}
                 onChange={(event) =>
                   setFormState((current) => ({
@@ -669,7 +669,7 @@ export function ProductsPage() {
               <input
                 type="number"
                 min="0"
-                step="0.01"
+                step="any"
                 value={formState.salePrice}
                 onChange={(event) =>
                   setFormState((current) => ({

@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getDailySummaryReport, DailySummaryReport } from '@/lib/api/sales';
-import { formatCurrency, formatNumber } from '@/lib/utils/format';
+import { formatCurrency, formatNumber, formatUnitPrice } from '@/lib/utils/format';
 
 function ReportContent() {
   const searchParams = useSearchParams();
@@ -103,7 +103,7 @@ function ReportContent() {
                     <td className="py-2 px-2 text-slate-500">{index + 1}</td>
                     <td className="py-2 px-2 font-bold text-slate-900">{item.productName}</td>
                     <td className="py-2 px-2 text-right font-bold text-slate-800">{formatNumber(item.quantitySold)}</td>
-                    <td className="py-2 px-2 text-right font-medium text-slate-600">{formatCurrency(item.unitPrice)}</td>
+                    <td className="py-2 px-2 text-right font-medium text-slate-600">{formatUnitPrice(item.unitPrice)}</td>
                     <td className="py-2 px-2 text-right font-bold text-slate-900">{formatCurrency(item.totalAmount)}</td>
                   </tr>
                 ))}
