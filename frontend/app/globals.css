@@ -89,3 +89,10 @@ input[type="number"] {
   scrollbar-width: none;
 }
 
+/* Suppress browser print header/footer (removes URL, date, and 1/1 page numbering) */
+@media print {
+  @page {
+    margin: 0 !important;
+  }
+}
+

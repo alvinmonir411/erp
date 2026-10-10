@@ -116,7 +116,8 @@ export function OrderPrintModal({
             width: ${printLayout === 'POS' ? '72mm' : '100%'} !important;
             max-width: ${printLayout === 'POS' ? '72mm' : '190mm'} !important;
             margin: 0 auto !important;
-            padding: ${printLayout === 'POS' ? '2mm 1mm' : '10mm 12mm'} !important;
+            padding: ${printLayout === 'POS' ? '2mm 1mm' : '8mm 10mm'} !important;
+            box-sizing: border-box !important;
             background: #ffffff !important;
             color: #000000 !important;
             box-shadow: none !important;
@@ -132,7 +133,7 @@ export function OrderPrintModal({
           }
           @page {
             size: ${printLayout === 'POS' ? '80mm auto' : 'A4 portrait'};
-            margin: ${printLayout === 'POS' ? '1mm' : '10mm 12mm'};
+            margin: 0 !important;
           }
         }
       `}</style>

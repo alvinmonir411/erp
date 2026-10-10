@@ -669,7 +669,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         @media print {
           @page {
             size: A4 portrait;
-            margin: 5mm 6mm !important;
+            margin: 0 !important;
           }
 
           .no-print,
@@ -694,8 +694,9 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             top: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
-            padding: 0 !important;
+            padding: 6mm 8mm !important;
             margin: 0 !important;
+            box-sizing: border-box !important;
             background: #ffffff !important;
             color: #000000 !important;
             font-size: 8.5px !important;
