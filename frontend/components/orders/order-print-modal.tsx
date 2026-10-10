@@ -55,7 +55,7 @@ export function OrderPrintModal({
     ? Number(order.dueAmount)
     : (order.status === 'SETTLED' ? 0 : Math.max(0, grandTotal - paidAmount));
 
-  // Compact amount formatter (e.g. "3,798")
+  // Clean amount formatter using standard sans-serif with comma separation
   const formatAmount = (val: number | string) => {
     const num = typeof val === 'string' ? parseFloat(val) : Number(val);
     if (isNaN(num)) return '0';
@@ -116,7 +116,7 @@ export function OrderPrintModal({
             <button
               type="button"
               onClick={handleCopyInvoiceNumber}
-              className="inline-flex items-center gap-1 text-[10px] font-mono font-bold bg-white/10 hover:bg-white/20 text-slate-200 px-2 py-0.5 rounded transition-colors"
+              className="inline-flex items-center gap-1 text-[10px] font-bold bg-white/10 hover:bg-white/20 text-slate-200 px-2 py-0.5 rounded transition-colors tabular-nums"
               title="Copy invoice number"
             >
               <span>#{order.id.toString().padStart(6, '0')}</span>
@@ -183,7 +183,7 @@ export function OrderPrintModal({
                 <p className="text-[10px] text-slate-600 mt-0.5">
                   Ghorashal / Borodarga
                 </p>
-                <p className="text-[10px] text-slate-600 font-mono font-medium">
+                <p className="text-[10px] text-slate-600 font-medium tabular-nums">
                   Mob: 01763-088369
                 </p>
                 <div className="text-[9px] font-black uppercase tracking-wider text-slate-700 mt-1">
@@ -194,13 +194,13 @@ export function OrderPrintModal({
               {/* Minimal Customer & Invoice Info */}
               <div className="pb-2 mb-2 border-b border-dashed border-slate-400 text-[10px] space-y-1">
                 <div className="flex items-center justify-between">
-                  <span>Inv: <strong className="font-mono text-slate-900 font-bold">#{order.id.toString().padStart(6, '0')}</strong></span>
+                  <span>Inv: <strong className="text-slate-900 font-bold tabular-nums">#{order.id.toString().padStart(6, '0')}</strong></span>
                   <span className="text-slate-600">{formatDate(order.orderDate || order.createdAt)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="truncate">Customer: <strong className="text-slate-900 font-bold">{order.shop?.name || 'Walk-in'}</strong></span>
                   {order.shop?.phone && (
-                    <span className="text-slate-600 font-mono text-[9.5px] shrink-0 ml-1">{order.shop.phone}</span>
+                    <span className="text-slate-600 tabular-nums text-[9.5px] shrink-0 ml-1">{order.shop.phone}</span>
                   )}
                 </div>
               </div>
@@ -208,23 +208,23 @@ export function OrderPrintModal({
               {/* ONLY 3 COLUMNS: NAME | QTY | PRICE */}
               <table className="w-full text-left text-[10.5px] mb-2 border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-slate-900 text-[9.5px] font-black uppercase text-slate-800">
+                  <tr className="border-b border-slate-900 text-[9.5px] font-black uppercase text-slate-800">
                     <th className="py-1 pr-1 text-left">Name</th>
                     <th className="py-1 px-1 text-center w-12">Qty</th>
                     <th className="py-1 pl-1 text-right w-16">Price</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-dashed divide-slate-200">
+                <tbody>
                   {isManualDue ? (
-                    <tr>
-                      <td className="py-1.5 pr-1 font-bold text-slate-900 leading-tight">
+                    <tr className="border-b border-slate-100">
+                      <td className="py-1 pr-1 font-bold text-slate-900 leading-tight">
                         Due Settlement
                         {cleanedNote && (
                           <p className="text-[9px] text-slate-500 font-normal mt-0.5">{cleanedNote}</p>
                         )}
                       </td>
-                      <td className="py-1.5 px-1 text-center font-bold">1</td>
-                      <td className="py-1.5 pl-1 text-right font-mono font-bold text-slate-900">{formatAmount(grandTotal)}</td>
+                      <td className="py-1 px-1 text-center font-bold tabular-nums">1</td>
+                      <td className="py-1 pl-1 text-right tabular-nums font-bold text-slate-900">{formatAmount(grandTotal)}</td>
                     </tr>
                   ) : (
                     items.map((item: any, idx: number) => {
@@ -234,15 +234,15 @@ export function OrderPrintModal({
                       const lineTotal = Number(item.lineTotal || (qPaid * price));
 
                       return (
-                        <tr key={idx}>
-                          <td className="py-1.5 pr-1 font-semibold text-slate-900 leading-tight">
+                        <tr key={idx} className="border-b border-slate-100/60 last:border-none">
+                          <td className="py-1 pr-1 font-semibold text-slate-900 leading-tight">
                             {item.product?.name || 'Item'}
                             {qFree > 0 && <span className="text-[8.5px] text-emerald-700 font-bold ml-1">(+{qFree} free)</span>}
                           </td>
-                          <td className="py-1.5 px-1 text-center font-mono font-bold">
-                            {qPaid}
+                          <td className="py-1 px-1 text-center tabular-nums font-semibold text-slate-800">
+                            {formatAmount(qPaid)}
                           </td>
-                          <td className="py-1.5 pl-1 text-right font-mono font-bold text-slate-900">
+                          <td className="py-1 pl-1 text-right tabular-nums font-bold text-slate-900">
                             {formatAmount(lineTotal)}
                           </td>
                         </tr>
@@ -253,37 +253,37 @@ export function OrderPrintModal({
               </table>
 
               {/* POS Financial Summary */}
-              <div className="border-t-2 border-dashed border-slate-900 pt-1.5 space-y-1 text-[10.5px]">
+              <div className="border-t border-slate-400 pt-1.5 space-y-1 text-[10.5px]">
                 <div className="flex justify-between text-slate-600">
                   <span>Total Qty:</span>
-                  <span className="font-mono font-bold">{isManualDue ? '1' : totalQty}</span>
+                  <span className="tabular-nums font-bold text-slate-900">{formatAmount(totalQty)}</span>
                 </div>
 
                 {discountAmount > 0 && (
-                  <div className="flex justify-between text-rose-600">
+                  <div className="flex justify-between text-rose-600 font-medium">
                     <span>Discount:</span>
-                    <span className="font-mono font-bold">-{formatAmount(discountAmount)}</span>
+                    <span className="tabular-nums font-bold">-{formatAmount(discountAmount)}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between font-black text-slate-900 border-t border-slate-300 pt-1 text-[11px]">
+                <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1 text-[11px]">
                   <span>Total Bill:</span>
-                  <span className="font-mono">{formatCurrency(grandTotal)}</span>
+                  <span className="tabular-nums font-black">{formatCurrency(grandTotal)}</span>
                 </div>
 
-                <div className="flex justify-between text-slate-700 font-semibold">
+                <div className="flex justify-between text-slate-700 font-medium">
                   <span>Paid:</span>
-                  <span className="font-mono font-bold">{formatCurrency(paidAmount)}</span>
+                  <span className="tabular-nums font-semibold">{formatCurrency(paidAmount)}</span>
                 </div>
 
-                <div className="flex justify-between font-black text-rose-700 border-t-2 border-slate-900 pt-1 text-[11.5px]">
+                <div className="flex justify-between font-black text-rose-700 border-t border-slate-400 pt-1 text-[11.5px]">
                   <span>Due Amount:</span>
-                  <span className="font-mono">{formatCurrency(dueAmount)}</span>
+                  <span className="tabular-nums">{formatCurrency(dueAmount)}</span>
                 </div>
               </div>
 
               {/* POS Footer */}
-              <div className="text-center text-[9px] text-slate-500 mt-3 pt-2 border-t border-dashed border-slate-300">
+              <div className="text-center text-[9px] text-slate-500 mt-2.5 pt-2 border-t border-dashed border-slate-300">
                 Thank you! Please visit again.
               </div>
             </div>
@@ -295,7 +295,7 @@ export function OrderPrintModal({
             /* ========================================================================= */
             <div 
               id="order-print-canvas"
-              className="w-full max-w-xl bg-white shadow-lg rounded-xl p-5 sm:p-7 text-slate-900 text-xs leading-normal"
+              className="w-full max-w-xl bg-white shadow-lg rounded-xl p-5 sm:p-7 text-slate-900 text-xs leading-normal font-sans"
             >
               {/* A4 Header */}
               <div className="border-b-2 border-slate-900 pb-3 mb-4 flex justify-between items-start">
@@ -307,14 +307,14 @@ export function OrderPrintModal({
                     Authorized Wholesale Distributor & Dealer
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Ghorashal / Borodarga · Phone: <strong className="font-mono text-slate-700">01763-088369</strong>
+                    Ghorashal / Borodarga · Phone: <strong className="tabular-nums text-slate-700">01763-088369</strong>
                   </p>
                 </div>
                 <div className="text-right">
                   <span className="inline-block px-3 py-1 bg-slate-900 text-white text-xs font-black uppercase tracking-wider rounded-md">
                     Sales Invoice
                   </span>
-                  <p className="font-mono font-bold text-sm text-slate-900 mt-1.5">
+                  <p className="tabular-nums font-bold text-sm text-slate-900 mt-1.5">
                     #{order.id.toString().padStart(6, '0')}
                   </p>
                   <p className="text-xs text-slate-500">
@@ -331,7 +331,7 @@ export function OrderPrintModal({
                     {order.shop?.name || 'Direct Customer'}
                   </h3>
                   {order.shop?.phone && (
-                    <p className="text-slate-600 font-mono mt-0.5">Phone: {order.shop.phone}</p>
+                    <p className="text-slate-600 tabular-nums mt-0.5">Phone: {order.shop.phone}</p>
                   )}
                   {order.shop?.address && (
                     <p className="text-slate-500 mt-0.5">{order.shop.address}</p>
@@ -375,9 +375,9 @@ export function OrderPrintModal({
                           <p className="text-[11px] text-amber-900 font-medium mt-0.5">Note: {cleanedNote}</p>
                         )}
                       </td>
-                      <td className="py-2.5 px-2 text-center font-bold border-r border-slate-200">1</td>
-                      <td className="py-2.5 px-3 text-right font-mono border-r border-slate-200">{formatCurrency(grandTotal)}</td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">{formatCurrency(grandTotal)}</td>
+                      <td className="py-2.5 px-2 text-center font-bold border-r border-slate-200 tabular-nums">1</td>
+                      <td className="py-2.5 px-3 text-right tabular-nums border-r border-slate-200">{formatCurrency(grandTotal)}</td>
+                      <td className="py-2.5 px-3 text-right tabular-nums font-bold text-slate-900">{formatCurrency(grandTotal)}</td>
                     </tr>
                   ) : (
                     items.map((item: any, idx: number) => {
@@ -388,16 +388,16 @@ export function OrderPrintModal({
 
                       return (
                         <tr key={idx}>
-                          <td className="py-2 px-2 text-center text-slate-400 border-r border-slate-200">{idx + 1}</td>
+                          <td className="py-2 px-2 text-center text-slate-400 border-r border-slate-200 tabular-nums">{idx + 1}</td>
                           <td className="py-2 px-3 font-semibold text-slate-900 border-r border-slate-200">
                             {item.product?.name || 'Item'}
                             {item.product?.sku && <span className="text-[10px] text-slate-400 font-normal ml-1.5">({item.product.sku})</span>}
                           </td>
-                          <td className="py-2 px-2 text-center font-mono border-r border-slate-200">
-                            {qPaid}{qFree > 0 && <span className="text-emerald-700 font-bold ml-1">+{qFree}f</span>}
+                          <td className="py-2 px-2 text-center tabular-nums border-r border-slate-200">
+                            {formatAmount(qPaid)}{qFree > 0 && <span className="text-emerald-700 font-bold ml-1">+{qFree}f</span>}
                           </td>
-                          <td className="py-2 px-3 text-right font-mono text-slate-600 border-r border-slate-200">{formatCurrency(price)}</td>
-                          <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">{formatCurrency(lineTotal)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums text-slate-600 border-r border-slate-200">{formatCurrency(price)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900">{formatCurrency(lineTotal)}</td>
                         </tr>
                       );
                     })
@@ -408,10 +408,10 @@ export function OrderPrintModal({
                     <td colSpan={2} className="py-2 px-3 text-right uppercase text-slate-600 border-r border-slate-300">
                       Total Quantity:
                     </td>
-                    <td className="py-2 px-2 text-center font-mono text-slate-900 border-r border-slate-300">
-                      {isManualDue ? '1' : totalQty}
+                    <td className="py-2 px-2 text-center tabular-nums text-slate-900 border-r border-slate-300">
+                      {isManualDue ? '1' : formatAmount(totalQty)}
                     </td>
-                    <td colSpan={2} className="py-2 px-3 text-right font-mono text-slate-900">
+                    <td colSpan={2} className="py-2 px-3 text-right tabular-nums text-slate-900">
                       {formatCurrency(subtotal)}
                     </td>
                   </tr>
@@ -424,29 +424,29 @@ export function OrderPrintModal({
                   <div className="p-3 space-y-1.5">
                     <div className="flex justify-between text-slate-600">
                       <span>Subtotal:</span>
-                      <span className="font-mono font-bold text-slate-900">{formatCurrency(subtotal)}</span>
+                      <span className="tabular-nums font-bold text-slate-900">{formatCurrency(subtotal)}</span>
                     </div>
 
                     {discountAmount > 0 && (
                       <div className="flex justify-between text-rose-600">
                         <span>Discount:</span>
-                        <span className="font-mono font-bold">-{formatCurrency(discountAmount)}</span>
+                        <span className="tabular-nums font-bold">-{formatCurrency(discountAmount)}</span>
                       </div>
                     )}
 
                     <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1.5 text-sm">
                       <span>Net Total:</span>
-                      <span className="font-mono">{formatCurrency(grandTotal)}</span>
+                      <span className="tabular-nums">{formatCurrency(grandTotal)}</span>
                     </div>
 
                     <div className="flex justify-between text-emerald-700 font-bold">
                       <span>Paid Amount:</span>
-                      <span className="font-mono">{formatCurrency(paidAmount)}</span>
+                      <span className="tabular-nums">{formatCurrency(paidAmount)}</span>
                     </div>
 
                     <div className="flex justify-between text-rose-700 font-black border-t-2 border-slate-900 pt-1.5 text-sm bg-rose-50 -mx-3 -mb-3 p-2.5">
                       <span>Remaining Due:</span>
-                      <span className="font-mono">{formatCurrency(dueAmount)}</span>
+                      <span className="tabular-nums">{formatCurrency(dueAmount)}</span>
                     </div>
                   </div>
                 </div>
@@ -496,7 +496,7 @@ export function OrderPrintModal({
             className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
           >
             <Printer className="w-4 h-4" />
-            <span>Print {printLayout === 'POS' ? 'POS Slip' : 'A4 Invoice'}</span>
+            <span>Print {printLayout === 'POS' ? 'Slip' : 'Invoice'}</span>
           </button>
         </div>
 

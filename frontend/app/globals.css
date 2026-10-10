@@ -26,7 +26,7 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --font-sans: Arial, Helvetica, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Segoe UI Mono", "Liberation Mono", monospace;
   --radius-xl: var(--radius);
 }
 
