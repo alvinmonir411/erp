@@ -10,7 +10,7 @@ import {
   TrendingUp, ShoppingCart, AlertCircle, RefreshCw,
   Lock, ShieldAlert, CreditCard, Save, ChevronDown, ChevronUp, Plus, DollarSign, Truck, Undo2,
   ArrowLeft, LogOut,
-  User, Info
+  User, Info, Phone
 } from 'lucide-react';
 import { StatCard } from '@/components/ui/stat-card';
 import { Pagination } from '@/components/ui/pagination';
@@ -28,14 +28,15 @@ import { OrderModal } from './order-modal';
 import { OrderPrintModal } from './order-print-modal';
 
 const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
-  DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-600', icon: Clock },
-  CONFIRMED: { label: 'Confirmed', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
-  ASSIGNED: { label: 'Assigned', color: 'bg-indigo-100 text-indigo-700', icon: Package },
-  OUT_FOR_DELIVERY: { label: 'Out for Delivery', color: 'bg-amber-100 text-amber-700', icon: Package },
-  DELIVERED: { label: 'Delivered', color: 'bg-cyan-100 text-cyan-700', icon: ShoppingCart },
-  PARTIAL_DUE: { label: 'Partial Due', color: 'bg-amber-100 text-amber-700', icon: DollarSign },
-  SETTLED: { label: 'Settled', color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle },
-  CANCELLED: { label: 'Cancelled', color: 'bg-rose-100 text-rose-700', icon: XCircle },
+  DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-700 border-slate-200', icon: Clock },
+  CONFIRMED: { label: 'Confirmed', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: CheckCircle },
+  ASSIGNED: { label: 'Assigned', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', icon: Package },
+  OUT_FOR_DELIVERY: { label: 'Dispatched', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Package },
+  DELIVERED: { label: 'Delivered', color: 'bg-cyan-100 text-cyan-700 border-cyan-200', icon: ShoppingCart },
+  PARTIAL_DUE: { label: 'Partial Due (আংশিক বকেয়া)', color: 'bg-amber-100 text-amber-800 border-amber-300 font-bold', icon: DollarSign },
+  MANUAL_DUE: { label: 'Manual Due (বকেয়া রেকর্ড)', color: 'bg-rose-100 text-rose-800 border-rose-300 font-black', icon: DollarSign },
+  SETTLED: { label: 'Settled (পরিশোধিত)', color: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold', icon: CheckCircle },
+  CANCELLED: { label: 'Cancelled', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: XCircle },
 };
 
 const PAGE_SIZE = 10;
@@ -196,6 +197,7 @@ export function AllOrdersPage() {
     { label: 'Pending', value: 'CONFIRMED' },
     { label: 'Dispatched', value: 'OUT_FOR_DELIVERY' },
     { label: 'Settled', value: 'SETTLED' },
+    { label: 'Due / বকেয়া', value: 'MANUAL_DUE' },
   ];
 
   return (
@@ -353,39 +355,76 @@ export function AllOrdersPage() {
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => (
-                  <tr key={order.id} className="group hover:bg-secondary/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => setSelectedOrder(order)}
-                        className="text-sm font-bold text-foreground hover:text-accent transition-colors"
-                      >
-                        #{order.id.toString().padStart(6, '0')}
-                      </button>
-                      <p className="mt-1 text-[10px] font-bold text-muted flex items-center gap-1 uppercase tracking-tight">
-                        <Calendar className="h-3 w-3" /> {formatDate(order.createdAt)}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-foreground">{order.shop?.name || 'Direct Shop'}</p>
-                      <p className="mt-1 text-[10px] font-bold text-muted flex items-center gap-1 uppercase tracking-tight">
-                        <MapPin className="h-3 w-3" /> {order.route?.name || 'No Route'}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <p className="text-sm font-bold text-foreground">
-                        {order.items?.reduce((sum: number, item: any) => sum + Number(item.quantity) + Number(item.freeQuantity), 0) || 0}
-                      </p>
-                      <p className="text-[10px] font-bold text-muted uppercase">Units</p>
-                    </td>
-                    <td className="px-6 py-4 text-right font-bold text-foreground">
-                      {formatCurrency(Number(order.grandTotal))}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${STATUS_CONFIG[order.status]?.color || 'bg-slate-100 text-slate-600'}`}>
-                        {order.status.replace(/_/g, ' ')}
-                      </span>
-                    </td>
+                orders.map((order) => {
+                  const isManualDue = order.status === 'MANUAL_DUE' || !order.items || order.items.length === 0;
+                  const totalUnits = order.items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0) + Number(item.freeQuantity || 0), 0) || 0;
+                  const totalItemsCount = order.items?.length || 0;
+                  const grandTotal = Number(order.actualSoldAmount || order.grandTotal || 0);
+                  const paidAmount = Number(order.collectedAmount || order.advancePaid || 0);
+                  const dueAmount = order.dueAmount !== undefined && order.dueAmount !== null
+                    ? Number(order.dueAmount)
+                    : (order.status === 'SETTLED' ? 0 : Math.max(0, grandTotal - paidAmount));
+
+                  return (
+                    <tr key={order.id} className={`group hover:bg-secondary/30 transition-colors ${isManualDue ? 'bg-amber-50/20' : ''}`}>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => setSelectedOrder(order)}
+                          className="text-sm font-bold text-foreground hover:text-accent transition-colors flex items-center gap-1.5"
+                        >
+                          #{order.id.toString().padStart(6, '0')}
+                          {isManualDue && (
+                            <span className="text-[9px] font-black uppercase bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded border border-rose-200">
+                              Due
+                            </span>
+                          )}
+                        </button>
+                        <p className="mt-1 text-[10px] font-bold text-muted flex items-center gap-1 uppercase tracking-tight">
+                          <Calendar className="h-3 w-3" /> {formatDate(order.orderDate || order.createdAt)}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-bold text-foreground">{order.shop?.name || 'Direct Shop'}</p>
+                        <p className="mt-1 text-[10px] font-bold text-muted flex items-center gap-1 uppercase tracking-tight">
+                          <MapPin className="h-3 w-3" /> {order.route?.name || 'No Route'}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {isManualDue ? (
+                          <div>
+                            <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700 border border-rose-200">
+                              <DollarSign className="h-3 w-3" /> বকেয়া রেকর্ড
+                            </span>
+                            <p className="text-[10px] text-muted font-bold mt-0.5">পণ্য ছাড়া সরাসরি</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-sm font-bold text-foreground">
+                              {totalUnits}
+                            </p>
+                            <p className="text-[10px] font-bold text-muted uppercase">Units ({totalItemsCount} items)</p>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <p className="text-sm font-black text-foreground">
+                          {formatCurrency(grandTotal)}
+                        </p>
+                        {dueAmount > 0 ? (
+                          <p className="text-[11px] font-black text-rose-600 mt-0.5">
+                            বকেয়া: {formatCurrency(dueAmount)}
+                          </p>
+                        ) : (
+                          <p className="text-[10px] font-bold text-emerald-600 mt-0.5">
+                            পরিশোধিত
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider border shadow-2xs ${STATUS_CONFIG[order.status]?.color || 'bg-slate-100 text-slate-600'}`}>
+                          {STATUS_CONFIG[order.status]?.label || order.status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
                     <td className="px-6 py-4">
                       <p className="text-[11px] font-medium text-slate-500 max-w-[150px] truncate" title={order.note}>
                         {order.note || '—'}
@@ -437,99 +476,209 @@ export function AllOrdersPage() {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                );
+              })
+            )}
             </tbody>
           </table>
         </div>
 
-        {/* Mobile Card View */}
-        <div className="md:hidden divide-y divide-border">
+        {/* Mobile Card Feed - Alada Alada Card View */}
+        <div className="md:hidden space-y-3.5 p-3 sm:p-4 bg-slate-100/70 rounded-2xl">
           {isLoading ? (
-            <div className="px-6 py-10 text-center">
+            <div className="px-6 py-12 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-2" />
-              <p className="text-xs font-bold text-muted">Loading...</p>
+              <p className="text-xs font-bold text-slate-500">Loading orders...</p>
             </div>
           ) : orders.length === 0 ? (
-            <div className="px-6 py-10 text-center">
-              <p className="text-sm text-muted">No orders found</p>
+            <div className="px-6 py-12 text-center bg-white rounded-2xl border border-slate-200 shadow-sm">
+              <p className="text-sm font-bold text-slate-500">No orders found</p>
             </div>
           ) : (
-            orders.map((order) => (
-              <div key={order.id} className="p-4 space-y-3 hover:bg-secondary/10 transition-colors" onClick={() => setSelectedOrder(order)}>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-black text-primary">#{order.id.toString().padStart(6, '0')}</span>
-                    <span className="text-[10px] font-bold text-muted uppercase">{formatDate(order.createdAt)}</span>
-                  </div>
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${STATUS_CONFIG[order.status]?.color || 'bg-slate-100 text-slate-600'}`}>
-                    {order.status.replace(/_/g, ' ')}
-                  </span>
-                </div>
+            orders.map((order) => {
+              const isManualDue = order.status === 'MANUAL_DUE' || !order.items || order.items.length === 0;
+              const totalUnits = order.items?.reduce((sum: number, item: any) => sum + Number(item.quantity || 0) + Number(item.freeQuantity || 0), 0) || 0;
+              const totalItemsCount = order.items?.length || 0;
+              const grandTotal = Number(order.actualSoldAmount || order.grandTotal || 0);
+              const paidAmount = Number(order.collectedAmount || order.advancePaid || 0);
+              const dueAmount = order.dueAmount !== undefined && order.dueAmount !== null
+                ? Number(order.dueAmount)
+                : (order.status === 'SETTLED' ? 0 : Math.max(0, grandTotal - paidAmount));
 
-                <div className="space-y-1">
-                  <p className="text-sm font-black text-foreground">{order.shop?.name || 'Direct Shop'}</p>
-                  <p className="text-[10px] font-bold text-muted flex items-center gap-1 uppercase tracking-tight">
-                    <MapPin className="h-3 w-3" /> {order.route?.name || 'No Route'}
-                  </p>
-                </div>
+              return (
+                <div
+                  key={order.id}
+                  className={`rounded-2xl border bg-white p-4 shadow-sm hover:shadow-md transition-all relative overflow-hidden space-y-3 cursor-pointer ${
+                    isManualDue
+                      ? 'border-l-4 border-l-rose-500 border-slate-200 bg-gradient-to-br from-rose-50/20 via-white to-white'
+                      : order.status === 'SETTLED'
+                      ? 'border-l-4 border-l-emerald-500 border-slate-200'
+                      : dueAmount > 0
+                      ? 'border-l-4 border-l-amber-500 border-slate-200'
+                      : 'border-slate-200'
+                  }`}
+                  onClick={() => setSelectedOrder(order)}
+                >
+                  {/* Card Top: Order ID + Date & Status Badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-black text-slate-900 tracking-tight">
+                          #{order.id.toString().padStart(6, '0')}
+                        </span>
+                        {isManualDue && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-rose-500/10 px-2 py-0.5 text-[10px] font-black text-rose-700 border border-rose-200">
+                            <DollarSign className="h-3 w-3" /> বকেয়া রেকর্ড
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDate(order.orderDate || order.createdAt)}
+                      </p>
+                    </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-border">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Units</span>
-                    <span className="text-sm font-black">{order.items?.reduce((sum: number, item: any) => sum + Number(item.quantity) + Number(item.freeQuantity), 0) || 0}</span>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border shadow-2xs ${
+                      STATUS_CONFIG[order.status]?.color || 'bg-slate-100 text-slate-700 border-slate-200'
+                    }`}>
+                      {STATUS_CONFIG[order.status]?.label || order.status.replace(/_/g, ' ')}
+                    </span>
                   </div>
-                  <div className="text-right flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Grand Total</span>
-                    <span className="text-sm font-black text-foreground">{formatCurrency(Number(order.grandTotal))}</span>
-                  </div>
-                </div>
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedOrder(order);
-                    }}
-                    className="text-[10px] font-bold uppercase text-primary px-3 py-1.5 bg-primary/5 rounded-lg font-black"
-                  >
-                    View Details
-                  </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPrintingOrder(order);
-                    }}
-                    className="text-[10px] font-bold uppercase text-indigo-700 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center gap-1 font-black transition-colors"
-                  >
-                    <Printer className="h-3.5 w-3.5" /> Print
-                  </button>
-                  {user?.role !== 'SR' && !['SETTLED', 'PARTIAL_DUE'].includes(order.status) && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSettlingOrder(order);
-                      }}
-                      className="text-[10px] font-bold uppercase text-emerald-600 px-3 py-1.5 bg-emerald-50 rounded-lg flex items-center gap-1 font-black"
-                    >
-                      <CheckCircle className="h-3.5 w-3.5" /> Settle
-                    </button>
+                  {/* Shop & Route Details */}
+                  <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-black text-slate-900 flex items-center gap-1.5 truncate">
+                        <Store className="h-4 w-4 text-slate-500 shrink-0" />
+                        <span>{order.shop?.name || 'Direct Shop / সাধারণ কাস্টমার'}</span>
+                      </p>
+                      {order.shop?.phone && (
+                        <span className="text-[10px] font-bold text-slate-500 flex items-center gap-0.5 shrink-0">
+                          <Phone className="h-2.5 w-2.5" /> {order.shop.phone}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] font-bold text-slate-500">
+                      <span className="flex items-center gap-1 text-slate-600">
+                        <MapPin className="h-3 w-3 text-slate-400" /> {order.route?.name || 'No Route'}
+                      </span>
+                      {order.shop?.ownerName && (
+                        <span className="text-slate-500">
+                          মালিক: <strong className="text-slate-700">{order.shop.ownerName}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Note / Remarks if any */}
+                  {order.note && (
+                    <div className="text-[11px] font-medium text-amber-900 bg-amber-50/70 border border-amber-200/70 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+                      <Info className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <p className="line-clamp-2 leading-relaxed">{order.note}</p>
+                    </div>
                   )}
-                  {user?.role === 'SUPER_ADMIN' && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(order.id);
-                      }}
-                      disabled={isActionLoading === order.id}
-                      className="text-[10px] font-bold uppercase text-rose-600 px-3 py-1.5 bg-rose-50 rounded-lg flex items-center gap-1 hover:bg-rose-100 transition-all disabled:opacity-50 font-black"
+
+                  {/* Units vs Products Clarity */}
+                  <div className="rounded-xl bg-slate-50/50 p-2.5 border border-slate-100">
+                    {isManualDue ? (
+                      <div className="flex items-center justify-between text-xs font-bold text-amber-800">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full bg-rose-500"></span>
+                          <span>পণ্যের সংখ্যা (Units):</span>
+                        </span>
+                        <span className="font-black text-rose-800 bg-rose-100/80 px-2 py-0.5 rounded text-[11px] border border-rose-200">
+                          কোনো পণ্য নেই (সরাসরি বকেয়া)
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-500 flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5 text-slate-400" /> মোট পণ্য (Units):
+                        </span>
+                        <span className="font-black text-slate-800">
+                          {totalUnits} টি {totalItemsCount > 0 && <span className="text-slate-400 font-medium text-[11px]">({totalItemsCount} আইটেম)</span>}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Financial Breakdown (Grand Total, Paid, Due) */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {isManualDue ? 'ধার্যকৃত মোট বকেয়া' : 'মোট বিল (Total)'}
+                      </span>
+                      <span className="text-sm font-black text-slate-900">
+                        {formatCurrency(grandTotal)}
+                      </span>
+                      {paidAmount > 0 && (
+                        <span className="text-[10px] font-bold text-emerald-600 mt-0.5">
+                          আদায়: {formatCurrency(paidAmount)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-end text-right">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        অবশিষ্ট বকেয়া (Due)
+                      </span>
+                      {dueAmount > 0 ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-base font-black text-rose-600">
+                            {formatCurrency(dueAmount)}
+                          </span>
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded border border-rose-200">
+                            Due
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-black text-emerald-600 flex items-center gap-1 mt-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <CheckCircle className="h-3 w-3" /> পরিশোধিত (Paid)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                    <button 
+                      onClick={() => setSelectedOrder(order)}
+                      className="text-[11px] font-bold text-slate-700 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1 transition-colors active:scale-95"
                     >
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                      <Eye className="h-3.5 w-3.5 text-slate-500" />
+                      <span>বিস্তারিত</span>
                     </button>
-                  )}
+                    <button 
+                      onClick={() => setPrintingOrder(order)}
+                      className="text-[11px] font-black text-indigo-700 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center gap-1 transition-colors active:scale-95"
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                      <span>প্রিন্ট</span>
+                    </button>
+                    {user?.role !== 'SR' && !['SETTLED', 'PARTIAL_DUE'].includes(order.status) && (
+                      <button
+                        onClick={() => setSettlingOrder(order)}
+                        className="text-[11px] font-black text-emerald-700 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 rounded-lg flex items-center gap-1 transition-colors active:scale-95"
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        <span>সেটেল</span>
+                      </button>
+                    )}
+                    {user?.role === 'SUPER_ADMIN' && (
+                      <button
+                        onClick={() => handleDelete(order.id)}
+                        disabled={isActionLoading === order.id}
+                        className="text-[11px] font-bold text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors active:scale-95 disabled:opacity-50"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 

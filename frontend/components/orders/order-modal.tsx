@@ -127,8 +127,14 @@ export function OrderModal({ order, onClose, onDeleteSuccess }: OrderModalProps)
                   <div className="mt-1 space-y-1.5">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Status:</span>
-                      <span className="text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                        {order.status.replace(/_/g, ' ')}
+                      <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                        order.status === 'MANUAL_DUE' 
+                          ? 'bg-rose-100 text-rose-800 border-rose-300' 
+                          : order.status === 'SETTLED'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}>
+                        {order.status === 'MANUAL_DUE' ? 'Manual Due (বকেয়া এন্ট্রি)' : order.status.replace(/_/g, ' ')}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -192,8 +198,14 @@ export function OrderModal({ order, onClose, onDeleteSuccess }: OrderModalProps)
               </h3>
               
               {!order.items || order.items.length === 0 ? (
-                <div className="text-slate-500 font-bold p-6 bg-slate-50 border border-slate-100 rounded-xl text-center text-xs uppercase tracking-wider">
-                  No itemized product records (Manual Due Record)
+                <div className="p-6 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-center space-y-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-black border border-amber-300">
+                    <DollarSign className="w-3.5 h-3.5 text-amber-700" />
+                    <span>সরাসরি বকেয়া এন্ট্রি (Manual Due Entry)</span>
+                  </div>
+                  <p className="text-xs font-bold text-amber-900 leading-relaxed max-w-md mx-auto">
+                    এই চালানে কোনো পণ্য (Products / Units) যুক্ত নেই — এটি দোকান বা কাস্টমারের পূর্বের বাকি বা সরাসরি বকেয়া সমন্বয়ের জন্য এন্ট্রি করা হয়েছে।
+                  </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-slate-100">
