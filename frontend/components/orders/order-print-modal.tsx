@@ -98,6 +98,20 @@ export function OrderPrintModal({
 
   const cleanedNote = order.note ? order.note.replace(/^Manual due:\s*/i, '').trim() : '';
 
+  const formattedInvoiceDate = (() => {
+    try {
+      const d = new Date(order.orderDate || order.createdAt);
+      if (isNaN(d.getTime())) return formatDate(order.orderDate || order.createdAt);
+      const day = String(d.getDate()).padStart(2, '0');
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = monthNames[d.getMonth()];
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch {
+      return formatDate(order.orderDate || order.createdAt);
+    }
+  })();
+
   return (
     <div className="fixed inset-0 z-[10005] flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150 print:p-0 print:bg-white print:static">
       {/* Dynamic Print CSS for A4 Page vs POS System */}
@@ -113,10 +127,10 @@ export function OrderPrintModal({
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: ${printLayout === 'POS' ? '72mm' : '100%'} !important;
-            max-width: ${printLayout === 'POS' ? '72mm' : '190mm'} !important;
+            width: ${printLayout === 'POS' ? '72mm' : isManualDue ? '105mm' : '100%'} !important;
+            max-width: ${printLayout === 'POS' ? '72mm' : isManualDue ? '105mm' : '190mm'} !important;
             margin: 0 auto !important;
-            padding: ${printLayout === 'POS' ? '2mm 1mm' : '8mm 10mm'} !important;
+            padding: ${printLayout === 'POS' ? '2mm 1mm' : isManualDue ? '5mm 5mm' : '8mm 10mm'} !important;
             box-sizing: border-box !important;
             background: #ffffff !important;
             color: #000000 !important;
@@ -139,7 +153,7 @@ export function OrderPrintModal({
       `}</style>
 
       {/* Main Modal Card */}
-      <div className={`w-full ${printLayout === 'POS' ? 'max-w-sm' : 'max-w-2xl'} bg-slate-100 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-300 flex flex-col max-h-[96vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:bg-white transition-all duration-200`}>
+      <div className={`w-full ${isManualDue ? 'max-w-md' : printLayout === 'POS' ? 'max-w-sm' : 'max-w-2xl'} bg-slate-100 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-300 flex flex-col max-h-[96vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:bg-white transition-all duration-200`}>
         
         {/* Top Control Bar with 2 Clear Options: POS System & A4 Page */}
         <div className="no-print bg-slate-900 text-white px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 shrink-0">
@@ -199,10 +213,89 @@ export function OrderPrintModal({
         {/* Scrollable Canvas Preview Area */}
         <div className="flex-1 overflow-y-auto p-2 sm:p-4 bg-slate-200/80 flex justify-center print:p-0 print:bg-white print:overflow-visible">
           
-          {/* ========================================================================= */}
-          {/* OPTION 1: POS SYSTEM (80mm Thermal Slip - Only Name, Qty, Price) */}
-          {/* ========================================================================= */}
-          {printLayout === 'POS' ? (
+          {isManualDue ? (
+            /* ========================================================================= */
+            /* DUE SETTLEMENT SLIP (Exact 1:1 clean format requested by user) */
+            /* ========================================================================= */
+            <div 
+              id="order-print-canvas"
+              className={`w-full ${printLayout === 'POS' ? 'max-w-[320px] p-4 text-[11px]' : 'max-w-md mx-auto p-6 sm:p-7 text-xs'} bg-white shadow-md rounded-2xl text-slate-900 leading-normal font-sans`}
+            >
+              {/* Header: Left (Company & Address & Mobile) | Right (Invoice, Date, Customer) */}
+              <div className="flex justify-between items-start pb-3 border-b border-slate-200">
+                <div>
+                  <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
+                    M/S KARIM TRADERS
+                  </h1>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Pirgacha
+                  </p>
+                  <p className="text-xs text-slate-600 tabular-nums">
+                    Mobile: 01763-088369
+                  </p>
+                </div>
+                <div className="text-right text-xs space-y-0.5">
+                  <p className="text-slate-900 font-bold">
+                    Invoice: <span className="font-mono">#{order.id.toString().padStart(5, '0')}</span>
+                  </p>
+                  <p className="text-slate-600">
+                    {formattedInvoiceDate}
+                  </p>
+                  <p className="text-slate-900 font-medium">
+                    Customer: <span className="font-black uppercase">{order.shop?.name || 'Walk-in'}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* ITEM | QTY | PRICE Headers */}
+              <div className="border-b border-slate-200 py-2.5 flex justify-between text-xs font-black uppercase text-slate-800 tracking-wider">
+                <span className="text-left flex-1">ITEM</span>
+                <span className="text-center w-14">QTY</span>
+                <span className="text-right w-20">PRICE</span>
+              </div>
+
+              {/* Due Settlement Line */}
+              <div className="border-b border-slate-200 py-3">
+                <div className="flex justify-between items-start text-xs">
+                  <div className="flex-1 pr-2">
+                    <p className="font-bold text-slate-900 text-sm">Due Settlement</p>
+                    {cleanedNote && (
+                      <p className="text-[11px] text-slate-500 font-normal mt-0.5 uppercase tracking-wide">
+                        {cleanedNote}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-center w-14 font-semibold text-slate-800 text-sm">1</div>
+                  <div className="text-right w-20 font-bold tabular-nums text-slate-900 text-sm">
+                    {formatAmount(grandTotal)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial Summary: Total & Paid */}
+              <div className="py-2.5 space-y-1.5 text-xs border-b border-slate-200">
+                <div className="flex justify-between text-slate-600 font-medium">
+                  <span>Total</span>
+                  <span className="font-black text-slate-900 tabular-nums">{formatCurrency(grandTotal)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600 font-medium">
+                  <span>Paid</span>
+                  <span className="tabular-nums font-semibold text-slate-700">{formatCurrency(paidAmount)}</span>
+                </div>
+              </div>
+
+              {/* Due Amount Highlight */}
+              <div className="py-3 border-b border-slate-200 flex justify-between items-center text-sm font-black text-slate-900">
+                <span>Due Amount</span>
+                <span className="tabular-nums font-black">{formatCurrency(dueAmount)}</span>
+              </div>
+
+              {/* Footer */}
+              <div className="text-center pt-5 text-xs text-slate-500 font-medium">
+                Thank you!
+              </div>
+            </div>
+          ) : printLayout === 'POS' ? (
             <div 
               id="order-print-canvas"
               className="w-full max-w-[310px] bg-white shadow-md rounded-xl p-3.5 text-slate-900 text-[10.5px] leading-tight font-sans"
