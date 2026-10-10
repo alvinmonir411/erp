@@ -1538,37 +1538,37 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       {/* PRINT SECTION (HIDDEN ON SCREEN) */}
       <div className="final-settlement-print text-black bg-white">
         {/* TOP HEADER: Store Name & Mobile Number */}
-        <div className="text-center mb-1.5 pb-1 border-b border-black">
+        <div className="text-center mb-1 pb-1 border-b border-black">
           <h1 className="text-base font-black uppercase tracking-tight text-black leading-tight">
             M/S KARIM TRADERS
           </h1>
-          <p className="text-[10px] font-bold text-slate-700 tabular-nums">
-            Mob: 01763-088369 · Ghorashal / Borodarga
+          <p className="text-[9.5px] font-bold text-slate-700 tabular-nums">
+            Mob: 01763-088369 · Pirgachha
           </p>
-          <div className="text-[9px] font-black uppercase tracking-wider text-black mt-0.5">
+          <div className="text-[8.5px] font-black uppercase tracking-wider text-black mt-0.5">
             Final Batch Settlement
           </div>
         </div>
 
-        {/* LOGISTICS ROW: Left Side (Route, Delivery Man) & Right Side (Batch ID, Date) */}
-        <div className="grid grid-cols-2 gap-4 mb-2 text-[10px] border-b border-black pb-1.5">
+        {/* LOGISTICS ROW: Left Side (Route, Delivery Man) & Right Side (Batch ID, Date) - COMPACT */}
+        <div className="grid grid-cols-2 gap-2 mb-1.5 text-[8.5px] border-b border-black pb-1 leading-tight">
           <div className="space-y-0.5">
-            <div className="flex gap-2">
-              <span className="font-bold text-slate-600 w-24">Route:</span>
+            <div className="flex gap-1.5 items-center">
+              <span className="font-bold text-slate-600 text-[8px] uppercase">Route:</span>
               <span className="font-black uppercase text-black">{batch.route?.name || 'N/A'}</span>
             </div>
-            <div className="flex gap-2">
-              <span className="font-bold text-slate-600 w-24">Delivery Man:</span>
+            <div className="flex gap-1.5 items-center">
+              <span className="font-bold text-slate-600 text-[8px] uppercase">Delivery Man:</span>
               <span className="font-black uppercase text-black">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name || 'N/A'}</span>
             </div>
           </div>
           <div className="space-y-0.5 text-right">
-            <div className="flex justify-end gap-2">
-              <span className="font-bold text-slate-600">Batch ID:</span>
+            <div className="flex justify-end gap-1.5 items-center">
+              <span className="font-bold text-slate-600 text-[8px] uppercase">Batch ID:</span>
               <span className="font-black tabular-nums text-black">#BT-{batch.id}</span>
             </div>
-            <div className="flex justify-end gap-2">
-              <span className="font-bold text-slate-600">Date:</span>
+            <div className="flex justify-end gap-1.5 items-center">
+              <span className="font-bold text-slate-600 text-[8px] uppercase">Date:</span>
               <span className="font-black tabular-nums text-black">{formatDate(batch.dispatchedAt || batch.createdAt)}</span>
             </div>
           </div>
@@ -1702,49 +1702,36 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               </div>
             </div>
 
-            {/* Right Column: Final Cash Reconciliation */}
-            <div className="space-y-1 font-semibold">
+            {/* Right Column: Simplified Cash Reconciliation (Total Sale & Total Costing) */}
+            <div className="space-y-1.5 font-semibold">
               <p className="font-black uppercase text-[8px] text-slate-700 border-b border-slate-200 pb-0.5">
                 Cash Reconciliation:
               </p>
 
-              <div className="flex justify-between">
-                <span>Gross Order / Dispatch Amount:</span>
-                <span className="tabular-nums">{formatCurrency(currentGrossDispatched)}</span>
+              <div className="flex justify-between font-bold text-slate-900">
+                <span>Total Sale:</span>
+                <span className="tabular-nums font-black">{formatCurrency(currentFinalAmount)}</span>
               </div>
 
-              <div className="flex justify-between text-rose-600">
-                <span>(-) Total Paid Return Amount:</span>
-                <span className="tabular-nums">- {formatCurrency(currentReturnAdjusted)}</span>
-              </div>
+              {currentCustomerDue > 0 && (
+                <div className="flex justify-between text-rose-600">
+                  <span>(-) Total Customer Due / Baki:</span>
+                  <span className="tabular-nums font-bold">- {formatCurrency(currentCustomerDue)}</span>
+                </div>
+              )}
 
-              <div className="flex justify-between border-t border-slate-200 pt-0.5 font-bold text-slate-900">
-                <span>= Gross Sold Amount:</span>
-                <span className="tabular-nums">{formatCurrency(currentFinalAmount)}</span>
-              </div>
-
-              <div className="flex justify-between text-rose-600">
-                <span>(-) Total Customer Due/Baki:</span>
-                <span className="tabular-nums">- {formatCurrency(currentCustomerDue)}</span>
-              </div>
-
-              <div className="flex justify-between border-t border-slate-200 pt-0.5 font-bold text-slate-900">
-                <span>= Gross Cash Collectable:</span>
-                <span className="tabular-nums">{formatCurrency(currentCashCollectable)}</span>
-              </div>
-
-              <div className="flex justify-between text-rose-600">
-                <span>(-) Total Daily Expenses:</span>
+              <div className="flex justify-between text-rose-700 font-bold">
+                <span>(-) Total Costing:</span>
                 <span className="tabular-nums">- {formatCurrency(isBatchSettled ? Number(batch.totalExpenses || 0) : totalExpensesVal)}</span>
               </div>
 
-              <div className="flex justify-between border-t border-black pt-1 font-black text-emerald-700 text-[8.5px]">
-                <span>= Net Expected Cash:</span>
+              <div className="flex justify-between border-t border-black pt-1 font-black text-black text-[8.5px]">
+                <span>= Net Cash (Collectable):</span>
                 <span className="tabular-nums">{formatCurrency(netExpectedCashFromDeliveryMan)}</span>
               </div>
 
               <div className="flex justify-between bg-slate-100 p-1 font-black text-slate-900 border border-black text-[8.5px]">
-                <span>Actual Cash Received by Admin:</span>
+                <span>Actual Cash Received:</span>
                 <span className="tabular-nums">{formatCurrency(isBatchSettled ? Number(batch.totalCollectedAmount || 0) : Number(actualCashReceived || netExpectedCashFromDeliveryMan))}</span>
               </div>
             </div>
@@ -1761,6 +1748,13 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             <div className="border-t border-black mx-auto w-32 pt-1 font-black uppercase tracking-wider">Authorized Admin Signature</div>
             <p className="text-[7.5px] font-bold text-slate-500 mt-0.5 uppercase">Warehouse Management</p>
           </div>
+        </div>
+
+        {/* Bottom Disclaimer */}
+        <div className="text-center pt-2 mt-1.5 border-t border-slate-300">
+          <p className="text-[8px] font-black text-black tracking-wide uppercase">
+            বিড়ি পণ্য ফেরত নেওয়া হয় না (Biri ponno ferot neoya hoy na)
+          </p>
         </div>
       </div>
 

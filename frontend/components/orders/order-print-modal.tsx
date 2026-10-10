@@ -212,7 +212,7 @@ export function OrderPrintModal({
                   M/S KARIM TRADERS
                 </h1>
                 <p className="text-[10px] text-slate-600 mt-0.5">
-                  Ghorashal / Borodarga
+                  Pirgacha
                 </p>
                 <p className="text-[10px] text-slate-600 font-medium tabular-nums">
                   Mob: 01763-088369
@@ -311,8 +311,9 @@ export function OrderPrintModal({
               </div>
 
               {/* POS Footer */}
-              <div className="text-center text-[9px] text-slate-500 mt-2.5 pt-2 border-t border-dashed border-slate-300">
-                Thank you! Please visit again.
+              <div className="text-center text-[9px] text-slate-700 mt-2.5 pt-2 border-t border-dashed border-slate-300 space-y-0.5">
+                <p className="font-bold">বিড়ি পণ্য ফেরত নেওয়া হয় না</p>
+                <p className="text-[8px] text-slate-500">Thank you! Please visit again.</p>
               </div>
             </div>
 
@@ -335,7 +336,7 @@ export function OrderPrintModal({
                     Authorized Wholesale Distributor & Dealer
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Ghorashal / Borodarga · Phone: <strong className="tabular-nums text-slate-700">01763-088369</strong>
+                    Pirgacha · Phone: <strong className="tabular-nums text-slate-700">01763-088369</strong>
                   </p>
                 </div>
                 <div className="text-right">
@@ -486,6 +487,13 @@ export function OrderPrintModal({
                   <div className="border-t border-slate-800 mx-auto w-36 mb-1.5"></div>
                   <p className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Authorized Signature</p>
                 </div>
+              </div>
+
+              {/* A4 Footer Disclaimer */}
+              <div className="text-center pt-4 border-t border-slate-200 mt-4">
+                <p className="text-[9px] font-bold text-slate-700 uppercase tracking-wider">
+                  বিড়ি পণ্য ফেরত নেওয়া হয় না (Biri ponno ferot neoya hoy na)
+                </p>
               </div>
             </div>
           )}
