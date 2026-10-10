@@ -16,7 +16,8 @@ import {
   Layers,
   Sparkles,
   RefreshCw,
-  HelpCircle
+  HelpCircle,
+  MapPin
 } from 'lucide-react';
 import { getShopDues, collectDue } from '@/lib/api/dues';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
@@ -30,6 +31,7 @@ interface MultiInvoiceCollectModalProps {
     name: string;
     ownerName?: string;
     phone?: string;
+    address?: string;
     route?: { name: string };
   };
   onClose: () => void;
@@ -305,6 +307,12 @@ export function MultiInvoiceCollectModal({ shop, onClose, onSuccess }: MultiInvo
                 Customer: <span className="font-bold text-slate-800">{shop.name}</span>
                 {shop.route?.name ? ` · Route: ${shop.route.name}` : ''}
               </p>
+              {shop.address && (
+                <p className="text-[11px] text-slate-600 flex items-center gap-1 mt-0.5">
+                  <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                  <span className="font-semibold text-slate-700">{shop.address}</span>
+                </p>
+              )}
             </div>
           </div>
           <button 

@@ -130,10 +130,16 @@ export function CustomerLedgerModal({
                   Verified Ledger
                 </span>
               </div>
-              <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+              <p className="text-xs text-slate-500 flex items-center gap-2 flex-wrap mt-0.5">
                 {shop.ownerName && <span>Owner: <strong className="text-slate-700">{shop.ownerName}</strong></span>}
                 {shop.route?.name && <span>· Route: <strong className="text-slate-700">{shop.route.name}</strong></span>}
               </p>
+              {shop.address && (
+                <p className="text-[11px] text-slate-600 flex items-center gap-1 mt-0.5">
+                  <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                  <span className="font-semibold text-slate-700">{shop.address}</span>
+                </p>
+              )}
             </div>
           </div>
           

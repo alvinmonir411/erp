@@ -777,17 +777,23 @@ export function DuesPage() {
                               {acc.shop.name}
                             </button>
                             <div className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
-                              {acc.shop.ownerName && <span>{acc.shop.ownerName}</span>}
+                              {acc.shop.ownerName && <span>Owner: <strong>{acc.shop.ownerName}</strong></span>}
                               {acc.shop.phone && (
                                 <a 
                                   href={`tel:${acc.shop.phone}`} 
-                                  className="text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                                  className="text-indigo-600 hover:underline inline-flex items-center gap-0.5 font-bold"
                                 >
                                   <Phone className="w-2.5 h-2.5" />
                                   {acc.shop.phone}
                                 </a>
                               )}
                             </div>
+                            {acc.shop.address && (
+                              <p className="text-[11px] text-slate-600 flex items-center gap-1 mt-0.5">
+                                <MapPin className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                                <span className="font-medium text-slate-700">{acc.shop.address}</span>
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -924,7 +930,22 @@ export function DuesPage() {
                     </span>
                   </div>
 
-                  {/* Contact & Route Strip */}
+                  {/* Shop Address & Route Box (Prominently visible on mobile) */}
+                  <div className="flex items-start gap-2 text-xs bg-slate-50 border border-slate-200/90 rounded-xl p-2.5">
+                    <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-800 text-[11px] leading-tight break-words">
+                        {acc.shop.address || <span className="text-slate-400 font-normal italic">Address: Not specified</span>}
+                      </p>
+                      {acc.shop.route?.name && (
+                        <p className="text-[10px] text-slate-500 mt-1 font-medium flex items-center gap-1">
+                          Route: <span className="font-bold text-slate-700 bg-white border border-slate-200 px-1.5 py-0.2 rounded">{acc.shop.route.name}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Contact & Invoice Counts Strip */}
                   <div className="flex flex-wrap items-center gap-1.5 text-xs">
                     {acc.shop.phone && (
                       <a
@@ -937,12 +958,7 @@ export function DuesPage() {
                       </a>
                     )}
 
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                      <MapPin className="w-3 h-3 text-slate-400" />
-                      {acc.shop.route?.name || 'Unassigned'}
-                    </span>
-
-                    <span className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md font-medium">
+                    <span className="text-[11px] text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md font-medium">
                       {acc.openInvoiceCount} open / {acc.invoiceCount} invoices
                     </span>
 
