@@ -55,12 +55,10 @@ export function OrderPrintModal({
   const isDeliveredOrder = isDeliveredStatus || hasDeliveryReturns;
 
   // Map item rows to actual delivered quantities when delivery has occurred
-  const itemRows = items.map((item: any) => {
+  const allItemRows = items.map((item: any) => {
     const isItemSettled = isDeliveredOrder && item.deliveredPaidQuantity !== undefined && item.deliveredPaidQuantity !== null;
     const qPaid = isItemSettled ? Number(item.deliveredPaidQuantity || 0) : Number(item.quantity || 0);
     const qFree = isItemSettled ? Number(item.deliveredFreeQuantity || 0) : Number(item.freeQuantity || 0);
-    const qReturned = Number(item.returnedPaidQuantity || 0) + Number(item.damagedPaidQuantity || 0);
-    const qOriginal = Number(item.quantity || 0);
     const price = Number(item.unitPrice || 0);
     const lineTotal = Number(qPaid * price);
 
@@ -68,21 +66,20 @@ export function OrderPrintModal({
       ...item,
       qPaid,
       qFree,
-      qReturned,
-      qOriginal,
       price,
       lineTotal,
     };
   });
 
-  const totalDeliveredQty = itemRows.reduce((sum: number, i: any) => sum + i.qPaid, 0);
-  const totalOriginalQty = itemRows.reduce((sum: number, i: any) => sum + i.qOriginal, 0);
-  const itemsDeliveredTotal = itemRows.reduce((sum: number, i: any) => sum + i.lineTotal, 0);
-  const originalDispatchedTotal = Number(order.subtotal || itemRows.reduce((sum: number, i: any) => sum + (i.qOriginal * i.price), 0));
+  // Filter out items with 0 quantity so no unnecessary 0-quantity rows clutter the bill
+  const visibleItemRows = allItemRows.filter((item: any) => item.qPaid > 0 || item.qFree > 0);
+
+  const totalDeliveredQty = visibleItemRows.reduce((sum: number, i: any) => sum + i.qPaid, 0);
+  const itemsDeliveredTotal = visibleItemRows.reduce((sum: number, i: any) => sum + i.lineTotal, 0);
 
   const grandTotal = Number(order.actualSoldAmount || order.grandTotal || itemsDeliveredTotal || 0);
+  const subtotal = itemsDeliveredTotal > 0 ? itemsDeliveredTotal : grandTotal;
   const discountAmount = Number(order.discountAmount || 0);
-  const returnedAdjustment = Math.max(0, originalDispatchedTotal - (grandTotal + discountAmount));
 
   const paidAmount = Number(order.advancePaid || order.collectedAmount || 0);
   const dueAmount = order.dueAmount !== undefined && order.dueAmount !== null
@@ -242,7 +239,7 @@ export function OrderPrintModal({
               {/* ONLY 3 COLUMNS: NAME | QTY | PRICE */}
               <table className="w-full text-left text-[10.5px] mb-2 border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-900 text-[9.5px] font-black uppercase text-slate-800">
+                  <tr className="border-b-2 border-slate-900 text-[9.5px] font-black uppercase text-slate-800">
                     <th className="py-1 pr-1 text-left">Name</th>
                     <th className="py-1 px-1 text-center w-12">Qty</th>
                     <th className="py-1 pl-1 text-right w-16">Price</th>
@@ -261,13 +258,12 @@ export function OrderPrintModal({
                       <td className="py-1 pl-1 text-right tabular-nums font-bold text-slate-900">{formatAmount(grandTotal)}</td>
                     </tr>
                   ) : (
-                    itemRows.map((item: any, idx: number) => {
+                    visibleItemRows.map((item: any, idx: number) => {
                       return (
                         <tr key={idx} className="border-b border-slate-100/60 last:border-none">
                           <td className="py-1 pr-1 font-semibold text-slate-900 leading-tight">
                             {item.product?.name || 'Item'}
-                            {item.qFree > 0 && <span className="text-[8.5px] text-emerald-700 font-bold ml-1">(+{item.qFree} free)</span>}
-                            {item.qReturned > 0 && <span className="text-[8px] text-amber-700 font-normal ml-1">(-{item.qReturned} ret)</span>}
+                            {item.qFree > 0 && <span className="text-[8.5px] text-slate-500 font-bold ml-1">(+{item.qFree} free)</span>}
                           </td>
                           <td className="py-1 px-1 text-center tabular-nums font-semibold text-slate-800">
                             {formatAmount(item.qPaid)}
@@ -291,15 +287,8 @@ export function OrderPrintModal({
                   </span>
                 </div>
 
-                {returnedAdjustment > 0 && (
-                  <div className="flex justify-between text-amber-700 font-medium">
-                    <span>Returns Adj:</span>
-                    <span className="tabular-nums font-bold">-{formatAmount(returnedAdjustment)}</span>
-                  </div>
-                )}
-
                 {discountAmount > 0 && (
-                  <div className="flex justify-between text-rose-600 font-medium">
+                  <div className="flex justify-between text-slate-600 font-medium">
                     <span>Discount:</span>
                     <span className="tabular-nums font-bold">-{formatAmount(discountAmount)}</span>
                   </div>
@@ -315,7 +304,7 @@ export function OrderPrintModal({
                   <span className="tabular-nums font-semibold">{formatCurrency(paidAmount)}</span>
                 </div>
 
-                <div className="flex justify-between font-black text-rose-700 border-t border-slate-400 pt-1 text-[11.5px]">
+                <div className="flex justify-between font-black text-slate-900 border-t border-slate-400 pt-1 text-[11.5px]">
                   <span>Due Amount:</span>
                   <span className="tabular-nums">{formatCurrency(dueAmount)}</span>
                 </div>
@@ -330,7 +319,7 @@ export function OrderPrintModal({
           ) : (
 
             /* ========================================================================= */
-            /* OPTION 2: A4 PAGE (Full Standard A4 Invoice / Cash Memo) */
+            /* OPTION 2: A4 PAGE (Full Standard A4 Invoice / Cash Memo) - CLEAN & SINGLE COLOR */
             /* ========================================================================= */
             <div 
               id="order-print-canvas"
@@ -411,7 +400,7 @@ export function OrderPrintModal({
                       <td className="py-2.5 px-3 border-r border-slate-200">
                         <p className="font-bold text-slate-900">Direct Due Settlement Record</p>
                         {cleanedNote && (
-                          <p className="text-[11px] text-amber-900 font-medium mt-0.5">Note: {cleanedNote}</p>
+                          <p className="text-[11px] text-slate-600 font-medium mt-0.5">Note: {cleanedNote}</p>
                         )}
                       </td>
                       <td className="py-2.5 px-2 text-center font-bold border-r border-slate-200 tabular-nums">1</td>
@@ -419,24 +408,17 @@ export function OrderPrintModal({
                       <td className="py-2.5 px-3 text-right tabular-nums font-bold text-slate-900">{formatCurrency(grandTotal)}</td>
                     </tr>
                   ) : (
-                    itemRows.map((item: any, idx: number) => {
+                    visibleItemRows.map((item: any, idx: number) => {
                       return (
                         <tr key={idx}>
                           <td className="py-2 px-2 text-center text-slate-400 border-r border-slate-200 tabular-nums">{idx + 1}</td>
                           <td className="py-2 px-3 font-semibold text-slate-900 border-r border-slate-200">
-                            <div>
-                              <span>{item.product?.name || 'Item'}</span>
-                              {item.product?.sku && <span className="text-[10px] text-slate-400 font-normal ml-1.5">({item.product.sku})</span>}
-                            </div>
-                            {item.qReturned > 0 && (
-                              <p className="text-[10px] text-amber-700 font-medium mt-0.5">
-                                Dispatched: {formatAmount(item.qOriginal)} · Returned: {formatAmount(item.qReturned)}
-                              </p>
-                            )}
+                            <span>{item.product?.name || 'Item'}</span>
+                            {item.product?.sku && <span className="text-[10px] text-slate-400 font-normal ml-1.5">({item.product.sku})</span>}
                           </td>
                           <td className="py-2 px-2 text-center tabular-nums border-r border-slate-200">
-                            <span className="font-bold">{formatAmount(item.qPaid)}</span>
-                            {item.qFree > 0 && <span className="text-emerald-700 font-bold ml-1">+{item.qFree}f</span>}
+                            <span className="font-bold text-slate-900">{formatAmount(item.qPaid)}</span>
+                            {item.qFree > 0 && <span className="text-slate-500 font-bold ml-1">+{item.qFree}f</span>}
                           </td>
                           <td className="py-2 px-3 text-right tabular-nums text-slate-600 border-r border-slate-200">{formatCurrency(item.price)}</td>
                           <td className="py-2 px-3 text-right tabular-nums font-bold text-slate-900">{formatCurrency(item.lineTotal)}</td>
@@ -454,36 +436,23 @@ export function OrderPrintModal({
                       {isManualDue ? '1' : formatAmount(totalDeliveredQty)}
                     </td>
                     <td colSpan={2} className="py-2 px-3 text-right tabular-nums text-slate-900">
-                      {formatCurrency(itemsDeliveredTotal)}
+                      {formatCurrency(subtotal)}
                     </td>
                   </tr>
                 </tfoot>
               </table>
 
-              {/* A4 Financial Summary */}
+              {/* A4 Financial Summary - Clean, Single Color, No Fluff */}
               <div className="flex justify-end mb-8">
                 <div className="w-72 border border-slate-300 rounded-lg overflow-hidden bg-white text-xs">
                   <div className="p-3 space-y-1.5">
                     <div className="flex justify-between text-slate-600">
-                      <span>Delivered Subtotal:</span>
-                      <span className="tabular-nums font-bold text-slate-900">{formatCurrency(itemsDeliveredTotal)}</span>
+                      <span>Subtotal:</span>
+                      <span className="tabular-nums font-bold text-slate-900">{formatCurrency(subtotal)}</span>
                     </div>
 
-                    {returnedAdjustment > 0 && (
-                      <div className="border-y border-slate-100 py-1.5 my-1 space-y-1 text-[11px]">
-                        <div className="flex justify-between text-slate-500">
-                          <span>Original Dispatched:</span>
-                          <span className="tabular-nums">{formatCurrency(originalDispatchedTotal)}</span>
-                        </div>
-                        <div className="flex justify-between text-amber-700 font-semibold">
-                          <span>Returned / Adjusted:</span>
-                          <span className="tabular-nums">-{formatCurrency(returnedAdjustment)}</span>
-                        </div>
-                      </div>
-                    )}
-
                     {discountAmount > 0 && (
-                      <div className="flex justify-between text-rose-600">
+                      <div className="flex justify-between text-slate-600">
                         <span>Discount:</span>
                         <span className="tabular-nums font-bold">-{formatCurrency(discountAmount)}</span>
                       </div>
@@ -494,12 +463,12 @@ export function OrderPrintModal({
                       <span className="tabular-nums font-black">{formatCurrency(grandTotal)}</span>
                     </div>
 
-                    <div className="flex justify-between text-emerald-700 font-bold">
+                    <div className="flex justify-between text-slate-700 font-medium">
                       <span>Paid Amount:</span>
-                      <span className="tabular-nums">{formatCurrency(paidAmount)}</span>
+                      <span className="tabular-nums font-semibold">{formatCurrency(paidAmount)}</span>
                     </div>
 
-                    <div className="flex justify-between text-rose-700 font-black border-t-2 border-slate-900 pt-1.5 text-sm bg-rose-50 -mx-3 -mb-3 p-2.5">
+                    <div className="flex justify-between text-slate-900 font-black border-t-2 border-slate-900 pt-1.5 text-sm bg-slate-50 -mx-3 -mb-3 p-2.5">
                       <span>Remaining Due:</span>
                       <span className="tabular-nums">{formatCurrency(dueAmount)}</span>
                     </div>
