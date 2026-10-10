@@ -25,6 +25,7 @@ import { useCompanies, useRoutes, useShops } from '@/hooks/use-common-queries';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { OrderModal } from './order-modal';
+import { OrderPrintModal } from './order-print-modal';
 
 const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }> = {
   DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-600', icon: Clock },
@@ -64,6 +65,7 @@ export function AllOrdersPage() {
 
   // Selection & Details
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [printingOrder, setPrintingOrder] = useState<any>(null);
   const [settlingOrder, setSettlingOrder] = useState<any>(null);
   const [isActionLoading, setIsActionLoading] = useState<number | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<any | null>(null);
@@ -398,6 +400,13 @@ export function AllOrdersPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
+                        <button
+                          onClick={() => setPrintingOrder(order)}
+                          className="p-2 text-muted hover:text-indigo-600 transition-colors"
+                          title="Print Cash Memo / Invoice"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </button>
                         {user?.role !== 'SR' && !['SETTLED', 'PARTIAL_DUE'].includes(order.status) && (
                           <>
                             <Link
@@ -486,6 +495,15 @@ export function AllOrdersPage() {
                   >
                     View Details
                   </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPrintingOrder(order);
+                    }}
+                    className="text-[10px] font-bold uppercase text-indigo-700 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center gap-1 font-black transition-colors"
+                  >
+                    <Printer className="h-3.5 w-3.5" /> Print
+                  </button>
                   {user?.role !== 'SR' && !['SETTLED', 'PARTIAL_DUE'].includes(order.status) && (
                     <button
                       onClick={(e) => {
@@ -535,6 +553,13 @@ export function AllOrdersPage() {
             fetchOrders();
             fetchStats();
           }}
+        />
+      )}
+
+      {printingOrder && (
+        <OrderPrintModal
+          order={printingOrder}
+          onClose={() => setPrintingOrder(null)}
         />
       )}
 

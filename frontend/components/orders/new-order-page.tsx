@@ -37,6 +37,7 @@ import {
   Save
 } from 'lucide-react';
 import { createShop } from '@/lib/api/shops';
+import { OrderPrintModal } from './order-print-modal';
 
 interface OrderLine {
   productId: number;
@@ -57,6 +58,7 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [createdOrderForPrint, setCreatedOrderForPrint] = useState<any | null>(null);
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -380,16 +382,36 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
       if (orderId) {
         await updateOrder(orderId, payload);
         setSuccess('Order updated successfully');
+        router.push('/orders');
       } else {
-        await createOrder(payload);
+        const created = await createOrder(payload);
         setSuccess('Order created successfully');
+        setCreatedOrderForPrint(created);
       }
-      router.push('/orders');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save order');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleResetForNewOrder = () => {
+    setCreatedOrderForPrint(null);
+    setShopId('');
+    setShopSearch('');
+    setNote('');
+    setLines([{
+      productId: 0,
+      productName: '',
+      quantity: 0,
+      freeQuantity: 0,
+      unitPrice: 0,
+      discountType: 'FIXED',
+      discountValue: 0,
+      lineTotal: 0
+    }]);
+    setSuccess(null);
+    setError(null);
   };
 
   if (isLoading) return <LoadingBlock label="Initializing Order Form..." />;
@@ -1162,6 +1184,15 @@ export function NewOrderPage({ orderId }: { orderId?: number }) {
             </div>
           </div>
         </div>
+      )}
+
+      {createdOrderForPrint && (
+        <OrderPrintModal
+          order={createdOrderForPrint}
+          isSuccessModal={true}
+          onNewOrder={handleResetForNewOrder}
+          onClose={() => router.push('/orders')}
+        />
       )}
     </div>
   );
