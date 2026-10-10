@@ -113,7 +113,7 @@ export function OrderPrintModal({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <h2 className="text-xs sm:text-base font-black tracking-tight truncate">
-                  Invoice & Cash Memo
+                  Sales Invoice & Cash Memo
                 </h2>
                 <button
                   type="button"
@@ -184,7 +184,7 @@ export function OrderPrintModal({
           <div className="no-print bg-emerald-50 border-b border-emerald-200 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-2 text-emerald-900 shrink-0">
             <div className="flex items-center gap-2 text-xs font-bold">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Order placed successfully! Ready for printing and distribution.</span>
+              <span>Order saved successfully! Ready for printing and distribution.</span>
             </div>
             {onNewOrder && (
               <button
@@ -219,14 +219,14 @@ export function OrderPrintModal({
               <h1 className="text-xl sm:text-3xl font-black uppercase tracking-tight text-slate-900 leading-none">
                 M/S KARIM TRADERS
               </h1>
-              <p className="text-xs font-bold text-slate-700 tracking-wider mt-1">
-                মেসার্স করিম ট্রেডার্স · Authorized Wholesale Distributor & Dealer
+              <p className="text-xs font-bold text-slate-700 tracking-wider mt-1 uppercase">
+                Authorized Wholesale Distributor & Dealer
               </p>
               <p className="text-[11px] font-semibold text-slate-600 mt-0.5">
                 Proprietor: Md. Karim · Mobile: 01763-088369 · Ghorashal / Borodarga
               </p>
               <div className="inline-block mt-2 px-3 py-1 bg-slate-900 text-white rounded text-[11px] font-black uppercase tracking-widest">
-                Sales Invoice / Cash Memo (বিক্রয় চালান ও ক্যাশ মেমো)
+                SALES INVOICE / CASH MEMO
               </div>
             </div>
 
@@ -235,13 +235,13 @@ export function OrderPrintModal({
               {/* Top Banner Row */}
               <div className="bg-slate-100 px-3 py-1.5 border-b border-slate-300 flex items-center justify-between font-bold text-[11px]">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-slate-500 uppercase text-[10px]">চালান নং / Invoice:</span>
+                  <span className="text-slate-500 uppercase text-[10px]">Invoice No:</span>
                   <span className="font-mono font-black text-slate-900 text-xs sm:text-sm">
                     #{order.id.toString().padStart(6, '0')}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-slate-500 text-[10px]">তারিখ / Date:</span>
+                  <span className="text-slate-500 text-[10px]">Date:</span>
                   <span className="font-bold text-slate-800">
                     {formatDate(order.orderDate || order.createdAt)}
                   </span>
@@ -253,24 +253,24 @@ export function OrderPrintModal({
                 {/* Left: Customer Info */}
                 <div className="space-y-0.5">
                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                    ক্রেতার বিবরণ (Billed To):
+                    Billed To (Customer Details):
                   </p>
                   <p className="font-black text-slate-900 text-sm">
-                    {order.shop?.name || 'Walk-in Direct Customer (সাধারণ কাস্টমার)'}
+                    {order.shop?.name || 'Walk-in Direct Customer'}
                   </p>
                   {order.shop?.ownerName && (
                     <p className="text-slate-700 text-[11px]">
-                      মালিক: <strong>{order.shop.ownerName}</strong>
+                      Owner: <strong>{order.shop.ownerName}</strong>
                     </p>
                   )}
                   {order.shop?.phone && (
                     <p className="text-slate-700 text-[11px]">
-                      মোবাইল: <strong>{order.shop.phone}</strong>
+                      Phone: <strong>{order.shop.phone}</strong>
                     </p>
                   )}
                   {order.shop?.address && (
                     <p className="text-slate-500 text-[10px] leading-tight">
-                      ঠিকানা: {order.shop.address}
+                      Address: {order.shop.address}
                     </p>
                   )}
                 </div>
@@ -278,22 +278,22 @@ export function OrderPrintModal({
                 {/* Right: Logistics Info */}
                 <div className="space-y-0.5 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                    চালান ও লজিস্টিকস (Logistics):
+                    Logistics & Order Info:
                   </p>
                   <p className="text-slate-800 text-[11px]">
-                    রুট (Route): <strong>{order.route?.name || 'Direct Route'}</strong>
+                    Route: <strong>{order.route?.name || 'Direct Route'}</strong>
                   </p>
                   {order.company?.name && (
                     <p className="text-slate-800 text-[11px]">
-                      কোম্পানি (Company): <strong>{order.company.name}</strong>
+                      Company: <strong>{order.company.name}</strong>
                     </p>
                   )}
                   <p className="text-slate-600 text-[10px]">
-                    সেলস রিপ্রেজেন্টেটিভ (SR): <strong>{order.createdBy || 'Office'}</strong>
+                    Sales Rep (SR): <strong>{order.createdBy || 'Office'}</strong>
                   </p>
                   {deliveryPersonName && (
                     <p className="text-slate-600 text-[10px]">
-                      ডেলিভারি ম্যান: <strong>{deliveryPersonName}</strong>
+                      Delivery Staff: <strong>{deliveryPersonName}</strong>
                     </p>
                   )}
                 </div>
@@ -305,12 +305,12 @@ export function OrderPrintModal({
               <table className="w-full text-left text-xs border border-slate-800 border-collapse">
                 <thead>
                   <tr className="bg-slate-100 border-b-2 border-slate-800 text-[10px] sm:text-[11px] font-black uppercase text-slate-800 tracking-wider">
-                    <th className="py-2 px-1.5 text-center w-8 border-r border-slate-300">ক্র.নং</th>
-                    <th className="py-2 px-2.5 border-r border-slate-300">পণ্যের বিবরণ (Particulars)</th>
-                    <th className="py-2 px-2 text-right w-16 border-r border-slate-300">দর (Rate)</th>
-                    <th className="py-2 px-2 text-center w-12 border-r border-slate-300">সংখ্যা</th>
-                    <th className="py-2 px-1.5 text-center w-12 border-r border-slate-300">ফ্রী</th>
-                    <th className="py-2 px-2.5 text-right w-24">মোট টাকা (৳)</th>
+                    <th className="py-2 px-1.5 text-center w-8 border-r border-slate-300">SL</th>
+                    <th className="py-2 px-2.5 border-r border-slate-300">Item Description / Particulars</th>
+                    <th className="py-2 px-2 text-right w-16 border-r border-slate-300">Rate</th>
+                    <th className="py-2 px-2 text-center w-12 border-r border-slate-300">Qty</th>
+                    <th className="py-2 px-1.5 text-center w-12 border-r border-slate-300">Free</th>
+                    <th className="py-2 px-2.5 text-right w-24">Amount (BDT)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 font-medium">
@@ -318,18 +318,18 @@ export function OrderPrintModal({
                     /* Clean official line item for Manual Due Record */
                     <tr className="bg-rose-50/20">
                       <td className="py-3 px-1.5 text-center font-bold text-slate-500 border-r border-slate-200">
-                        ১
+                        1
                       </td>
                       <td className="py-3 px-2.5 border-r border-slate-200">
                         <p className="font-black text-slate-900 text-xs sm:text-sm">
-                          পূর্বের বকেয়া হিসাব সমন্বয় (Manual Due Record / Baki)
+                          Manual Due Settlement Record (Direct Due Entry)
                         </p>
                         <p className="text-[10px] text-slate-500 mt-0.5">
-                          সরাসরি বকেয়া এন্ট্রি — কোনো প্রডাক্ট আইটেম অন্তর্ভুক্ত নয়
+                          Direct Opening / Previous Due Balance Record (No physical goods attached)
                         </p>
                         {order.note && (
                           <div className="mt-1.5 p-1.5 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-900 font-semibold leading-relaxed">
-                            <strong>রিমার্কস নোট:</strong> {order.note}
+                            <strong>Remarks:</strong> {order.note}
                           </div>
                         )}
                       </td>
@@ -337,7 +337,7 @@ export function OrderPrintModal({
                         {formatCurrency(grandTotal)}
                       </td>
                       <td className="py-3 px-2 text-center font-black text-slate-800 border-r border-slate-200">
-                        ১
+                        1
                       </td>
                       <td className="py-3 px-1.5 text-center font-bold text-slate-400 border-r border-slate-200">
                         —
@@ -387,13 +387,13 @@ export function OrderPrintModal({
                 <tfoot>
                   <tr className="border-t-2 border-slate-800 bg-slate-50 font-black text-xs">
                     <td colSpan={3} className="py-2 px-2 text-right uppercase text-[10px] text-slate-600 border-r border-slate-300">
-                      Total Quantity (মোট সংখ্যা):
+                      Total Quantity:
                     </td>
                     <td className="py-2 px-2 text-center font-black text-slate-900 border-r border-slate-300 font-mono">
-                      {isManualDue ? '১' : totalQty}
+                      {isManualDue ? '1' : totalQty}
                     </td>
                     <td className="py-2 px-1.5 text-center font-black text-emerald-700 border-r border-slate-300 font-mono">
-                      {isManualDue ? '০' : (totalFree > 0 ? `+${totalFree}` : '0')}
+                      {isManualDue ? '0' : (totalFree > 0 ? `+${totalFree}` : '0')}
                     </td>
                     <td className="py-2 px-2.5 text-right font-black text-slate-900 font-mono text-sm">
                       {formatCurrency(subtotal)}
@@ -406,43 +406,43 @@ export function OrderPrintModal({
             {/* Remarks box if normal order with note */}
             {!isManualDue && order.note && (
               <div className="mb-3 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
-                <strong className="font-bold">Remarks (মন্তব্য): </strong>
+                <strong className="font-bold">Remarks: </strong>
                 <span>{order.note}</span>
               </div>
             )}
 
             {/* ── 4. FINANCIAL LEDGER & SUMMARY ── */}
             <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-start gap-3 mb-4">
-              {/* Payment Summary Box - Robust with whitespace-nowrap and never breaking */}
+              {/* Payment Summary Box */}
               <div className="w-full sm:w-80 ml-auto border-2 border-slate-900 rounded-xl overflow-hidden text-xs bg-white shadow-2xs">
                 <div className="bg-slate-900 text-white px-3 py-1.5 font-black uppercase text-[10px] tracking-wider text-center">
-                  Payment Summary (হিসাব বিবরণী)
+                  PAYMENT SUMMARY
                 </div>
                 <div className="p-3 space-y-1.5">
                   <div className="flex items-center justify-between text-slate-600">
-                    <span className="whitespace-nowrap">Subtotal (উপ-মোট):</span>
+                    <span className="whitespace-nowrap">Subtotal:</span>
                     <span className="font-bold font-mono text-slate-900">{formatCurrency(subtotal)}</span>
                   </div>
 
                   {discountAmount > 0 && (
                     <div className="flex items-center justify-between text-rose-600">
-                      <span className="whitespace-nowrap">Discount (ছাড়):</span>
+                      <span className="whitespace-nowrap">Discount:</span>
                       <span className="font-bold font-mono">-{formatCurrency(discountAmount)}</span>
                     </div>
                   )}
 
                   <div className="flex items-center justify-between font-black text-slate-900 text-sm border-t border-slate-200 pt-1.5">
-                    <span className="whitespace-nowrap">মোট বিল (Net Bill):</span>
+                    <span className="whitespace-nowrap">Net Invoice Total:</span>
                     <span className="font-mono">{formatCurrency(grandTotal)}</span>
                   </div>
 
                   <div className="flex items-center justify-between text-emerald-700 font-bold border-t border-slate-200 pt-1.5">
-                    <span className="whitespace-nowrap">নগদ গ্রহণ (Paid):</span>
+                    <span className="whitespace-nowrap">Cash Received (Paid):</span>
                     <span className="font-mono font-black">{formatCurrency(paidAmount)}</span>
                   </div>
 
                   <div className="flex items-center justify-between text-rose-700 font-black text-sm border-t-2 border-slate-900 pt-1.5 bg-rose-50 -mx-3 -mb-3 p-3">
-                    <span className="whitespace-nowrap">অবশিষ্ট বকেয়া (Due):</span>
+                    <span className="whitespace-nowrap">Remaining Due Amount:</span>
                     <span className="font-mono text-base">{formatCurrency(dueAmount)}</span>
                   </div>
                 </div>
@@ -451,29 +451,29 @@ export function OrderPrintModal({
 
             {/* ── 5. TERMS AND CONDITIONS (Full width underneath) ── */}
             <div className="mb-4 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[10px] text-slate-600 leading-relaxed">
-              <p className="font-bold text-slate-800">শর্তাবলী / Terms & Conditions:</p>
-              <p className="mt-0.5">১. চালানের পণ্য বুঝিয়া গ্রহণ করার পর কোনো অভিযোগ গ্রহণযোগ্য হইবে না।</p>
-              <p>২. বিক্রিত পণ্য ফেরত নেওয়া হয় না। বকেয়া থাকিলে অবিলম্বে পরিশোধ করার জন্য অনুরোধ করা হইল।</p>
+              <p className="font-bold text-slate-800">Terms & Conditions:</p>
+              <p className="mt-0.5">1. Goods once sold will not be returned or exchanged.</p>
+              <p>2. Please verify all quantities upon delivery. Outstanding dues must be settled promptly.</p>
             </div>
 
             {/* ── 6. SIGNATURE STRIP ── */}
             <div className={`grid ${printLayout === 'THERMAL' ? 'grid-cols-2 gap-4 pt-6 mt-4' : 'grid-cols-3 gap-4 pt-8 mt-4'} border-t border-dashed border-slate-300 text-center text-xs`}>
               <div>
                 <div className="border-t border-slate-800 mx-auto w-24 sm:w-28 mb-1"></div>
-                <p className="font-bold text-slate-800 text-[10px]">ক্রেতার স্বাক্ষর</p>
-                <p className="text-[9px] text-slate-400">Customer</p>
+                <p className="font-bold text-slate-800 text-[10px]">Customer Signature</p>
+                <p className="text-[9px] text-slate-400">Received By</p>
               </div>
               {printLayout !== 'THERMAL' && (
                 <div>
                   <div className="border-t border-slate-800 mx-auto w-24 sm:w-28 mb-1"></div>
-                  <p className="font-bold text-slate-800 text-[10px]">ডেলিভারি ম্যানের স্বাক্ষর</p>
-                  <p className="text-[9px] text-slate-400">Delivery Staff</p>
+                  <p className="font-bold text-slate-800 text-[10px]">Delivery Staff</p>
+                  <p className="text-[9px] text-slate-400">Delivered By</p>
                 </div>
               )}
               <div>
                 <div className="border-t border-slate-800 mx-auto w-24 sm:w-28 mb-1"></div>
-                <p className="font-bold text-slate-800 text-[10px]">কর্তৃপক্ষের স্বাক্ষর</p>
-                <p className="text-[9px] text-slate-400">Authorized</p>
+                <p className="font-bold text-slate-800 text-[10px]">Authorized Signature</p>
+                <p className="text-[9px] text-slate-400">Management</p>
               </div>
             </div>
 

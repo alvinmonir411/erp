@@ -134,7 +134,7 @@ export function OrderModal({ order, onClose, onDeleteSuccess }: OrderModalProps)
                           ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                           : 'bg-slate-100 text-slate-700 border-slate-200'
                       }`}>
-                        {order.status === 'MANUAL_DUE' ? 'Manual Due (বকেয়া এন্ট্রি)' : order.status.replace(/_/g, ' ')}
+                        {order.status === 'MANUAL_DUE' ? 'Manual Due Record' : order.status.replace(/_/g, ' ')}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -201,10 +201,10 @@ export function OrderModal({ order, onClose, onDeleteSuccess }: OrderModalProps)
                 <div className="p-6 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-center space-y-2">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-black border border-amber-300">
                     <DollarSign className="w-3.5 h-3.5 text-amber-700" />
-                    <span>সরাসরি বকেয়া এন্ট্রি (Manual Due Entry)</span>
+                    <span>Direct Manual Due Record</span>
                   </div>
                   <p className="text-xs font-bold text-amber-900 leading-relaxed max-w-md mx-auto">
-                    এই চালানে কোনো পণ্য (Products / Units) যুক্ত নেই — এটি দোকান বা কাস্টমারের পূর্বের বাকি বা সরাসরি বকেয়া সমন্বয়ের জন্য এন্ট্রি করা হয়েছে।
+                    No physical product items are attached to this invoice. This record represents an opening balance or direct manual due for this customer.
                   </p>
                 </div>
               ) : (

@@ -33,9 +33,9 @@ const STATUS_CONFIG: Record<string, { label: string, color: string, icon: any }>
   ASSIGNED: { label: 'Assigned', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', icon: Package },
   OUT_FOR_DELIVERY: { label: 'Dispatched', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Package },
   DELIVERED: { label: 'Delivered', color: 'bg-cyan-100 text-cyan-700 border-cyan-200', icon: ShoppingCart },
-  PARTIAL_DUE: { label: 'Partial Due (আংশিক বকেয়া)', color: 'bg-amber-100 text-amber-800 border-amber-300 font-bold', icon: DollarSign },
-  MANUAL_DUE: { label: 'Manual Due (বকেয়া রেকর্ড)', color: 'bg-rose-100 text-rose-800 border-rose-300 font-black', icon: DollarSign },
-  SETTLED: { label: 'Settled (পরিশোধিত)', color: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold', icon: CheckCircle },
+  PARTIAL_DUE: { label: 'Partial Due', color: 'bg-amber-100 text-amber-800 border-amber-300 font-bold', icon: DollarSign },
+  MANUAL_DUE: { label: 'Manual Due Record', color: 'bg-rose-100 text-rose-800 border-rose-300 font-black', icon: DollarSign },
+  SETTLED: { label: 'Settled / Paid', color: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold', icon: CheckCircle },
   CANCELLED: { label: 'Cancelled', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: XCircle },
 };
 
@@ -197,7 +197,7 @@ export function AllOrdersPage() {
     { label: 'Pending', value: 'CONFIRMED' },
     { label: 'Dispatched', value: 'OUT_FOR_DELIVERY' },
     { label: 'Settled', value: 'SETTLED' },
-    { label: 'Due / বকেয়া', value: 'MANUAL_DUE' },
+    { label: 'Due / Unpaid', value: 'MANUAL_DUE' },
   ];
 
   return (
@@ -393,9 +393,9 @@ export function AllOrdersPage() {
                         {isManualDue ? (
                           <div>
                             <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700 border border-rose-200">
-                              <DollarSign className="h-3 w-3" /> বকেয়া রেকর্ড
+                              <DollarSign className="h-3 w-3" /> Due Record
                             </span>
-                            <p className="text-[10px] text-muted font-bold mt-0.5">পণ্য ছাড়া সরাসরি</p>
+                            <p className="text-[10px] text-muted font-bold mt-0.5">No Items</p>
                           </div>
                         ) : (
                           <div>
@@ -412,11 +412,11 @@ export function AllOrdersPage() {
                         </p>
                         {dueAmount > 0 ? (
                           <p className="text-[11px] font-black text-rose-600 mt-0.5">
-                            বকেয়া: {formatCurrency(dueAmount)}
+                            Due: {formatCurrency(dueAmount)}
                           </p>
                         ) : (
                           <p className="text-[10px] font-bold text-emerald-600 mt-0.5">
-                            পরিশোধিত
+                            Paid in Full
                           </p>
                         )}
                       </td>
@@ -528,7 +528,7 @@ export function AllOrdersPage() {
                         </span>
                         {isManualDue && (
                           <span className="inline-flex items-center gap-1 rounded-md bg-rose-500/10 px-2 py-0.5 text-[10px] font-black text-rose-700 border border-rose-200">
-                            <DollarSign className="h-3 w-3" /> বকেয়া রেকর্ড
+                            <DollarSign className="h-3 w-3" /> Due Record
                           </span>
                         )}
                       </div>
@@ -550,7 +550,7 @@ export function AllOrdersPage() {
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-black text-slate-900 flex items-center gap-1.5 truncate">
                         <Store className="h-4 w-4 text-slate-500 shrink-0" />
-                        <span>{order.shop?.name || 'Direct Shop / সাধারণ কাস্টমার'}</span>
+                        <span>{order.shop?.name || 'Walk-in Direct Customer'}</span>
                       </p>
                       {order.shop?.phone && (
                         <span className="text-[10px] font-bold text-slate-500 flex items-center gap-0.5 shrink-0">
@@ -565,7 +565,7 @@ export function AllOrdersPage() {
                       </span>
                       {order.shop?.ownerName && (
                         <span className="text-slate-500">
-                          মালিক: <strong className="text-slate-700">{order.shop.ownerName}</strong>
+                          Owner: <strong className="text-slate-700">{order.shop.ownerName}</strong>
                         </span>
                       )}
                     </div>
@@ -585,19 +585,19 @@ export function AllOrdersPage() {
                       <div className="flex items-center justify-between text-xs font-bold text-amber-800">
                         <span className="flex items-center gap-1.5">
                           <span className="h-2 w-2 rounded-full bg-rose-500"></span>
-                          <span>পণ্যের সংখ্যা (Units):</span>
+                          <span>Item Units:</span>
                         </span>
                         <span className="font-black text-rose-800 bg-rose-100/80 px-2 py-0.5 rounded text-[11px] border border-rose-200">
-                          কোনো পণ্য নেই (সরাসরি বকেয়া)
+                          No Physical Items (Direct Due Entry)
                         </span>
                       </div>
                     ) : (
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-bold text-slate-500 flex items-center gap-1">
-                          <Package className="h-3.5 w-3.5 text-slate-400" /> মোট পণ্য (Units):
+                          <Package className="h-3.5 w-3.5 text-slate-400" /> Total Units:
                         </span>
                         <span className="font-black text-slate-800">
-                          {totalUnits} টি {totalItemsCount > 0 && <span className="text-slate-400 font-medium text-[11px]">({totalItemsCount} আইটেম)</span>}
+                          {totalUnits} Units {totalItemsCount > 0 && <span className="text-slate-400 font-medium text-[11px]">({totalItemsCount} items)</span>}
                         </span>
                       </div>
                     )}
@@ -607,21 +607,21 @@ export function AllOrdersPage() {
                   <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        {isManualDue ? 'ধার্যকৃত মোট বকেয়া' : 'মোট বিল (Total)'}
+                        {isManualDue ? 'Recorded Due' : 'Total Bill'}
                       </span>
                       <span className="text-sm font-black text-slate-900">
                         {formatCurrency(grandTotal)}
                       </span>
                       {paidAmount > 0 && (
                         <span className="text-[10px] font-bold text-emerald-600 mt-0.5">
-                          আদায়: {formatCurrency(paidAmount)}
+                          Paid: {formatCurrency(paidAmount)}
                         </span>
                       )}
                     </div>
 
                     <div className="flex flex-col items-end text-right">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        অবশিষ্ট বকেয়া (Due)
+                        Remaining Due
                       </span>
                       {dueAmount > 0 ? (
                         <div className="flex items-center gap-1">
@@ -629,12 +629,12 @@ export function AllOrdersPage() {
                             {formatCurrency(dueAmount)}
                           </span>
                           <span className="text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded border border-rose-200">
-                            Due
+                            DUE
                           </span>
                         </div>
                       ) : (
                         <span className="text-xs font-black text-emerald-600 flex items-center gap-1 mt-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                          <CheckCircle className="h-3 w-3" /> পরিশোধিত (Paid)
+                          <CheckCircle className="h-3 w-3" /> Paid in Full
                         </span>
                       )}
                     </div>
@@ -647,14 +647,14 @@ export function AllOrdersPage() {
                       className="text-[11px] font-bold text-slate-700 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1 transition-colors active:scale-95"
                     >
                       <Eye className="h-3.5 w-3.5 text-slate-500" />
-                      <span>বিস্তারিত</span>
+                      <span>Details</span>
                     </button>
                     <button 
                       onClick={() => setPrintingOrder(order)}
                       className="text-[11px] font-black text-indigo-700 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center gap-1 transition-colors active:scale-95"
                     >
                       <Printer className="h-3.5 w-3.5" />
-                      <span>প্রিন্ট</span>
+                      <span>Print</span>
                     </button>
                     {user?.role !== 'SR' && !['SETTLED', 'PARTIAL_DUE'].includes(order.status) && (
                       <button
@@ -662,7 +662,7 @@ export function AllOrdersPage() {
                         className="text-[11px] font-black text-emerald-700 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 rounded-lg flex items-center gap-1 transition-colors active:scale-95"
                       >
                         <CheckCircle className="h-3.5 w-3.5" />
-                        <span>সেটেল</span>
+                        <span>Settle</span>
                       </button>
                     )}
                     {user?.role === 'SUPER_ADMIN' && (
