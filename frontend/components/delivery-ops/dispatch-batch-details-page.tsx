@@ -669,11 +669,13 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         @media print {
           @page {
             size: A4 portrait;
-            margin: 4mm 6mm !important;
+            margin: 5mm 6mm !important;
           }
 
-          .no-print {
+          .no-print,
+          .no-print * {
             display: none !important;
+            visibility: hidden !important;
           }
           
           body * {
@@ -682,27 +684,30 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
           .final-settlement-print,
           .final-settlement-print * {
-            visibility: visible;
+            visibility: visible !important;
           }
 
           .final-settlement-print {
             display: block !important;
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
-            background: white;
-            color: black;
-            font-size: 8px !important;
-            line-height: 1.15 !important;
-            page-break-inside: avoid;
+            background: #ffffff !important;
+            color: #000000 !important;
+            font-size: 8.5px !important;
+            line-height: 1.2 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           
           table { 
             page-break-inside: auto; 
             border-collapse: collapse;
+            width: 100% !important;
           }
           tr { 
             page-break-inside: avoid; 
@@ -712,13 +717,14 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           /* Table spacing overrides */
           .final-settlement-print table th, 
           .final-settlement-print table td { 
-            padding: 1.5px 2.5px !important; 
-            font-size: 7.5px !important;
-            line-height: 1.1 !important;
+            padding: 2px 3px !important; 
+            font-size: 8px !important;
+            line-height: 1.15 !important;
+            border-color: #000000 !important;
           }
           
           .final-settlement-print .signature-grid {
-            margin-top: 4px !important;
+            margin-top: 6px !important;
             padding-top: 4px !important;
           }
           
