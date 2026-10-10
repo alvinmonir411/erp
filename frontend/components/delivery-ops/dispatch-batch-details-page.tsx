@@ -669,7 +669,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         @media print {
           @page {
             size: A4 portrait;
-            margin: 6mm 8mm !important;
+            margin: 4mm 6mm !important;
           }
 
           .no-print {
@@ -677,7 +677,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           }
           
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
 
           .final-settlement-print,
@@ -686,8 +686,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           }
 
           .final-settlement-print {
-            display: flex !important;
-            flex-direction: column !important;
+            display: block !important;
             position: absolute;
             left: 0;
             top: 0;
@@ -696,15 +695,14 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             margin: 0 !important;
             background: white;
             color: black;
-            overflow: hidden;
-            height: auto !important;
-            min-height: 262mm !important;
-            max-height: none !important;
+            font-size: 8px !important;
+            line-height: 1.15 !important;
             page-break-inside: avoid;
           }
           
           table { 
             page-break-inside: auto; 
+            border-collapse: collapse;
           }
           tr { 
             page-break-inside: avoid; 
@@ -714,21 +712,14 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           /* Table spacing overrides */
           .final-settlement-print table th, 
           .final-settlement-print table td { 
-            padding: 4px 6px !important; 
-            font-size: 10px !important;
-            line-height: 1.15 !important;
+            padding: 1.5px 2.5px !important; 
+            font-size: 7.5px !important;
+            line-height: 1.1 !important;
           }
           
-          /* Spacing cleanups for print */
-          .final-settlement-print .mb-8 { margin-bottom: 8px !important; }
-          .final-settlement-print .pb-4 { padding-bottom: 4px !important; }
-          .final-settlement-print .mb-10 { margin-bottom: 10px !important; }
-          .final-settlement-print .gap-8 { gap: 8px !important; }
-          .final-settlement-print .mt-12 { margin-top: 10px !important; }
-          .final-settlement-print .gap-12 { gap: 12px !important; }
           .final-settlement-print .signature-grid {
-            margin-top: auto !important;
-            padding-top: 20px !important;
+            margin-top: 4px !important;
+            padding-top: 4px !important;
           }
           
           .pb-24 { padding-bottom: 0 !important; }
@@ -1540,65 +1531,62 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
       {/* PRINT SECTION (HIDDEN ON SCREEN) */}
       <div className="final-settlement-print text-black bg-white">
-        <div className="text-center mb-6 border-b-2 border-black pb-3">
-          <h1 className="text-3xl font-black uppercase tracking-tight mb-1">KORIM TRADERS ERP</h1>
-          <h2 className="text-xl font-bold uppercase tracking-widest text-slate-600">Final Batch Settlement</h2>
-          <p className="text-[10px] font-bold mt-1 uppercase">Printed on {new Date().toLocaleString()}</p>
+        {/* TOP HEADER: Store Name & Mobile Number */}
+        <div className="text-center mb-1.5 pb-1 border-b border-black">
+          <h1 className="text-base font-black uppercase tracking-tight text-black leading-tight">
+            M/S KARIM TRADERS
+          </h1>
+          <p className="text-[10px] font-bold text-slate-700 tabular-nums">
+            Mob: 01763-088369 · Ghorashal / Borodarga
+          </p>
+          <div className="text-[9px] font-black uppercase tracking-wider text-black mt-0.5">
+            Final Batch Settlement
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
-          <div className="space-y-1.5 border-l-4 border-black pl-4">
-            <div className="flex justify-between border-b border-slate-100 pb-1">
-              <span className="font-bold text-slate-500">Batch ID:</span>
-              <span className="font-black">#BT-{batch.id}</span>
+        {/* LOGISTICS ROW: Left Side (Route, Delivery Man) & Right Side (Batch ID, Date) */}
+        <div className="grid grid-cols-2 gap-4 mb-2 text-[10px] border-b border-black pb-1.5">
+          <div className="space-y-0.5">
+            <div className="flex gap-2">
+              <span className="font-bold text-slate-600 w-24">Route:</span>
+              <span className="font-black uppercase text-black">{batch.route?.name || 'N/A'}</span>
             </div>
-            <div className="flex justify-between border-b border-slate-100 pb-1">
-              <span className="font-bold text-slate-500">Dispatch Date:</span>
-              <span className="font-black">{formatDate(batch.dispatchedAt || batch.createdAt)}</span>
-            </div>
-            <div className="flex justify-between border-b border-slate-100 pb-1">
-              <span className="font-bold text-slate-500">Route:</span>
-              <span className="font-black uppercase">{batch.route?.name}</span>
-            </div>
-            <div className="flex justify-between border-b border-slate-100 pb-1">
-              <span className="font-bold text-slate-500">Delivery Man:</span>
-              <span className="font-black uppercase">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</span>
+            <div className="flex gap-2">
+              <span className="font-bold text-slate-600 w-24">Delivery Man:</span>
+              <span className="font-black uppercase text-black">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name || 'N/A'}</span>
             </div>
           </div>
-          <div className="space-y-1.5 border-l-4 border-emerald-500 pl-4">
-            <div className="flex justify-between border-b border-slate-100 pb-1">
-              <span className="font-bold text-slate-500">Settlement Status:</span>
-              <span className="font-black text-emerald-600">FULLY SETTLED</span>
+          <div className="space-y-0.5 text-right">
+            <div className="flex justify-end gap-2">
+              <span className="font-bold text-slate-600">Batch ID:</span>
+              <span className="font-black tabular-nums text-black">#BT-{batch.id}</span>
             </div>
-            <div className="flex justify-between border-b border-slate-100 pb-1">
-              <span className="font-bold text-slate-500">Settled At:</span>
-              <span className="font-black">{formatDate(new Date())}</span>
-            </div>
-            <div className="flex justify-between border-b border-slate-100 pb-1">
-              <span className="font-bold text-slate-500">Market Area:</span>
-              <span className="font-black uppercase">{batch.route?.area || 'N/A'}</span>
+            <div className="flex justify-end gap-2">
+              <span className="font-bold text-slate-600">Date:</span>
+              <span className="font-black tabular-nums text-black">{formatDate(batch.dispatchedAt || batch.createdAt)}</span>
             </div>
           </div>
         </div>
 
-        <table className="w-full border-2 border-black text-xs mb-4">
+        {/* 12-COLUMN ITEMS TABLE */}
+        <table className="w-full border border-black text-[8px] mb-2 border-collapse">
           <thead>
-            <tr className="bg-slate-100 border-b-2 border-black font-black uppercase">
-              <th className="border-r border-black px-2 py-3 text-center">SL</th>
-              <th className="border-r border-black px-2 py-3 text-left">Product Name</th>
-              <th className="border-r border-black px-2 py-3 text-center">Paid Qty</th>
-              <th className="border-r border-black px-2 py-3 text-center">Free Sent</th>
-              <th className="border-r border-black px-2 py-3 text-center">Ret (Paid)</th>
-              <th className="border-r border-black px-2 py-3 text-center">Ret (Free)</th>
-              <th className="border-r border-black px-2 py-3 text-center">Dam (Paid)</th>
-              <th className="border-r border-black px-2 py-3 text-center">Final Sold</th>
-              <th className="border-r border-black px-2 py-3 text-center">Del. Free</th>
-              <th className="border-r border-black px-2 py-3 text-center">Unit Price</th>
-              <th className="border-r border-black px-2 py-3 text-right">Final Amount</th>
-              <th className="px-2 py-3 text-right bg-rose-100 text-rose-800">Due</th>
+            <tr className="bg-slate-100 border-b border-black font-black uppercase text-[7.5px] leading-tight">
+              <th className="border-r border-black px-1 py-1 text-center w-5">SL</th>
+              <th className="border-r border-black px-1.5 py-1 text-left">Product Name</th>
+              <th className="border-r border-black px-1 py-1 text-center w-10">Paid Qty</th>
+              <th className="border-r border-black px-1 py-1 text-center w-10">Free Sent</th>
+              <th className="border-r border-black px-1 py-1 text-center w-10">Ret (Paid)</th>
+              <th className="border-r border-black px-1 py-1 text-center w-10">Ret (Free)</th>
+              <th className="border-r border-black px-1 py-1 text-center w-10">Dam (Paid)</th>
+              <th className="border-r border-black px-1 py-1 text-center w-10">Final Sold</th>
+              <th className="border-r border-black px-1 py-1 text-center w-10">Del. Free</th>
+              <th className="border-r border-black px-1 py-1 text-right w-14">Unit Price</th>
+              <th className="border-r border-black px-1 py-1 text-right w-16">Final Amount</th>
+              <th className="px-1 py-1 text-right w-12 bg-rose-50 text-rose-900">Due</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-black/10">
+          <tbody className="divide-y divide-slate-200">
             {aggregatedItems.map((item, idx) => {
               const state = batchReturnState[item.productId] || { returned: '0', damaged: '0', free: '0' };
               const rPaid = Number(state.returned || 0);
@@ -1634,150 +1622,138 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                 }, 0);
 
               return (
-                <tr key={item.productId} className="font-bold">
-                  <td className="border-r border-black px-2 py-2 text-center">{idx + 1}</td>
-                  <td className="border-r border-black px-2 py-2">{item.name}</td>
-                  <td className="border-r border-black px-2 py-2 text-center">{formatNumber(item.totalPaidQty)}</td>
-                  <td className="border-r border-black px-2 py-2 text-center">{formatNumber(item.totalFreeQty)}</td>
-                  <td className="border-r border-black px-2 py-2 text-center text-rose-600">{rPaid > 0 ? formatNumber(rPaid) : '—'}</td>
-                  <td className="border-r border-black px-2 py-2 text-center text-rose-500">{rFree > 0 ? formatNumber(rFree) : '—'}</td>
-                  <td className="border-r border-black px-2 py-2 text-center text-amber-600">{dPaid > 0 ? formatNumber(dPaid) : '—'}</td>
-                  <td className="border-r border-black px-2 py-2 text-center text-blue-600">{formatNumber(finalSold)}</td>
-                  <td className="border-r border-black px-2 py-2 text-center text-emerald-600">{formatNumber(deliveredFree)}</td>
-                  <td className="border-r border-black px-2 py-2 text-center font-black text-slate-500">{formatCurrency(item.price)}</td>
-                  <td className="border-r border-black px-2 py-2 text-right font-black">{formatCurrency(itemFinalSoldAmount)}</td>
-                  <td className={`px-2 py-2 text-right font-black ${itemDue > 0 ? 'text-rose-700 bg-rose-50' : 'text-slate-300'}`}>
+                <tr key={item.productId} className="font-semibold text-[8px] leading-snug">
+                  <td className="border-r border-black px-1 py-0.5 text-center text-slate-500 tabular-nums">{idx + 1}</td>
+                  <td className="border-r border-black px-1.5 py-0.5 font-bold truncate max-w-[140px]">{item.name}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-center tabular-nums">{formatNumber(item.totalPaidQty)}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-center tabular-nums">{formatNumber(item.totalFreeQty)}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-center text-rose-600 tabular-nums">{rPaid > 0 ? formatNumber(rPaid) : '—'}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-center text-rose-500 tabular-nums">{rFree > 0 ? formatNumber(rFree) : '—'}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-center text-amber-600 tabular-nums">{dPaid > 0 ? formatNumber(dPaid) : '—'}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-center text-blue-700 font-bold tabular-nums">{formatNumber(finalSold)}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-center text-emerald-700 font-bold tabular-nums">{formatNumber(deliveredFree)}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-right font-bold text-slate-600 tabular-nums">{formatCurrency(item.price)}</td>
+                  <td className="border-r border-black px-1 py-0.5 text-right font-black tabular-nums">{formatCurrency(itemFinalSoldAmount)}</td>
+                  <td className={`px-1 py-0.5 text-right font-black tabular-nums ${itemDue > 0 ? 'text-rose-700 bg-rose-50/70' : 'text-slate-300'}`}>
                     {itemDue > 0 ? formatCurrency(itemDue) : '—'}
                   </td>
                 </tr>
               );
             })}
           </tbody>
-          <tfoot className="border-t-2 border-black bg-slate-50 font-black uppercase text-sm">
+          <tfoot className="border-t border-black bg-slate-50 font-black uppercase text-[8.5px]">
             <tr>
-              <td colSpan={7} className="border-r border-black px-4 py-3 text-right">Batch Grand Totals:</td>
-              <td className="border-r border-black px-2 py-3 text-center text-blue-700">{formatNumber(finalMetrics?.finalSold || 0)}</td>
-              <td className="border-r border-black px-2 py-3 text-center text-emerald-700">{formatNumber(finalMetrics?.totalFree || 0)}</td>
-              <td className="border-r border-black px-2 py-3 text-center text-slate-400">—</td>
-              <td className="border-r border-black px-2 py-3 text-right text-slate-900">{formatCurrency(currentFinalAmount)}</td>
-              <td className="px-2 py-3 text-right text-rose-700 bg-rose-50">{currentCustomerDue > 0 ? formatCurrency(currentCustomerDue) : '—'}</td>
+              <td colSpan={7} className="border-r border-black px-2 py-1 text-right">Batch Grand Totals:</td>
+              <td className="border-r border-black px-1 py-1 text-center text-blue-700 tabular-nums">{formatNumber(finalMetrics?.finalSold || 0)}</td>
+              <td className="border-r border-black px-1 py-1 text-center text-emerald-700 tabular-nums">{formatNumber(finalMetrics?.totalFree || 0)}</td>
+              <td className="border-r border-black px-1 py-1 text-center text-slate-400">—</td>
+              <td className="border-r border-black px-1 py-1 text-right text-slate-900 tabular-nums">{formatCurrency(currentFinalAmount)}</td>
+              <td className="px-1 py-1 text-right text-rose-700 bg-rose-50 tabular-nums">{currentCustomerDue > 0 ? formatCurrency(currentCustomerDue) : '—'}</td>
             </tr>
-            <tr className="border-t-2 border-black bg-white text-black">
-              <td colSpan={11} className="border-r border-black px-4 py-2.5 text-right font-black">Cash Collected:</td>
-              <td className="px-2 py-2.5 text-right font-black text-black">{formatCurrency(isBatchSettled ? (batch.totalCollectedAmount || 0) : Number(actualCashReceived || netExpectedCashFromDeliveryMan))}</td>
+            <tr className="border-t border-black bg-white text-black">
+              <td colSpan={10} className="border-r border-black px-2 py-1 text-right font-black">Cash Collected:</td>
+              <td colSpan={2} className="px-1 py-1 text-right font-black text-black tabular-nums">{formatCurrency(isBatchSettled ? (batch.totalCollectedAmount || 0) : Number(actualCashReceived || netExpectedCashFromDeliveryMan))}</td>
             </tr>
           </tfoot>
         </table>
 
-        {/* Settlement Financial & Expense Reconciliation Table / Card for Print */}
-        <div className="border-2 border-black p-4 mb-6 rounded-none bg-white text-xs">
-          <h3 className="font-black uppercase tracking-wider text-sm border-b-2 border-black pb-2 mb-3">
+        {/* Settlement Financial & Expense Reconciliation Table */}
+        <div className="border border-black p-2 mb-2 bg-white text-[8px] leading-tight">
+          <h3 className="font-black uppercase tracking-wider text-[8.5px] border-b border-black pb-1 mb-1.5">
             Settlement Reconciliation & Daily Expenses Breakdown
           </h3>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4">
             {/* Left Column: Expenses Itemization */}
-            <div className="space-y-1.5 border-r border-slate-300 pr-4">
-              <p className="font-black uppercase text-[11px] text-slate-700 mb-1 border-b border-slate-200 pb-1">
+            <div className="space-y-1 border-r border-slate-300 pr-3">
+              <p className="font-black uppercase text-[8px] text-slate-700 border-b border-slate-200 pb-0.5">
                 Delivery Daily Expenses:
               </p>
 
-              <div className="flex justify-between font-bold">
+              <div className="flex justify-between font-semibold">
                 <span>1. Van Rent:</span>
-                <span>{formatCurrency(isBatchSettled ? Number(batch.vanRent || 0) : vanRentVal)}</span>
+                <span className="tabular-nums">{formatCurrency(isBatchSettled ? Number(batch.vanRent || 0) : vanRentVal)}</span>
               </div>
 
               {Number(isBatchSettled ? (batch.salary || 0) : salaryVal) > 0 && (
-                <div className="flex justify-between font-bold">
+                <div className="flex justify-between font-semibold">
                   <span>2. Salary / Labor:</span>
-                  <span>{formatCurrency(isBatchSettled ? Number(batch.salary || 0) : salaryVal)}</span>
+                  <span className="tabular-nums">{formatCurrency(isBatchSettled ? Number(batch.salary || 0) : salaryVal)}</span>
                 </div>
               )}
 
               {/* Custom Expenses List */}
               {(isBatchSettled ? (batch.expenses || []) : customExpenses.filter(e => e.name.trim() && Number(e.amount || 0) > 0)).map((exp: any, i: number) => (
-                <div key={exp.id || i} className="flex justify-between font-bold text-slate-800">
+                <div key={exp.id || i} className="flex justify-between font-semibold text-slate-800">
                   <span>{i + (Number(isBatchSettled ? (batch.salary || 0) : salaryVal) > 0 ? 3 : 2)}. {exp.name}:</span>
-                  <span>{formatCurrency(Number(exp.amount || 0))}</span>
+                  <span className="tabular-nums">{formatCurrency(Number(exp.amount || 0))}</span>
                 </div>
               ))}
 
-              <div className="flex justify-between font-black text-rose-700 border-t border-black pt-1.5 mt-2 text-sm">
+              <div className="flex justify-between font-black text-rose-700 border-t border-black pt-1 mt-1 text-[8.5px]">
                 <span>Total Expenses:</span>
-                <span>- {formatCurrency(isBatchSettled ? Number(batch.totalExpenses || 0) : totalExpensesVal)}</span>
+                <span className="tabular-nums">- {formatCurrency(isBatchSettled ? Number(batch.totalExpenses || 0) : totalExpensesVal)}</span>
               </div>
             </div>
 
             {/* Right Column: Final Cash Reconciliation */}
-            <div className="space-y-2 font-bold">
-              <p className="font-black uppercase text-[11px] text-slate-700 mb-1 border-b border-slate-200 pb-1">
+            <div className="space-y-1 font-semibold">
+              <p className="font-black uppercase text-[8px] text-slate-700 border-b border-slate-200 pb-0.5">
                 Cash Reconciliation:
               </p>
 
               <div className="flex justify-between">
                 <span>Gross Order / Dispatch Amount:</span>
-                <span>{formatCurrency(currentGrossDispatched)}</span>
+                <span className="tabular-nums">{formatCurrency(currentGrossDispatched)}</span>
               </div>
 
               <div className="flex justify-between text-rose-600">
                 <span>(-) Total Paid Return Amount:</span>
-                <span>- {formatCurrency(currentReturnAdjusted)}</span>
+                <span className="tabular-nums">- {formatCurrency(currentReturnAdjusted)}</span>
               </div>
 
-              <div className="flex justify-between border-t border-slate-200 pt-1 font-black text-slate-900">
+              <div className="flex justify-between border-t border-slate-200 pt-0.5 font-bold text-slate-900">
                 <span>= Gross Sold Amount:</span>
-                <span>{formatCurrency(currentFinalAmount)}</span>
+                <span className="tabular-nums">{formatCurrency(currentFinalAmount)}</span>
               </div>
 
               <div className="flex justify-between text-rose-600">
                 <span>(-) Total Customer Due/Baki:</span>
-                <span>- {formatCurrency(currentCustomerDue)}</span>
+                <span className="tabular-nums">- {formatCurrency(currentCustomerDue)}</span>
               </div>
 
-              <div className="flex justify-between border-t border-slate-200 pt-1 font-black text-slate-900">
+              <div className="flex justify-between border-t border-slate-200 pt-0.5 font-bold text-slate-900">
                 <span>= Gross Cash Collectable:</span>
-                <span>{formatCurrency(currentCashCollectable)}</span>
+                <span className="tabular-nums">{formatCurrency(currentCashCollectable)}</span>
               </div>
 
               <div className="flex justify-between text-rose-600">
                 <span>(-) Total Daily Expenses:</span>
-                <span>- {formatCurrency(isBatchSettled ? Number(batch.totalExpenses || 0) : totalExpensesVal)}</span>
+                <span className="tabular-nums">- {formatCurrency(isBatchSettled ? Number(batch.totalExpenses || 0) : totalExpensesVal)}</span>
               </div>
 
-              <div className="flex justify-between border-t border-black pt-1.5 font-black text-emerald-700 text-sm">
+              <div className="flex justify-between border-t border-black pt-1 font-black text-emerald-700 text-[8.5px]">
                 <span>= Net Expected Cash:</span>
-                <span>{formatCurrency(netExpectedCashFromDeliveryMan)}</span>
+                <span className="tabular-nums">{formatCurrency(netExpectedCashFromDeliveryMan)}</span>
               </div>
 
-              <div className="flex justify-between bg-slate-100 p-2 rounded-none font-black text-slate-900 border border-black text-sm">
+              <div className="flex justify-between bg-slate-100 p-1 font-black text-slate-900 border border-black text-[8.5px]">
                 <span>Actual Cash Received by Admin:</span>
-                <span>{formatCurrency(isBatchSettled ? Number(batch.totalCollectedAmount || 0) : Number(actualCashReceived || netExpectedCashFromDeliveryMan))}</span>
+                <span className="tabular-nums">{formatCurrency(isBatchSettled ? Number(batch.totalCollectedAmount || 0) : Number(actualCashReceived || netExpectedCashFromDeliveryMan))}</span>
               </div>
-
-              {/* Discrepancy */}
-              {((isBatchSettled && Number(batch.shortageOrExcess || 0) !== 0) || (!isBatchSettled && actualCashReceived !== '' && Math.abs(Number(actualCashReceived) - netExpectedCashFromDeliveryMan) >= 0.01)) && (
-                <div className={`flex justify-between p-1.5 font-black text-xs ${
-                  (isBatchSettled ? Number(batch.shortageOrExcess || 0) : Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0
-                    ? 'text-rose-700 bg-rose-50 border border-rose-200'
-                    : 'text-blue-700 bg-blue-50 border border-blue-200'
-                }`}>
-                  <span>Discrepancy ({(isBatchSettled ? Number(batch.shortageOrExcess || 0) : Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0 ? 'Shortage' : 'Excess'}):</span>
-                  <span>{formatCurrency(Math.abs(isBatchSettled ? Number(batch.shortageOrExcess || 0) : (Number(actualCashReceived) - netExpectedCashFromDeliveryMan)))}</span>
-                </div>
-              )}
             </div>
           </div>
         </div>
 
         {/* Signatures */}
-        <div className="grid grid-cols-2 gap-10 mt-10 signature-grid">
-          <div className="text-center">
-            <div className="border-t-2 border-black pt-2 font-black uppercase tracking-widest text-sm">Delivery Man Signature</div>
-            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</p>
+        <div className="grid grid-cols-2 gap-8 pt-2 signature-grid text-center text-[8.5px]">
+          <div>
+            <div className="border-t border-black mx-auto w-32 pt-1 font-black uppercase tracking-wider">Delivery Man Signature</div>
+            <p className="text-[7.5px] font-bold text-slate-500 mt-0.5 uppercase">{batch.assignedDeliveryMan?.name || batch.deliveryPerson?.name}</p>
           </div>
-          <div className="text-center">
-            <div className="border-t-2 border-black pt-2 font-black uppercase tracking-widest text-sm">Authorized Admin Signature</div>
-            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase">Korim Traders Warehouse</p>
+          <div>
+            <div className="border-t border-black mx-auto w-32 pt-1 font-black uppercase tracking-wider">Authorized Admin Signature</div>
+            <p className="text-[7.5px] font-bold text-slate-500 mt-0.5 uppercase">Warehouse Management</p>
           </div>
         </div>
       </div>
