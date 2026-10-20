@@ -73,7 +73,7 @@ export function DuesPage() {
   // Manual Due Modal State
   const [isManualDueModalOpen, setIsManualDueModalOpen] = useState(false);
 
-  const { data: dues = [], isLoading } = useQuery({
+  const { data: dues = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['dues'],
     queryFn: getDues,
   });
@@ -783,6 +783,19 @@ export function DuesPage() {
                     <p className="mt-2 text-xs font-bold text-slate-400">Loading customer AR accounts...</p>
                   </td>
                 </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <p className="text-sm font-bold text-rose-600">Failed to load customer dues.</p>
+                    <button
+                      type="button"
+                      onClick={() => refetch()}
+                      className="mt-2 px-3 py-1.5 text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 rounded-xl hover:bg-rose-100 transition-colors"
+                    >
+                      Retry
+                    </button>
+                  </td>
+                </tr>
               ) : filteredShopAccounts.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-slate-400 text-sm font-bold">
@@ -927,6 +940,17 @@ export function DuesPage() {
             <div className="p-12 text-center">
               <Loader2 className="w-7 h-7 animate-spin text-indigo-600 mx-auto" />
               <p className="mt-2 text-xs text-slate-400 font-bold">Loading customer accounts...</p>
+            </div>
+          ) : isError ? (
+            <div className="p-8 text-center">
+              <p className="text-xs font-bold text-rose-600">Failed to load customer accounts.</p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="mt-2 px-3 py-1.5 text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 rounded-xl hover:bg-rose-100"
+              >
+                Retry
+              </button>
             </div>
           ) : filteredShopAccounts.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs font-bold">

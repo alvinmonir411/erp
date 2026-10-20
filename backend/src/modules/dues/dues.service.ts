@@ -44,7 +44,8 @@ export class DuesService {
       .leftJoinAndSelect('due.route', 'route')
       .leftJoinAndSelect('order.route', 'orderRoute')
       .where('due.status != :paidStatus', { paidStatus: DueStatus.PAID })
-      .orderBy('COALESCE(due.dueDate, due.createdAt::date)', 'DESC');
+      .orderBy('due.dueDate', 'DESC', 'NULLS LAST')
+      .addOrderBy('due.createdAt', 'DESC');
 
     if (role === Role.SR) {
       query.andWhere('due.srId = :userId', { userId });
@@ -804,7 +805,8 @@ export class DuesService {
     }
 
     const dues = await query
-      .orderBy('COALESCE(due.dueDate, due.createdAt::date)', 'DESC')
+      .orderBy('due.dueDate', 'DESC', 'NULLS LAST')
+      .addOrderBy('due.createdAt', 'DESC')
       .take(200)
       .getMany();
     return dues.map(due => {
