@@ -64,6 +64,7 @@ export type CustomExpenseItemPayload = {
 
 export type SettlementPayload = {
   note?: string;
+  settlementDate?: string;
   collections: {
     orderId: number;
     collectedAmount: number;
@@ -74,6 +75,9 @@ export type SettlementPayload = {
     orderId: number;
     amount: number;
     note?: string;
+    dueDate?: string;
+    shopId?: number;
+    productId?: number;
   }[];
   vanRent?: number;
   salary?: number;

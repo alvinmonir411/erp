@@ -56,11 +56,12 @@ export class DuesController {
 
   @Post('upsert')
   @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
-  upsert(@Body() data: { orderId: number; amount: number; note?: string }) {
+  upsert(@Body() data: { orderId: number; amount: number; note?: string; dueDate?: string }) {
     return this.duesService.upsertByOrderId(
       data.orderId,
       data.amount,
       data.note,
+      data.dueDate,
     );
   }
 

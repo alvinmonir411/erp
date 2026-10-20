@@ -1231,8 +1231,8 @@ export class DashboardService {
 
       if (!isAllTime && periodStartDateStr && periodEndDateStr) {
         qb.where(
-          '(order.orderDate >= :periodStartDateStr AND order.orderDate <= :periodEndDateStr OR (due.createdAt >= :periodStartUtc AND due.createdAt <= :periodEndUtc))',
-          { periodStartDateStr, periodEndDateStr, periodStartUtc, periodEndUtc },
+          'COALESCE(due."dueDate", order."orderDate", due."createdAt"::date) BETWEEN :periodStartDateStr AND :periodEndDateStr',
+          { periodStartDateStr, periodEndDateStr },
         );
       }
       if (companyId) {
@@ -1265,6 +1265,7 @@ export class DashboardService {
           remainingDue: safeNum(d.remainingDue),
           status: d.status,
           orderDate: d.order?.orderDate,
+          dueDate: d.dueDate,
         })),
       };
     }
@@ -1500,4 +1501,3 @@ export class DashboardService {
     return { type, items: [], total: 0 };
   }
 }
-

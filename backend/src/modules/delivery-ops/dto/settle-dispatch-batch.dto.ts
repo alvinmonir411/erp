@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsDateString,
   IsNumber,
   IsOptional,
   IsString,
@@ -44,6 +45,7 @@ class DispatchCollectionDto {
   @IsString()
   @IsOptional()
   note?: string;
+
 }
 
 class DueEntryDto {
@@ -64,6 +66,10 @@ class DueEntryDto {
   @IsString()
   @IsOptional()
   note?: string;
+
+  @IsDateString()
+  @IsOptional()
+  dueDate?: string;
 }
 
 class DispatchExpenseItemDto {
@@ -115,6 +121,10 @@ export class SettleDispatchBatchDto {
   @IsNumber()
   @Type(() => Number)
   actualCashReceived: number;
+
+  @IsString()
+  @IsOptional()
+  settlementDate?: string;
 
   @IsString()
   @IsOptional()

@@ -91,6 +91,11 @@ export class Due {
   @Column({ type: 'text', nullable: true })
   note: string;
 
+  // Business date of the due. It can be different from the time the entry was recorded.
+  @Index()
+  @Column({ type: 'date', nullable: true })
+  dueDate?: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

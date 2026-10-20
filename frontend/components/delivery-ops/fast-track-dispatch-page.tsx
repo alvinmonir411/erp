@@ -59,6 +59,20 @@ interface OrderLine {
   showResults?: boolean;
 }
 
+type FastTrackSnapshot = {
+  orderDate: string;
+  routeId: number | '';
+  shopId: number | '';
+  assignedDeliveryManId: string;
+  marketArea: string;
+  note: string;
+  lines: OrderLine[];
+  savedAt: string;
+};
+
+const FAST_TRACK_DRAFT_KEY = 'fast_track_dispatch_draft_v1';
+const FAST_TRACK_LAST_DISPATCH_KEY = 'fast_track_dispatch_last_v1';
+
 export function FastTrackDispatchPage() {
   const router = useRouter();
   const { error: showErrorToast, success: showSuccessToast } = useToast();
@@ -93,6 +107,43 @@ export function FastTrackDispatchPage() {
 
   // Lines
   const [lines, setLines] = useState<OrderLine[]>([]);
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [hasPreviousDispatch, setHasPreviousDispatch] = useState(false);
+  const isSubmittedRef = useRef(false);
+
+  // Accidental Page Close Protection (ভুলে page close প্রতিরোধ)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isSubmittedRef.current) return;
+      const isDirty = lines.length > 0 || !!routeId || !!shopId || !!note;
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [lines, routeId, shopId, note]);
+
+  // Continuous Auto-save Draft
+  useEffect(() => {
+    if (isLoading) return;
+    const isDirty = lines.length > 0 || !!routeId || !!shopId || !!note;
+    if (!isDirty) return;
+
+    const timer = setTimeout(() => {
+      if (isSubmittedRef.current) return;
+      try {
+        const snapshot = buildSnapshot();
+        localStorage.setItem(FAST_TRACK_DRAFT_KEY, JSON.stringify(snapshot));
+        setHasSavedDraft(true);
+      } catch (err) {
+        // Silently ignore storage errors in auto-save
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [lines, routeId, shopId, orderDate, assignedDeliveryManId, marketArea, note, isLoading]);
 
   useEffect(() => {
     async function load() {
@@ -128,6 +179,15 @@ export function FastTrackDispatchPage() {
       }
     }
     void load();
+  }, []);
+
+  useEffect(() => {
+    try {
+      setHasSavedDraft(Boolean(localStorage.getItem(FAST_TRACK_DRAFT_KEY)));
+      setHasPreviousDispatch(Boolean(localStorage.getItem(FAST_TRACK_LAST_DISPATCH_KEY)));
+    } catch {
+      // The form still works when browser storage is unavailable.
+    }
   }, []);
 
   useEffect(() => {
@@ -239,6 +299,63 @@ export function FastTrackDispatchPage() {
 
   const isFormValid = !!orderDate && !!routeId && !!assignedDeliveryManId && lines.length > 0 && lines.every(l => l.productId > 0);
 
+  const buildSnapshot = (): FastTrackSnapshot => ({
+    orderDate,
+    routeId,
+    shopId,
+    assignedDeliveryManId,
+    marketArea,
+    note,
+    lines,
+    savedAt: new Date().toISOString(),
+  });
+
+  const applySnapshot = (snapshot: FastTrackSnapshot, resetDate = false) => {
+    setOrderDate(resetDate ? getTodayBDDate() : snapshot.orderDate || getTodayBDDate());
+    setRouteId(snapshot.routeId || '');
+    setShopId(snapshot.shopId || '');
+    setAssignedDeliveryManId(snapshot.assignedDeliveryManId || '');
+    setMarketArea(snapshot.marketArea || '');
+    setNote(snapshot.note || '');
+    setLines((snapshot.lines || []).map((line) => ({ ...line, showResults: false })));
+    const selectedRoute = routes.find((route) => route.id === snapshot.routeId);
+    const selectedShop = shops.find((shop) => shop.id === snapshot.shopId);
+    setRouteSearch(selectedRoute?.name || '');
+    setShopSearch(selectedShop?.name || '');
+  };
+
+  const handleSaveDraft = () => {
+    try {
+      localStorage.setItem(FAST_TRACK_DRAFT_KEY, JSON.stringify(buildSnapshot()));
+      setHasSavedDraft(true);
+      showSuccessToast('Fast Track draft saved on this device');
+    } catch {
+      showErrorToast('Could not save the draft in this browser');
+    }
+  };
+
+  const handleResumeDraft = () => {
+    try {
+      const rawDraft = localStorage.getItem(FAST_TRACK_DRAFT_KEY);
+      if (!rawDraft) return;
+      applySnapshot(JSON.parse(rawDraft));
+      showSuccessToast('Saved Fast Track draft restored');
+    } catch {
+      showErrorToast('The saved draft could not be restored');
+    }
+  };
+
+  const handleDuplicatePrevious = () => {
+    try {
+      const rawPrevious = localStorage.getItem(FAST_TRACK_LAST_DISPATCH_KEY);
+      if (!rawPrevious) return;
+      applySnapshot(JSON.parse(rawPrevious), true);
+      showSuccessToast('Previous dispatch copied. Please review stock and quantities before confirming.');
+    } catch {
+      showErrorToast('The previous dispatch could not be restored');
+    }
+  };
+
   const handleConfirmAndDispatch = async () => {
     if (!orderDate || !routeId || !assignedDeliveryManId) {
       showErrorToast('Please select dispatch date, route, and delivery person');
@@ -271,6 +388,7 @@ export function FastTrackDispatchPage() {
 
     try {
       setIsSaving(true);
+      isSubmittedRef.current = true;
 
       // 1. Create order for all items
       const orderPayload: any = {
@@ -304,6 +422,15 @@ export function FastTrackDispatchPage() {
       };
 
       const batch = await createDispatchBatch(batchPayload);
+
+      try {
+        localStorage.setItem(FAST_TRACK_LAST_DISPATCH_KEY, JSON.stringify(buildSnapshot()));
+        localStorage.removeItem(FAST_TRACK_DRAFT_KEY);
+        setHasPreviousDispatch(true);
+        setHasSavedDraft(false);
+      } catch {
+        // Dispatch completion must not fail just because browser storage is unavailable.
+      }
 
       showSuccessToast('Order and instant delivery challan created successfully!');
       router.push(`/delivery-ops/batches/${batch.id}`);
@@ -342,7 +469,32 @@ export function FastTrackDispatchPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center">
+        <div className="flex flex-wrap items-center justify-end gap-2 self-start sm:self-center">
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-indigo-700 transition hover:bg-indigo-100"
+          >
+            Save Draft
+          </button>
+          {hasSavedDraft && (
+            <button
+              type="button"
+              onClick={handleResumeDraft}
+              className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-cyan-700 transition hover:bg-cyan-100"
+            >
+              Resume Draft
+            </button>
+          )}
+          {hasPreviousDispatch && (
+            <button
+              type="button"
+              onClick={handleDuplicatePrevious}
+              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-emerald-700 transition hover:bg-emerald-100"
+            >
+              Duplicate Last
+            </button>
+          )}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2 flex items-center gap-3">
             <div className="text-right">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Today's Date</p>

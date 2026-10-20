@@ -335,6 +335,21 @@ export class SchemaSyncService implements OnApplicationBootstrap {
         await this.dataSource.query(`
           CREATE UNIQUE INDEX IF NOT EXISTS "UQ_dues_orderId_shopId" ON dues("orderId", "shopId");
         `);
+
+        this.logger.log('Backfilling missing routeId on existing dues and orders from shops...');
+        await this.dataSource.query(`
+          UPDATE "dues" d
+          SET "routeId" = s."routeId"
+          FROM "shops" s
+          WHERE d."shopId" = s.id
+            AND (d."routeId" IS NULL OR d."routeId" != s."routeId");
+
+          UPDATE "orders" o
+          SET "routeId" = s."routeId"
+          FROM "shops" s
+          WHERE o."shopId" = s.id
+            AND (o."routeId" IS NULL OR o."routeId" != s."routeId");
+        `);
       } catch (e) {
         this.logger.error('Failed to migrate dues constraints:', e.message);
       }
@@ -548,7 +563,21 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       this.logger.error('Failed to sync purchases/company_payments tables:', e.message);
     }
 
-    // 16. Sync activity_logs table
+    // 16. Sync due business-date column
+    try {
+      this.logger.log('Ensuring due business-date column exists...');
+      await this.dataSource.query(`
+        ALTER TABLE "dues" ADD COLUMN IF NOT EXISTS "dueDate" DATE;
+        UPDATE "dues" SET "dueDate" = COALESCE("dueDate", "createdAt"::date) WHERE "dueDate" IS NULL;
+        CREATE INDEX IF NOT EXISTS "idx_dues_due_date" ON "dues" ("dueDate" DESC);
+      `);
+    } catch (e) {
+      if (!e.message.includes('does not exist')) {
+        this.logger.error('Failed to sync due business-date column:', e.message);
+      }
+    }
+
+    // 17. Sync activity_logs table
     try {
       this.logger.log('Ensuring activity_logs table exists...');
       await this.dataSource.query(`
@@ -582,4 +611,3 @@ export class SchemaSyncService implements OnApplicationBootstrap {
     }
   }
 }
-

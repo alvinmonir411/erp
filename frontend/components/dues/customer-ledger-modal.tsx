@@ -87,7 +87,7 @@ export function CustomerLedgerModal({
       totalRemaining += rem;
 
       if (rem > 0) {
-        const orderDateStr = d.order?.orderDate || d.createdAt;
+        const orderDateStr = d.dueDate || d.order?.orderDate || d.createdAt;
         const diffDays = orderDateStr 
           ? Math.floor((now - new Date(orderDateStr).getTime()) / (1000 * 60 * 60 * 24))
           : 0;
@@ -295,7 +295,7 @@ export function CustomerLedgerModal({
                               </button>
                             </td>
                             <td className="px-4 py-3 text-slate-600">
-                              {formatDate(d.order?.orderDate || d.createdAt)}
+                              {formatDate(d.dueDate || d.order?.orderDate || d.createdAt)}
                             </td>
                             <td className="px-4 py-3 text-slate-700 font-medium">
                               {d.deliveryManName || '—'}
@@ -387,7 +387,7 @@ export function CustomerLedgerModal({
                         </div>
 
                         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
-                          <span>Date: <strong>{formatDate(d.order?.orderDate || d.createdAt)}</strong></span>
+                          <span>Date: <strong>{formatDate(d.dueDate || d.order?.orderDate || d.createdAt)}</strong></span>
                           <span>Delivery: <strong>{d.deliveryManName || '—'}</strong></span>
                         </div>
                       </div>

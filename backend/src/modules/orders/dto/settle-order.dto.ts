@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsNumber,
   IsOptional,
   IsString,
@@ -38,6 +39,10 @@ class SettleOrderDueEntryDto {
   @IsString()
   @IsOptional()
   note?: string;
+
+  @IsDateString()
+  @IsOptional()
+  dueDate?: string;
 }
 
 export class SettleOrderDto {
@@ -52,6 +57,10 @@ export class SettleOrderDto {
   @IsString()
   @IsOptional()
   settlementNote?: string;
+
+  @IsDateString()
+  @IsOptional()
+  settlementDate?: string;
 
   @IsArray()
   @IsOptional()

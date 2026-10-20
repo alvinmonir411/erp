@@ -35,6 +35,7 @@ export async function upsertDue(data: {
   orderId: number;
   amount: number;
   note?: string;
+  dueDate?: string;
 }) {
   return apiRequest<Due>('/dues/upsert', {
     method: 'POST',

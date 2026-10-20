@@ -82,9 +82,20 @@ export class SalesService {
 
     const ledgerNote = this.buildLedgerNote(reason, note);
 
+    let businessDate = new Date();
+    if (dto.date) {
+      const parsedDate = new Date(dto.date.includes('T') ? dto.date : `${dto.date}T00:00:00.000Z`);
+      if (Number.isNaN(parsedDate.getTime())) {
+        throw new BadRequestException('Invalid date provided.');
+      }
+      businessDate = parsedDate;
+    }
+
+    const cleanDateStr = dto.date ? (dto.date.includes('T') ? dto.date.split('T')[0] : dto.date) : undefined;
+
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const order = manager.create(Order, {
-        orderDate: new Date(),
+        orderDate: businessDate,
         companyId: shop.companyId,
         routeId: shop.routeId,
         shopId: shop.id,
@@ -97,7 +108,7 @@ export class SalesService {
         actualSoldAmount: amount,
         collectedAmount: 0,
         dueAmount: amount,
-        settledAt: new Date(),
+        settledAt: businessDate,
         isLocked: true,
         status: OrderStatus.MANUAL_DUE,
         note: ledgerNote,
@@ -113,6 +124,8 @@ export class SalesService {
         amount,
         manager,
         ledgerNote,
+        undefined,
+        cleanDateStr,
       );
 
       if (!due) {

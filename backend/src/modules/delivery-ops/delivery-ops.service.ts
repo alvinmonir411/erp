@@ -1344,6 +1344,11 @@ export class DeliveryOpsService {
       if (currentBatch.status === DispatchBatchStatus.CANCELLED)
         throw new BadRequestException('Cannot settle a cancelled batch');
 
+      // Settlement reports belong to the original dispatch day, even when the
+      // accountant completes the settlement later.
+      const rawDispatchDate = currentBatch.dispatchDate || currentBatch.dispatchedAt || currentBatch.createdAt;
+      const dispatchBusinessDate = dto.settlementDate ? this.toDateOnly(dto.settlementDate) : this.toDateOnly(rawDispatchDate);
+
       // 2. Fail-fast if ANY order is already settled or lacks a shop
       for (const bo of currentBatch.orders) {
         if (
@@ -1411,6 +1416,7 @@ export class DeliveryOpsService {
             shopId: d.shopId,
             productId: d.productId,
             amount: d.amount,
+            dueDate: d.dueDate ? this.toDateOnly(d.dueDate) : dispatchBusinessDate,
             note: d.note || dto.note || batchOrder.deliveryNote,
           }));
 
@@ -1421,6 +1427,7 @@ export class DeliveryOpsService {
             items: settlementItems,
             collectedAmount: Number(collectedAmount),
             settlementNote: dto.note || batchOrder.deliveryNote,
+            settlementDate: dispatchBusinessDate,
             dueEntries: orderDueEntries,
           } as any,
           manager,
@@ -1531,7 +1538,7 @@ export class DeliveryOpsService {
       // 5. Update Batch with Audit Metadata
       await manager.update(DispatchBatch, id, {
         status: DispatchBatchStatus.SETTLED,
-        settledAt: new Date(),
+        settledAt: this.toBusinessDate(dispatchBusinessDate),
         grossDispatchedValue,
         returnAdjustedValue,
         totalCollectedAmount: finalCashCollectable,
@@ -1883,6 +1890,17 @@ export class DeliveryOpsService {
     }
 
     return { success: result.success, message: result.message };
+  }
+
+  private toDateOnly(date: Date | string): string {
+    return typeof date === 'string'
+      ? date.slice(0, 10)
+      : date.toISOString().slice(0, 10);
+  }
+
+  private toBusinessDate(date: string): Date {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day, 6, 0, 0));
   }
 
   private generateBatchNo(manager: any, date: string): string {

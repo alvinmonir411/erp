@@ -23,6 +23,10 @@ export class CreateManualDueDto {
 
   @IsOptional()
   @IsString()
+  date?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(2000)
   note?: string;
 }

@@ -72,7 +72,7 @@ export function SRDuesList() {
             <div className="flex items-center justify-between pt-2 border-t border-slate-100/50">
                <div className="flex items-center gap-2 text-slate-400">
                   <Calendar className="h-3 w-3" />
-                  <span className="text-[9px] font-bold uppercase">{formatDate(due.createdAt)}</span>
+                  <span className="text-[9px] font-bold uppercase">{formatDate(due.dueDate || due.createdAt)}</span>
                </div>
                <div className="flex items-center gap-2 text-slate-400">
                   <Clock className="h-3 w-3" />

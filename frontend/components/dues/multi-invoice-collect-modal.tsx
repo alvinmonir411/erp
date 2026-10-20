@@ -79,8 +79,8 @@ export function MultiInvoiceCollectModal({ shop, onClose, onSuccess }: MultiInvo
     return rawDues
       .filter((d: any) => Number(d.remainingDue) > 0)
       .sort((a: any, b: any) => {
-        const dateA = a.order?.orderDate || a.createdAt || '';
-        const dateB = b.order?.orderDate || b.createdAt || '';
+        const dateA = a.dueDate || a.order?.orderDate || a.createdAt || '';
+        const dateB = b.dueDate || b.order?.orderDate || b.createdAt || '';
         return dateA.localeCompare(dateB);
       });
   }, [rawDues]);
@@ -660,7 +660,7 @@ export function MultiInvoiceCollectModal({ shop, onClose, onSuccess }: MultiInvo
                           <div className="flex items-center gap-1.5">
                             <span className="font-black text-slate-900 text-xs">Order #{d.orderId}</span>
                             <span className="text-[10px] text-slate-400 font-medium">
-                              {formatDate(d.order?.orderDate || d.createdAt)}
+                              {formatDate(d.dueDate || d.order?.orderDate || d.createdAt)}
                             </span>
                           </div>
                           <p className="text-[10px] text-slate-500 mt-0.5">
@@ -776,7 +776,7 @@ export function MultiInvoiceCollectModal({ shop, onClose, onSuccess }: MultiInvo
                           <td className="px-3.5 py-2.5">
                             <span className="font-black text-slate-900 block">Order #{d.orderId}</span>
                             <span className="text-[10px] text-slate-400">
-                              {formatDate(d.order?.orderDate || d.createdAt)}
+                              {formatDate(d.dueDate || d.order?.orderDate || d.createdAt)}
                             </span>
                           </td>
                           <td className="px-3.5 py-2.5 text-right font-medium text-slate-600">

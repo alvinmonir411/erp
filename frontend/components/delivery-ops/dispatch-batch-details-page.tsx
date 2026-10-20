@@ -70,7 +70,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
     damaged: string;
     free: string;
   }>>({});
-  const [draftDues, setDraftDues] = useState<Record<string, Array<{ shopId: number; shopName: string; amount: number; note?: string }>>>({});
+  const [draftDues, setDraftDues] = useState<Record<string, Array<{ shopId: number; shopName: string; amount: number; note?: string; dueDate?: string }>>>({});
   const [dueModalProduct, setDueModalProduct] = useState<{ id: number; name: string } | null>(null);
   const [actualCashReceived, setActualCashReceived] = useState<string>('');
   const [vanRent, setVanRent] = useState<string>('');
@@ -611,6 +611,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                 amount: d.amount,
                 shopId: d.shopId,
                 productId,
+                dueDate: d.dueDate || batch.dispatchDate,
                 note: d.note || 'Added during batch settlement'
               });
             }
@@ -641,7 +642,8 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         vanRent: vanRentNum,
         salary: salaryNum,
         customExpenses: validExpenses.length > 0 ? validExpenses : undefined,
-        actualCashReceived: Number(actualCashReceived)
+        actualCashReceived: Number(actualCashReceived),
+        settlementDate: batch.dispatchDate ? (typeof batch.dispatchDate === 'string' ? batch.dispatchDate.slice(0, 10) : new Date(batch.dispatchDate).toISOString().slice(0, 10)) : undefined
       }), 'Settling batch...');
 
       showSuccessToast('Batch marked as settled and dues recorded');
@@ -1534,6 +1536,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         }
         route={batch.route}
         companyId={batch.companyId || batch.orders[0]?.order.companyId || 0}
+        defaultDueDate={batch.dispatchDate}
         onAddDraftDue={(orderId, duesList) => {
           if (dueModalProduct) {
             const key = `${orderId}_${dueModalProduct.id}`;
@@ -1778,6 +1781,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
           draftDues={draftDues}
           route={batch.route}
           companyId={batch.companyId}
+          defaultDueDate={batch.dispatchDate}
           onAddDraftDue={(orderId, dues) => {
             if (dueModalProduct) {
               const key = `${orderId}_${dueModalProduct.id}`;

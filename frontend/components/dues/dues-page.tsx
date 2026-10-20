@@ -27,11 +27,12 @@ import {
   SlidersHorizontal,
   User,
   MapPin,
-  CheckCircle2
+  CheckCircle2,
+  Calendar
 } from 'lucide-react';
 import { getDues, getDueStats } from '@/lib/api/dues';
 import { apiRequest } from '@/lib/api/client';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, getTodayBDDate } from '@/lib/utils/format';
 import { useAuth } from '../auth/auth-provider';
 import { useToast } from '@/components/ui/toast-provider';
 import { Role } from '@/types/api';
@@ -88,8 +89,16 @@ export function DuesPage() {
   const { data: routes = [] } = useRoutes();
 
   const uniqueRoutes = useMemo(() => {
-    return Array.from(new Set(routes.map((r: any) => r.name))).filter(Boolean) as string[];
-  }, [routes]);
+    const routeSet = new Set<string>();
+    routes.forEach((r: any) => {
+      if (r?.name) routeSet.add(r.name.trim());
+    });
+    dues.forEach((d: any) => {
+      const rName = d.shop?.route?.name || d.route?.name || d.order?.route?.name;
+      if (rName) routeSet.add(rName.trim());
+    });
+    return Array.from(routeSet).sort((a, b) => a.localeCompare(b));
+  }, [routes, dues]);
 
   // Unique Delivery Personnel from all dues
   const uniqueDeliveryMen = useMemo(() => {
@@ -150,19 +159,26 @@ export function DuesPage() {
 
     dues.forEach((due: any) => {
       const shopKey = due.shopId ? `shop_${due.shopId}` : 'direct_sales';
-      const shopObj = due.shop || {
+      const resolvedRoute = due.shop?.route || due.route || due.order?.route || null;
+      const shopObj = due.shop ? {
+        ...due.shop,
+        route: due.shop.route || resolvedRoute,
+      } : {
         id: -1,
         name: 'Direct Route Sale / Clearing',
         ownerName: 'Route Direct',
         phone: '—',
-        route: due.route || { name: 'Route Clearing' },
+        route: resolvedRoute || { name: 'Direct / Unassigned' },
       };
+
+      const routeName = (due.shop?.route?.name || resolvedRoute?.name || '').trim();
 
       if (!shopMap.has(shopKey)) {
         shopMap.set(shopKey, {
           shopKey,
           shopId: due.shopId,
           shop: shopObj,
+          routeName: routeName || 'Direct / Unassigned',
           totalDue: 0,
           totalPaid: 0,
           remainingDue: 0,
@@ -172,7 +188,7 @@ export function DuesPage() {
           aging16_30: 0,
           aging31_60: 0,
           aging60Plus: 0,
-          lastDate: due.order?.orderDate || due.createdAt,
+          lastDate: due.dueDate || due.order?.orderDate || due.createdAt,
           hasDraftAnomaly: false,
           deliveryMen: new Set<string>(),
           srNames: new Set<string>(),
@@ -180,6 +196,17 @@ export function DuesPage() {
       }
 
       const acc = shopMap.get(shopKey)!;
+      // Enrich shop details if prior due record lacked route or address
+      if (!acc.shop.route && (due.shop?.route || resolvedRoute)) {
+        acc.shop.route = due.shop?.route || resolvedRoute;
+      }
+      if (!acc.shop.address && due.shop?.address) {
+        acc.shop.address = due.shop.address;
+      }
+      if ((!acc.routeName || acc.routeName === 'Direct / Unassigned') && routeName) {
+        acc.routeName = routeName;
+      }
+
       const dueAmt = Number(due.dueAmount || 0);
       const paidAmt = Number(due.paidAmount || 0);
       const remAmt = Number(due.remainingDue || 0);
@@ -199,7 +226,7 @@ export function DuesPage() {
       }
 
       if (remAmt > 0) {
-        const orderDateStr = due.order?.orderDate || due.createdAt;
+        const orderDateStr = due.dueDate || due.order?.orderDate || due.createdAt;
         const diffDays = orderDateStr 
           ? Math.floor((now - new Date(orderDateStr).getTime()) / (1000 * 60 * 60 * 24))
           : 0;
@@ -221,6 +248,8 @@ export function DuesPage() {
   // Filtered Shop Accounts
   const filteredShopAccounts = useMemo(() => {
     const list = shopAccounts.filter((acc: any) => {
+      const currentRouteName = (acc.shop?.route?.name || acc.routeName || '').trim();
+
       // 1. Search filter
       if (searchTerm) {
         const q = searchTerm.toLowerCase();
@@ -229,14 +258,16 @@ export function DuesPage() {
           acc.shop.ownerName?.toLowerCase().includes(q) ||
           acc.shop.phone?.toLowerCase().includes(q) ||
           acc.shop.address?.toLowerCase().includes(q) ||
-          acc.shop.route?.name?.toLowerCase().includes(q)
+          currentRouteName.toLowerCase().includes(q)
         );
         if (!matches) return false;
       }
 
       // 2. Route filter
-      if (selectedRoute && acc.shop.route?.name !== selectedRoute) {
-        return false;
+      if (selectedRoute) {
+        if (currentRouteName.toLowerCase() !== selectedRoute.trim().toLowerCase()) {
+          return false;
+        }
       }
 
       // 3. Delivery Person filter
@@ -295,7 +326,7 @@ export function DuesPage() {
     dues.forEach((due: any) => {
       const rem = Number(due.remainingDue || 0);
       if (rem > 0) {
-        const orderDateStr = due.order?.orderDate || due.createdAt;
+        const orderDateStr = due.dueDate || due.order?.orderDate || due.createdAt;
         const diffDays = orderDateStr 
           ? Math.floor((now - new Date(orderDateStr).getTime()) / (1000 * 60 * 60 * 24))
           : 0;
@@ -800,8 +831,13 @@ export function DuesPage() {
 
                       <td className="px-5 py-3.5">
                         <span className="font-bold text-slate-700 text-xs block">
-                          {acc.shop.route?.name || 'Direct / Unassigned'}
+                          {acc.shop.route?.name || acc.routeName || 'Direct / Unassigned'}
                         </span>
+                        {acc.shop.address && (
+                          <span className="text-[10px] text-slate-500 block truncate max-w-[200px]" title={acc.shop.address}>
+                            {acc.shop.address}
+                          </span>
+                        )}
                         <div className="flex items-center gap-1 flex-wrap mt-0.5">
                           <span className="text-[10px] text-slate-400">
                             {acc.openInvoiceCount} open / {acc.invoiceCount} invoices
@@ -937,9 +973,9 @@ export function DuesPage() {
                       <p className="font-bold text-slate-800 text-[11px] leading-tight break-words">
                         {acc.shop.address || <span className="text-slate-400 font-normal italic">Address: Not specified</span>}
                       </p>
-                      {acc.shop.route?.name && (
+                      {(acc.shop.route?.name || acc.routeName) && (
                         <p className="text-[10px] text-slate-500 mt-1 font-medium flex items-center gap-1">
-                          Route: <span className="font-bold text-slate-700 bg-white border border-slate-200 px-1.5 py-0.2 rounded">{acc.shop.route.name}</span>
+                          Route: <span className="font-bold text-slate-700 bg-white border border-slate-200 px-1.5 py-0.2 rounded">{acc.shop.route?.name || acc.routeName}</span>
                         </p>
                       )}
                     </div>
@@ -1097,6 +1133,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
   const { user } = useAuth();
   const { success: showSuccessToast, error: showErrorToast } = useToast();
   const [shopId, setShopId] = useState('');
+  const [date, setDate] = useState(() => getTodayBDDate());
   const [shopSearch, setShopSearch] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [amount, setAmount] = useState('');
@@ -1124,6 +1161,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
       s.name?.toLowerCase().includes(q) ||
       s.ownerName?.toLowerCase().includes(q) ||
       s.phone?.includes(q) ||
+      s.address?.toLowerCase().includes(q) ||
       s.route?.name?.toLowerCase().includes(q)
     );
   }, [shops, shopSearch]);
@@ -1154,6 +1192,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
         amount: parsedAmount,
         reason: reason.trim(),
         note: note.trim() || undefined,
+        date: date || undefined,
       });
       showSuccessToast('New manual due added successfully.');
       onSuccess();
@@ -1190,6 +1229,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
                     <p className="text-xs text-slate-500">
                       {selectedShop.route?.name ? `Route: ${selectedShop.route.name}` : ''}
                       {selectedShop.ownerName ? ` · ${selectedShop.ownerName}` : ''}
+                      {selectedShop.address ? ` · ${selectedShop.address}` : ''}
                     </p>
                   </div>
                 </div>
@@ -1213,7 +1253,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
                       setIsDropdownOpen(true);
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
-                    placeholder="Search shop by name, route or mobile..."
+                    placeholder="Search shop by name, route, address or mobile..."
                     disabled={isLoading}
                     className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
                   />
@@ -1240,6 +1280,7 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
                             <p className="text-xs text-slate-500">
                               {shop.route?.name ? `Route: ${shop.route.name}` : 'No Route'}
                               {shop.ownerName ? ` · ${shop.ownerName}` : ''}
+                              {shop.address ? ` · ${shop.address}` : ''}
                             </p>
                           </div>
                           {shop.phone && (
@@ -1256,6 +1297,23 @@ function ManualDueModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
                 )}
               </div>
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Due Date / বকেয়ার তারিখ</label>
+              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">Default: Today</span>
+            </div>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium text-slate-800 bg-white"
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">

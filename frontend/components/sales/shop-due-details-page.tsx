@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
-import { History, Loader2, PlusCircle, XCircle } from 'lucide-react';
+import { History, Loader2, PlusCircle, XCircle, Calendar } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getShopDues } from '@/lib/api/dues';
 import { addManualDue } from '@/lib/api/sales';
@@ -16,7 +16,7 @@ import {
   useToast,
   useToastNotification,
 } from '@/components/ui/toast-provider';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, getTodayBDDate } from '@/lib/utils/format';
 import type {
   CreateManualDuePayload,
   Due,
@@ -215,7 +215,7 @@ function DueLedgerCard({
           </p>
           <p className="mt-1 text-sm font-bold uppercase text-slate-500">
             SR: {due.srName || 'Unknown'} -{' '}
-            {formatDate(due.order?.orderDate || due.createdAt)}
+            {formatDate(due.dueDate || due.order?.orderDate || due.createdAt)}
           </p>
           {due.note ? (
             <p className="mt-2 max-w-2xl whitespace-pre-line text-sm leading-6 text-slate-600">
@@ -274,6 +274,7 @@ function ManualDueModal({
   onClose: () => void;
   onSubmit: (payload: CreateManualDuePayload) => void;
 }) {
+  const [date, setDate] = useState(() => getTodayBDDate());
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
@@ -302,6 +303,7 @@ function ManualDueModal({
       amount: Number(parsedAmount.toFixed(2)),
       reason: cleanReason,
       note: cleanNote || undefined,
+      date: date || undefined,
     });
   }
 
@@ -334,7 +336,27 @@ function ManualDueModal({
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          <label className="block">
+                    <label className="block">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase text-slate-500">
+                Due Date / বকেয়ার তারিখ
+              </span>
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Default: Today</span>
+            </div>
+            <div className="relative mt-2">
+              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="date"
+                required
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                disabled={isSubmitting}
+                className="w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+            </div>
+          </label>
+
+<label className="block">
             <span className="text-xs font-black uppercase text-slate-500">
               Due Amount
             </span>

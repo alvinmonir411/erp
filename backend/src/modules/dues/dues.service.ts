@@ -15,6 +15,7 @@ import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/orders.constants';
 import { Role } from '../../common/enums/role.enum';
 import { User } from '../users/entities/user.entity';
+import { Shop } from '../shops/entities/shop.entity';
 
 @Injectable()
 export class DuesService {
@@ -39,9 +40,11 @@ export class DuesService {
       .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
       .leftJoinAndSelect('order.company', 'orderCompany')
       .leftJoinAndSelect('due.shop', 'shop')
+      .leftJoinAndSelect('shop.route', 'shopRoute')
       .leftJoinAndSelect('due.route', 'route')
+      .leftJoinAndSelect('order.route', 'orderRoute')
       .where('due.status != :paidStatus', { paidStatus: DueStatus.PAID })
-      .orderBy('due.createdAt', 'DESC');
+      .orderBy('COALESCE(due.dueDate, due.createdAt::date)', 'DESC');
 
     if (role === Role.SR) {
       query.andWhere('due.srId = :userId', { userId });
@@ -67,10 +70,23 @@ export class DuesService {
     }
 
     const dues = await query.take(200).getMany();
-    return dues.map(due => ({
-      ...due,
-      deliveryManName: due.order?.assignedDeliveryMan?.name || due.order?.deliveryPerson?.name || null,
-    }));
+    return dues.map(due => {
+      const resolvedRoute = due.shop?.route || due.route || due.order?.route || null;
+      return {
+        ...due,
+        route: resolvedRoute,
+        shop: due.shop
+          ? {
+              ...due.shop,
+              route: due.shop.route || resolvedRoute,
+            }
+          : null,
+        deliveryManName:
+          due.order?.assignedDeliveryMan?.name ||
+          due.order?.deliveryPerson?.name ||
+          null,
+      };
+    });
   }
 
   async findPendingCollections(user: any) {
@@ -217,7 +233,12 @@ export class DuesService {
     return this.collectionsRepository.save(collection);
   }
 
-  async upsertByOrderId(orderId: number, dueAmount: number, note?: string) {
+  async upsertByOrderId(
+    orderId: number,
+    dueAmount: number,
+    note?: string,
+    dueDate?: string,
+  ) {
     const order = await this.ordersRepository.findOne({
       where: { id: orderId },
       relations: ['shop', 'route'],
@@ -225,7 +246,14 @@ export class DuesService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    return this.upsertDue(order, dueAmount, this.dataSource.manager, note);
+    return this.upsertDue(
+      order,
+      dueAmount,
+      this.dataSource.manager,
+      note,
+      undefined,
+      dueDate,
+    );
   }
 
   async upsertDue(
@@ -234,6 +262,7 @@ export class DuesService {
     manager: any,
     note?: string,
     targetShopId?: number,
+    dueDate?: string,
   ) {
     const finalShopId = targetShopId ?? order.shopId;
 
@@ -297,6 +326,27 @@ export class DuesService {
       }
     }
 
+    const dateStr = dueDate
+      ? (typeof dueDate === 'string' && dueDate.includes('T')
+          ? dueDate.split('T')[0]
+          : String(dueDate).slice(0, 10))
+      : undefined;
+    const fallbackDate = order.orderDate
+      ? (order.orderDate instanceof Date ? order.orderDate : new Date(order.orderDate))
+      : undefined;
+    const normalizedDueDate = dateStr ? new Date(`${dateStr}T00:00:00.000Z`) : fallbackDate;
+    if (normalizedDueDate && Number.isNaN(normalizedDueDate.getTime())) {
+      throw new BadRequestException('Invalid due date.');
+    }
+
+    let targetRouteId = order.routeId;
+    if (finalShopId) {
+      const shopRec = await manager.getRepository(Shop).findOne({ where: { id: finalShopId } });
+      if (shopRec && shopRec.routeId) {
+        targetRouteId = shopRec.routeId;
+      }
+    }
+
     let due = await manager.findOne(Due, {
       where: { orderId: order.id, shopId: finalShopId },
       lock: { mode: 'pessimistic_write' },
@@ -312,7 +362,7 @@ export class DuesService {
           .values({
             orderId: order.id,
             shopId: finalShopId,
-            routeId: order.routeId,
+            routeId: targetRouteId || order.routeId,
             srId: srId,
             srName: srName,
             dueAmount: dueAmount,
@@ -320,9 +370,10 @@ export class DuesService {
             remainingDue: dueAmount,
             status: DueStatus.DUE,
             note: note,
+            dueDate: normalizedDueDate,
           })
           .orUpdate(
-            ['dueAmount', 'remainingDue', 'status', 'note'],
+            ['dueAmount', 'remainingDue', 'status', 'note', 'dueDate', 'routeId'],
             ['orderId', 'shopId']
           )
           .execute();
@@ -344,8 +395,16 @@ export class DuesService {
           due.status = DueStatus.DUE;
         }
 
+        if (targetRouteId) {
+          due.routeId = targetRouteId;
+        }
         if (note) {
           due.note = note;
+        }
+        if (normalizedDueDate) {
+          due.dueDate = normalizedDueDate;
+        } else if (!due.dueDate && fallbackDate) {
+          due.dueDate = fallbackDate;
         }
         await manager.save(due);
       }
@@ -359,6 +418,7 @@ export class DuesService {
         due.remainingDue = Math.max(0, dueAmount - Number(due.paidAmount || 0));
         due.status = due.remainingDue <= 0 ? DueStatus.PAID : (due.paidAmount > 0 ? DueStatus.PARTIAL : DueStatus.DUE);
         if (note) due.note = note;
+        if (normalizedDueDate) due.dueDate = normalizedDueDate;
         await manager.save(due);
       }
     }
@@ -734,17 +794,35 @@ export class DuesService {
       .leftJoinAndSelect('order.deliveryPerson', 'deliveryPerson')
       .leftJoinAndSelect('order.company', 'orderCompany')
       .leftJoinAndSelect('due.shop', 'shop')
+      .leftJoinAndSelect('shop.route', 'shopRoute')
       .leftJoinAndSelect('due.route', 'route')
+      .leftJoinAndSelect('order.route', 'orderRoute')
       .where('due.shopId = :shopId', { shopId });
 
     if (user.role === Role.SR) {
       query.andWhere('due.srId = :userId', { userId: user.id || user.sub });
     }
 
-    const dues = await query.orderBy('due.createdAt', 'DESC').take(200).getMany();
-    return dues.map(due => ({
-      ...due,
-      deliveryManName: due.order?.assignedDeliveryMan?.name || due.order?.deliveryPerson?.name || null,
-    }));
+    const dues = await query
+      .orderBy('COALESCE(due.dueDate, due.createdAt::date)', 'DESC')
+      .take(200)
+      .getMany();
+    return dues.map(due => {
+      const resolvedRoute = due.shop?.route || due.route || due.order?.route || null;
+      return {
+        ...due,
+        route: resolvedRoute,
+        shop: due.shop
+          ? {
+              ...due.shop,
+              route: due.shop.route || resolvedRoute,
+            }
+          : null,
+        deliveryManName:
+          due.order?.assignedDeliveryMan?.name ||
+          due.order?.deliveryPerson?.name ||
+          null,
+      };
+    });
   }
 }

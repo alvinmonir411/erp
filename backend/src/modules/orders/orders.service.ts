@@ -744,12 +744,14 @@ export class OrdersService {
         Number((expectedCash - collectedAmount).toFixed(2)),
       );
 
+      const fallbackDateStr = order.orderDate ? (typeof order.orderDate === 'string' ? order.orderDate.slice(0, 10) : order.orderDate.toISOString().slice(0, 10)) : undefined;
+      const settlementDate = this.toBusinessDate(dto.settlementDate, order.orderDate);
       await m.update(Order, id, {
         actualSoldAmount: grandTotal,
         collectedAmount,
         dueAmount,
         settlementNote: dto.settlementNote,
-        settledAt: new Date(),
+        settledAt: settlementDate,
         status:
           dueAmount > 0.01 ? OrderStatus.PARTIAL_DUE : OrderStatus.SETTLED,
         isLocked: true,
@@ -763,13 +765,18 @@ export class OrdersService {
 
       if (dto.dueEntries && dto.dueEntries.length > 0) {
         // 1. Merge duplicate shop entries by summing their amounts
-        const mergedDues = new Map<number, { amount: number; note?: string }>();
+        const mergedDues = new Map<number, { amount: number; note?: string; dueDate?: string }>();
         for (const entry of dto.dueEntries) {
           const shopId = entry.shopId;
-          const current = mergedDues.get(shopId) || { amount: 0, note: entry.note };
+          const current = mergedDues.get(shopId) || {
+            amount: 0,
+            note: entry.note,
+            dueDate: entry.dueDate,
+          };
           mergedDues.set(shopId, {
             amount: current.amount + entry.amount,
             note: entry.note || current.note || dto.settlementNote,
+            dueDate: entry.dueDate || current.dueDate || dto.settlementDate || fallbackDateStr,
           });
         }
 
@@ -790,11 +797,19 @@ export class OrdersService {
             m,
             data.note,
             shopId,
+            data.dueDate || dto.settlementDate,
           );
         }
       } else {
         // Fallback to standard flow
-        await this.duesService.upsertDue(order, dueAmount, m, dto.settlementNote);
+        await this.duesService.upsertDue(
+          order,
+          dueAmount,
+          m,
+          dto.settlementNote,
+          undefined,
+          dto.settlementDate,
+        );
       }
 
       return m.findOne(Order, {
@@ -807,6 +822,19 @@ export class OrdersService {
     const result = await this.dataSource.transaction(exec);
     this.realtimeGateway.emitPayload('orderUpdated', result);
     return result;
+  }
+
+  private toBusinessDate(date?: string, fallbackOrderDate?: Date | string): Date {
+    if (!date && fallbackOrderDate) {
+      return fallbackOrderDate instanceof Date ? fallbackOrderDate : new Date(fallbackOrderDate);
+    }
+    if (!date) return new Date();
+    const [year, month, day] = date.split('-').map(Number);
+    if (!year || !month || !day) {
+      throw new BadRequestException('Invalid settlement date.');
+    }
+    // Store at noon Bangladesh time to prevent a date shift in Bangladeshi reports.
+    return new Date(Date.UTC(year, month - 1, day, 6, 0, 0));
   }
 
   // --- Helper Methods ---

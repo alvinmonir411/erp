@@ -227,6 +227,7 @@ export type Due = {
   totalDue?: number | string;
   status: string;
   note?: string | null;
+  dueDate?: string | null;
   srName?: string;
   shop?: Shop;
   order?: Order;
@@ -831,6 +832,7 @@ export type CreateManualDuePayload = {
   amount: number;
   reason: string;
   note?: string;
+  date?: string;
 };
 
 export type ManualDueResponse = {

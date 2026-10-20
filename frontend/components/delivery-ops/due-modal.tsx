@@ -17,10 +17,12 @@ import {
   ChevronRight,
   Trash2
 } from 'lucide-react';
-import { formatCurrency, formatDate, toNumber } from '@/lib/utils/format';
+import { formatCurrency, formatDate, getTodayBDDate, toNumber } from '@/lib/utils/format';
 import { getShops, createShop } from '@/lib/api/shops';
 import { useToast } from '@/components/ui/toast-provider';
 import type { Order, Shop, Route } from '@/types/api';
+
+type DraftDueEntry = { shopId: number; shopName: string; amount: number; note?: string; dueDate?: string };
 
 interface DueModalProps {
   isOpen: boolean;
@@ -28,10 +30,11 @@ interface DueModalProps {
   productName: string;
   productId: number;
   batchOrders: any[]; // DispatchBatchOrder with order relation
-  draftDues: Record<number, Array<{ shopId: number; shopName: string; amount: number; note?: string }>>;
+  draftDues: Record<number, DraftDueEntry[]>;
   route: Route;
   companyId: number;
-  onAddDraftDue: (orderId: number, dues: Array<{ shopId: number; shopName: string; amount: number; note?: string }>) => void;
+  defaultDueDate?: string;
+  onAddDraftDue: (orderId: number, dues: DraftDueEntry[]) => void;
   onSuccess: () => void;
 }
 
@@ -44,12 +47,14 @@ export function DueModal({
   draftDues,
   route,
   companyId,
+  defaultDueDate,
   onAddDraftDue,
   onSuccess
 }: DueModalProps) {
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [dueAmount, setDueAmount] = useState('');
+  const [dueDate, setDueDate] = useState(() => defaultDueDate || getTodayBDDate());
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
@@ -62,7 +67,7 @@ export function DueModal({
   const [shopSearch, setShopSearch] = useState('');
   
   // List of added dues for this order/product
-  const [orderDues, setOrderDues] = useState<Array<{ shopId: number; shopName: string; amount: number; note?: string }>>([]);
+  const [orderDues, setOrderDues] = useState<DraftDueEntry[]>([]);
 
   // New shop form
   const [newShop, setNewShop] = useState({
@@ -108,6 +113,7 @@ export function DueModal({
 
   useEffect(() => {
     if (isOpen) {
+      setDueDate(defaultDueDate || getTodayBDDate());
       if (relevantOrders.length === 1) {
         const oid = relevantOrders[0].orderId;
         setSelectedOrderId(oid);
@@ -117,6 +123,7 @@ export function DueModal({
     } else {
       setSelectedOrderId(null);
       setDueAmount('');
+      setDueDate(defaultDueDate || getTodayBDDate());
       setNote('');
       setOrderDues([]);
       setSelectedShop(null);
@@ -130,6 +137,7 @@ export function DueModal({
     setOrderDues(draftDues[oid] || []);
     setSelectedShop(null);
     setDueAmount('');
+    setDueDate(defaultDueDate || getTodayBDDate());
     setNote('');
   };
 
@@ -181,6 +189,7 @@ export function DueModal({
           ...updated[existingIndex],
           amount: updated[existingIndex].amount + amount,
           note: note ? note.trim() : updated[existingIndex].note,
+          dueDate,
         };
         return updated;
       });
@@ -188,13 +197,14 @@ export function DueModal({
     } else {
       setOrderDues(prev => [
         ...prev,
-        { shopId: selectedShop.id, shopName: selectedShop.name, amount, note: note ? note.trim() : undefined }
+        { shopId: selectedShop.id, shopName: selectedShop.name, amount, note: note ? note.trim() : undefined, dueDate }
       ]);
       showSuccessToast(`Due added for ${selectedShop.name}.`);
     }
 
     setSelectedShop(null);
     setDueAmount('');
+    setDueDate(defaultDueDate || getTodayBDDate());
     setNote('');
   };
 
@@ -403,7 +413,17 @@ export function DueModal({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Due Date */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-slate-400 px-1">Due Date</label>
+                      <input
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-cyan-600 focus:bg-white transition-all"
+                      />
+                    </div>
                     {/* Due Amount Input */}
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black uppercase text-slate-400 px-1">Due Amount</label>
