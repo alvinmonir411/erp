@@ -236,7 +236,7 @@ export function ExpensesPage() {
           </div>
 
           {/* Preset Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
             {[
               { id: 'today', label: 'Today (আজ)' },
               { id: 'yesterday', label: 'Yesterday (গতকাল)' },
@@ -250,7 +250,7 @@ export function ExpensesPage() {
               <button
                 key={p.id}
                 onClick={() => setDatePreset(p.id)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg shrink-0 whitespace-nowrap transition active:scale-95 ${
                   datePreset === p.id
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -366,7 +366,7 @@ export function ExpensesPage() {
       </div>
 
       {/* TOP 8 EXECUTIVE KPI CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* 1. Total Inventory */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition">
           <div className="flex items-center justify-between">
@@ -842,8 +842,8 @@ export function ExpensesPage() {
       {/* DETAIL TABLES & TABS SECTION */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 pb-3">
-          <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 pb-3">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 -mx-2 px-2 sm:mx-0 sm:px-0">
             {[
               { id: 'overview', label: '📊 Overview' },
               { id: 'companyProfits', label: `🏢 Company Profit (${companyProfits.list?.length || 0})` },
@@ -859,7 +859,7 @@ export function ExpensesPage() {
                   setActiveTab(tab.id as any);
                   setTableSearch('');
                 }}
-                className={`px-3 py-2 text-xs font-bold rounded-lg transition ${
+                className={`px-3 py-2 text-xs font-bold rounded-lg shrink-0 whitespace-nowrap transition active:scale-95 ${
                   activeTab === tab.id
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'

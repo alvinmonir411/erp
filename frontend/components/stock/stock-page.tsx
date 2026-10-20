@@ -285,115 +285,230 @@ export function StockPage() {
           </div>
         </div>
 
-        {/* Inventory Table */}
-        <div className="overflow-x-auto">
-          {tab === 'current' ? (
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-secondary/20 text-[10px] font-bold uppercase tracking-wider text-muted border-b border-border">
-                  <th className="px-6 py-4">Product Details</th>
-                  <th className="px-6 py-4">Company</th>
-                  <th className="px-6 py-4 text-center">Stock Level</th>
-                  <th className="px-6 py-4 text-right">Value</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {stockList.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-20 text-center text-muted text-sm font-bold">No products found in inventory.</td>
+        {/* Inventory Table (Desktop) & Cards (Mobile) */}
+        {tab === 'current' ? (
+          <>
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-secondary/20 text-[10px] font-bold uppercase tracking-wider text-muted border-b border-border">
+                    <th className="px-6 py-4">Product Details</th>
+                    <th className="px-6 py-4">Company</th>
+                    <th className="px-6 py-4 text-center">Stock Level</th>
+                    <th className="px-6 py-4 text-right">Value</th>
+                    <th className="px-6 py-4 text-center">Status</th>
                   </tr>
-                ) : (
-                  stockList.map((item, idx) => (
-                    <tr key={idx} className="group hover:bg-secondary/30 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-bold text-foreground">{item.name}</p>
-                        <p className="mt-1 text-[10px] font-bold text-muted uppercase tracking-tight">{item.sku}</p>
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-muted">
-                        {item.company?.name}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col items-center gap-1.5">
-                          <p className="text-sm font-black text-foreground">{formatNumber(item.currentStock)} {item.unit}</p>
-                          <div className="h-1.5 w-24 bg-secondary rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all ${
-                                item.currentStock <= 0 ? 'bg-rose-500 w-0' : 
-                                item.currentStock <= 10 ? 'bg-amber-500 w-1/4' : 
-                                'bg-emerald-500 w-full'
-                              }`} 
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm font-bold text-foreground">
-                        {formatCurrency(item.stockValue)}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                          item.currentStock <= 0 ? 'bg-rose-100 text-rose-700' : 
-                          item.currentStock <= 10 ? 'bg-amber-100 text-amber-700' : 
-                          'bg-emerald-100 text-emerald-700'
-                        }`}>
-                          {item.currentStock <= 0 ? 'Out of Stock' : item.currentStock <= 10 ? 'Low Stock' : 'In Stock'}
-                        </span>
-                      </td>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {stockList.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-20 text-center text-muted text-sm font-bold">No products found in inventory.</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          ) : (
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-secondary/20 text-[10px] font-bold uppercase tracking-wider text-muted border-b border-border">
-                  <th className="px-6 py-4">Movement Info</th>
-                  <th className="px-6 py-4">Product</th>
-                  <th className="px-6 py-4 text-center">Type</th>
-                  <th className="px-6 py-4 text-right">Quantity</th>
-                  <th className="px-6 py-4">Note / User</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {history.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-20 text-center text-muted text-sm font-bold">No movement history available.</td>
-                  </tr>
-                ) : (
-                  history.map((item, idx) => {
-                    const cfg = MOVEMENT_CONFIG[item.type] || { label: item.type, color: 'bg-slate-100 text-slate-600', icon: Clock };
-                    const Icon = cfg.icon;
-                    return (
+                  ) : (
+                    stockList.map((item, idx) => (
                       <tr key={idx} className="group hover:bg-secondary/30 transition-colors">
                         <td className="px-6 py-4">
-                          <p className="text-xs font-bold text-foreground">{new Date(item.createdAt).toLocaleDateString()}</p>
-                          <p className="mt-1 text-[10px] font-medium text-muted uppercase">{new Date(item.createdAt).toLocaleTimeString()}</p>
+                          <p className="text-sm font-bold text-foreground">{item.name}</p>
+                          <p className="mt-1 text-[10px] font-bold text-muted uppercase tracking-tight">{item.sku}</p>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-muted">
+                          {item.company?.name}
                         </td>
                         <td className="px-6 py-4">
-                          <p className="text-sm font-bold text-foreground">{item.product?.name}</p>
-                          <p className="mt-1 text-[10px] font-bold text-muted uppercase tracking-tight">{item.company?.name}</p>
+                          <div className="flex flex-col items-center gap-1.5">
+                            <p className="text-sm font-black text-foreground">{formatNumber(item.currentStock)} {item.unit}</p>
+                            <div className="h-1.5 w-24 bg-secondary rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${
+                                  item.currentStock <= 0 ? 'bg-rose-500 w-0' : 
+                                  item.currentStock <= 10 ? 'bg-amber-500 w-1/4' : 
+                                  'bg-emerald-500 w-full'
+                                }`} 
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm font-bold text-foreground">
+                          {formatCurrency(item.stockValue)}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${cfg.color}`}>
-                            <Icon className="h-3 w-3" /> {cfg.label}
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                            item.currentStock <= 0 ? 'bg-rose-100 text-rose-700' : 
+                            item.currentStock <= 10 ? 'bg-amber-100 text-amber-700' : 
+                            'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {item.currentStock <= 0 ? 'Out of Stock' : item.currentStock <= 10 ? 'Low Stock' : 'In Stock'}
                           </span>
                         </td>
-                        <td className={`px-6 py-4 text-right text-sm font-black ${Number(item.quantity) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {item.quantity > 0 ? '+' : ''}{item.quantity}
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-xs font-medium text-foreground max-w-[200px] truncate" title={item.note}>{item.note || 'No note'}</p>
-                          <p className="mt-1 text-[10px] font-bold text-muted uppercase tracking-tight">By {item.user || 'System'}</p>
-                        </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards Feed */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {stockList.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs font-bold">
+                  No products found in inventory.
+                </div>
+              ) : (
+                stockList.map((item, idx) => (
+                  <div key={idx} className="p-4 space-y-3 bg-white hover:bg-slate-50/50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-black text-slate-900 text-sm leading-snug">{item.name}</p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className="text-[10px] font-bold font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                            {item.sku}
+                          </span>
+                          {item.company?.name && (
+                            <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                              {item.company.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider shrink-0 ${
+                        item.currentStock <= 0 ? 'bg-rose-100 text-rose-700 border border-rose-200' : 
+                        item.currentStock <= 10 ? 'bg-amber-100 text-amber-800 border border-amber-200' : 
+                        'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}>
+                        {item.currentStock <= 0 ? 'Out of Stock' : item.currentStock <= 10 ? 'Low Stock' : 'In Stock'}
+                      </span>
+                    </div>
+
+                    {/* Stock Meter & Numbers Strip */}
+                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-slate-400 block">Available Stock</span>
+                        <span className="text-base font-black text-slate-900 mt-0.5 block">
+                          {formatNumber(item.currentStock)} <span className="text-xs text-slate-500 font-medium">{item.unit}</span>
+                        </span>
+                        <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden mt-1.5">
+                          <div 
+                            className={`h-full rounded-full transition-all ${
+                              item.currentStock <= 0 ? 'bg-rose-500 w-0' : 
+                              item.currentStock <= 10 ? 'bg-amber-500 w-1/4' : 
+                              'bg-emerald-500 w-full'
+                            }`} 
+                          />
+                        </div>
+                      </div>
+                      <div className="text-right flex flex-col justify-between">
+                        <span className="text-[10px] font-bold uppercase text-slate-400 block">Valuation</span>
+                        <span className="text-base font-black text-indigo-600 block">
+                          {formatCurrency(item.stockValue)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium block">
+                          Value in Stock
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Desktop History Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-secondary/20 text-[10px] font-bold uppercase tracking-wider text-muted border-b border-border">
+                    <th className="px-6 py-4">Movement Info</th>
+                    <th className="px-6 py-4">Product</th>
+                    <th className="px-6 py-4 text-center">Type</th>
+                    <th className="px-6 py-4 text-right">Quantity</th>
+                    <th className="px-6 py-4">Note / User</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {history.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-20 text-center text-muted text-sm font-bold">No movement history available.</td>
+                    </tr>
+                  ) : (
+                    history.map((item, idx) => {
+                      const cfg = MOVEMENT_CONFIG[item.type] || { label: item.type, color: 'bg-slate-100 text-slate-600', icon: Clock };
+                      const Icon = cfg.icon;
+                      return (
+                        <tr key={idx} className="group hover:bg-secondary/30 transition-colors">
+                          <td className="px-6 py-4">
+                            <p className="text-xs font-bold text-foreground">{new Date(item.createdAt).toLocaleDateString()}</p>
+                            <p className="mt-1 text-[10px] font-medium text-muted uppercase">{new Date(item.createdAt).toLocaleTimeString()}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-bold text-foreground">{item.product?.name}</p>
+                            <p className="mt-1 text-[10px] font-bold text-muted uppercase tracking-tight">{item.company?.name}</p>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${cfg.color}`}>
+                              <Icon className="h-3 w-3" /> {cfg.label}
+                            </span>
+                          </td>
+                          <td className={`px-6 py-4 text-right text-sm font-black ${Number(item.quantity) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {item.quantity > 0 ? '+' : ''}{item.quantity}
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-xs font-medium text-foreground max-w-[200px] truncate" title={item.note}>{item.note || 'No note'}</p>
+                            <p className="mt-1 text-[10px] font-bold text-muted uppercase tracking-tight">By {item.user || 'System'}</p>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile History Cards Feed */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {history.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs font-bold">
+                  No movement history available.
+                </div>
+              ) : (
+                history.map((item, idx) => {
+                  const cfg = MOVEMENT_CONFIG[item.type] || { label: item.type, color: 'bg-slate-100 text-slate-600', icon: Clock };
+                  const Icon = cfg.icon;
+                  const isNeg = Number(item.quantity) < 0;
+                  return (
+                    <div key={idx} className="p-4 space-y-2 bg-white hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-900 text-sm">{item.product?.name}</p>
+                          <p className="text-[10px] font-semibold text-slate-400 uppercase mt-0.5">{item.company?.name}</p>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 ${cfg.color}`}>
+                          <Icon className="h-3 w-3" /> {cfg.label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="text-[11px] text-slate-500 font-medium">
+                          {new Date(item.createdAt).toLocaleDateString()} {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <div className={`text-base font-black ${isNeg ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {item.quantity > 0 ? '+' : ''}{item.quantity}
+                        </div>
+                      </div>
+
+                      {item.note && (
+                        <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 break-words">
+                          {item.note}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Action Modal */}

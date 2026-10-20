@@ -226,14 +226,14 @@ export function AllOrdersPage() {
       {/* Main Content Area */}
       <div className="modern-card overflow-hidden no-print">
         {/* Header & Tabs */}
-        <div className="border-b border-border bg-white px-6">
-          <div className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+        <div className="border-b border-border bg-white px-3 sm:px-6">
+          <div className="flex flex-col gap-3 py-3 sm:py-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
               {tabs.map((tab) => (
                 <button
                   key={tab.value}
                   onClick={() => setActiveTab(tab.value)}
-                  className={`relative px-4 py-2 text-sm font-bold transition-all ${activeTab === tab.value
+                  className={`relative px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold shrink-0 whitespace-nowrap transition-all active:scale-95 ${activeTab === tab.value
                     ? 'text-primary'
                     : 'text-muted hover:text-foreground'
                     }`}
@@ -248,14 +248,14 @@ export function AllOrdersPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${showFilters ? 'bg-primary text-white border-primary' : 'bg-white text-muted border-border hover:bg-secondary'
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs sm:text-sm font-bold transition-all active:scale-95 ${showFilters ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-muted border-border hover:bg-secondary'
                   }`}
               >
-                <Filter className="h-4 w-4" /> Filters
+                <Filter className="h-4 w-4" /> Filters {showFilters ? '▲' : '▼'}
               </button>
               <Link
                 href="/orders/new"
-                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 rounded-xl bg-primary px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white hover:bg-primary/90 transition-all shadow-sm active:scale-95"
               >
                 <Plus className="h-4 w-4" /> New Order
               </Link>

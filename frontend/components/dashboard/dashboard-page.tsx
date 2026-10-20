@@ -280,8 +280,8 @@ export function DashboardPage() {
         </div>
 
         {/* Period Selector Tabs in Simple Bangla */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex flex-wrap rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold gap-0.5">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full py-0.5 -mx-1 px-1 sm:mx-0 sm:px-0 sm:flex-wrap">
+          <div className="inline-flex items-center gap-0.5 overflow-x-auto no-scrollbar rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold shrink-0 sm:flex-wrap">
             <button
               onClick={() => {
                 setPeriod('today');

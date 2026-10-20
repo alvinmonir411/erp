@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic';
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Providers } from "@/components/providers";
@@ -8,6 +8,14 @@ import { Analytics } from "@vercel/analytics/next";
 export const metadata: Metadata = {
   title: "Dealer ERP Admin",
   description: "Frontend for company, product, and stock management",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: "#4f46e5",
 };
 
 export default function RootLayout({

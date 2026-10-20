@@ -146,19 +146,26 @@ export function Sidebar({ isOpen, onToggle, onClose }: { isOpen: boolean, onTogg
       {/* Sidebar Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity"
           onClick={onClose}
         />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-40 w-72 transform bg-white transition-transform duration-300 ease-in-out lg:static lg:block lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} border-r border-border`}>
-        <div className="flex h-16 items-center border-b border-border px-6">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] transform bg-white shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out lg:static lg:block lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} border-r border-border`}>
+        <div className="flex h-16 items-center justify-between border-b border-border px-5">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
               <Package className="h-5 w-5" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-primary">MS Karim traders</span>
+            <span className="text-lg font-black tracking-tight text-primary">MS Karim traders</span>
           </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg lg:hidden"
+            title="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         <nav className="h-[calc(100vh-128px)] overflow-y-auto p-4 scrollbar-thin">

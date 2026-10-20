@@ -89,6 +89,18 @@ input[type="number"] {
   scrollbar-width: none;
 }
 
+/* Mobile Safe Area & Touch UX Ergonomics */
+button, a, input, select, textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Suppress browser print header/footer (removes URL, date, and 1/1 page numbering) */
 @media print {
   @page {

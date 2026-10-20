@@ -272,55 +272,63 @@ export function ShopsPage() {
 
                 return (
                   <div key={shop.id} className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition ${isEditing ? 'border-cyan-300 ring-2 ring-cyan-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-md'}`}>
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-3">
+                    <div className="p-4 sm:p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                             <p className="text-base font-bold text-slate-900">{shop.name}</p>
-                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${shop.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold ${shop.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                               {shop.isActive ? '● Active' : '○ Inactive'}
                             </span>
-                            <span className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                            <span className="rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-slate-500">
                               {shop.route?.name ?? `Route #${shop.routeId}`}
                             </span>
-                            <span className="rounded-lg bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold text-cyan-600">
+                            <span className="rounded-lg bg-cyan-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-cyan-600">
                               {shopCompany?.name ?? `Company #${shop.companyId}`}
                             </span>
-                            {isEditing && <span className="rounded-full bg-cyan-100 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-700">Editing</span>}
+                            {isEditing && <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-cyan-700">Editing</span>}
                           </div>
-                          <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-slate-400">
+                          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
                             {shop.ownerName ? <span>👤 {shop.ownerName}</span> : null}
-                            {shop.phone ? <span>📞 {shop.phone}</span> : null}
+                            {shop.phone ? <a href={`tel:${shop.phone}`} className="text-cyan-600 font-medium hover:underline">📞 {shop.phone}</a> : null}
                             {shop.address ? <span>📍 {shop.address}</span> : null}
                           </div>
                         </div>
-                        <div className="flex flex-shrink-0 items-center gap-1.5">
-                          <Link href={`/sales/shops/${shop.id}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-white">
+
+                        {/* Action buttons (Touch-friendly & full-width on mobile) */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+                          <Link href={`/sales/shops/${shop.id}`} className="flex-1 sm:flex-initial text-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white active:scale-95">
                             Ledger
                           </Link>
                           <button type="button" onClick={() => void handleToggleStatus(shop)} disabled={isToggling}
-                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition disabled:opacity-50 ${shop.isActive ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
+                            className={`flex-1 sm:flex-initial rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-95 disabled:opacity-50 ${shop.isActive ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
                             {isToggling ? '…' : shop.isActive ? 'Deactivate' : 'Activate'}
                           </button>
-                          <button type="button" onClick={() => setEditingShop(isEditing ? null : shop)}
-                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${isEditing ? 'border-cyan-300 bg-cyan-100 text-cyan-800' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'}`}>
+                          <button type="button" onClick={() => {
+                            setEditingShop(isEditing ? null : shop);
+                            const formEl = document.getElementById('shop-form-section');
+                            if (formEl) formEl.scrollIntoView({ behavior: 'smooth' });
+                          }}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-95 ${isEditing ? 'border-cyan-300 bg-cyan-100 text-cyan-800' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'}`}
+                            title="Edit Shop">
                             {isEditing ? '✕' : '✏️'}
                           </button>
                           <button type="button" onClick={() => setDeletingShop(shop)}
-                            className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100">
+                            className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 active:scale-95"
+                            title="Delete Shop">
                             🗑️
                           </button>
                         </div>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap gap-3 border-t border-slate-100 pt-3">
-                        <div className="rounded-xl bg-slate-50 px-4 py-2.5 text-center">
+                      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+                        <div className="rounded-xl bg-slate-50 px-3 py-2 text-center">
                           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Orders</p>
-                          <p className="mt-0.5 text-xl font-bold text-slate-900">{shop.totalOrders ?? 0}</p>
+                          <p className="mt-0.5 text-lg font-bold text-slate-900">{shop.totalOrders ?? 0}</p>
                         </div>
-                        <div className={`rounded-xl px-4 py-2.5 text-center ${hasDue ? 'bg-amber-50' : 'bg-emerald-50'}`}>
-                          <p className={`text-[10px] font-semibold uppercase tracking-wider ${hasDue ? 'text-amber-500' : 'text-emerald-500'}`}>Due</p>
-                          <p className={`mt-0.5 text-xl font-bold ${hasDue ? 'text-amber-800' : 'text-emerald-800'}`}>{formatCurrency(shop.totalDue ?? 0)}</p>
+                        <div className={`rounded-xl px-3 py-2 text-center ${hasDue ? 'bg-amber-50' : 'bg-emerald-50'}`}>
+                          <p className={`text-[10px] font-semibold uppercase tracking-wider ${hasDue ? 'text-amber-600' : 'text-emerald-600'}`}>Due</p>
+                          <p className={`mt-0.5 text-lg font-bold ${hasDue ? 'text-amber-800' : 'text-emerald-800'}`}>{formatCurrency(shop.totalDue ?? 0)}</p>
                         </div>
                       </div>
                     </div>
@@ -333,7 +341,7 @@ export function ShopsPage() {
           </div>
 
           {/* ── Right: Form ── */}
-          <div className="sticky top-4 h-fit">
+          <div id="shop-form-section" className="sticky top-4 h-fit scroll-mt-20">
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-4">
                 <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-slate-400">{editingShop ? 'Edit Shop' : 'Add Shop'}</p>
