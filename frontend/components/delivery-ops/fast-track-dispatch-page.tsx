@@ -446,63 +446,57 @@ export function FastTrackDispatchPage() {
   return (
     <div className="space-y-6 pb-24 max-w-[1600px] mx-auto">
       {/* Top Header & Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 shadow-xs">
-        <div className="flex items-center gap-3.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xs">
+        <div className="flex items-center gap-3">
           <Link
             href="/delivery-ops"
-            className="h-11 w-11 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 shadow-xs transition hover:bg-slate-100 hover:text-slate-900 active:scale-95"
+            className="h-10 w-10 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 shadow-xs transition hover:bg-slate-100 hover:text-slate-900 active:scale-95 shrink-0"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-cyan-50 border border-cyan-200 text-cyan-700 text-[10px] font-black uppercase tracking-wider">
-                <Zap className="h-3 w-3 fill-cyan-500 text-cyan-500" /> Fast-Track Dispatch
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold">
-                ⚡ Fast-Track Dispatch
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-50 border border-cyan-200 text-cyan-700 text-[10px] font-black uppercase tracking-wider">
+                <Zap className="h-3 w-3 fill-cyan-500 text-cyan-500" /> Fast-Track
               </span>
             </div>
-            <h1 className="mt-1 text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              Instant Order & Delivery Challan
+            <h1 className="mt-0.5 text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+              Instant Order & Challan
             </h1>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 self-start sm:self-center">
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-indigo-700 transition hover:bg-indigo-100"
-          >
-            Save Draft
-          </button>
-          {hasSavedDraft && (
+        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={handleResumeDraft}
-              className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-cyan-700 transition hover:bg-cyan-100"
+              onClick={handleSaveDraft}
+              className="rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-700 transition hover:bg-indigo-100"
             >
-              Resume Draft
+              Save Draft
             </button>
-          )}
-          {hasPreviousDispatch && (
-            <button
-              type="button"
-              onClick={handleDuplicatePrevious}
-              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-emerald-700 transition hover:bg-emerald-100"
-            >
-              Duplicate Last
-            </button>
-          )}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2 flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Today's Date</p>
-              <p className="text-xs font-black text-slate-800">{orderDate}</p>
-            </div>
-            <div className="h-8 w-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
-              <Calendar className="h-4 w-4" />
-            </div>
+            {hasSavedDraft && (
+              <button
+                type="button"
+                onClick={handleResumeDraft}
+                className="rounded-xl border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-cyan-700 transition hover:bg-cyan-100"
+              >
+                Resume
+              </button>
+            )}
+            {hasPreviousDispatch && (
+              <button
+                type="button"
+                onClick={handleDuplicatePrevious}
+                className="rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700 transition hover:bg-emerald-100"
+              >
+                Duplicate
+              </button>
+            )}
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 flex items-center gap-2 text-xs font-bold text-slate-700">
+            <Calendar className="h-3.5 w-3.5 text-indigo-600" />
+            <span>{orderDate}</span>
           </div>
         </div>
       </div>
@@ -512,51 +506,46 @@ export function FastTrackDispatchPage() {
         <div className="space-y-6">
           
           {/* 1. Delivery Setup Card */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-7 shadow-xs space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shadow-md shadow-cyan-500/20">
-                  <Truck className="h-5 w-5" />
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shadow-xs">
+                  <Truck className="h-4 w-4" />
                 </div>
-                <div>
-                  <h2 className="text-base font-black text-slate-900">
-                    1. Delivery Setup
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Select delivery date, assigned route, and delivery personnel
-                  </p>
-                </div>
+                <h2 className="text-sm sm:text-base font-black text-slate-900">
+                  1. Delivery Setup
+                </h2>
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {/* Date Input */}
-              <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <div className="space-y-1">
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-700">
                   <Calendar className="w-3.5 h-3.5 text-cyan-600" />
-                  <span>Dispatch Date</span>
+                  <span>Date</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="date"
                   value={orderDate}
                   onChange={(e) => setOrderDate(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs"
                 />
               </div>
 
               {/* Route Input */}
-              <div className="relative space-y-1.5" ref={routeRef}>
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <div className="relative space-y-1" ref={routeRef}>
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-700">
                   <MapPin className="w-3.5 h-3.5 text-cyan-600" />
-                  <span>Delivery Route</span>
+                  <span>Route</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Search or select route..."
-                    className={`w-full rounded-2xl border px-3.5 py-2.5 text-xs font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs pr-8 ${
+                    placeholder="Select route..."
+                    className={`w-full rounded-xl border px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs pr-8 ${
                       routeId ? 'border-cyan-300 bg-cyan-50/30 text-cyan-900' : 'border-slate-200 bg-slate-50/70 text-slate-800 focus:bg-white'
                     }`}
                     value={routeSearch}
@@ -605,8 +594,8 @@ export function FastTrackDispatchPage() {
               </div>
 
               {/* Delivery Personnel Select */}
-              <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <div className="space-y-1">
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-700">
                   <User className="w-3.5 h-3.5 text-cyan-600" />
                   <span>Delivery Person</span>
                   <span className="text-rose-500 font-bold">*</span>
@@ -615,7 +604,7 @@ export function FastTrackDispatchPage() {
                   <select
                     value={assignedDeliveryManId}
                     onChange={(e) => setAssignedDeliveryManId(e.target.value)}
-                    className={`w-full rounded-2xl border px-3.5 py-2.5 text-xs font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition appearance-none cursor-pointer shadow-2xs ${
+                    className={`w-full rounded-xl border px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition appearance-none cursor-pointer shadow-2xs ${
                       assignedDeliveryManId ? 'border-cyan-300 bg-cyan-50/30 text-cyan-900' : 'border-slate-200 bg-slate-50/70 text-slate-800 focus:bg-white'
                     }`}
                   >
@@ -631,16 +620,16 @@ export function FastTrackDispatchPage() {
               </div>
 
               {/* Shop Select (Optional) */}
-              <div className="relative space-y-1.5" ref={shopRef}>
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <div className="relative space-y-1" ref={shopRef}>
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-700">
                   <Store className="w-3.5 h-3.5 text-cyan-600" />
-                  <span>Specific Outlet / Shop (Optional)</span>
+                  <span>Shop (Optional)</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder={routeId ? 'Search shop / outlet...' : 'Select a route first'}
-                    className={`w-full rounded-2xl border px-3.5 py-2.5 text-xs font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs pr-8 ${
+                    placeholder={routeId ? 'Search shop...' : 'Select route first'}
+                    className={`w-full rounded-xl border px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs pr-8 ${
                       !routeId
                         ? 'bg-slate-100 cursor-not-allowed text-slate-400 border-slate-200'
                         : shopId
@@ -662,7 +651,7 @@ export function FastTrackDispatchPage() {
                 {routeId && showShopResults && (
                   <div className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1">
                     {filteredShops.filter((s) => s.name.toLowerCase().includes(shopSearch.toLowerCase())).length === 0 ? (
-                      <div className="p-3 text-center text-xs text-slate-400 font-bold">No shops found in this route</div>
+                      <div className="p-3 text-center text-xs text-slate-400 font-bold">No shops found</div>
                     ) : (
                       filteredShops
                         .filter((s) => s.name.toLowerCase().includes(shopSearch.toLowerCase()))
@@ -694,50 +683,45 @@ export function FastTrackDispatchPage() {
             </div>
 
             {/* Market Area & Dispatch Note */}
-            <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-slate-100">
-              <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+            <div className="grid gap-3 sm:grid-cols-2 pt-2 border-t border-slate-100">
+              <div className="space-y-1">
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-700">
                   <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Market Area / Location</span>
+                  <span>Area / Location</span>
                 </label>
                 <input
                   value={marketArea}
                   onChange={(e) => setMarketArea(e.target.value)}
-                  placeholder="e.g. Chawkbazar, Sadarghat..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs"
+                  placeholder="e.g. Chawkbazar..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <div className="space-y-1">
+                <label className="flex items-center gap-1 text-xs font-bold text-slate-700">
                   <FileText className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Dispatch Note / Remarks</span>
+                  <span>Note (Optional)</span>
                 </label>
                 <input
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Any special dispatch instructions..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs"
+                  placeholder="Dispatch instructions..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition shadow-2xs"
                 />
               </div>
             </div>
           </div>
 
           {/* 2. Order Items Card */}
-          <div className="rounded-3xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-            <div className="p-5 sm:p-7 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/40">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
-                  <ShoppingCart className="h-5 w-5" />
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+            <div className="p-3.5 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/40">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xs">
+                  <ShoppingCart className="h-4 w-4" />
                 </div>
-                <div>
-                  <h2 className="text-base font-black text-slate-900">
-                    2. Dispatch Items
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Add products from any company and prepare for dispatch
-                  </p>
-                </div>
+                <h2 className="text-sm sm:text-base font-black text-slate-900">
+                  2. Dispatch Items
+                </h2>
               </div>
 
               <button
