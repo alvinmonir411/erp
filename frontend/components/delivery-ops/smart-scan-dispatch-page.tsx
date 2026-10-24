@@ -32,6 +32,7 @@ import {
   FileText,
   Boxes,
   Send,
+  LogOut,
 } from 'lucide-react';
 
 import { useAuth } from '@/components/auth/auth-provider';
@@ -134,7 +135,7 @@ function playSound(type: 'success' | 'free_success' | 'warning' | 'error' = 'suc
 
 export function SmartScanDispatchPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const isDeliveryMan = user?.role === Role.DELIVERY_MAN;
   const { error: showErrorToast, success: showSuccessToast } = useToast();
 
@@ -973,6 +974,23 @@ export function SmartScanDispatchPage() {
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>রিসেট</span>
+              </button>
+            )}
+
+            {/* Logout Button */}
+            {isDeliveryMan && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('আপনি কি নিশ্চিত যে লগআউট করতে চান?')) {
+                    logout();
+                  }
+                }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs transition cursor-pointer shadow-md border border-rose-400/40"
+                title="লগআউট করুন"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>লগআউট</span>
               </button>
             )}
           </div>

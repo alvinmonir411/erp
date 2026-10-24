@@ -729,150 +729,213 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
     <div className="min-h-screen bg-slate-50 pb-28 md:pb-12 font-sans text-slate-800 antialiased">
       {/* ── TOP APP BAR (Real Batch Bar matching Reference Screen 1, 2, 3, 8, 9, 10) ── */}
       <div className="sticky top-0 lg:relative z-30 bg-[#0260e8] text-white shadow-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5">
-          <div className="flex items-center gap-3">
-            {selectedShopForDelivery ? (
+        <div className="mx-auto max-w-5xl px-3 sm:px-4 py-2.5 sm:py-3 space-y-2">
+          {/* Main Top Row: Left Title + Right Action Controls */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              {selectedShopForDelivery ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedShopForDelivery(null)}
+                  className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white active:scale-95 transition cursor-pointer"
+                  title="ফিরে যান"
+                >
+                  <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 rotate-180" />
+                </button>
+              ) : (
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
+                  <Truck className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <h1 className="text-sm sm:text-lg font-black tracking-tight leading-tight truncate">
+                  {selectedShopForDelivery
+                    ? 'দোকান বিবরণ ও ডেলিভারি'
+                    : currentTab === 'home'
+                    ? 'ডেলিভারি ম্যান প্যানেল'
+                    : currentTab === 'shops'
+                    ? `সকল দোকান ও রুট (${totalShopsCount})`
+                    : currentTab === 'collection'
+                    ? 'টাকা আদায় (Collection)'
+                    : currentTab === 'returns'
+                    ? 'ফেরত ও ড্যামেজ'
+                    : 'দিনের জমার হিসাব ও সেটেলমেন্ট'}
+                </h1>
+                <p className="text-[10px] sm:text-[11px] font-medium text-blue-100 opacity-90 truncate">
+                  {activeBatch?.dispatchDate ? String(activeBatch.dispatchDate).split('T')[0] : getTodayBDDate()} • {activeBatch?.route?.name || 'সকল রুট'}
+                </p>
+              </div>
+            </div>
+
+            {/* Right Side Buttons - Perfectly sized to fit on every screen width */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Batch Selector Dropdown (Desktop: Inline) */}
+              {batches.length > 1 && (
+                <div className="hidden sm:block relative">
+                  <select
+                    value={activeBatch?.id || ''}
+                    onChange={(e) => handleSelectBatch(Number(e.target.value))}
+                    className="rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white border border-white/25 outline-none cursor-pointer max-w-[170px] truncate"
+                    title="তারিখ ও রুট নির্বাচন করুন"
+                  >
+                    {batches.map((b) => {
+                      const dateStr = b.dispatchDate ? String(b.dispatchDate).split('T')[0] : '';
+                      const routeName = b.route?.name || 'রুট';
+                      return (
+                        <option key={b.id} value={b.id} className="text-slate-800">
+                          {dateStr} • {routeName}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+
+              {/* Reload Button */}
               <button
                 type="button"
-                onClick={() => setSelectedShopForDelivery(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white active:scale-95 transition cursor-pointer"
+                onClick={() => void loadData()}
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 text-white transition active:scale-95 cursor-pointer shrink-0"
+                title="রিলোড করুন"
               >
-                <ArrowRight className="h-5 w-5 rotate-180" />
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
-            ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white">
-                <Truck className="h-5 w-5" />
-              </div>
-            )}
-            <div>
-              <h1 className="text-base sm:text-lg font-black tracking-tight leading-snug">
-                {selectedShopForDelivery
-                  ? 'দোকান বিবরণ ও ডেলিভারি'
-                  : currentTab === 'home'
-                  ? 'ডেলিভারি ম্যান প্যানেল'
-                  : currentTab === 'shops'
-                  ? `সকল দোকান ও রুট (${totalShopsCount})`
-                  : currentTab === 'collection'
-                  ? 'টাকা আদায় (Collection)'
-                  : currentTab === 'returns'
-                  ? 'ফেরত ও ড্যামেজ'
-                  : 'দিনের জমার হিসাব ও সেটেলমেন্ট'}
-              </h1>
-              <p className="text-[11px] font-medium text-blue-100 opacity-90 truncate">
-                {activeBatch?.dispatchDate ? String(activeBatch.dispatchDate).split('T')[0] : getTodayBDDate()} • {activeBatch?.route?.name || 'সকল রুট'}
-              </p>
+
+              {/* Profile Icon Button */}
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 text-white transition active:scale-95 cursor-pointer shrink-0"
+                title="প্রোফাইল বিবরণ"
+              >
+                <User className="h-3.5 w-3.5" />
+              </button>
+
+              {/* High-Visibility Red Logout Button - ALWAYS VISIBLE */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('আপনি কি নিশ্চিত যে লগআউট করতে চান?')) {
+                    logout();
+                  }
+                }}
+                className="flex h-8 items-center gap-1 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs transition cursor-pointer shadow-md border border-rose-400/40 shrink-0"
+                title="লগআউট করুন"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="text-[11px] font-black">লগআউট</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Batch Selector Dropdown if multiple batches exist */}
-            {batches.length > 1 && (
-              <div className="relative">
-                <select
-                  value={activeBatch?.id || ''}
-                  onChange={(e) => handleSelectBatch(Number(e.target.value))}
-                  className="rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white border border-white/25 outline-none cursor-pointer max-w-[150px] sm:max-w-[210px] truncate"
-                  title="তারিখ ও রুট নির্বাচন করুন"
-                >
-                  {batches.map((b) => {
-                    const dateStr = b.dispatchDate ? String(b.dispatchDate).split('T')[0] : '';
-                    const routeName = b.route?.name || 'রুট';
-                    return (
-                      <option key={b.id} value={b.id} className="text-slate-800">
-                        {dateStr} • {routeName}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => void loadData()}
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 text-white transition active:scale-95 cursor-pointer"
-              title="রিলোড করুন"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
-
-            {/* Profile Icon Button */}
-            <button
-              type="button"
-              onClick={() => setShowProfileModal(true)}
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 text-white transition active:scale-95 cursor-pointer"
-              title="প্রোফাইল বিবরণ"
-            >
-              <User className="h-4 w-4" />
-            </button>
-          </div>
+          {/* Mobile Batch Selector Bar (when multiple batches exist: placed on sleek sub-row so it NEVER pushes buttons) */}
+          {batches.length > 1 && (
+            <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/15 sm:hidden">
+              <span className="text-[10px] font-bold text-blue-100 flex items-center gap-1">
+                <Truck className="h-3 w-3" />
+                রুট / চালান পরিবর্তন:
+              </span>
+              <select
+                value={activeBatch?.id || ''}
+                onChange={(e) => handleSelectBatch(Number(e.target.value))}
+                className="rounded-lg bg-white/20 px-2 py-0.5 text-[11px] font-bold text-white border border-white/25 outline-none cursor-pointer max-w-[200px] truncate"
+                title="তারিখ ও রুট নির্বাচন করুন"
+              >
+                {batches.map((b) => {
+                  const dateStr = b.dispatchDate ? String(b.dispatchDate).split('T')[0] : '';
+                  const routeName = b.route?.name || 'রুট';
+                  return (
+                    <option key={b.id} value={b.id} className="text-slate-800">
+                      {dateStr} • {routeName}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Desktop View Top Menu Tabs (Hidden on mobile) */}
-        <div className="hidden md:flex mx-auto max-w-5xl border-t border-white/15 px-4">
-          <button
-            type="button"
-            onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('home'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
-              currentTab === 'home' && !selectedShopForDelivery
-                ? 'border-white text-white'
-                : 'border-transparent text-blue-100 hover:text-white'
-            }`}
-          >
-            <Home className="h-4 w-4" />
-            <span>হোম ড্যাশবোর্ড</span>
-          </button>
+        <div className="hidden md:flex mx-auto max-w-5xl border-t border-white/15 px-4 items-center justify-between">
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('home'); }}
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
+                currentTab === 'home' && !selectedShopForDelivery
+                  ? 'border-white text-white'
+                  : 'border-transparent text-blue-100 hover:text-white'
+              }`}
+            >
+              <Home className="h-4 w-4" />
+              <span>হোম ড্যাশবোর্ড</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('shops'); }}
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
+                currentTab === 'shops'
+                  ? 'border-white text-white'
+                  : 'border-transparent text-blue-100 hover:text-white'
+              }`}
+            >
+              <Store className="h-4 w-4" />
+              <span>সকল দোকান ({totalShopsCount})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('collection'); }}
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
+                currentTab === 'collection'
+                  ? 'border-white text-white'
+                  : 'border-transparent text-blue-100 hover:text-white'
+              }`}
+            >
+              <DollarSign className="h-4 w-4" />
+              <span>টাকা আদায়</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('returns'); }}
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
+                currentTab === 'returns'
+                  ? 'border-white text-white'
+                  : 'border-transparent text-blue-100 hover:text-white'
+              }`}
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>ফেরত ও ড্যামেজ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('settlement'); }}
+              className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
+                currentTab === 'settlement'
+                  ? 'border-white text-white'
+                  : 'border-transparent text-blue-100 hover:text-white'
+              }`}
+            >
+              <Receipt className="h-4 w-4" />
+              <span>হিসাব জমা</span>
+            </button>
+          </div>
 
           <button
             type="button"
-            onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('shops'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
-              currentTab === 'shops'
-                ? 'border-white text-white'
-                : 'border-transparent text-blue-100 hover:text-white'
-            }`}
+            onClick={() => {
+              if (window.confirm('আপনি কি নিশ্চিত যে লগআউট করতে চান?')) {
+                logout();
+              }
+            }}
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-rose-500/80 hover:bg-rose-600 text-white text-xs font-bold transition active:scale-95 cursor-pointer shadow-xs border border-rose-400/40"
+            title="লগআউট করুন"
           >
-            <Store className="h-4 w-4" />
-            <span>সকল দোকান ({totalShopsCount})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('collection'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
-              currentTab === 'collection'
-                ? 'border-white text-white'
-                : 'border-transparent text-blue-100 hover:text-white'
-            }`}
-          >
-            <DollarSign className="h-4 w-4" />
-            <span>টাকা আদায়</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('returns'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
-              currentTab === 'returns'
-                ? 'border-white text-white'
-                : 'border-transparent text-blue-100 hover:text-white'
-            }`}
-          >
-            <RotateCcw className="h-4 w-4" />
-            <span>ফেরত ও ড্যামেজ</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('settlement'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
-              currentTab === 'settlement'
-                ? 'border-white text-white'
-                : 'border-transparent text-blue-100 hover:text-white'
-            }`}
-          >
-            <Receipt className="h-4 w-4" />
-            <span>হিসাব জমা</span>
+            <LogOut className="h-3.5 w-3.5" />
+            <span>লগআউট</span>
           </button>
         </div>
       </div>
@@ -1081,6 +1144,35 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                ══════════════════════════════════════════════════════════════ */}
             {currentTab === 'home' && (
               <div className="space-y-3 animate-in fade-in">
+                {/* Mobile Delivery Man User & Logout Quick Action Card */}
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200/90 bg-white p-3 shadow-xs md:hidden">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white font-bold shadow-xs">
+                      <User className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black text-slate-900 leading-tight truncate">
+                        {user?.name || user?.username || 'ডেলিভারি ম্যান'}
+                      </div>
+                      <div className="text-[10px] text-blue-600 font-bold truncate">
+                        @{user?.username || 'delivery'} • {activeBatch?.route?.name || 'রুট'}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('আপনি কি নিশ্চিত যে লগআউট করতে চান?')) {
+                        logout();
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs shadow-xs transition shrink-0 cursor-pointer"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    <span>লগআউট</span>
+                  </button>
+                </div>
+
                 {/* Real Dispatch Info Card */}
                 <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs">
                   <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
@@ -1943,6 +2035,20 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   >
                     <Send className="h-4 w-4" />
                     <span>{isSubmitting ? 'জমা সম্পন্ন হচ্ছে...' : 'জমা নিশ্চিত করুন'}</span>
+                  </button>
+
+                  {/* End of Day Logout Action */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('আপনি কি নিশ্চিত যে লগআউট করতে চান?')) {
+                        logout();
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 hover:bg-rose-100 active:scale-98 text-rose-700 font-black py-3 text-xs transition cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>দিনের কাজ শেষ? লগআউট করুন</span>
                   </button>
                 </div>
               </div>
