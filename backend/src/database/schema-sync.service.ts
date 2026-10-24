@@ -26,6 +26,10 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       this.logger.log('Ensuring products table columns exist...');
       await this.dataSource.query(`
         ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "currentStock" DECIMAL(12,2) DEFAULT 0;
+        ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "defaultCartonSize" DECIMAL(10,2) DEFAULT 1;
+        ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "freeSchemeBuyQty" DECIMAL(10,2) DEFAULT 0;
+        ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "freeSchemeFreeQty" DECIMAL(10,2) DEFAULT 0;
+        ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "cartonBarcodePrefix" VARCHAR(50);
         ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "version" INTEGER DEFAULT 1;
         ALTER TABLE "products" ALTER COLUMN "buyPrice" TYPE NUMERIC(14, 5);
         ALTER TABLE "products" ALTER COLUMN "salePrice" TYPE NUMERIC(14, 5);
@@ -637,6 +641,35 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       `);
     } catch (e) {
       this.logger.error('Failed to sync recycle_bin table:', e.message);
+    }
+
+    // 19. Sync carton_labels table and dispatch_batches oldDueCollectedAmount
+    try {
+      this.logger.log('Ensuring carton_labels table exists...');
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS "carton_labels" (
+          "id" SERIAL PRIMARY KEY,
+          "cartonCode" VARCHAR(100) NOT NULL UNIQUE,
+          "productId" INTEGER NOT NULL,
+          "companyId" INTEGER,
+          "packSize" NUMERIC(10, 2) DEFAULT 1,
+          "status" VARCHAR(50) DEFAULT 'AVAILABLE',
+          "currentBatchId" INTEGER,
+          "printedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          "scannedAt" TIMESTAMP WITH TIME ZONE,
+          "notes" TEXT,
+          "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS "idx_carton_labels_code" ON "carton_labels" ("cartonCode");
+        CREATE INDEX IF NOT EXISTS "idx_carton_labels_prod_status" ON "carton_labels" ("productId", "status");
+        CREATE INDEX IF NOT EXISTS "idx_carton_labels_batch" ON "carton_labels" ("currentBatchId");
+
+        ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "oldDueCollectedAmount" DECIMAL(12,2) DEFAULT 0;
+      `);
+    } catch (e) {
+      this.logger.error('Failed to sync carton_labels table:', e.message);
     }
 
       this.logger.log('--- DEFENSIVE SCHEMA SYNC COMPLETED ---');

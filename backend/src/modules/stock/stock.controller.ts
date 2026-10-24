@@ -10,7 +10,7 @@ import { Role } from '../../common/enums/role.enum';
 
 @Controller('stock')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+@Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 

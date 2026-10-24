@@ -61,6 +61,36 @@ export class Product {
   })
   currentStock: number;
 
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 1,
+    transformer: numericColumnTransformer,
+  })
+  defaultCartonSize: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: numericColumnTransformer,
+  })
+  freeSchemeBuyQty: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: numericColumnTransformer,
+  })
+  freeSchemeFreeQty: number;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  cartonBarcodePrefix?: string;
+
   @Column({ default: true })
   isActive: boolean;
 

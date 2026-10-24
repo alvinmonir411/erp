@@ -44,4 +44,23 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  defaultCartonSize?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  freeSchemeBuyQty?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  freeSchemeFreeQty?: number;
+
+  @IsOptional()
+  @IsString()
+  cartonBarcodePrefix?: string;
 }

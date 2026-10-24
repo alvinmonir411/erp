@@ -13,7 +13,7 @@ export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Post('manual-due')
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
   addManualDue(@Body() dto: CreateManualDueDto, @CurrentUser() user: any) {
     return this.salesService.addManualDue(dto, user);
   }

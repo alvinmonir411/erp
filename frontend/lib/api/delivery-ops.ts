@@ -81,6 +81,7 @@ export type SettlementPayload = {
   }[];
   vanRent?: number;
   salary?: number;
+  oldDueCollectedAmount?: number;
   customExpenses?: CustomExpenseItemPayload[];
   actualCashReceived?: number;
 };

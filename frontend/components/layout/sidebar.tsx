@@ -58,6 +58,7 @@ const navigation = [
     items: [
       { href: '/expenses', label: 'Business Analytics', icon: TrendingUp },
       { href: '/delivery-ops', label: 'Delivery Summary', icon: FileText },
+      { href: '/delivery-ops/scan-dispatch', label: 'কার্টুন স্ক্যান ও লোডিং', icon: Truck },
     ]
   },
   {

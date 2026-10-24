@@ -31,13 +31,13 @@ export class CompaniesController {
     return this.companiesService.create(createCompanyDto);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
   @Get()
   findAll(@Query() query: QueryCompaniesDto) {
     return this.companiesService.findAll(query);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.companiesService.findOne(id);

@@ -141,6 +141,15 @@ export class DispatchBatch {
     default: 0,
     transformer: new ColumnNumericTransformer(),
   })
+  oldDueCollectedAmount: number;
+
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
   shortageOrExcess: number;
 
   @Column({

@@ -1491,13 +1491,13 @@ export class DeliveryOpsService {
         (vanRent + salary + customExpensesTotal).toFixed(2),
       );
 
-      // Validate totalExpenses against Gross Cash Collectable across all orders
-      const grossCashCollectable = totalExpectedCash;
-      if (totalExpenses > grossCashCollectable + 0.01) {
-        throw new BadRequestException(
-          `Total Expenses (${totalExpenses}) cannot exceed Gross Cash Collectable (${grossCashCollectable})`,
-        );
-      }
+      const oldDueCollected = Math.max(0, Number(dto.oldDueCollectedAmount || 0));
+
+      // Gross cash collectable = (Total Sold Value - Today's Credit Dues) + Old Dues Collected
+      const grossCashCollectable = Math.max(
+        0,
+        Number((totalFinalValue - totalDueAmount + oldDueCollected).toFixed(2)),
+      );
 
       const netExpectedCash = Math.max(
         0,
@@ -1547,12 +1547,13 @@ export class DeliveryOpsService {
         totalCollectedAmount: finalCashCollectable,
         finalSoldValue: totalFinalValue,
         totalDueAmount: finalDueBaki,
+        oldDueCollectedAmount: oldDueCollected,
         vanRent,
         salary,
         totalExpenses,
         shortageOrExcess: cashDiscrepancy,
         settlementNote:
-          `${dto.note || ''} [Expenses: VanRent=${vanRent}, Salary=${salary}, Custom=${customExpensesTotal}, Total=${totalExpenses} | NetExpectedCash=${netExpectedCash}, Actual=${actualCashReceived}]`.trim(),
+          `${dto.note || ''} [Expenses: VanRent=${vanRent}, Salary=${salary}, Custom=${customExpensesTotal}, Total=${totalExpenses} | OldDueCollected=${oldDueCollected} | NetExpectedCash=${netExpectedCash}, Actual=${actualCashReceived}]`.trim(),
       });
 
       return this.getDispatchBatch(id);

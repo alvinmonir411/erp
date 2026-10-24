@@ -45,6 +45,10 @@ export type Product = {
   buyPrice: number;
   salePrice: number;
   currentStock: number;
+  defaultCartonSize?: number;
+  freeSchemeBuyQty?: number;
+  freeSchemeFreeQty?: number;
+  cartonBarcodePrefix?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -59,6 +63,10 @@ export type CreateProductPayload = {
   buyPrice: number;
   salePrice: number;
   isActive?: boolean;
+  defaultCartonSize?: number;
+  freeSchemeBuyQty?: number;
+  freeSchemeFreeQty?: number;
+  cartonBarcodePrefix?: string;
 };
 
 export type UpdateProductPayload = Partial<CreateProductPayload>;
@@ -415,6 +423,7 @@ export type DispatchBatch = {
   totalAdvancePaid: number | string;
   totalCollectedAmount: number | string;
   totalDueAmount: number | string;
+  oldDueCollectedAmount?: number | string;
   shortageOrExcess: number | string;
   vanRent?: number | string;
   salary?: number | string;

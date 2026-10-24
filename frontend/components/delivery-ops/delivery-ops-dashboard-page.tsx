@@ -12,7 +12,7 @@ import { getDeliveryDashboard, getDispatchBatches, deleteDispatchBatch } from '@
 import { useCompanies, useRoutes } from '@/hooks/use-common-queries';
 import { batchStatusConfig, StatusBadge } from './delivery-ops-ui';
 import type { DispatchBatch } from '@/types/api';
-import { AlertCircle, ArrowUpRight, BarChart3, CheckCircle, CheckCircle2, CheckCircle2Icon, ClipboardList, DollarSign, Filter, HandCoins, History, MapPin, Package, Plus, Search, TrendingUp, Truck, Undo2, Wallet, ArrowLeft, LogOut, User, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, BarChart3, CheckCircle, CheckCircle2, CheckCircle2Icon, ClipboardList, DollarSign, Filter, HandCoins, History, MapPin, Package, Plus, Search, TrendingUp, Truck, Undo2, Wallet, ArrowLeft, LogOut, User, Trash2, Scan } from 'lucide-react';
 
 
 
@@ -163,6 +163,12 @@ export function DeliveryOpsDashboardPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
+          <Link 
+            href="/delivery-ops/scan-dispatch" 
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+          >
+            <Scan className="h-3.5 w-3.5" /> কার্টুন স্ক্যান ও লোডিং
+          </Link>
           <Link 
             href="/delivery-ops/fast-track" 
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-black uppercase tracking-wider hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95"

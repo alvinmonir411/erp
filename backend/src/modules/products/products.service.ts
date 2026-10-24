@@ -10,6 +10,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { QueryProductsDto } from './dto/query-products.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
+import { CartonLabel, CartonStatus } from './entities/carton-label.entity';
 
 @Injectable()
 export class ProductsService {
@@ -18,6 +19,8 @@ export class ProductsService {
     private readonly productsRepository: Repository<Product>,
     @InjectRepository(Company)
     private readonly companiesRepository: Repository<Company>,
+    @InjectRepository(CartonLabel)
+    private readonly cartonLabelsRepository: Repository<CartonLabel>,
   ) {}
 
   async create(createProductDto: CreateProductDto) {
@@ -243,6 +246,182 @@ export class ProductsService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Generate N unique carton barcode labels for a product
+   */
+  async generateCartonLabels(dto: {
+    productId: number;
+    packSize?: number;
+    count: number;
+    prefix?: string;
+  }) {
+    const product = await this.findOne(dto.productId);
+    const count = Math.min(Math.max(1, dto.count || 1), 500); // Between 1 and 500
+    const packSize = Number(dto.packSize || product.defaultCartonSize || 1);
+
+    const labelsToInsert: CartonLabel[] = [];
+    const timestampPart = Date.now().toString(36).toUpperCase();
+
+    for (let i = 1; i <= count; i++) {
+      const seq = i.toString().padStart(3, '0');
+      const cartonCode = `CRT-P${product.id}-${timestampPart}-${seq}`;
+
+      labelsToInsert.push(
+        this.cartonLabelsRepository.create({
+          cartonCode,
+          productId: product.id,
+          companyId: product.companyId,
+          packSize,
+          status: CartonStatus.AVAILABLE,
+          printedAt: new Date(),
+        }),
+      );
+    }
+
+    const savedLabels = await this.cartonLabelsRepository.save(labelsToInsert);
+    return {
+      success: true,
+      count: savedLabels.length,
+      product: {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        companyName: product.company?.name || '',
+      },
+      labels: savedLabels,
+    };
+  }
+
+  async getCartonLabels(query: {
+    productId?: number;
+    status?: CartonStatus;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const qb = this.cartonLabelsRepository
+      .createQueryBuilder('label')
+      .leftJoinAndSelect('label.product', 'product')
+      .leftJoinAndSelect('product.company', 'company')
+      .orderBy('label.createdAt', 'DESC');
+
+    if (query.productId) {
+      qb.andWhere('label.productId = :productId', { productId: query.productId });
+    }
+
+    if (query.status) {
+      qb.andWhere('label.status = :status', { status: query.status });
+    }
+
+    if (query.search) {
+      qb.andWhere(
+        '(label.cartonCode ILIKE :search OR product.name ILIKE :search OR product.sku ILIKE :search)',
+        { search: `%${query.search.trim()}%` },
+      );
+    }
+
+    qb.skip(query.offset || 0);
+    qb.take(query.limit || 100);
+
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total };
+  }
+
+  /**
+   * Scan a carton code or fallback barcode for instant loading verification
+   */
+  async scanCarton(cartonCode: string, batchId?: number) {
+    if (!cartonCode || !cartonCode.trim()) {
+      throw new ConflictException('Barcode cannot be empty');
+    }
+
+    const cleanCode = cartonCode.trim();
+
+    // 1. First, search exact unique carton_labels
+    const label = await this.cartonLabelsRepository.findOne({
+      where: { cartonCode: cleanCode },
+      relations: ['product', 'product.company'],
+    });
+
+    if (label && label.product) {
+      const isAlreadyScanned =
+        Boolean(batchId) &&
+        label.currentBatchId === Number(batchId) &&
+        label.status === CartonStatus.LOADED;
+
+      return {
+        found: true,
+        type: 'CARTON_LABEL',
+        carton: label,
+        product: label.product,
+        packSize: Number(label.packSize || label.product.defaultCartonSize || 1),
+        isAlreadyScanned,
+      };
+    }
+
+    // 2. Fallback: Search product by SKU, ID, or cartonBarcodePrefix
+    const productQb = this.productsRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.company', 'company')
+      .where('product.isActive = true');
+
+    if (!isNaN(Number(cleanCode))) {
+      productQb.andWhere(
+        '(product.id = :idNum OR product.sku = :code OR product.cartonBarcodePrefix = :code)',
+        { idNum: Number(cleanCode), code: cleanCode },
+      );
+    } else {
+      productQb.andWhere(
+        '(product.sku = :code OR product.cartonBarcodePrefix = :code)',
+        { code: cleanCode },
+      );
+    }
+
+    const matchedProduct = await productQb.getOne();
+
+    if (matchedProduct) {
+      return {
+        found: true,
+        type: 'PRODUCT_FALLBACK',
+        carton: null,
+        product: matchedProduct,
+        packSize: Number(matchedProduct.defaultCartonSize || 1),
+        isAlreadyScanned: false,
+      };
+    }
+
+    return {
+      found: false,
+      message: `বারকোড বা কার্টুন "${cleanCode}" পাওয়া যায়নি`,
+    };
+  }
+
+  async updatePackaging(
+    id: number,
+    dto: {
+      defaultCartonSize?: number;
+      freeSchemeBuyQty?: number;
+      freeSchemeFreeQty?: number;
+      cartonBarcodePrefix?: string;
+    },
+  ) {
+    const product = await this.findOne(id);
+    if (dto.defaultCartonSize !== undefined) {
+      product.defaultCartonSize = Math.max(1, Number(dto.defaultCartonSize));
+    }
+    if (dto.freeSchemeBuyQty !== undefined) {
+      product.freeSchemeBuyQty = Math.max(0, Number(dto.freeSchemeBuyQty));
+    }
+    if (dto.freeSchemeFreeQty !== undefined) {
+      product.freeSchemeFreeQty = Math.max(0, Number(dto.freeSchemeFreeQty));
+    }
+    if (dto.cartonBarcodePrefix !== undefined) {
+      product.cartonBarcodePrefix = dto.cartonBarcodePrefix.trim() || undefined;
+    }
+
+    return this.productsRepository.save(product);
   }
 
   private async ensureCompanyExists(companyId: number) {

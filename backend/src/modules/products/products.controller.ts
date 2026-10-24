@@ -38,7 +38,7 @@ export class ProductsController {
     return this.productsService.create(createProductDto);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
   @Get()
   async findAll(@Query() query: QueryProductsDto) {
     const cacheKey = `products_list_${JSON.stringify(query)}`;
@@ -50,7 +50,7 @@ export class ProductsController {
     return data;
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
   @Get('summary')
   async getSummary(@Query('companyId') companyId?: number) {
     const cacheKey = `products_summary_${companyId ?? 'all'}`;
@@ -62,7 +62,35 @@ export class ProductsController {
     return data;
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Post('carton-labels/generate')
+  async generateCartonLabels(
+    @Body()
+    dto: {
+      productId: number;
+      packSize?: number;
+      count: number;
+      prefix?: string;
+    },
+  ) {
+    return this.productsService.generateCartonLabels(dto);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
+  @Get('carton-labels/list')
+  async getCartonLabels(@Query() query: any) {
+    return this.productsService.getCartonLabels(query);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN, Role.SR)
+  @Post('carton/scan')
+  async scanCarton(
+    @Body() dto: { cartonCode: string; currentBatchId?: number },
+  ) {
+    return this.productsService.scanCarton(dto.cartonCode, dto.currentBatchId);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.findOne(id);
@@ -76,6 +104,22 @@ export class ProductsController {
   ) {
     await this.cacheManager.clear();
     return this.productsService.update(id, updateProductDto);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Patch(':id/packaging')
+  async updatePackaging(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    dto: {
+      defaultCartonSize?: number;
+      freeSchemeBuyQty?: number;
+      freeSchemeFreeQty?: number;
+      cartonBarcodePrefix?: string;
+    },
+  ) {
+    await this.cacheManager.clear();
+    return this.productsService.updatePackaging(id, dto);
   }
 
   @Roles(Role.SUPER_ADMIN)

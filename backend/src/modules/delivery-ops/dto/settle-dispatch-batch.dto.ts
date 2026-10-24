@@ -112,6 +112,11 @@ export class SettleDispatchBatchDto {
   @Type(() => Number)
   salary?: number;
 
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  oldDueCollectedAmount?: number;
+
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })

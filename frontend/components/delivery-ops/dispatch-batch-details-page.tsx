@@ -73,6 +73,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
   const [draftDues, setDraftDues] = useState<Record<string, Array<{ shopId: number; shopName: string; amount: number; note?: string; dueDate?: string }>>>({});
   const [dueModalProduct, setDueModalProduct] = useState<{ id: number; name: string } | null>(null);
   const [actualCashReceived, setActualCashReceived] = useState<string>('');
+  const [oldDueCollected, setOldDueCollected] = useState<string>('');
   const [vanRent, setVanRent] = useState<string>('');
   const [salary, setSalary] = useState<string>('');
   const [customExpenses, setCustomExpenses] = useState<Array<{
@@ -318,6 +319,9 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
       setBatch(data);
       if (data.vanRent) setVanRent(String(data.vanRent));
       if (data.salary) setSalary(String(data.salary));
+      if (data.oldDueCollectedAmount !== undefined && data.oldDueCollectedAmount !== null) {
+        setOldDueCollected(String(data.oldDueCollectedAmount));
+      }
       if (data.expenses && Array.isArray(data.expenses)) {
         setCustomExpenses(
           data.expenses.map((e: any) => ({
@@ -396,9 +400,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
 
   const vanRentVal = Math.max(0, Number(vanRent || 0));
   const salaryVal = Math.max(0, Number(salary || 0));
+  const oldDueCollectedVal = Math.max(0, Number(oldDueCollected || 0));
   const customExpensesTotalVal = customExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const totalExpensesVal = vanRentVal + salaryVal + customExpensesTotalVal;
-  const netExpectedCashFromDeliveryMan = Math.max(0, currentCashCollectable - totalExpensesVal);
+  const netExpectedCashFromDeliveryMan = Math.max(0, currentCashCollectable + oldDueCollectedVal - totalExpensesVal);
 
   // Auto-fill actual cash received dynamically whenever netExpectedCashFromDeliveryMan updates,
   // unless admin has explicitly typed a custom amount manually.
@@ -641,6 +646,7 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
         dueEntries: dueEntries.length > 0 ? dueEntries : undefined,
         vanRent: vanRentNum,
         salary: salaryNum,
+        oldDueCollectedAmount: oldDueCollectedVal,
         customExpenses: validExpenses.length > 0 ? validExpenses : undefined,
         actualCashReceived: Number(actualCashReceived),
         settlementDate: batch.dispatchDate ? (typeof batch.dispatchDate === 'string' ? batch.dispatchDate.slice(0, 10) : new Date(batch.dispatchDate).toISOString().slice(0, 10)) : undefined
@@ -1427,6 +1433,26 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                     <span className="text-slate-900 font-black">{formatCurrency(currentCashCollectable)}</span>
                   </div>
 
+                  {/* Old Due Collected Section */}
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-black uppercase tracking-wider text-blue-900">
+                        আগের বাকি আদায় (Old Due Collected)
+                      </label>
+                      <span className="text-xs font-bold text-blue-700">{formatCurrency(oldDueCollectedVal)}</span>
+                    </div>
+                    <p className="text-[11px] text-blue-600">
+                      দোকানদার যদি পূর্বের কোনো বকেয়া টাকা ডেলিভারি ম্যানের কাছে পরিশোধ করে থাকেন, তা এখানে লিখুন।
+                    </p>
+                    <input
+                      type="number"
+                      value={oldDueCollected}
+                      onChange={(e) => setOldDueCollected(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-base font-bold text-slate-900 outline-none focus:border-blue-600 shadow-xs"
+                    />
+                  </div>
+
                   {/* Expense Entry Section */}
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-200 pb-2">
@@ -1535,6 +1561,12 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                       <span>= Gross Cash Collectable</span>
                       <span>{formatCurrency(currentCashCollectable)}</span>
                     </div>
+                    {oldDueCollectedVal > 0 && (
+                      <div className="flex justify-between items-center text-xs font-medium text-blue-400">
+                        <span>(+) Old Due Collected (পুরোনো বাকি আদায়)</span>
+                        <span>+ {formatCurrency(oldDueCollectedVal)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-xs font-medium text-rose-400">
                       <span>(-) Total Daily Expenses</span>
                       <span>- {formatCurrency(totalExpensesVal)}</span>

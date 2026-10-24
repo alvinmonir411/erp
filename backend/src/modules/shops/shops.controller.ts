@@ -28,25 +28,25 @@ import { Role } from '../../common/enums/role.enum';
 export class ShopsController {
   constructor(private readonly shopsService: ShopsService) {}
 
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
   @Post()
   create(@Body() createShopDto: CreateShopDto, @CurrentUser() user: any) {
     return this.shopsService.create(createShopDto, user);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
   @Get()
   findAll(@Query() query: QueryShopsDto, @CurrentUser() user: any) {
     return this.shopsService.findAll(query, user);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.shopsService.findOne(id);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
   @Get('route/:routeId')
   listByRoute(@Param('routeId', ParseIntPipe) routeId: number) {
     return this.shopsService.listByRoute(routeId);
