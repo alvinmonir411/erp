@@ -34,6 +34,7 @@ import {
   FileText,
   Fuel,
   Info,
+  LogOut,
 } from 'lucide-react';
 
 import { useAuth } from '@/components/auth/auth-provider';
@@ -119,11 +120,12 @@ interface RealReturnRecord {
 }
 
 export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {}) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { success: showSuccessToast, error: showErrorToast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Batches and Master Shops from real database
   const [batches, setBatches] = useState<DispatchBatch[]>([]);
@@ -757,7 +759,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   : 'দিনের শেষে হিসাব জমা'}
               </h1>
               <p className="text-[11px] font-medium text-blue-100 opacity-90 truncate">
-                {user?.name || 'ডেলিভারি ম্যান'} • চালান #{activeBatch?.batchNo || activeBatch?.id || 'N/A'}
+                {activeBatch?.dispatchDate ? String(activeBatch.dispatchDate).split('T')[0] : getTodayBDDate()} • {activeBatch?.route?.name || 'সকল রুট'}
               </p>
             </div>
           </div>
@@ -769,13 +771,18 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                 <select
                   value={activeBatch?.id || ''}
                   onChange={(e) => handleSelectBatch(Number(e.target.value))}
-                  className="rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white border border-white/25 outline-none cursor-pointer"
+                  className="rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white border border-white/25 outline-none cursor-pointer max-w-[150px] sm:max-w-[210px] truncate"
+                  title="তারিখ ও রুট নির্বাচন করুন"
                 >
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id} className="text-slate-800">
-                      চালান #{b.batchNo || b.id} ({b.route?.name || 'রুট'})
-                    </option>
-                  ))}
+                  {batches.map((b) => {
+                    const dateStr = b.dispatchDate ? String(b.dispatchDate).split('T')[0] : '';
+                    const routeName = b.route?.name || 'রুট';
+                    return (
+                      <option key={b.id} value={b.id} className="text-slate-800">
+                        {dateStr} • {routeName}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             )}
@@ -787,6 +794,16 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
               title="রিলোড করুন"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
+
+            {/* Profile Icon Button */}
+            <button
+              type="button"
+              onClick={() => setShowProfileModal(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 text-white transition active:scale-95 cursor-pointer"
+              title="প্রোফাইল বিবরণ"
+            >
+              <User className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -2086,6 +2103,94 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
             >
               {isCreatingShop ? 'তৈরি হচ্ছে...' : 'দোকান সেভ করুন'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── PROFILE MODAL ── */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md">
+                  <User className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 leading-tight">
+                    {user?.name || user?.username || 'ডেলিভারি ম্যান'}
+                  </h3>
+                  <p className="text-[11px] font-bold text-blue-600">
+                    @{user?.username || 'delivery'} • ডেলিভারি ম্যান
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Profile Info Cards */}
+            <div className="space-y-2 rounded-2xl bg-slate-50 p-3.5 text-xs font-bold text-slate-700">
+              <div className="flex justify-between items-center py-1">
+                <span className="text-slate-400">রুট:</span>
+                <span className="text-slate-900 font-black">{activeBatch?.route?.name || 'নির্ধারিত রুট নেই'}</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-t border-slate-200/60">
+                <span className="text-slate-400">চালানের তারিখ:</span>
+                <span className="text-slate-900 font-black">
+                  {activeBatch?.dispatchDate ? String(activeBatch.dispatchDate).split('T')[0] : getTodayBDDate()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-t border-slate-200/60">
+                <span className="text-slate-400">চালান নম্বর:</span>
+                <span className="text-blue-700 font-black">
+                  #{activeBatch?.batchNo || activeBatch?.id || 'N/A'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-t border-slate-200/60">
+                <span className="text-slate-400">স্ট্যাটাস:</span>
+                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-black uppercase ${
+                  activeBatch?.status === 'DISPATCHED'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {activeBatch?.status || 'DRAFT'}
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileModal(false);
+                  void loadData();
+                  showSuccessToast('ডাটা সফলভাবে রিফ্রেশ হয়েছে');
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>ডাটা রিফ্রেশ করুন</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileModal(false);
+                  logout();
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md transition active:scale-95 cursor-pointer"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>লগআউট করুন</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
