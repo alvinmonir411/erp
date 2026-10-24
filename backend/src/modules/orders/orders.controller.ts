@@ -70,7 +70,7 @@ export class OrdersController {
     return this.ordersService.update(id, updateOrderDto);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Patch('shop-link/:id')
   updateShop(
     @Param('id', ParseIntPipe) id: number,
@@ -90,7 +90,7 @@ export class OrdersController {
     return this.ordersService.updateDelivery(id, dto, user);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Patch(':id/status')
   updateStatus(
     @Param('id', ParseIntPipe) id: number,

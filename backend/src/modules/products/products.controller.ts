@@ -62,7 +62,7 @@ export class ProductsController {
     return data;
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Post('carton-labels/generate')
   async generateCartonLabels(
     @Body()

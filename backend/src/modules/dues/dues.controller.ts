@@ -26,7 +26,7 @@ export class DuesController {
   }
 
   @Get('stats')
-  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN, Role.DELIVERY_MAN)
   getStats(@CurrentUser() user: any) {
     return this.duesService.getStats(user);
   }
@@ -37,25 +37,25 @@ export class DuesController {
   }
 
   @Get('collections')
-  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN, Role.DELIVERY_MAN)
   getCollections(@CurrentUser() user: any) {
     return this.duesService.findCollections(user);
   }
 
   @Get('order/:orderId/collections')
-  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN, Role.DELIVERY_MAN)
   getOrderCollections(@Param('orderId', ParseIntPipe) orderId: number) {
     return this.duesService.findCollectionsByOrderId(orderId);
   }
 
   @Post('collect')
-  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN, Role.DELIVERY_MAN)
   collect(@Body() data: any, @CurrentUser() user: any) {
     return this.duesService.collectDue(data, user);
   }
 
   @Post('upsert')
-  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN, Role.DELIVERY_MAN)
   upsert(@Body() data: { orderId: number; amount: number; note?: string; dueDate?: string }) {
     return this.duesService.upsertByOrderId(
       data.orderId,
@@ -108,7 +108,7 @@ export class DuesController {
   }
 
   @Get('shop/:shopId')
-  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SR, Role.MANAGER, Role.SUPER_ADMIN, Role.ADMIN, Role.DELIVERY_MAN)
   getShopDues(
     @Param('shopId', ParseIntPipe) shopId: number,
     @CurrentUser() user: any,

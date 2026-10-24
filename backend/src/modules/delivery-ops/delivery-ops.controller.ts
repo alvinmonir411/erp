@@ -79,7 +79,7 @@ export class DeliveryOpsController {
     return this.deliveryOpsService.getDeliveryExpenseReport(query, user);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('personnel')
   getDeliveryPeople(@Query('includeInactive') includeInactive?: string) {
     return this.deliveryOpsService.getDeliveryPeople(
@@ -93,7 +93,7 @@ export class DeliveryOpsController {
     return this.deliveryOpsService.createDeliveryPerson(dto);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('personnel/:id')
   getDeliveryPersonById(@Param('id', ParseIntPipe) id: number) {
     return this.deliveryOpsService.getDeliveryPersonById(id);
