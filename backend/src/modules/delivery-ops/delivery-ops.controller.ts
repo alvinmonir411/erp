@@ -171,7 +171,7 @@ export class DeliveryOpsController {
     return this.deliveryOpsService.markMorningPrinted(id);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
   @Patch('batches/:id/dispatch')
   dispatchBatch(@Param('id', ParseIntPipe) id: number) {
     return this.deliveryOpsService.dispatchBatch(id);

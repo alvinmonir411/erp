@@ -31,8 +31,10 @@ import {
   ArrowRight,
   FileText,
   Boxes,
+  Send,
 } from 'lucide-react';
 
+import { useAuth } from '@/components/auth/auth-provider';
 import { getRoutes } from '@/lib/api/routes';
 import { getProducts, scanCarton } from '@/lib/api/products';
 import { getDeliveryMen } from '@/lib/api/users';
@@ -42,7 +44,7 @@ import { createDispatchBatch } from '@/lib/api/delivery-ops';
 import { LoadingBlock } from '@/components/ui/loading-block';
 import { useToast } from '@/components/ui/toast-provider';
 import { formatCurrency, formatNumber, getTodayBDDate } from '@/lib/utils/format';
-import type { Route, Product, User as UserType } from '@/types/api';
+import { Route, Product, User as UserType, Role } from '@/types/api';
 
 interface ScannedItemRow {
   productId: number;
@@ -132,6 +134,8 @@ function playSound(type: 'success' | 'free_success' | 'warning' | 'error' = 'suc
 
 export function SmartScanDispatchPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const isDeliveryMan = user?.role === Role.DELIVERY_MAN;
   const { error: showErrorToast, success: showSuccessToast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -236,6 +240,10 @@ export function SmartScanDispatchPage() {
         } catch {
           // Ignore draft parse errors
         }
+
+        if (user?.role === Role.DELIVERY_MAN && user?.id) {
+          setAssignedDeliveryManId(user.id);
+        }
       } catch (err: any) {
         showErrorToast(err.message || 'মাস্টার ডাটা লোড করতে সমস্যা হয়েছে');
       } finally {
@@ -244,7 +252,7 @@ export function SmartScanDispatchPage() {
     }
 
     void init();
-  }, []);
+  }, [user]);
 
   // 2. Auto-save Draft
   useEffect(() => {
@@ -850,7 +858,8 @@ export function SmartScanDispatchPage() {
       showErrorToast('অনুগ্রহ করে একটি ডেলিভারি রুট নির্বাচন করুন');
       return;
     }
-    if (!assignedDeliveryManId) {
+    const effectiveDeliveryManId = isDeliveryMan ? (user?.id || assignedDeliveryManId) : assignedDeliveryManId;
+    if (!effectiveDeliveryManId) {
       showErrorToast('অনুগ্রহ করে ডেলিভারি ম্যান নির্বাচন করুন');
       return;
     }
@@ -879,10 +888,13 @@ export function SmartScanDispatchPage() {
         };
       });
 
+      const effectiveDeliveryManId = isDeliveryMan ? (user?.id || assignedDeliveryManId) : assignedDeliveryManId;
       const orderPayload: any = {
         orderDate: dispatchDate,
         routeId: Number(routeId),
-        note: vehicleNote.trim() || undefined,
+        note: isDeliveryMan
+          ? (vehicleNote.trim() ? `${vehicleNote.trim()} [ডেলিভারিম্যানের লোডিং]` : '[ডেলিভারিম্যানের সকালের লোডিং]')
+          : (vehicleNote.trim() || undefined),
         discountType: 'FIXED',
         discountValue: 0,
         items: orderItems,
@@ -893,8 +905,10 @@ export function SmartScanDispatchPage() {
       const batchPayload = {
         dispatchDate,
         routeId: Number(routeId),
-        assignedDeliveryManId,
-        note: vehicleNote.trim() || undefined,
+        assignedDeliveryManId: effectiveDeliveryManId,
+        note: isDeliveryMan
+          ? (vehicleNote.trim() ? `${vehicleNote.trim()} [ডেলিভারিম্যানের লোডিং সাবমিশন]` : '[ডেলিভারিম্যানের লোডিং সাবমিশন - অনুমোদনের অপেক্ষায়]')
+          : (vehicleNote.trim() || undefined),
         orderIds: [order.id],
       };
 
@@ -902,11 +916,15 @@ export function SmartScanDispatchPage() {
 
       // Clear local draft
       localStorage.removeItem(DRAFT_STORAGE_KEY);
-      showSuccessToast('সকালের লোডিং গেটপাস চালান সফলভাবে তৈরি হয়েছে!');
       setShowConfirmModal(false);
 
-      // Redirect to batch details
-      router.push(`/delivery-ops/batches/${batch.id}`);
+      if (isDeliveryMan) {
+        showSuccessToast('✅ সকালের ভ্যান লোডিং সাবমিট হয়েছে! এডমিন অনুমোদন (Approve) করলেই চূড়ান্ত ডিসপ্যাচ লাইভ হবে।');
+        router.push('/my-deliveries');
+      } else {
+        showSuccessToast('সকালের লোডিং গেটপাস চালান সফলভাবে তৈরি হয়েছে!');
+        router.push(`/delivery-ops/batches/${batch.id}`);
+      }
     } catch (err: any) {
       showErrorToast(err.message || 'চালান তৈরি করতে সমস্যা হয়েছে');
     } finally {
@@ -923,7 +941,7 @@ export function SmartScanDispatchPage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
-              href="/delivery-ops"
+              href={isDeliveryMan ? "/my-deliveries" : "/delivery-ops"}
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white backdrop-blur-xs transition hover:bg-white/25 active:scale-95"
               aria-label="Back"
             >
@@ -934,7 +952,7 @@ export function SmartScanDispatchPage() {
                 কার্টুন স্ক্যান ও সকালের লোডিং
               </h1>
               <p className="text-[11px] font-medium text-blue-100 opacity-90">
-                Delivery Loading &amp; Dispatch
+                {isDeliveryMan ? 'সকালের ভ্যান লোডিং স্ক্যান ও সাবমিশন' : 'Delivery Loading & Dispatch'}
               </p>
             </div>
           </div>
@@ -1027,18 +1045,24 @@ export function SmartScanDispatchPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[10px] font-bold text-slate-400">ডেলিভারি ম্যান</div>
-                <select
-                  value={assignedDeliveryManId}
-                  onChange={(e) => setAssignedDeliveryManId(e.target.value)}
-                  className="w-full font-bold text-slate-800 bg-transparent outline-none text-xs truncate"
-                >
-                  <option value="">নির্বাচন করুন</option>
-                  {deliveryMen.map((dm) => (
-                    <option key={dm.id} value={dm.id}>
-                      {dm.name || dm.username}
-                    </option>
-                  ))}
-                </select>
+                {isDeliveryMan ? (
+                  <div className="text-xs font-black text-blue-900 truncate">
+                    {user?.name || user?.username} <span className="text-[10px] font-bold text-blue-600">(আপনি)</span>
+                  </div>
+                ) : (
+                  <select
+                    value={assignedDeliveryManId}
+                    onChange={(e) => setAssignedDeliveryManId(e.target.value)}
+                    className="w-full font-bold text-slate-800 bg-transparent outline-none text-xs truncate"
+                  >
+                    <option value="">নির্বাচন করুন</option>
+                    {deliveryMen.map((dm) => (
+                      <option key={dm.id} value={dm.id}>
+                        {dm.name || dm.username}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -1696,10 +1720,16 @@ export function SmartScanDispatchPage() {
           >
             {isSaving ? (
               <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : isDeliveryMan ? (
+              <Send className="h-4 w-4" />
             ) : (
               <Printer className="h-4 w-4" />
             )}
-            <span>কনফার্ম গেটপাস প্রিন্ট</span>
+            <span>
+              {isDeliveryMan
+                ? 'সকালের লোডিং সাবমিট করুন (এডমিন অনুমোদনের জন্য)'
+                : 'কনফার্ম গেটপাস প্রিন্ট'}
+            </span>
           </button>
         </div>
       </div>
@@ -1868,13 +1898,15 @@ export function SmartScanDispatchPage() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 font-bold">
-                  <Printer className="h-5 w-5" />
+                  {isDeliveryMan ? <Send className="h-5 w-5" /> : <Printer className="h-5 w-5" />}
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900">
-                    গেটপাস চালান কনফার্মেশন
+                    {isDeliveryMan ? 'সকালের লোডিং সাবমিট কনফার্মেশন' : 'গেটপাস চালান কনফার্মেশন'}
                   </h3>
-                  <p className="text-xs text-slate-500">ভ্যান লোডিং তথ্য ও স্টক যাচাই</p>
+                  <p className="text-xs text-slate-500">
+                    {isDeliveryMan ? 'এডমিন অনুমোদনের জন্য ভ্যান লোডিং সাবমিট করুন' : 'ভ্যান লোডিং তথ্য ও স্টক যাচাই'}
+                  </p>
                 </div>
               </div>
               <button
@@ -1968,10 +2000,12 @@ export function SmartScanDispatchPage() {
               >
                 {isSaving ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : isDeliveryMan ? (
+                  <Send className="h-4 w-4" />
                 ) : (
                   <Printer className="h-4 w-4" />
                 )}
-                <span>চালান কনফার্ম ও প্রিন্ট</span>
+                <span>{isDeliveryMan ? 'হ্যাঁ, লোডিং সাবমিট করুন' : 'চালান কনফার্ম ও প্রিন্ট'}</span>
               </button>
             </div>
           </div>

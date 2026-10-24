@@ -827,17 +827,17 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
               <button
                 onClick={handleDispatch}
                 disabled={isDispatching}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-amber-600 active:scale-95 disabled:opacity-60"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-black text-white shadow-sm transition active:scale-95 disabled:opacity-60 cursor-pointer"
               >
                 {isDispatching ? (
                   <>
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    <span>Dispatching...</span>
+                    <span>অনুমোদন হচ্ছে...</span>
                   </>
                 ) : (
                   <>
-                    <Send className="h-3.5 w-3.5" />
-                    <span>Dispatch to Field</span>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>অনুমোদন ও ফাইনাল ডিসপ্যাচ</span>
                   </>
                 )}
               </button>

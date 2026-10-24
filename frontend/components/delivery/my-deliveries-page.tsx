@@ -1181,34 +1181,83 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   </div>
                 </div>
 
-                {/* Enterprise Quick Operations: Carton Scanner & Fast Track Dispatch */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <Link
-                    href="/delivery-ops/scan-dispatch"
-                    className="flex items-center gap-2.5 rounded-2xl border border-blue-200 bg-white p-3 shadow-2xs hover:border-blue-400 hover:shadow-xs transition active:scale-95 group"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs group-hover:scale-105 transition">
-                      <Camera className="h-5 w-5" />
+                {/* Batch Status Notification Banner */}
+                {activeBatch && (
+                  <div className={`p-3.5 rounded-2xl border flex items-start gap-3 shadow-2xs ${
+                    activeBatch.status === 'DRAFT'
+                      ? 'bg-amber-50/90 border-amber-200/90 text-amber-900'
+                      : activeBatch.status === 'DISPATCHED'
+                      ? 'bg-emerald-50/90 border-emerald-200/90 text-emerald-900'
+                      : 'bg-blue-50/90 border-blue-200/90 text-blue-900'
+                  }`}>
+                    <div className="mt-0.5 shrink-0">
+                      {activeBatch.status === 'DRAFT' ? (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-500 text-white font-bold text-xs shadow-xs">
+                          ⏳
+                        </div>
+                      ) : activeBatch.status === 'DISPATCHED' ? (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-xs">
+                          ✓
+                        </div>
+                      ) : (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-600 text-white font-bold text-xs shadow-xs">
+                          📋
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <div className="text-xs font-black text-slate-900 leading-tight">কার্টুন স্ক্যান</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">ক্যামেরা দিয়ে ভ্যান লোডিং</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-black">
+                          {activeBatch.status === 'DRAFT'
+                            ? 'সকালের লোডিং সাবমিট হয়েছে (এডমিন অনুমোদনের অপেক্ষায়)'
+                            : activeBatch.status === 'DISPATCHED'
+                            ? 'আজকের চালান অনুমোদিত ও ডিসপ্যাচ হয়েছে (লাইভ)'
+                            : `চালান স্ট্যাটাস: ${activeBatch.status}`}
+                        </p>
+                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                          activeBatch.status === 'DRAFT'
+                            ? 'bg-amber-200 text-amber-800'
+                            : activeBatch.status === 'DISPATCHED'
+                            ? 'bg-emerald-200 text-emerald-800'
+                            : 'bg-slate-200 text-slate-800'
+                        }`}>
+                          {activeBatch.status === 'DRAFT' ? 'Pending Approval' : activeBatch.status}
+                        </span>
+                      </div>
+                      <p className="text-[11px] opacity-85 mt-0.5 leading-tight">
+                        {activeBatch.status === 'DRAFT'
+                          ? `চালান #${activeBatch.batchNo || activeBatch.id} • এডমিন অনুমোদন (Approve) করলেই আজকের চূড়ান্ত ফিল্ড ডেলিভারি শুরু হবে।`
+                          : `চালান #${activeBatch.batchNo || activeBatch.id} • রুট: ${activeBatch.route?.name || 'নির্ধারিত রুট'} • ফিল্ডে ডেলিভারি ও বকেয়া আদায় চলমান।`}
+                      </p>
                     </div>
-                  </Link>
+                  </div>
+                )}
 
-                  <Link
-                    href="/delivery-ops/fast-track"
-                    className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-white p-3 shadow-2xs hover:border-amber-400 hover:shadow-xs transition active:scale-95 group"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs group-hover:scale-105 transition">
-                      <Boxes className="h-5 w-5" />
+                {/* Dedicated Scan & Loading Operation (Single Focused Card - No Fast Track) */}
+                <Link
+                  href="/delivery-ops/scan-dispatch"
+                  className="flex items-center gap-3.5 rounded-2xl border-2 border-blue-500/30 bg-linear-to-r from-blue-50 to-indigo-50/50 p-3.5 shadow-xs hover:border-blue-500 hover:shadow-md transition active:scale-98 group"
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md group-hover:scale-105 group-hover:bg-blue-700 transition">
+                    <Camera className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-black text-slate-900 leading-tight">
+                        কার্টুন স্ক্যান ও সকালের লোডিং
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-blue-600/10 px-2 py-0.5 text-[10px] font-black text-blue-700">
+                        ক্যামেরা স্ক্যানার
+                      </span>
                     </div>
-                    <div>
-                      <div className="text-xs font-black text-slate-900 leading-tight">ফাস্ট ট্র্যাক চালান</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">ঝটপট লোডিং ও রুট</div>
-                    </div>
-                  </Link>
-                </div>
+                    <p className="text-xs text-slate-600 mt-1 line-clamp-1">
+                      বারকোড দিয়ে কার্টুন মিলিয়ে লোডিং সাবমিট করুন (এডমিন অনুমোদনে চূড়ান্ত হবে)
+                    </p>
+                  </div>
+                  <span className="flex h-8 items-center rounded-xl bg-blue-600 px-3 text-xs font-black text-white shadow-xs group-hover:bg-blue-700 transition shrink-0">
+                    স্ক্যান করুন &rarr;
+                  </span>
+                </Link>
 
                 {/* Primary Action Button: আজকের ডেলিভারি শুরু করুন */}
                 <button

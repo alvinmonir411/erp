@@ -109,8 +109,7 @@ const navigation = [
     roles: [Role.DELIVERY_MAN],
     items: [
       { href: '/my-deliveries', label: 'ডেলিভারি ড্যাশবোর্ড', icon: Truck },
-      { href: '/delivery-ops/scan-dispatch', label: 'কার্টুন স্ক্যান ও লোডিং', icon: Package },
-      { href: '/delivery-ops/fast-track', label: 'ফাস্ট ট্র্যাক চালান তৈরি', icon: Box },
+      { href: '/delivery-ops/scan-dispatch', label: 'কার্টুন স্ক্যান ও সকালের লোডিং', icon: Package },
       { href: '/my-deliveries/assigned', label: 'Assigned Orders', icon: List },
       { href: '/my-deliveries/completed', label: 'Completed Deliveries', icon: CheckCircle },
     ]

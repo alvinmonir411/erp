@@ -38,7 +38,7 @@ export class OrdersController {
     return this.ordersService.getStats(user);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Post()
   create(@Body() createOrderDto: CreateOrderDto, @CurrentUser() user: any) {
     return this.ordersService.create(createOrderDto, user);

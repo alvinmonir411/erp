@@ -51,7 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (
         path.startsWith('/my-deliveries') ||
         path.startsWith('/delivery-ops/scan-dispatch') ||
-        path.startsWith('/delivery-ops/fast-track') ||
         path.startsWith('/delivery-ops/batches')
       ) {
         return true;
@@ -63,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ADMIN: ['/users', '/settings'], // Admin can't delete, but also maybe restricted from some settings
       MANAGER: ['/users', '/settings', '/dashboard', '/recycle-bin'],
       SR: ['/dashboard', '/delivery-ops', '/products', '/stock', '/users', '/settings', '/recycle-bin'],
-      DELIVERY_MAN: ['/dashboard', '/sr-dashboard', '/manager-dashboard', '/orders', '/dues', '/products', '/stock', '/users', '/settings', '/routes', '/shops', '/companies', '/recycle-bin', '/delivery-ops/personnel', '/delivery-ops/reports'],
+      DELIVERY_MAN: ['/dashboard', '/sr-dashboard', '/manager-dashboard', '/orders', '/dues', '/products', '/stock', '/users', '/settings', '/routes', '/shops', '/companies', '/recycle-bin', '/delivery-ops/personnel', '/delivery-ops/reports', '/delivery-ops/fast-track'],
     };
 
     const restricted = restrictedPaths[userRole] || [];
