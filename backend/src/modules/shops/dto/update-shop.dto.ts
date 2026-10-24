@@ -35,6 +35,13 @@ export class UpdateShopDto {
   address?: string | null;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  companyId?: number;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }
+

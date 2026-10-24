@@ -190,10 +190,16 @@ export class ShopsService {
 
   async update(id: number, updateShopDto: UpdateShopDto) {
     const shop = await this.findOne(id);
+    const isChangingRoute =
+      updateShopDto.routeId !== undefined &&
+      updateShopDto.routeId !== shop.routeId;
     const nextRouteId = updateShopDto.routeId ?? shop.routeId;
     const nextName = updateShopDto.name ?? shop.name;
+
     const route = await this.findRouteOrFail(nextRouteId);
-    this.ensureRouteIsActive(route);
+    if (isChangingRoute) {
+      this.ensureRouteIsActive(route);
+    }
 
     if (nextRouteId !== shop.routeId || nextName !== shop.name) {
       await this.ensureUniqueShopName(nextRouteId, nextName, shop.id);
@@ -201,6 +207,10 @@ export class ShopsService {
 
     Object.assign(shop, {
       ...updateShopDto,
+      companyId:
+        updateShopDto.companyId !== undefined
+          ? (updateShopDto.companyId ?? null)
+          : shop.companyId,
       ownerName:
         updateShopDto.ownerName !== undefined
           ? (updateShopDto.ownerName ?? null)
