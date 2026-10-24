@@ -710,6 +710,9 @@ export function SmartScanDispatchPage() {
               Html5QrcodeSupportedFormats.UPC_A,
             ],
             verbose: false,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true,
+            },
           });
           html5QrCodeRef.current = scanner;
 
@@ -719,9 +722,12 @@ export function SmartScanDispatchPage() {
           await scanner.start(
             { facingMode: 'environment' },
             {
-              fps: 15,
-              qrbox: { width: 260, height: 260 },
-              aspectRatio: 1.0,
+              fps: 20,
+              qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+                const width = Math.max(260, Math.min(viewfinderWidth - 20, 380));
+                const height = Math.max(150, Math.min(viewfinderHeight - 20, 240));
+                return { width, height };
+              },
             },
             (decodedText) => {
               const now = Date.now();
@@ -1723,13 +1729,16 @@ export function SmartScanDispatchPage() {
           </div>
 
           {/* Camera Viewfinder with Green Corners & Animated Red Laser */}
-          <div className="relative flex-1 flex items-center justify-center overflow-hidden">
+          <div className="relative flex-1 flex items-center justify-center overflow-hidden bg-black">
             {/* html5-qrcode target div */}
-            <div id="reader-viewfinder" className="w-full h-full max-w-md mx-auto" />
+            <div
+              id="reader-viewfinder"
+              className="w-full h-full max-w-md mx-auto flex items-center justify-center [&_#reader-viewfinder__scan_region]:border-none! [&_#reader-viewfinder__scan_region_img]:hidden! [&_video]:w-full! [&_video]:h-full! [&_video]:object-cover!"
+            />
 
             {/* Overlay Targeting Frame with Neon Green Corners & Red Laser */}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <div className="relative h-64 w-64 sm:h-72 sm:w-72 rounded-3xl border-2 border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.3)] flex items-center justify-center overflow-hidden">
+              <div className="relative h-48 w-80 sm:h-56 sm:w-96 rounded-3xl border-2 border-emerald-400 shadow-[0_0_25px_rgba(52,211,153,0.35)] flex items-center justify-center overflow-hidden">
                 {/* 4 Neon corner accents */}
                 <div className="absolute top-0 left-0 h-6 w-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-2xl" />
                 <div className="absolute top-0 right-0 h-6 w-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-2xl" />
@@ -1741,9 +1750,9 @@ export function SmartScanDispatchPage() {
               </div>
 
               {/* Guidance text pill below frame */}
-              <div className="mt-6 flex items-center gap-1.5 rounded-full bg-black/60 px-4 py-1.5 text-xs font-bold text-white backdrop-blur-xs">
+              <div className="mt-4 flex items-center gap-1.5 rounded-full bg-black/70 px-4 py-1.5 text-xs font-bold text-white backdrop-blur-xs">
                 <Scan className="h-3.5 w-3.5 text-emerald-400" />
-                <span>কার্টুনের বারকোড/QR ক্যামেরার সামনে আনুন</span>
+                <span>কার্টুনের বারকোড বা QR কোড ফ্রেমের মধ্যে রাখুন</span>
               </div>
             </div>
           </div>

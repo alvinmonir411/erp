@@ -14,6 +14,7 @@ import {
   ListFilter,
 } from 'lucide-react';
 import { BarcodeView } from '@/components/ui/barcode-view';
+import { QrCodeView } from '@/components/ui/qr-code-view';
 import { generateCartonLabels, getCartonLabels } from '@/lib/api/products';
 import { Product, Company } from '@/types/api';
 import { useToast } from '@/components/ui/toast-provider';
@@ -258,13 +259,18 @@ export function CartonLabelsModal({
                     </div>
 
                     {/* Pack size indicator */}
-                    <div className="inline-block px-2 py-0.5 rounded bg-slate-900 text-white text-[10px] font-black uppercase my-1 tracking-wider">
+                    <div className="inline-block px-2.5 py-0.5 rounded bg-slate-900 text-white text-[10px] font-black uppercase my-1 tracking-wider">
                       ১ কার্টুন = {label.packSize} {selectedProduct?.unit || 'PCS'}
                     </div>
 
-                    {/* Crisp Barcode View */}
-                    <div className="my-1 w-full flex justify-center">
-                      <BarcodeView value={label.cartonCode} height={40} width={1.4} />
+                    {/* Barcode & QR Code Side-by-Side matching reference sticker */}
+                    <div className="my-1.5 w-full flex items-center justify-between gap-2 px-1">
+                      <div className="flex-1 flex flex-col items-center min-w-0">
+                        <BarcodeView value={label.cartonCode} height={38} width={1.2} />
+                      </div>
+                      <div className="shrink-0 flex items-center justify-center p-1 bg-white border border-slate-200 rounded-lg shadow-2xs">
+                        <QrCodeView value={label.cartonCode} size={48} />
+                      </div>
                     </div>
 
                     <div className="text-[9px] text-slate-400 font-mono mt-0.5">

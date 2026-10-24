@@ -177,7 +177,7 @@ export class DeliveryOpsController {
     return this.deliveryOpsService.dispatchBatch(id);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Post('batches/:id/returns')
   recordReturns(
     @Param('id', ParseIntPipe) id: number,
@@ -186,7 +186,7 @@ export class DeliveryOpsController {
     return this.deliveryOpsService.recordReturns(id, dto);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Post('batches/:id/settlement')
   settleBatch(
     @Param('id', ParseIntPipe) id: number,

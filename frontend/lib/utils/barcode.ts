@@ -52,5 +52,7 @@ export function generateCode128Bars(text: string): string {
     }
   }
 
-  return barString;
+  const quietZone = '0'.repeat(12);
+  return quietZone + barString + quietZone;
 }
+

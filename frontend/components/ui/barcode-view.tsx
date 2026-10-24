@@ -40,6 +40,7 @@ export function BarcodeView({
         viewBox={`0 0 ${svgWidth} ${height}`}
         className="shape-rendering-crispEdges block"
       >
+        <rect width={svgWidth} height={height} fill="#ffffff" />
         {bars.split('').map((char, index) => {
           if (char === '1') {
             return (
