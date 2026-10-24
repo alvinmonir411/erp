@@ -358,15 +358,16 @@ export class OrdersService {
     return result;
   }
 
-  async delete(id: number) {
-    return this.deleteOrder(String(id));
+  async delete(id: number, currentUser?: any) {
+    return this.deleteOrder(String(id), currentUser);
   }
 
   /**
    * Highly scalable, concurrent-safe, and high-performance order deletion and stock reversion.
    * Reverts both ordered quantity and free quantity to product stock atomically.
+   * Captures a complete snapshot to Recycle Bin so accidental deletions can be restored.
    */
-  async deleteOrder(orderId: string): Promise<any> {
+  async deleteOrder(orderId: string, currentUser?: any): Promise<any> {
     const numericId = parseInt(orderId, 10);
     if (isNaN(numericId)) {
       throw new BadRequestException(`Invalid order ID: ${orderId}`);
@@ -385,6 +386,7 @@ export class OrdersService {
       // 1. Fetch order with pessimistic write lock to prevent concurrent modifications
       const order = await queryRunner.manager.findOne(Order, {
         where: { id: numericId },
+        relations: ['shop', 'route', 'company'],
         lock: { mode: 'pessimistic_write' },
       });
 
@@ -489,6 +491,60 @@ export class OrdersService {
         await queryRunner.manager.save(movementsToInsert);
       }
 
+      // 3.5. Capture complete snapshot for Recycle Bin (so Admin can restore if deleted by mistake)
+      try {
+        const existingDues = await queryRunner.manager.find(Due, {
+          where: { orderId: numericId },
+        });
+        const existingCollections = await queryRunner.manager.find(DueCollection, {
+          where: { orderId: numericId },
+        });
+        const existingBatchOrders = await queryRunner.manager.find(DispatchBatchOrder, {
+          where: { orderId: numericId },
+        });
+
+        const snapshot = {
+          order: { ...order },
+          items: orderItems.map((item) => ({ ...item })),
+          dues: existingDues.map((d) => ({ ...d })),
+          collections: existingCollections.map((c) => ({ ...c })),
+          batchOrders: existingBatchOrders.map((b) => ({ ...b })),
+          stockReverted: movementsToInsert.map((m) => ({
+            productId: m.productId,
+            quantity: m.quantity,
+          })),
+        };
+
+        const title = order.shop?.name
+          ? `Order #${numericId} - ${order.shop.name}`
+          : `Order #${numericId}`;
+
+        await queryRunner.manager.query(
+          `INSERT INTO "recycle_bin" 
+            ("entityType", "entityId", "entityNumber", "title", "shopName", "routeName", "totalAmount", "dueAmount", "itemCount", "snapshot", "deletedById", "deletedByName", "deletedByRole", "status", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'DELETED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [
+            'ORDER',
+            numericId,
+            `Order #${numericId}`,
+            title,
+            order.shop?.name || null,
+            order.route?.name || null,
+            Number(order.actualSoldAmount || order.grandTotal || 0),
+            Number(order.dueAmount || 0),
+            orderItems.length,
+            JSON.stringify(snapshot),
+            currentUser?.id || currentUser?.sub || null,
+            currentUser?.name || currentUser?.username || 'Admin',
+            currentUser?.role || 'ADMIN',
+          ],
+        );
+      } catch (binErr: any) {
+        this.logger.warn(
+          `[OrdersService.deleteOrder] Failed to save recycle bin snapshot: ${binErr.message}`,
+        );
+      }
+
       this.logger.log(
         `[OrdersService.deleteOrder] Deleting relational constraints for Order #${numericId}`,
       );
@@ -526,6 +582,10 @@ export class OrdersService {
 
       try {
         this.realtimeGateway?.emitPayload('orderDeleted', { id: numericId });
+        this.realtimeGateway?.emitPayload('recycleBinUpdated', {
+          id: numericId,
+          action: 'DELETED',
+        });
       } catch (err: any) {
         this.logger.warn(`Failed to emit orderDeleted event: ${err?.message}`);
       }

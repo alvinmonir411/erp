@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Inject,
   forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -62,6 +63,8 @@ const getBundleSize = (paid: number, free: number): number => {
 
 @Injectable()
 export class DeliveryOpsService {
+  private readonly logger = new Logger(DeliveryOpsService.name);
+
   constructor(
     @InjectRepository(DeliveryPerson)
     private readonly deliveryPersonRepository: Repository<DeliveryPerson>,
@@ -1763,7 +1766,7 @@ export class DeliveryOpsService {
     return this.getDispatchBatch(id);
   }
 
-  async deleteDispatchBatch(id: number) {
+  async deleteDispatchBatch(id: number, currentUser?: any) {
     const result = await this.dataSource.transaction(async (manager) => {
       // 1. Lock the batch to prevent concurrent modifications
       const batch = await manager
@@ -1785,6 +1788,7 @@ export class DeliveryOpsService {
           'orders.order.items',
           'orders.order.items.product',
           'items',
+          'route',
         ],
       });
 
@@ -1797,6 +1801,58 @@ export class DeliveryOpsService {
         DispatchBatchStatus.PARTIALLY_SETTLED,
       ].includes(batch.status);
       const orderIds = fullBatch.orders.map((bo) => bo.orderId);
+
+      // 1.5. Capture snapshot for Recycle Bin so accidental batch deletions can be restored
+      try {
+        let allDues: any[] = [];
+        if (orderIds.length > 0) {
+          allDues = await manager.query(
+            `SELECT * FROM dues WHERE "orderId" IN (${orderIds.join(',')})`,
+          );
+        }
+
+        const snapshot = {
+          batch: { ...fullBatch },
+          orders: fullBatch.orders.map((bo) => ({
+            ...bo,
+            order: bo.order
+              ? {
+                  ...bo.order,
+                  items: bo.order.items ? bo.order.items.map((i) => ({ ...i })) : [],
+                }
+              : null,
+          })),
+          dues: allDues,
+          items: fullBatch.items ? fullBatch.items.map((i) => ({ ...i })) : [],
+        };
+
+        const title = `Delivery Challan #${id} (${fullBatch.route?.name || 'All Routes'})`;
+
+        await manager.query(
+          `INSERT INTO "recycle_bin" 
+            ("entityType", "entityId", "entityNumber", "title", "shopName", "routeName", "totalAmount", "dueAmount", "itemCount", "snapshot", "deletedById", "deletedByName", "deletedByRole", "status", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'DELETED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [
+            'DISPATCH_BATCH',
+            id,
+            `Batch #${id}`,
+            title,
+            null,
+            fullBatch.route?.name || null,
+            Number(fullBatch.grossDispatchedValue || 0),
+            Number(fullBatch.totalDueAmount || 0),
+            orderIds.length,
+            JSON.stringify(snapshot),
+            currentUser?.id || currentUser?.sub || null,
+            currentUser?.name || currentUser?.username || 'Admin',
+            currentUser?.role || 'ADMIN',
+          ],
+        );
+      } catch (binErr: any) {
+        this.logger.warn(
+          `[DeliveryOpsService.deleteDispatchBatch] Failed to save recycle bin snapshot: ${binErr.message}`,
+        );
+      }
 
       // 2. Process each order in the batch: restore stock and delete order & related entries
       for (const batchOrder of fullBatch.orders) {
@@ -1888,6 +1944,7 @@ export class DeliveryOpsService {
         this.realtimeGateway.emitPayload('orderDeleted', { id: orderId });
       }
     }
+    this.realtimeGateway.emitPayload('recycleBinUpdated', { id, action: 'DELETED' });
 
     return { success: result.success, message: result.message };
   }

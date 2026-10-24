@@ -108,9 +108,12 @@ export class OrdersController {
     return this.ordersService.settleOrder(id, dto);
   }
 
-  @Roles(Role.SUPER_ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @Delete(':id')
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.delete(id);
+  delete(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.ordersService.delete(id, user);
   }
 }

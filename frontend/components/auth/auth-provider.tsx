@@ -49,9 +49,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const restrictedPaths: Record<Role, string[]> = {
       SUPER_ADMIN: [],
       ADMIN: ['/users', '/settings'], // Admin can't delete, but also maybe restricted from some settings
-      MANAGER: ['/users', '/settings', '/dashboard'],
-      SR: ['/dashboard', '/delivery-ops', '/products', '/stock', '/users', '/settings'],
-      DELIVERY_MAN: ['/dashboard', '/sr-dashboard', '/manager-dashboard', '/orders', '/dues', '/delivery-ops', '/products', '/stock', '/users', '/settings', '/routes', '/shops', '/companies'],
+      MANAGER: ['/users', '/settings', '/dashboard', '/recycle-bin'],
+      SR: ['/dashboard', '/delivery-ops', '/products', '/stock', '/users', '/settings', '/recycle-bin'],
+      DELIVERY_MAN: ['/dashboard', '/sr-dashboard', '/manager-dashboard', '/orders', '/dues', '/delivery-ops', '/products', '/stock', '/users', '/settings', '/routes', '/shops', '/companies', '/recycle-bin'],
     };
 
     const restricted = restrictedPaths[userRole] || [];

@@ -25,6 +25,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 
 import { PurchasesModule } from './modules/purchases/purchases.module';
 import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
+import { RecycleBinModule } from './modules/recycle-bin/recycle-bin.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module
     RealtimeModule,
     AnalyticsModule,
     ActivityLogsModule,
+    RecycleBinModule,
   ],
 })
 export class AppModule {}

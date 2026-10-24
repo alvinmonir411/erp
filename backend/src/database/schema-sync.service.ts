@@ -605,6 +605,40 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       this.logger.error('Failed to sync activity_logs table:', e.message);
     }
 
+    // 18. Sync recycle_bin table
+    try {
+      this.logger.log('Ensuring recycle_bin table exists...');
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS "recycle_bin" (
+          "id" SERIAL PRIMARY KEY,
+          "entityType" VARCHAR(50) NOT NULL,
+          "entityId" INTEGER NOT NULL,
+          "entityNumber" VARCHAR(100),
+          "title" VARCHAR(255) NOT NULL,
+          "shopName" VARCHAR(255),
+          "routeName" VARCHAR(255),
+          "totalAmount" NUMERIC(14, 2) DEFAULT 0,
+          "dueAmount" NUMERIC(14, 2) DEFAULT 0,
+          "itemCount" INTEGER DEFAULT 0,
+          "snapshot" JSONB NOT NULL,
+          "deletedById" VARCHAR(100),
+          "deletedByName" VARCHAR(150),
+          "deletedByRole" VARCHAR(50),
+          "status" VARCHAR(50) DEFAULT 'DELETED',
+          "restoredAt" TIMESTAMP WITH TIME ZONE,
+          "restoredByName" VARCHAR(150),
+          "note" TEXT,
+          "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS "idx_recycle_bin_entity" ON "recycle_bin" ("entityType", "entityId");
+        CREATE INDEX IF NOT EXISTS "idx_recycle_bin_status_created" ON "recycle_bin" ("status", "createdAt" DESC);
+      `);
+    } catch (e) {
+      this.logger.error('Failed to sync recycle_bin table:', e.message);
+    }
+
       this.logger.log('--- DEFENSIVE SCHEMA SYNC COMPLETED ---');
     } catch (globalErr: any) {
       this.logger.error('Unexpected error in schema sync:', globalErr?.message);

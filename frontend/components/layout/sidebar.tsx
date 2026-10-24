@@ -24,6 +24,7 @@ import {
   Receipt,
   TrendingUp,
   Activity,
+  RotateCcw,
 } from 'lucide-react';
 import { useAuth } from '../auth/auth-provider';
 import { Role } from '@/types/api';
@@ -99,6 +100,7 @@ const navigation = [
     items: [
       { href: '/users', label: 'User Management', icon: Users, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
       { href: '/activity-logs', label: 'Activity & Audit Log', icon: Activity, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER], prefetch: false },
+      { href: '/recycle-bin', label: 'Recycle Bin', icon: RotateCcw, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
     ]
   },
   {
