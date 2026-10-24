@@ -1572,14 +1572,14 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                       <span>- {formatCurrency(totalExpensesVal)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm font-black text-emerald-400 border-t-2 border-white/20 pt-2">
-                      <span>= Net Expected Cash from Delivery Man</span>
+                      <span>= প্রত্যাশিত জমার পরিমাণ (৳) / Net Expected Cash</span>
                       <span>{formatCurrency(netExpectedCashFromDeliveryMan)}</span>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-900 flex items-center justify-between">
-                      <span>Actual Cash Received by Admin <span className="text-rose-600 font-black">*</span></span>
+                      <span>বাস্তবে জমা দেওয়া ক্যাশ (৳) / Actual Cash Received <span className="text-rose-600 font-black">*</span></span>
                       <span className="text-rose-600 font-bold text-[9px] uppercase tracking-normal">(Required)</span>
                     </label>
                     <input
@@ -1605,11 +1605,12 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
                     }`}>
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] font-black uppercase tracking-widest">
+                          হিসাবের পার্থক্য (৳):{' '}
                           {Math.abs(Number(actualCashReceived) - netExpectedCashFromDeliveryMan) < 0.01
-                            ? 'Balanced'
+                            ? 'Balanced (হিসাব মিলেছে)'
                             : Number(actualCashReceived) < netExpectedCashFromDeliveryMan
-                            ? 'Shortage'
-                            : 'Excess'}
+                            ? 'Shortage (ঘাটতি)'
+                            : 'Excess (উদ্বৃত্ত)'}
                         </p>
                         <p className="text-lg font-black">
                           {formatCurrency(Math.abs(Number(actualCashReceived) - netExpectedCashFromDeliveryMan))}
@@ -1633,10 +1634,10 @@ export function DispatchBatchDetailsPage({ id }: { id: string }) {
             <button
               onClick={handleSettle}
               disabled={isSettling || isReturnDirty}
-              className="w-full sm:max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-slate-900 px-6 sm:px-12 py-4 text-base sm:text-lg font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900 disabled:opacity-50 disabled:bg-slate-400 disabled:border-slate-400"
+              className="w-full sm:max-w-md flex items-center justify-center gap-3 rounded-none border-4 border-slate-900 bg-slate-900 px-6 sm:px-12 py-4 text-base sm:text-lg font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900 disabled:opacity-50 disabled:bg-slate-400 disabled:border-slate-400 cursor-pointer"
             >
               {isSettling ? <RefreshCw className="h-5 w-5 animate-spin" /> : <HandCoins className="h-5 w-5" />}
-              {isSettling ? 'Processing...' : 'Confirm & Settle Batch'}
+              {isSettling ? 'প্রক্রিয়াধীন...' : 'জমা নিশ্চিত করুন (Confirm & Settle Batch)'}
             </button>
           </div>
         )}

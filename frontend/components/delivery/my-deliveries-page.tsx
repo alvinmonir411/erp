@@ -703,13 +703,13 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           paymentMode: c.mode,
           note: c.note,
         })),
-        note: `ক্যাশ জমা: ${actualCashNum}, নতুন বাকি: ${totalNewDues}, ফেরত: ${totalReturnsValue}`,
+        note: `বাস্তবে জমা ক্যাশ: ${actualCashNum}, নতুন বাকি: ${totalNewDues}, ফেরত: ${totalReturnsValue}`,
       });
 
-      showSuccessToast('দিনের হিসাব সফলভাবে ডাটাবেসে সেভ ও সাবমিট করা হয়েছে!');
+      showSuccessToast('জমার হিসাব সফলভাবে ডাটাবেসে সেভ ও জমা নিশ্চিত করা হয়েছে!');
       void loadData();
     } catch (err: any) {
-      showSuccessToast('দিনের হিসাব সংরক্ষিত হয়েছে (লোকাল সিঙ্ক সম্পন্ন)');
+      showSuccessToast('জমার হিসাব সংরক্ষিত হয়েছে (লোকাল সিঙ্ক সম্পন্ন)');
     } finally {
       setIsSubmitting(false);
     }
@@ -756,7 +756,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   ? 'টাকা আদায় (Collection)'
                   : currentTab === 'returns'
                   ? 'ফেরত ও ড্যামেজ'
-                  : 'দিনের শেষে হিসাব জমা'}
+                  : 'দিনের জমার হিসাব ও সেটেলমেন্ট'}
               </h1>
               <p className="text-[11px] font-medium text-blue-100 opacity-90 truncate">
                 {activeBatch?.dispatchDate ? String(activeBatch.dispatchDate).split('T')[0] : getTodayBDDate()} • {activeBatch?.route?.name || 'সকল রুট'}
@@ -1869,10 +1869,10 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   {/* Net Expected Cash to Hand Over */}
                   <div className="rounded-xl bg-blue-50 p-3 flex items-center justify-between font-black text-sm text-blue-900 border border-blue-100">
                     <div>
-                      <div className="text-[10px] text-blue-600 uppercase tracking-wider">
-                        মোট জমাযোগ্য ক্যাশ
+                      <div className="text-[10px] text-blue-600 uppercase tracking-wider font-black">
+                        প্রত্যাশিত জমার পরিমাণ (৳)
                       </div>
-                      <div className="text-xs font-normal text-blue-700">বাবার কাছে দেওয়ার মতো</div>
+                      <div className="text-xs font-medium text-blue-700">জমার জন্য নির্ধারিত মোট ক্যাশ</div>
                     </div>
                     <div className="text-lg text-blue-800">
                       {formatCurrency(expectedCashToHandOver)}
@@ -1884,7 +1884,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                 <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3 text-xs">
                   <div>
                     <label className="block font-black text-slate-800 text-xs mb-1">
-                      বাস্তবে বাবার হাতে জমা দেওয়া ক্যাশ (BDT)
+                      বাস্তবে জমা দেওয়া ক্যাশ (৳)
                     </label>
                     <div className="relative">
                       <span className="absolute left-3.5 top-2.5 text-base font-black text-slate-400">৳</span>
@@ -1915,15 +1915,18 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                         ) : (
                           <AlertTriangle className="h-5 w-5 text-rose-600" />
                         )}
-                        <span>
-                          {Math.abs(cashDiscrepancy) <= 1
-                            ? 'হিসাব সম্পূর্ণ মিলেছে!'
-                            : cashDiscrepancy < -1
-                            ? 'ক্যাশ ঘাটতি রয়েছে'
-                            : 'ক্যাশ উদ্বৃত্ত রয়েছে'}
-                        </span>
+                        <div>
+                          <span>
+                            {Math.abs(cashDiscrepancy) <= 1
+                              ? 'হিসাব সম্পূর্ণ মিলেছে (জমা সম্পন্ন)'
+                              : cashDiscrepancy < -1
+                              ? 'হিসাবের পার্থক্য: ক্যাশ ঘাটতি রয়েছে'
+                              : 'হিসাবের পার্থক্য: ক্যাশ উদ্বৃত্ত রয়েছে'}
+                          </span>
+                          <span className="block text-[10px] font-normal opacity-75">হিসাবের পার্থক্য (৳)</span>
+                        </div>
                       </div>
-                      <div>
+                      <div className="text-right">
                         {Math.abs(cashDiscrepancy) <= 1
                           ? '৳ ০'
                           : formatCurrency(Math.abs(cashDiscrepancy))}
@@ -1931,7 +1934,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                     </div>
                   )}
 
-                  {/* Submit Settlement to Father */}
+                  {/* Confirm & Submit Settlement */}
                   <button
                     type="button"
                     onClick={handleSubmitSettlement}
@@ -1939,7 +1942,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                     className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0260e8] hover:bg-blue-700 active:scale-98 text-white font-black py-3.5 text-sm shadow-md transition cursor-pointer disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" />
-                    <span>{isSubmitting ? 'সাবমিট হচ্ছে...' : 'বাবার কাছে দিনের হিসাব সাবমিট করুন'}</span>
+                    <span>{isSubmitting ? 'জমা সম্পন্ন হচ্ছে...' : 'জমা নিশ্চিত করুন'}</span>
                   </button>
                 </div>
               </div>
