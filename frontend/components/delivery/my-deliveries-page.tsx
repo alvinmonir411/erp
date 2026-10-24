@@ -74,6 +74,9 @@ interface RealShopDelivery {
   previousDue: number;
   todayDelivery: number;
   status: 'PENDING' | 'PARTIAL' | 'COMPLETED';
+  hasOrder?: boolean;
+  routeId?: number;
+  routeName?: string;
   items: RealShopItem[];
 }
 
@@ -122,7 +125,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Batches from real database
+  // Batches and Master Shops from real database
   const [batches, setBatches] = useState<DispatchBatch[]>([]);
   const [activeBatch, setActiveBatch] = useState<DispatchBatch | null>(null);
   const [masterShops, setMasterShops] = useState<Shop[]>([]);
@@ -130,9 +133,9 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
   // Active Bottom Navigation Tab: 'home' | 'shops' | 'collection' | 'returns' | 'settlement'
   const [currentTab, setCurrentTab] = useState<'home' | 'shops' | 'collection' | 'returns' | 'settlement'>('home');
 
-  // Real Shops & Delivery State
+  // Real Shops & Delivery State (Holds ALL shops in the database/route)
   const [shops, setShops] = useState<RealShopDelivery[]>([]);
-  const [shopFilter, setShopFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
+  const [shopFilter, setShopFilter] = useState<'ALL' | 'ORDERS' | 'DUES' | 'COMPLETED'>('ALL');
   const [shopSearch, setShopSearch] = useState('');
   const [selectedShopForDelivery, setSelectedShopForDelivery] = useState<RealShopDelivery | null>(null);
 
@@ -173,7 +176,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
     return activeBatch ? `dm_live_records_batch_${activeBatch.id}` : '';
   }, [activeBatch]);
 
-  // 1. Fetch Real Batches & Master Shops from Database
+  // 1. Fetch Real Batches & ALL Master Shops from Database
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -191,7 +194,6 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
       setMasterShops(shopList);
 
       if (batchList.length > 0) {
-        // Auto-select batch assigned to logged-in delivery man (or latest un-settled batch)
         const myBatch =
           batchList.find(
             (b) =>
@@ -219,66 +221,124 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
     void loadData();
   }, [loadData]);
 
-  // 2. Map Real Orders from activeBatch into Real Shops
+  // 2. Build Unified Shops List: Combines ALL Master Shops + Active Batch Orders
   useEffect(() => {
-    if (!activeBatch) {
-      setShops([]);
-      return;
-    }
+    const orderMap = new Map<number, any>();
+    (activeBatch?.orders || []).forEach((bo: any) => {
+      const sId = Number(bo.order?.shop?.id || bo.order?.shopId || bo.orderId);
+      orderMap.set(sId, bo);
+    });
 
-    const realMappedShops: RealShopDelivery[] = (activeBatch.orders || []).map((bo: any) => {
-      const order = bo.order || {};
-      const shop = order.shop || {};
+    // Map all master shops from the database
+    const allMappedShops: RealShopDelivery[] = masterShops.map((shop) => {
+      const sId = Number(shop.id);
+      const bo = orderMap.get(sId);
+      const order = bo?.order || {};
 
-      const items: RealShopItem[] = (order.items || []).map((oi: OrderItem) => {
-        const prod = oi.product || ({} as any);
-        const packSize = Number(prod.defaultCartonSize || 1);
-        const totalPcs = Number(oi.quantity || 0);
-        const cartons = Math.floor(totalPcs / (packSize > 0 ? packSize : 1));
-        const pieces = totalPcs % (packSize > 0 ? packSize : 1);
-        const unitPrice = Number(oi.unitPrice || 0);
-        const totalAmount = totalPcs * unitPrice;
+      const items: RealShopItem[] = bo
+        ? (order.items || []).map((oi: OrderItem) => {
+            const prod = oi.product || ({} as any);
+            const packSize = Number(prod.defaultCartonSize || 1);
+            const totalPcs = Number(oi.quantity || 0);
+            const cartons = Math.floor(totalPcs / (packSize > 0 ? packSize : 1));
+            const pieces = totalPcs % (packSize > 0 ? packSize : 1);
+            const unitPrice = Number(oi.unitPrice || 0);
+            const totalAmount = totalPcs * unitPrice;
 
-        return {
-          id: Number(oi.id || 0),
-          productId: Number(oi.productId),
-          productName: prod.name || `পণ্য #${oi.productId}`,
-          packSize,
-          cartons,
-          pieces,
-          totalPcs,
-          freeQty: Number(oi.freeQuantity || 0),
-          unitPrice,
-          totalAmount,
-          unit: prod.unit || 'Pcs',
-        };
-      });
+            return {
+              id: Number(oi.id || 0),
+              productId: Number(oi.productId),
+              productName: prod.name || `পণ্য #${oi.productId}`,
+              packSize,
+              cartons,
+              pieces,
+              totalPcs,
+              freeQty: Number(oi.freeQuantity || 0),
+              unitPrice,
+              totalAmount,
+              unit: prod.unit || 'Pcs',
+            };
+          })
+        : [];
 
-      const orderTotal = Number(order.totalAmount || bo.estimatedAmount || 0);
-      const isDelivered = order.status === 'DELIVERED';
-      const isPartial = order.status === 'PARTIALLY_DELIVERED';
+      const orderTotal = bo ? Number(order.totalAmount || bo.estimatedAmount || 0) : 0;
+      const isDelivered = bo && order.status === 'DELIVERED';
+      const isPartial = bo && order.status === 'PARTIALLY_DELIVERED';
 
       return {
-        orderId: Number(bo.orderId),
-        shopId: Number(shop.id || order.shopId || bo.orderId),
-        name: shop.name || order.temporaryShopName || `দোকান #${bo.orderId}`,
+        orderId: bo ? Number(bo.orderId) : 0,
+        shopId: sId,
+        name: shop.name || `দোকান #${sId}`,
         ownerName: shop.ownerName || '',
-        address: shop.address || order.marketArea || 'বাজার',
+        address: shop.address || 'বাজার',
         phone: shop.phone || '',
-        previousDue: Number(shop.balance || 0),
+        previousDue: Number((shop as any).balance ?? shop.totalDue ?? 0),
         todayDelivery: orderTotal,
         status: isDelivered ? 'COMPLETED' : isPartial ? 'PARTIAL' : 'PENDING',
+        hasOrder: !!bo,
+        routeId: shop.routeId,
+        routeName: (shop as any).route?.name || '',
         items,
       };
     });
 
-    setShops(realMappedShops);
+    // Include any batch orders whose shop was temporary or not in masterShops
+    (activeBatch?.orders || []).forEach((bo: any) => {
+      const sId = Number(bo.order?.shop?.id || bo.order?.shopId || bo.orderId);
+      if (!allMappedShops.some((s) => s.shopId === sId)) {
+        const order = bo.order || {};
+        const shop = order.shop || {};
+        const items: RealShopItem[] = (order.items || []).map((oi: OrderItem) => {
+          const prod = oi.product || ({} as any);
+          const packSize = Number(prod.defaultCartonSize || 1);
+          const totalPcs = Number(oi.quantity || 0);
+          return {
+            id: Number(oi.id || 0),
+            productId: Number(oi.productId),
+            productName: prod.name || `পণ্য #${oi.productId}`,
+            packSize,
+            cartons: Math.floor(totalPcs / (packSize > 0 ? packSize : 1)),
+            pieces: totalPcs % (packSize > 0 ? packSize : 1),
+            totalPcs,
+            freeQty: Number(oi.freeQuantity || 0),
+            unitPrice: Number(oi.unitPrice || 0),
+            totalAmount: totalPcs * Number(oi.unitPrice || 0),
+            unit: prod.unit || 'Pcs',
+          };
+        });
+
+        allMappedShops.push({
+          orderId: Number(bo.orderId),
+          shopId: sId,
+          name: shop.name || order.temporaryShopName || `দোকান #${bo.orderId}`,
+          ownerName: shop.ownerName || '',
+          address: shop.address || order.marketArea || 'বাজার',
+          phone: shop.phone || '',
+          previousDue: Number((shop as any).balance ?? (shop as any).totalDue ?? 0),
+          todayDelivery: Number(order.totalAmount || bo.estimatedAmount || 0),
+          status: order.status === 'DELIVERED' ? 'COMPLETED' : order.status === 'PARTIALLY_DELIVERED' ? 'PARTIAL' : 'PENDING',
+          hasOrder: true,
+          items,
+        });
+      }
+    });
+
+    // Sort: Shops with today's orders first, then shops with dues, then alphabetically
+    allMappedShops.sort((a, b) => {
+      if (a.hasOrder && !b.hasOrder) return -1;
+      if (!a.hasOrder && b.hasOrder) return 1;
+      if (a.previousDue > 0 && b.previousDue <= 0) return -1;
+      if (a.previousDue <= 0 && b.previousDue > 0) return 1;
+      return a.name.localeCompare(b.name, 'bn');
+    });
+
+    setShops(allMappedShops);
 
     // Default select first shop for collection dropdown
-    if (realMappedShops.length > 0 && !selectedCollectionShopId) {
-      setSelectedCollectionShopId(realMappedShops[0].shopId);
+    if (allMappedShops.length > 0 && !selectedCollectionShopId) {
+      setSelectedCollectionShopId(allMappedShops[0].shopId);
     }
-  }, [activeBatch, selectedCollectionShopId]);
+  }, [activeBatch, masterShops, selectedCollectionShopId]);
 
   // 3. Extract Real Loaded Products in Van
   const loadedVanProducts = useMemo<RealLoadedProduct[]>(() => {
@@ -383,8 +443,10 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
 
   // 5. Accounting Reconciliation & KPI Math
   const totalShopsCount = shops.length;
-  const completedShopsCount = shops.filter((s) => s.status === 'COMPLETED').length;
-  const pendingShopsCount = shops.filter((s) => s.status !== 'COMPLETED').length;
+  const orderedShopsCount = shops.filter((s) => s.hasOrder).length;
+  const dueShopsCount = shops.filter((s) => s.previousDue > 0).length;
+  const completedShopsCount = shops.filter((s) => s.status === 'COMPLETED' && s.hasOrder).length;
+  const pendingShopsCount = shops.filter((s) => s.status !== 'COMPLETED' && s.hasOrder).length;
 
   const grossLoadedValue = Number(activeBatch?.grossDispatchedValue || 0);
 
@@ -409,7 +471,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
 
   // Delivered shop totals minus cash collected on today's delivery = new due
   const todayDeliveredValue = shops
-    .filter((s) => s.status === 'COMPLETED' || s.status === 'PARTIAL')
+    .filter((s) => (s.status === 'COMPLETED' || s.status === 'PARTIAL') && s.hasOrder)
     .reduce((sum, s) => sum + s.todayDelivery, 0);
 
   const todayCashCollected = collectionHistory
@@ -427,18 +489,20 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
   const actualCashNum = parseFloat(actualCashHandedOver) || 0;
   const cashDiscrepancy = actualCashNum - expectedCashToHandOver;
 
-  // Filtered Shops List
+  // Filtered Shops List (With Support for 'ALL' | 'ORDERS' | 'DUES' | 'COMPLETED')
   const filteredShops = useMemo(() => {
     return shops.filter((s) => {
-      if (shopFilter === 'PENDING' && s.status === 'COMPLETED') return false;
-      if (shopFilter === 'COMPLETED' && s.status !== 'COMPLETED') return false;
+      if (shopFilter === 'ORDERS' && !s.hasOrder) return false;
+      if (shopFilter === 'DUES' && s.previousDue <= 0) return false;
+      if (shopFilter === 'COMPLETED' && (s.status !== 'COMPLETED' || !s.hasOrder)) return false;
       if (shopSearch) {
         const query = shopSearch.toLowerCase();
         return (
           s.name.toLowerCase().includes(query) ||
           s.address.toLowerCase().includes(query) ||
           s.phone.includes(query) ||
-          s.ownerName.toLowerCase().includes(query)
+          s.ownerName.toLowerCase().includes(query) ||
+          (s.routeName && s.routeName.toLowerCase().includes(query))
         );
       }
       return true;
@@ -466,27 +530,28 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
 
     try {
       setIsSubmitting(true);
-      // Optimistic update
       setShops((prev) =>
-        prev.map((s) => (s.orderId === selectedShopForDelivery.orderId ? { ...s, status } : s)),
+        prev.map((s) => (s.shopId === selectedShopForDelivery.shopId ? { ...s, status } : s)),
       );
 
-      // Attempt backend result sync if applicable
-      try {
-        await submitDeliveryResult(selectedShopForDelivery.orderId, {
-          status: status === 'COMPLETED' ? 'COMPLETED' : 'DRAFT',
-          cashCollected: 0,
-          dueAmount: selectedShopForDelivery.todayDelivery,
-          items: selectedShopForDelivery.items.map((it) => ({
-            productId: it.productId,
-            returnedPaidQty: status === 'PENDING' ? it.totalPcs : 0,
-            returnedFreeQty: status === 'PENDING' ? it.freeQty : 0,
-            damagedPaidQty: 0,
-            damagedFreeQty: 0,
-          })),
-        });
-      } catch {
-        // Backend optional offline tolerance
+      // Attempt backend result sync if shop has an orderId
+      if (selectedShopForDelivery.orderId > 0) {
+        try {
+          await submitDeliveryResult(selectedShopForDelivery.orderId, {
+            status: status === 'COMPLETED' ? 'COMPLETED' : 'DRAFT',
+            cashCollected: 0,
+            dueAmount: selectedShopForDelivery.todayDelivery,
+            items: selectedShopForDelivery.items.map((it) => ({
+              productId: it.productId,
+              returnedPaidQty: status === 'PENDING' ? it.totalPcs : 0,
+              returnedFreeQty: status === 'PENDING' ? it.freeQty : 0,
+              damagedPaidQty: 0,
+              damagedFreeQty: 0,
+            })),
+          });
+        } catch {
+          // Backend optional offline tolerance
+        }
       }
 
       showSuccessToast(
@@ -510,9 +575,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
       return;
     }
 
-    const shop =
-      shops.find((s) => s.shopId === selectedCollectionShopId) ||
-      masterShops.find((s) => s.id === selectedCollectionShopId);
+    const shop = shops.find((s) => s.shopId === selectedCollectionShopId);
 
     const newEntry: RealCollectionRecord = {
       id: `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
@@ -591,9 +654,8 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
 
       showSuccessToast(`"${created.name}" নতুন দোকান সফলভাবে খোলা হয়েছে!`);
 
-      // Add to local real shops
       const newShopEntry: RealShopDelivery = {
-        orderId: Date.now(),
+        orderId: 0,
         shopId: created.id,
         name: created.name,
         ownerName: created.ownerName || '',
@@ -602,6 +664,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
         previousDue: 0,
         todayDelivery: 0,
         status: 'PENDING',
+        hasOrder: false,
         items: [],
       };
 
@@ -644,18 +707,17 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
       showSuccessToast('দিনের হিসাব সফলভাবে ডাটাবেসে সেভ ও সাবমিট করা হয়েছে!');
       void loadData();
     } catch (err: any) {
-      // If endpoint requires specific format, provide graceful fallback
       showSuccessToast('দিনের হিসাব সংরক্ষিত হয়েছে (লোকাল সিঙ্ক সম্পন্ন)');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading && !activeBatch) {
+  if (isLoading && !activeBatch && masterShops.length === 0) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
         <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mb-3" />
-        <h3 className="text-base font-bold text-slate-800">ডাটাবেস থেকে চালান লোড হচ্ছে...</h3>
+        <h3 className="text-base font-bold text-slate-800">ডাটাবেস থেকে দোকান ও চালান লোড হচ্ছে...</h3>
         <p className="text-xs text-slate-500 mt-1">দয়া করে অপেক্ষা করুন</p>
       </div>
     );
@@ -683,11 +745,11 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
             <div>
               <h1 className="text-base sm:text-lg font-black tracking-tight leading-snug">
                 {selectedShopForDelivery
-                  ? 'দোকান ডেলিভারি'
+                  ? 'দোকান বিবরণ ও ডেলিভারি'
                   : currentTab === 'home'
                   ? 'ডেলিভারি ম্যান প্যানেল'
                   : currentTab === 'shops'
-                  ? 'আজকের দোকান / Route'
+                  ? `সকল দোকান ও রুট (${totalShopsCount})`
                   : currentTab === 'collection'
                   ? 'টাকা আদায় (Collection)'
                   : currentTab === 'returns'
@@ -754,7 +816,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
             }`}
           >
             <Store className="h-4 w-4" />
-            <span>আজকের দোকান ({totalShopsCount})</span>
+            <span>সকল দোকান ({totalShopsCount})</span>
           </button>
 
           <button
@@ -800,41 +862,9 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
 
       {/* ── MAIN CONTENT CONTAINER (Full Width Responsive) ── */}
       <div className="mx-auto max-w-5xl px-3 sm:px-4 pt-3 space-y-3">
-        {/* If NO active batch assigned */}
-        {!activeBatch ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center space-y-4 shadow-xs my-6">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-              <Truck className="h-8 w-8" />
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900">
-                বর্তমানে কোনো সক্রিয় ডেলিভারি চালান পাওয়া যায়নি
-              </h2>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                অ্যাডমিন বা ম্যানেজার যখন আপনার নামে চালান তৈরি এবং কনফার্ম করবেন, তা সরাসরি এখানে দেখা যাবে।
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => void loadData()}
-                className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition cursor-pointer"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span>রিফ্রেশ করুন</span>
-              </button>
-              <Link
-                href="/delivery-ops/scan-dispatch"
-                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
-              >
-                <Boxes className="h-4 w-4" />
-                <span>কার্টুন স্ক্যান ও লোডিং</span>
-              </Link>
-            </div>
-          </div>
-        ) : selectedShopForDelivery ? (
+        {selectedShopForDelivery ? (
           /* ══════════════════════════════════════════════════════════════
-             SCREEN 3: INDIVIDUAL REAL SHOP DELIVERY EXECUTION (দোকান ডেলিভারি)
+             SCREEN 3: INDIVIDUAL REAL SHOP DETAILS & DELIVERY EXECUTION
              ══════════════════════════════════════════════════════════════ */
           <div className="space-y-3 animate-in fade-in">
             {/* Real Shop Header Card */}
@@ -851,6 +881,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                     <p className="text-xs text-slate-500 mt-0.5">
                       {selectedShopForDelivery.ownerName && `${selectedShopForDelivery.ownerName} • `}
                       {selectedShopForDelivery.address}
+                      {selectedShopForDelivery.routeName && ` (${selectedShopForDelivery.routeName})`}
                     </p>
                     {selectedShopForDelivery.phone ? (
                       <a
@@ -872,6 +903,8 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : selectedShopForDelivery.status === 'PARTIAL'
                       ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : selectedShopForDelivery.hasOrder
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
                       : 'bg-slate-100 text-slate-600 border-slate-200'
                   }`}
                 >
@@ -879,7 +912,9 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                     ? 'সম্পন্ন'
                     : selectedShopForDelivery.status === 'PARTIAL'
                     ? 'আংশিক'
-                    : 'পেন্ডিং'}
+                    : selectedShopForDelivery.hasOrder
+                    ? 'আজকের অর্ডার'
+                    : 'সাধারণ দোকান'}
                 </span>
               </div>
 
@@ -900,81 +935,127 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
               </div>
             </div>
 
-            {/* Real Ordered Products for this Shop */}
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between text-xs font-black text-slate-800">
-                <span>আজকের চালানভুক্ত পণ্য ({selectedShopForDelivery.items.length})</span>
-                <span className="text-slate-400">অর্ডার #{selectedShopForDelivery.orderId}</span>
-              </div>
+            {/* If shop has an order today: show items and completion buttons */}
+            {selectedShopForDelivery.hasOrder ? (
+              <>
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between text-xs font-black text-slate-800">
+                    <span>আজকের চালানভুক্ত পণ্য ({selectedShopForDelivery.items.length})</span>
+                    <span className="text-slate-400">অর্ডার #{selectedShopForDelivery.orderId}</span>
+                  </div>
 
-              {selectedShopForDelivery.items.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400">
-                  এই অর্ডারের জন্য কোনো আলাদা পণ্য তালিকা পাওয়া যায়নি
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {selectedShopForDelivery.items.map((item) => (
-                    <div key={item.id || item.productId} className="py-2.5 flex items-center justify-between text-xs">
-                      <div>
-                        <div className="font-bold text-slate-900">{item.productName}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          {item.cartons > 0 && `${item.cartons} কার্টুন `}
-                          {item.pieces > 0 && `+ ${item.pieces} পিস `}
-                          <span className="text-slate-400 font-normal">
-                            ({item.totalPcs} {item.unit})
-                          </span>
-                          {item.freeQty > 0 && (
-                            <span className="ml-1 text-emerald-600 font-bold">
-                              [ফ্রি: {item.freeQty}]
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-black text-slate-900">
-                          {formatCurrency(item.totalAmount)}
-                        </div>
-                        <span className="text-[10px] text-slate-400">
-                          @ {formatCurrency(item.unitPrice)}
-                        </span>
-                      </div>
+                  {selectedShopForDelivery.items.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      এই অর্ডারের জন্য কোনো আলাদা পণ্য তালিকা পাওয়া যায়নি
                     </div>
-                  ))}
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {selectedShopForDelivery.items.map((item) => (
+                        <div key={item.id || item.productId} className="py-2.5 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="font-bold text-slate-900">{item.productName}</div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {item.cartons > 0 && `${item.cartons} কার্টুন `}
+                              {item.pieces > 0 && `+ ${item.pieces} পিস `}
+                              <span className="text-slate-400 font-normal">
+                                ({item.totalPcs} {item.unit})
+                              </span>
+                              {item.freeQty > 0 && (
+                                <span className="ml-1 text-emerald-600 font-bold">
+                                  [ফ্রি: {item.freeQty}]
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-black text-slate-900">
+                              {formatCurrency(item.totalAmount)}
+                            </div>
+                            <span className="text-[10px] text-slate-400">
+                              @ {formatCurrency(item.unitPrice)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Action Buttons: ডেলিভারি সম্পন্ন / আংশিক / ফেল */}
-            <div className="space-y-2 pt-1">
-              <button
-                type="button"
-                onClick={() => handleUpdateShopDelivery('COMPLETED')}
-                disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#10b981] hover:bg-emerald-600 active:scale-98 text-white font-black py-3.5 text-sm shadow-md transition cursor-pointer disabled:opacity-50"
-              >
-                <CheckCircle2 className="h-5 w-5" />
-                <span>{isSubmitting ? 'আপডেট হচ্ছে...' : 'ডেলিভারি সম্পন্ন'}</span>
-              </button>
+                {/* Action Buttons: ডেলিভারি সম্পন্ন / আংশিক / ফেল */}
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateShopDelivery('COMPLETED')}
+                    disabled={isSubmitting}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#10b981] hover:bg-emerald-600 active:scale-98 text-white font-black py-3.5 text-sm shadow-md transition cursor-pointer disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span>{isSubmitting ? 'আপডেট হচ্ছে...' : 'ডেলিভারি সম্পন্ন'}</span>
+                  </button>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleUpdateShopDelivery('PARTIAL')}
-                  disabled={isSubmitting}
-                  className="rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 py-3 text-xs font-black text-amber-900 transition cursor-pointer disabled:opacity-50"
-                >
-                  আংশিক ডেলিভারি
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateShopDelivery('PENDING')}
-                  disabled={isSubmitting}
-                  className="rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 py-3 text-xs font-black text-rose-900 transition cursor-pointer disabled:opacity-50"
-                >
-                  ফেল / ফেরত
-                </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateShopDelivery('PARTIAL')}
+                      disabled={isSubmitting}
+                      className="rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 py-3 text-xs font-black text-amber-900 transition cursor-pointer disabled:opacity-50"
+                    >
+                      আংশিক ডেলিভারি
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateShopDelivery('PENDING')}
+                      disabled={isSubmitting}
+                      className="rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 py-3 text-xs font-black text-rose-900 transition cursor-pointer disabled:opacity-50"
+                    >
+                      ফেল / ফেরত
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* If shop has NO pre-order today: allow collecting dues or recording returns */
+              <div className="rounded-2xl border border-slate-200/90 bg-white p-5 text-center space-y-3.5 shadow-xs">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                  <Store className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-800">আজকের পূর্ব নির্ধারিত কোনো ডেলিভারি অর্ডার নেই</h4>
+                  <p className="text-xs text-slate-500 mt-0.5 max-w-sm mx-auto">
+                    দোকানের পূর্বের বকেয়া আদায় করতে বা মাল ফেরত নিতে নিচের অ্যাকশনগুলো ব্যবহার করুন।
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCollectionShopId(selectedShopForDelivery.shopId);
+                      setCollectionSubTab('old_due');
+                      setSelectedShopForDelivery(null);
+                      setCurrentTab('collection');
+                    }}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 py-3 text-xs font-black text-white shadow-xs transition cursor-pointer"
+                  >
+                    <DollarSign className="h-4 w-4" />
+                    <span>বকেয়া আদায় করুন</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedReturnShopId(selectedShopForDelivery.shopId);
+                      setSelectedShopForDelivery(null);
+                      setCurrentTab('returns');
+                    }}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 py-3 text-xs font-black text-white shadow-xs transition cursor-pointer"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>ফেরত রেকর্ড করুন</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           <>
@@ -993,7 +1074,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                       <div>
                         <div className="text-[10px] font-bold text-slate-400">তারিখ</div>
                         <div className="font-bold text-slate-800">
-                          {activeBatch.dispatchDate || getTodayBDDate()}
+                          {activeBatch?.dispatchDate || getTodayBDDate()}
                         </div>
                       </div>
                     </div>
@@ -1005,7 +1086,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                       <div>
                         <div className="text-[10px] font-bold text-slate-400">নির্ধারিত রুট</div>
                         <div className="font-bold text-slate-800">
-                          {activeBatch.route?.name || 'রুট'}
+                          {activeBatch?.route?.name || 'সকল রুট'}
                         </div>
                       </div>
                     </div>
@@ -1017,7 +1098,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                       <div>
                         <div className="text-[10px] font-bold text-slate-400">ভ্যান / বাহন</div>
                         <div className="font-bold text-slate-800">
-                          {(activeBatch as any).vehicle?.vehicleNumber || (activeBatch as any).vehicle?.name || 'ভ্যান'}
+                          {(activeBatch as any)?.vehicle?.vehicleNumber || (activeBatch as any)?.vehicle?.name || 'ভ্যান'}
                         </div>
                       </div>
                     </div>
@@ -1036,7 +1117,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   </div>
                 </div>
 
-                {/* 6 Real KPI Cards in 3x2 Grid matching Screen 1 */}
+                {/* 6 Real KPI Cards in 3x2 Grid */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-black text-slate-800">
                     <span>আজকের সারাংশ</span>
@@ -1050,7 +1131,15 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
-                    {/* 1. মোট দোকান */}
+                    {/* 1. আজকের অর্ডার */}
+                    <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-3 text-center shadow-2xs">
+                      <div className="text-[10px] sm:text-xs font-bold text-blue-700">আজকের অর্ডার</div>
+                      <div className="text-xl sm:text-2xl font-black text-blue-800 mt-0.5">
+                        {orderedShopsCount}
+                      </div>
+                    </div>
+
+                    {/* 2. মোট দোকান */}
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3 text-center shadow-2xs">
                       <div className="text-[10px] sm:text-xs font-bold text-emerald-700">মোট দোকান</div>
                       <div className="text-xl sm:text-2xl font-black text-emerald-800 mt-0.5">
@@ -1058,19 +1147,11 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                       </div>
                     </div>
 
-                    {/* 2. ডেলিভারি সম্পন্ন */}
-                    <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-3 text-center shadow-2xs">
-                      <div className="text-[10px] sm:text-xs font-bold text-blue-600">ডেলিভারি সম্পন্ন</div>
-                      <div className="text-xl sm:text-2xl font-black text-blue-700 mt-0.5">
-                        {completedShopsCount}
-                      </div>
-                    </div>
-
-                    {/* 3. বাকি দোকান */}
+                    {/* 3. বকেয়া দোকান */}
                     <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-3 text-center shadow-2xs">
-                      <div className="text-[10px] sm:text-xs font-bold text-amber-700">বাকি দোকান</div>
+                      <div className="text-[10px] sm:text-xs font-bold text-amber-700">বকেয়া দোকান</div>
                       <div className="text-xl sm:text-2xl font-black text-amber-800 mt-0.5">
-                        {pendingShopsCount}
+                        {dueShopsCount}
                       </div>
                     </div>
 
@@ -1100,20 +1181,49 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   </div>
                 </div>
 
+                {/* Enterprise Quick Operations: Carton Scanner & Fast Track Dispatch */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Link
+                    href="/delivery-ops/scan-dispatch"
+                    className="flex items-center gap-2.5 rounded-2xl border border-blue-200 bg-white p-3 shadow-2xs hover:border-blue-400 hover:shadow-xs transition active:scale-95 group"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs group-hover:scale-105 transition">
+                      <Camera className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-slate-900 leading-tight">কার্টুন স্ক্যান</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">ক্যামেরা দিয়ে ভ্যান লোডিং</div>
+                    </div>
+                  </Link>
+
+                  <Link
+                    href="/delivery-ops/fast-track"
+                    className="flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-white p-3 shadow-2xs hover:border-amber-400 hover:shadow-xs transition active:scale-95 group"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs group-hover:scale-105 transition">
+                      <Boxes className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-slate-900 leading-tight">ফাস্ট ট্র্যাক চালান</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">ঝটপট লোডিং ও রুট</div>
+                    </div>
+                  </Link>
+                </div>
+
                 {/* Primary Action Button: আজকের ডেলিভারি শুরু করুন */}
                 <button
                   type="button"
                   onClick={() => setCurrentTab('shops')}
                   className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0260e8] hover:bg-blue-700 active:scale-98 text-white font-black py-3.5 text-sm sm:text-base shadow-md transition cursor-pointer"
                 >
-                  <span>আজকের ডেলিভারি শুরু করুন</span>
+                  <span>আজকের ডেলিভারি শুরু করুন ({totalShopsCount} টি দোকান)</span>
                   <ArrowRight className="h-5 w-5" />
                 </button>
               </div>
             )}
 
             {/* ══════════════════════════════════════════════════════════════
-                SCREEN 2: আজকের দোকান / ROUTE (Real Shops List)
+                SCREEN 2: সকল দোকান / ROUTE (All Real Shops List)
                ══════════════════════════════════════════════════════════════ */}
             {currentTab === 'shops' && (
               <div className="space-y-3 animate-in fade-in">
@@ -1139,8 +1249,8 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   </button>
                 </div>
 
-                {/* Filter Tabs: সব / পেন্ডিং / সম্পন্ন */}
-                <div className="flex rounded-xl bg-slate-200/80 p-1 text-xs font-black text-slate-600">
+                {/* Filter Tabs: সব দোকান / আজকের অর্ডার / বকেয়া দোকান / সম্পন্ন */}
+                <div className="flex rounded-xl bg-slate-200/80 p-1 text-[11px] font-black text-slate-600">
                   <button
                     type="button"
                     onClick={() => setShopFilter('ALL')}
@@ -1152,12 +1262,21 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShopFilter('PENDING')}
+                    onClick={() => setShopFilter('ORDERS')}
                     className={`flex-1 rounded-lg py-1.5 transition cursor-pointer ${
-                      shopFilter === 'PENDING' ? 'bg-white text-amber-700 shadow-2xs' : 'hover:text-slate-900'
+                      shopFilter === 'ORDERS' ? 'bg-white text-blue-700 shadow-2xs' : 'hover:text-slate-900'
                     }`}
                   >
-                    পেন্ডিং ({pendingShopsCount})
+                    অর্ডার ({orderedShopsCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShopFilter('DUES')}
+                    className={`flex-1 rounded-lg py-1.5 transition cursor-pointer ${
+                      shopFilter === 'DUES' ? 'bg-white text-rose-700 shadow-2xs' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    বকেয়া ({dueShopsCount})
                   </button>
                   <button
                     type="button"
@@ -1180,9 +1299,11 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   <div className="space-y-2.5">
                     {filteredShops.map((shop, idx) => (
                       <div
-                        key={shop.orderId || shop.shopId}
+                        key={shop.shopId}
                         onClick={() => setSelectedShopForDelivery(shop)}
-                        className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs hover:border-blue-300 hover:shadow-xs transition active:scale-[0.99] cursor-pointer space-y-2.5"
+                        className={`rounded-2xl border bg-white p-3.5 shadow-2xs hover:shadow-xs transition active:scale-[0.99] cursor-pointer space-y-2.5 ${
+                          shop.hasOrder ? 'border-blue-300 bg-blue-50/20' : 'border-slate-200/90'
+                        }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-2.5">
@@ -1196,40 +1317,57 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                               <p className="text-[11px] text-slate-500 mt-0.5">
                                 {shop.ownerName && `${shop.ownerName} • `}
                                 {shop.address}
+                                {shop.routeName && ` (${shop.routeName})`}
                               </p>
                             </div>
                           </div>
 
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-black border ${
-                              shop.status === 'COMPLETED'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : shop.status === 'PARTIAL'
-                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            {shop.status === 'COMPLETED'
-                              ? 'সম্পন্ন'
-                              : shop.status === 'PARTIAL'
-                              ? 'আংশিক'
-                              : 'পেন্ডিং'}
-                          </span>
+                          <div className="flex flex-col items-end gap-1">
+                            {shop.hasOrder ? (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-black border ${
+                                  shop.status === 'COMPLETED'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : shop.status === 'PARTIAL'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                }`}
+                              >
+                                {shop.status === 'COMPLETED'
+                                  ? 'সম্পন্ন'
+                                  : shop.status === 'PARTIAL'
+                                  ? 'আংশিক'
+                                  : 'আজকের অর্ডার'}
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 border border-slate-200">
+                                অর্ডার নেই
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Real Financials for this shop */}
                         <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs">
                           <div>
                             <span className="text-[10px] text-slate-400">পূর্বের বাকি: </span>
-                            <span className="font-bold text-rose-600">
+                            <span className={`font-bold ${shop.previousDue > 0 ? 'text-rose-600' : 'text-slate-600'}`}>
                               {formatCurrency(shop.previousDue)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] text-slate-400">আজকের ডেলিভারি: </span>
-                            <span className="font-black text-blue-700">
-                              {formatCurrency(shop.todayDelivery)}
-                            </span>
+                            {shop.hasOrder ? (
+                              <>
+                                <span className="text-[10px] text-slate-400">আজকের ডেলিভারি: </span>
+                                <span className="font-black text-blue-700">
+                                  {formatCurrency(shop.todayDelivery)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-[10px] font-bold text-slate-400">
+                                কোনো সক্রিয় অর্ডার নেই
+                              </span>
+                            )}
                           </div>
                           <ChevronRight className="h-4 w-4 text-slate-400" />
                         </div>
@@ -1241,7 +1379,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
             )}
 
             {/* ══════════════════════════════════════════════════════════════
-                SCREEN 8: টাকা আদায় (Real Collection)
+                SCREEN 8: টাকা আদায় (Real Collection Across All Shops)
                ══════════════════════════════════════════════════════════════ */}
             {currentTab === 'collection' && (
               <div className="space-y-3 animate-in fade-in">
@@ -1273,7 +1411,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
 
                 {/* Collection Input Card */}
                 <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3 text-xs">
-                  {/* Select Real Shop */}
+                  {/* Select ANY Real Shop from master shops */}
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">দোকান নির্বাচন করুন</label>
                     <select
@@ -1434,7 +1572,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
 
                 {/* Real Return Entry Form */}
                 <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3 text-xs">
-                  {/* Select Real Shop */}
+                  {/* Select ANY Real Shop from master shops */}
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">কোন দোকান ফেরত দিয়েছে?</label>
                     <select

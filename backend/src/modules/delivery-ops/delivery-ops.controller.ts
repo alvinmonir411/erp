@@ -114,7 +114,7 @@ export class DeliveryOpsController {
     return this.deliveryOpsService.deleteDeliveryPerson(id);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('confirmed-orders')
   getEligibleOrders(
     @Query() query: QueryDispatchBatchesDto,
@@ -132,7 +132,7 @@ export class DeliveryOpsController {
     return this.deliveryOpsService.getDispatchBatches(query, user);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Post('batches')
   createDispatchBatch(@Body() dto: CreateDispatchBatchDto) {
     return this.deliveryOpsService.createDispatchBatch(dto);
@@ -165,13 +165,13 @@ export class DeliveryOpsController {
     return this.deliveryOpsService.getFinalReport(id, user);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Patch('batches/:id/print-morning')
   printMorning(@Param('id', ParseIntPipe) id: number) {
     return this.deliveryOpsService.markMorningPrinted(id);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.DELIVERY_MAN)
   @Patch('batches/:id/dispatch')
   dispatchBatch(@Param('id', ParseIntPipe) id: number) {
     return this.deliveryOpsService.dispatchBatch(id);
