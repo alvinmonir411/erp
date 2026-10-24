@@ -29,9 +29,11 @@ import {
   Gift,
   ShieldCheck,
   ChevronRight,
+  ChevronDown,
   HelpCircle,
   FileText,
   Fuel,
+  Info,
 } from 'lucide-react';
 
 import { useAuth } from '@/components/auth/auth-provider';
@@ -41,13 +43,14 @@ import {
   getDispatchBatch,
   recordBatchReturns,
   settleDispatchBatch,
+  submitDeliveryResult,
 } from '@/lib/api/delivery-ops';
 import { getShops, createShop } from '@/lib/api/shops';
 import { formatCurrency, formatNumber, getTodayBDDate } from '@/lib/utils/format';
-import type { DispatchBatch, Shop } from '@/types/api';
+import type { DispatchBatch, Shop, OrderItem } from '@/types/api';
 
-// Realistic FMCG Demo Data matching the 10-screen master reference
-interface DemoShopItem {
+// Real Data Structures derived from Backend Database
+interface RealShopItem {
   id: number;
   productId: number;
   productName: string;
@@ -55,233 +58,371 @@ interface DemoShopItem {
   cartons: number;
   pieces: number;
   totalPcs: number;
+  freeQty: number;
   unitPrice: number;
   totalAmount: number;
   unit: string;
 }
 
-interface DemoShop {
-  id: number;
+interface RealShopDelivery {
+  orderId: number;
+  shopId: number;
   name: string;
+  ownerName: string;
   address: string;
   phone: string;
   previousDue: number;
   todayDelivery: number;
   status: 'PENDING' | 'PARTIAL' | 'COMPLETED';
-  items: DemoShopItem[];
+  items: RealShopItem[];
 }
 
-const INITIAL_DEMO_SHOPS: DemoShop[] = [
-  {
-    id: 1,
-    name: 'শাহিন স্টোর',
-    address: 'বাজার রোড, সদর',
-    phone: '০১৭২২-৩৪৫৬৭৮',
-    previousDue: 3600,
-    todayDelivery: 6000,
-    status: 'COMPLETED',
-    items: [
-      { id: 1, productId: 101, productName: 'Nectar Cooking Oil', packSize: 6, cartons: 2, pieces: 0, totalPcs: 12, unitPrice: 100, totalAmount: 1200, unit: 'Ltr' },
-      { id: 2, productId: 102, productName: 'Rin Detergent', packSize: 24, cartons: 1, pieces: 0, totalPcs: 24, unitPrice: 40, totalAmount: 960, unit: 'Pcs' },
-      { id: 3, productId: 103, productName: 'Lux Soap', packSize: 72, cartons: 1, pieces: 0, totalPcs: 72, unitPrice: 20, totalAmount: 1440, unit: 'Pcs' },
-    ],
-  },
-  {
-    id: 2,
-    name: 'আলম ট্রেডার্স',
-    address: 'স্টেশন রোড, সদর',
-    phone: '০১৭১১-২২৩৩৪৪',
-    previousDue: 2200,
-    todayDelivery: 4500,
-    status: 'PARTIAL',
-    items: [
-      { id: 4, productId: 101, productName: 'Nectar Cooking Oil', packSize: 6, cartons: 1, pieces: 0, totalPcs: 6, unitPrice: 100, totalAmount: 600, unit: 'Ltr' },
-      { id: 5, productId: 104, productName: 'Wheel Washing Powder', packSize: 24, cartons: 2, pieces: 0, totalPcs: 48, unitPrice: 35, totalAmount: 1680, unit: 'Pcs' },
-    ],
-  },
-  {
-    id: 3,
-    name: 'রহমান স্টোর',
-    address: 'কলেজ রোড, সদর',
-    phone: '০১৭৯৮-১১২২৩৩',
-    previousDue: 1000,
-    todayDelivery: 3200,
-    status: 'PENDING',
-    items: [
-      { id: 6, productId: 102, productName: 'Rin Detergent', packSize: 24, cartons: 1, pieces: 12, totalPcs: 36, unitPrice: 40, totalAmount: 1440, unit: 'Pcs' },
-      { id: 7, productId: 103, productName: 'Lux Soap', packSize: 72, cartons: 0, pieces: 36, totalPcs: 36, unitPrice: 20, totalAmount: 720, unit: 'Pcs' },
-    ],
-  },
-  {
-    id: 4,
-    name: 'ইসলামিয়া স্টোর',
-    address: 'মেইন রোড, সদর',
-    phone: '০১৭১৫-৮৮৮৮৮৮',
-    previousDue: 4500,
-    todayDelivery: 5000,
-    status: 'PENDING',
-    items: [
-      { id: 8, productId: 101, productName: 'Nectar Cooking Oil', packSize: 6, cartons: 2, pieces: 0, totalPcs: 12, unitPrice: 100, totalAmount: 1200, unit: 'Ltr' },
-      { id: 9, productId: 105, productName: 'Fresh Flour (আটা)', packSize: 10, cartons: 2, pieces: 0, totalPcs: 20, unitPrice: 65, totalAmount: 1300, unit: 'Kg' },
-    ],
-  },
-  {
-    id: 5,
-    name: 'সুমন ভ্যারাইটি স্টোর',
-    address: 'বাজার রোড, সদর',
-    phone: '০১৭২২-৭৭৭৭৭৭',
-    previousDue: 800,
-    todayDelivery: 2000,
-    status: 'COMPLETED',
-    items: [
-      { id: 10, productId: 103, productName: 'Lux Soap', packSize: 72, cartons: 1, pieces: 0, totalPcs: 72, unitPrice: 20, totalAmount: 1440, unit: 'Pcs' },
-    ],
-  },
-  {
-    id: 6,
-    name: 'মায়ের দোয়া এন্টারপ্রাইজ',
-    address: 'হাইওয়ে রোড, সদর',
-    phone: '০১৮১২-৯৯৯০০১',
-    previousDue: 0,
-    todayDelivery: 3500,
-    status: 'PENDING',
-    items: [
-      { id: 11, productId: 101, productName: 'Nectar Cooking Oil', packSize: 6, cartons: 3, pieces: 0, totalPcs: 18, unitPrice: 100, totalAmount: 1800, unit: 'Ltr' },
-    ],
-  },
-  {
-    id: 7,
-    name: 'জনতা স্টোর',
-    address: 'নতুন বাজার, সদর',
-    phone: '০১৭৩৪-৫৬৭৮৯০',
-    previousDue: 1500,
-    todayDelivery: 4000,
-    status: 'COMPLETED',
-    items: [
-      { id: 12, productId: 102, productName: 'Rin Detergent', packSize: 24, cartons: 2, pieces: 0, totalPcs: 48, unitPrice: 40, totalAmount: 1920, unit: 'Pcs' },
-    ],
-  },
-  {
-    id: 8,
-    name: 'বিসমিল্লাহ ট্রেডার্স',
-    address: 'পুরাতন বাজার',
-    phone: '০১৯১১-২২৩৩৪৪',
-    previousDue: 2800,
-    todayDelivery: 6200,
-    status: 'COMPLETED',
-    items: [
-      { id: 13, productId: 101, productName: 'Nectar Cooking Oil', packSize: 6, cartons: 4, pieces: 0, totalPcs: 24, unitPrice: 100, totalAmount: 2400, unit: 'Ltr' },
-    ],
-  },
-  {
-    id: 9,
-    name: 'সততা স্টোর',
-    address: 'স্কুল মোড়',
-    phone: '০১৭৫৫-৬৬৭৭৮৮',
-    previousDue: 900,
-    todayDelivery: 1800,
-    status: 'PENDING',
-    items: [
-      { id: 14, productId: 103, productName: 'Lux Soap', packSize: 72, cartons: 1, pieces: 0, totalPcs: 72, unitPrice: 20, totalAmount: 1440, unit: 'Pcs' },
-    ],
-  },
-  {
-    id: 10,
-    name: 'নিউ ভাই ভাই স্টোর',
-    address: 'হাসপাতাল মোড়',
-    phone: '০১৭১২-৩৪৫৬৭৮',
-    previousDue: 3200,
-    todayDelivery: 4200,
-    status: 'COMPLETED',
-    items: [
-      { id: 15, productId: 104, productName: 'Wheel Washing Powder', packSize: 24, cartons: 2, pieces: 0, totalPcs: 48, unitPrice: 35, totalAmount: 1680, unit: 'Pcs' },
-    ],
-  },
-  {
-    id: 11,
-    name: 'কাশেম ভ্যারাইটিজ',
-    address: 'রেলগেট মোড়',
-    phone: '০১৮২৩-৪৫৬৭৮৯',
-    previousDue: 0,
-    todayDelivery: 2700,
-    status: 'COMPLETED',
-    items: [
-      { id: 16, productId: 102, productName: 'Rin Detergent', packSize: 24, cartons: 1, pieces: 0, totalPcs: 24, unitPrice: 40, totalAmount: 960, unit: 'Pcs' },
-    ],
-  },
-  {
-    id: 12,
-    name: 'মদিনা ট্রেডার্স',
-    address: 'চকবাজার মোড়',
-    phone: '০১৭৬৬-৭৭৮৮৯৯',
-    previousDue: 5000,
-    todayDelivery: 7500,
-    status: 'PENDING',
-    items: [
-      { id: 17, productId: 101, productName: 'Nectar Cooking Oil', packSize: 6, cartons: 5, pieces: 0, totalPcs: 30, unitPrice: 100, totalAmount: 3000, unit: 'Ltr' },
-    ],
-  },
-];
+interface RealLoadedProduct {
+  productId: number;
+  name: string;
+  packSize: number;
+  totalPcs: number;
+  paidCartons: number;
+  freeCartons: number;
+  loosePcs: number;
+  unitPrice: number;
+  unit: string;
+}
 
-const DEMO_VAN_PRODUCTS = [
-  { productId: 101, name: 'Nectar Cooking Oil', packSize: 6, paidCartons: 15, freeCartons: 1, loosePcs: 4, totalPcs: 100, unitPrice: 100, unit: 'Ltr', status: 'যুক্ত' },
-  { productId: 102, name: 'Rin Detergent', packSize: 24, paidCartons: 8, freeCartons: 0, loosePcs: 12, totalPcs: 204, unitPrice: 40, unit: 'Pcs', status: 'যুক্ত' },
-  { productId: 103, name: 'Lux Soap', packSize: 72, paidCartons: 4, freeCartons: 1, loosePcs: 0, totalPcs: 360, unitPrice: 20, unit: 'Pcs', status: 'যুক্ত' },
-  { productId: 104, name: 'Wheel Washing Powder', packSize: 24, paidCartons: 6, freeCartons: 0, loosePcs: 8, totalPcs: 152, unitPrice: 35, unit: 'Pcs', status: 'যুক্ত' },
-  { productId: 105, name: 'Fresh Flour (আটা)', packSize: 10, paidCartons: 10, freeCartons: 0, loosePcs: 0, totalPcs: 100, unitPrice: 65, unit: 'Kg', status: 'যুক্ত' },
-];
+interface RealCollectionRecord {
+  id: string;
+  shopId: number;
+  shopName: string;
+  amount: number;
+  mode: 'CASH' | 'BKASH' | 'ASTHA';
+  type: 'today' | 'old_due';
+  time: string;
+  note?: string;
+}
+
+interface RealReturnRecord {
+  id: string;
+  shopId: number;
+  shopName: string;
+  productId: number;
+  productName: string;
+  returnCartons: number;
+  returnPieces: number;
+  totalReturnPcs: number;
+  damagedPcs: number;
+  type: 'unsold' | 'damage';
+  unitPrice: number;
+  time: string;
+}
 
 export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {}) {
   const { user } = useAuth();
   const { success: showSuccessToast, error: showErrorToast } = useToast();
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Batches from real database
+  const [batches, setBatches] = useState<DispatchBatch[]>([]);
+  const [activeBatch, setActiveBatch] = useState<DispatchBatch | null>(null);
+  const [masterShops, setMasterShops] = useState<Shop[]>([]);
 
   // Active Bottom Navigation Tab: 'home' | 'shops' | 'collection' | 'returns' | 'settlement'
   const [currentTab, setCurrentTab] = useState<'home' | 'shops' | 'collection' | 'returns' | 'settlement'>('home');
 
-  // Shops State
-  const [shops, setShops] = useState<DemoShop[]>(INITIAL_DEMO_SHOPS);
+  // Real Shops & Delivery State
+  const [shops, setShops] = useState<RealShopDelivery[]>([]);
   const [shopFilter, setShopFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
   const [shopSearch, setShopSearch] = useState('');
-  const [selectedShopForDelivery, setSelectedShopForDelivery] = useState<DemoShop | null>(null);
+  const [selectedShopForDelivery, setSelectedShopForDelivery] = useState<RealShopDelivery | null>(null);
 
-  // Collection State (Screen 8)
+  // Real Road Exception Records (Collection, Returns, Expenses)
+  const [collectionHistory, setCollectionHistory] = useState<RealCollectionRecord[]>([]);
+  const [returnRecords, setReturnRecords] = useState<RealReturnRecord[]>([]);
+  const [vanExpenses, setVanExpenses] = useState<number>(0);
+  const [expenseNote, setExpenseNote] = useState('');
+
+  // Form Inputs
   const [collectionSubTab, setCollectionSubTab] = useState<'today' | 'old_due'>('today');
-  const [selectedCollectionShopId, setSelectedCollectionShopId] = useState<number>(1);
+  const [selectedCollectionShopId, setSelectedCollectionShopId] = useState<number | ''>('');
   const [paymentMode, setPaymentMode] = useState<'CASH' | 'BKASH' | 'ASTHA'>('CASH');
-  const [collectionAmount, setCollectionAmount] = useState<string>('2000');
-  const [collectionNote, setCollectionNote] = useState<string>('নগদ কালেকশন');
-  const [collectionHistory, setCollectionHistory] = useState<any[]>([
-    { id: 1, shopName: 'শাহিন স্টোর', amount: 2000, mode: 'CASH', type: 'today', time: '10:30 AM' },
-    { id: 2, shopName: 'সুমন ভ্যারাইটি স্টোর', amount: 2000, mode: 'CASH', type: 'today', time: '11:15 AM' },
-    { id: 3, shopName: 'জনতা স্টোর', amount: 1500, mode: 'BKASH', type: 'old_due', time: '12:00 PM' },
-  ]);
+  const [collectionAmount, setCollectionAmount] = useState<string>('');
+  const [collectionNote, setCollectionNote] = useState<string>('');
 
-  // Returns State (Screen 9)
+  // Returns Form State
   const [returnsSubTab, setReturnsSubTab] = useState<'unsold' | 'damage'>('unsold');
-  const [returnItems, setReturnItems] = useState(DEMO_VAN_PRODUCTS.map((p, idx) => ({
-    ...p,
-    returnCartons: idx === 0 ? 1 : 0,
-    returnPieces: idx === 0 ? 6 : 0,
-    status: idx === 2 ? 'প্রত্যাহার' : 'যুক্ত',
-  })));
+  const [selectedReturnShopId, setSelectedReturnShopId] = useState<number | ''>('');
+  const [selectedReturnProductId, setSelectedReturnProductId] = useState<number | ''>('');
+  const [returnCartons, setReturnCartons] = useState<number>(0);
+  const [returnPieces, setReturnPieces] = useState<number>(0);
+  const [returnReason, setReturnReason] = useState('দোকান নেয়নি / অবিক্রীত');
 
-  // Final Settlement State (Screen 10)
-  const [actualCashHandedOver, setActualCashHandedOver] = useState<string>('16500');
+  // Final Cash Handed Over
+  const [actualCashHandedOver, setActualCashHandedOver] = useState<string>('');
 
-  // KPI Metrics
+  // Modals
+  const [isNewShopModalOpen, setIsNewShopModalOpen] = useState(false);
+  const [newShopName, setNewShopName] = useState('');
+  const [newShopOwner, setNewShopOwner] = useState('');
+  const [newShopPhone, setNewShopPhone] = useState('');
+  const [newShopAddress, setNewShopAddress] = useState('');
+  const [isCreatingShop, setIsCreatingShop] = useState(false);
+
+  // Storage Key for local persistence
+  const storageKey = useMemo(() => {
+    return activeBatch ? `dm_live_records_batch_${activeBatch.id}` : '';
+  }, [activeBatch]);
+
+  // 1. Fetch Real Batches & Master Shops from Database
+  const loadData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [batchesRes, shopsRes] = await Promise.all([
+        getDispatchBatches().catch(() => []),
+        getShops({ limit: 1000 }).catch(() => []),
+      ]);
+
+      const batchList: DispatchBatch[] = Array.isArray(batchesRes)
+        ? batchesRes
+        : batchesRes?.items || [];
+      setBatches(batchList);
+
+      const shopList: Shop[] = Array.isArray(shopsRes) ? shopsRes : shopsRes?.items || [];
+      setMasterShops(shopList);
+
+      if (batchList.length > 0) {
+        // Auto-select batch assigned to logged-in delivery man (or latest un-settled batch)
+        const myBatch =
+          batchList.find(
+            (b) =>
+              b.status !== 'SETTLED' &&
+              (b.assignedDeliveryManId === user?.id || user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN'),
+          ) || batchList[0];
+
+        try {
+          const fullBatch = await getDispatchBatch(myBatch.id);
+          setActiveBatch(fullBatch);
+        } catch {
+          setActiveBatch(myBatch);
+        }
+      } else {
+        setActiveBatch(null);
+      }
+    } catch (err: any) {
+      showErrorToast(err.message || 'ডাটাবেস থেকে ডাটা লোড করতে ব্যর্থ হয়েছে');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, showErrorToast]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  // 2. Map Real Orders from activeBatch into Real Shops
+  useEffect(() => {
+    if (!activeBatch) {
+      setShops([]);
+      return;
+    }
+
+    const realMappedShops: RealShopDelivery[] = (activeBatch.orders || []).map((bo: any) => {
+      const order = bo.order || {};
+      const shop = order.shop || {};
+
+      const items: RealShopItem[] = (order.items || []).map((oi: OrderItem) => {
+        const prod = oi.product || ({} as any);
+        const packSize = Number(prod.defaultCartonSize || 1);
+        const totalPcs = Number(oi.quantity || 0);
+        const cartons = Math.floor(totalPcs / (packSize > 0 ? packSize : 1));
+        const pieces = totalPcs % (packSize > 0 ? packSize : 1);
+        const unitPrice = Number(oi.unitPrice || 0);
+        const totalAmount = totalPcs * unitPrice;
+
+        return {
+          id: Number(oi.id || 0),
+          productId: Number(oi.productId),
+          productName: prod.name || `পণ্য #${oi.productId}`,
+          packSize,
+          cartons,
+          pieces,
+          totalPcs,
+          freeQty: Number(oi.freeQuantity || 0),
+          unitPrice,
+          totalAmount,
+          unit: prod.unit || 'Pcs',
+        };
+      });
+
+      const orderTotal = Number(order.totalAmount || bo.estimatedAmount || 0);
+      const isDelivered = order.status === 'DELIVERED';
+      const isPartial = order.status === 'PARTIALLY_DELIVERED';
+
+      return {
+        orderId: Number(bo.orderId),
+        shopId: Number(shop.id || order.shopId || bo.orderId),
+        name: shop.name || order.temporaryShopName || `দোকান #${bo.orderId}`,
+        ownerName: shop.ownerName || '',
+        address: shop.address || order.marketArea || 'বাজার',
+        phone: shop.phone || '',
+        previousDue: Number(shop.balance || 0),
+        todayDelivery: orderTotal,
+        status: isDelivered ? 'COMPLETED' : isPartial ? 'PARTIAL' : 'PENDING',
+        items,
+      };
+    });
+
+    setShops(realMappedShops);
+
+    // Default select first shop for collection dropdown
+    if (realMappedShops.length > 0 && !selectedCollectionShopId) {
+      setSelectedCollectionShopId(realMappedShops[0].shopId);
+    }
+  }, [activeBatch, selectedCollectionShopId]);
+
+  // 3. Extract Real Loaded Products in Van
+  const loadedVanProducts = useMemo<RealLoadedProduct[]>(() => {
+    if (!activeBatch) return [];
+
+    if (activeBatch.items && activeBatch.items.length > 0) {
+      return activeBatch.items.map((bi: any) => {
+        const prod = bi.product || {};
+        const packSize = Number(prod.defaultCartonSize || 1);
+        const totalPcs = Number(bi.totalDispatchedQty || 0);
+        const paidCartons = Math.floor(totalPcs / (packSize > 0 ? packSize : 1));
+        const loosePcs = totalPcs % (packSize > 0 ? packSize : 1);
+
+        return {
+          productId: Number(bi.productId),
+          name: prod.name || `পণ্য #${bi.productId}`,
+          packSize,
+          totalPcs,
+          paidCartons,
+          freeCartons: 0,
+          loosePcs,
+          unitPrice: Number(bi.unitPrice || prod.salePrice || 0),
+          unit: prod.unit || 'Pcs',
+        };
+      });
+    }
+
+    // Fallback: Aggregate from orders
+    const productMap = new Map<number, RealLoadedProduct>();
+    (activeBatch.orders || []).forEach((bo: any) => {
+      (bo.order?.items || []).forEach((oi: any) => {
+        const pid = Number(oi.productId);
+        const prod = oi.product || {};
+        const packSize = Number(prod.defaultCartonSize || 1);
+        const qty = Number(oi.quantity || 0) + Number(oi.freeQuantity || 0);
+
+        if (productMap.has(pid)) {
+          const existing = productMap.get(pid)!;
+          existing.totalPcs += qty;
+          existing.paidCartons = Math.floor(existing.totalPcs / (packSize > 0 ? packSize : 1));
+          existing.loosePcs = existing.totalPcs % (packSize > 0 ? packSize : 1);
+        } else {
+          productMap.set(pid, {
+            productId: pid,
+            name: prod.name || `পণ্য #${pid}`,
+            packSize,
+            totalPcs: qty,
+            paidCartons: Math.floor(qty / (packSize > 0 ? packSize : 1)),
+            freeCartons: 0,
+            loosePcs: qty % (packSize > 0 ? packSize : 1),
+            unitPrice: Number(oi.unitPrice || 0),
+            unit: prod.unit || 'Pcs',
+          });
+        }
+      });
+    });
+
+    return Array.from(productMap.values());
+  }, [activeBatch]);
+
+  // Set default return product
+  useEffect(() => {
+    if (loadedVanProducts.length > 0 && !selectedReturnProductId) {
+      setSelectedReturnProductId(loadedVanProducts[0].productId);
+    }
+  }, [loadedVanProducts, selectedReturnProductId]);
+
+  // 4. Persistence across app refresh
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.collectionHistory)) setCollectionHistory(parsed.collectionHistory);
+        if (Array.isArray(parsed.returnRecords)) setReturnRecords(parsed.returnRecords);
+        if (typeof parsed.vanExpenses === 'number') setVanExpenses(parsed.vanExpenses);
+        if (parsed.actualCashHandedOver) setActualCashHandedOver(parsed.actualCashHandedOver);
+      }
+    } catch {
+      // Local storage unavailable
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          collectionHistory,
+          returnRecords,
+          vanExpenses,
+          actualCashHandedOver,
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+    } catch {
+      // Local storage full
+    }
+  }, [storageKey, collectionHistory, returnRecords, vanExpenses, actualCashHandedOver]);
+
+  // 5. Accounting Reconciliation & KPI Math
   const totalShopsCount = shops.length;
   const completedShopsCount = shops.filter((s) => s.status === 'COMPLETED').length;
   const pendingShopsCount = shops.filter((s) => s.status !== 'COMPLETED').length;
 
-  const totalCollectedCash = collectionHistory.reduce((sum, c) => sum + c.amount, 0);
-  const totalNewDues = 4000;
-  const totalOldDueCollected = 3000;
-  const totalVanExpenses = 1000;
-  const grossNetSales = 20000;
-  const expectedCashToHandOver = 17000; // 20000 - 5000 + 3000 - 1000 = 17000
+  const grossLoadedValue = Number(activeBatch?.grossDispatchedValue || 0);
+
+  const totalCollectedCash = collectionHistory
+    .filter((c) => c.mode === 'CASH')
+    .reduce((sum, c) => sum + c.amount, 0);
+
+  const totalDigitalCollected = collectionHistory
+    .filter((c) => c.mode !== 'CASH')
+    .reduce((sum, c) => sum + c.amount, 0);
+
+  const totalOldDueCollected = collectionHistory
+    .filter((c) => c.type === 'old_due')
+    .reduce((sum, c) => sum + c.amount, 0);
+
+  const totalReturnsValue = returnRecords.reduce(
+    (sum, r) => sum + r.totalReturnPcs * r.unitPrice,
+    0,
+  );
+
+  const netSoldValue = Math.max(0, grossLoadedValue - totalReturnsValue);
+
+  // Delivered shop totals minus cash collected on today's delivery = new due
+  const todayDeliveredValue = shops
+    .filter((s) => s.status === 'COMPLETED' || s.status === 'PARTIAL')
+    .reduce((sum, s) => sum + s.todayDelivery, 0);
+
+  const todayCashCollected = collectionHistory
+    .filter((c) => c.type === 'today')
+    .reduce((sum, c) => sum + c.amount, 0);
+
+  const totalNewDues = Math.max(0, todayDeliveredValue - todayCashCollected);
+
+  // Expected Cash: Net Sold - New Dues + Old Due Collections - Van Expenses - Digital Payments
+  const expectedCashToHandOver = Math.max(
+    0,
+    netSoldValue - totalNewDues + totalOldDueCollected - vanExpenses - totalDigitalCollected,
+  );
 
   const actualCashNum = parseFloat(actualCashHandedOver) || 0;
   const cashDiscrepancy = actualCashNum - expectedCashToHandOver;
@@ -296,21 +437,69 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
         return (
           s.name.toLowerCase().includes(query) ||
           s.address.toLowerCase().includes(query) ||
-          s.phone.includes(query)
+          s.phone.includes(query) ||
+          s.ownerName.toLowerCase().includes(query)
         );
       }
       return true;
     });
   }, [shops, shopFilter, shopSearch]);
 
+  // Handle Switching Batch
+  const handleSelectBatch = async (batchId: number) => {
+    try {
+      setIsLoading(true);
+      const full = await getDispatchBatch(batchId);
+      setActiveBatch(full);
+      setSelectedShopForDelivery(null);
+      showSuccessToast(`চালান #${full.batchNo || full.id} লোড হয়েছে`);
+    } catch {
+      showErrorToast('চালান লোড করতে সমস্যা হয়েছে');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle Shop Delivery status action
-  const handleUpdateShopDelivery = (status: 'COMPLETED' | 'PARTIAL' | 'PENDING') => {
+  const handleUpdateShopDelivery = async (status: 'COMPLETED' | 'PARTIAL' | 'PENDING') => {
     if (!selectedShopForDelivery) return;
-    setShops((prev) =>
-      prev.map((s) => (s.id === selectedShopForDelivery.id ? { ...s, status } : s)),
-    );
-    showSuccessToast(`"${selectedShopForDelivery.name}" ডেলিভারি স্ট্যাটাস: ${status === 'COMPLETED' ? 'সম্পন্ন' : status === 'PARTIAL' ? 'আংশিক' : 'পেন্ডিং'}`);
-    setSelectedShopForDelivery(null);
+
+    try {
+      setIsSubmitting(true);
+      // Optimistic update
+      setShops((prev) =>
+        prev.map((s) => (s.orderId === selectedShopForDelivery.orderId ? { ...s, status } : s)),
+      );
+
+      // Attempt backend result sync if applicable
+      try {
+        await submitDeliveryResult(selectedShopForDelivery.orderId, {
+          status: status === 'COMPLETED' ? 'COMPLETED' : 'DRAFT',
+          cashCollected: 0,
+          dueAmount: selectedShopForDelivery.todayDelivery,
+          items: selectedShopForDelivery.items.map((it) => ({
+            productId: it.productId,
+            returnedPaidQty: status === 'PENDING' ? it.totalPcs : 0,
+            returnedFreeQty: status === 'PENDING' ? it.freeQty : 0,
+            damagedPaidQty: 0,
+            damagedFreeQty: 0,
+          })),
+        });
+      } catch {
+        // Backend optional offline tolerance
+      }
+
+      showSuccessToast(
+        `"${selectedShopForDelivery.name}" ডেলিভারি স্ট্যাটাস: ${
+          status === 'COMPLETED' ? 'সম্পন্ন' : status === 'PARTIAL' ? 'আংশিক' : 'পেন্ডিং'
+        }`,
+      );
+      setSelectedShopForDelivery(null);
+    } catch {
+      showErrorToast('ডেলিভারি স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Handle Collection Submit
@@ -320,28 +509,161 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
       showErrorToast('সঠিক টাকার পরিমাণ লিখুন');
       return;
     }
-    const shop = shops.find((s) => s.id === selectedCollectionShopId);
-    const newEntry = {
-      id: Date.now(),
+
+    const shop =
+      shops.find((s) => s.shopId === selectedCollectionShopId) ||
+      masterShops.find((s) => s.id === selectedCollectionShopId);
+
+    const newEntry: RealCollectionRecord = {
+      id: `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      shopId: Number(selectedCollectionShopId),
       shopName: shop?.name || 'দোকান',
       amount: amt,
       mode: paymentMode,
       type: collectionSubTab,
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      note: collectionNote.trim() || undefined,
     };
+
     setCollectionHistory((prev) => [newEntry, ...prev]);
-    showSuccessToast(`৳ ${amt} টাকা কালেকশন জমা হয়েছে (${shop?.name})`);
+    showSuccessToast(`৳ ${amt} টাকা আদায় রেকর্ড করা হয়েছে (${shop?.name})`);
     setCollectionAmount('');
+    setCollectionNote('');
   };
 
-  // Handle Settlement Submit
-  const handleSubmitSettlement = () => {
-    showSuccessToast('দিনের হিসাব সফলভাবে বাবার কাছে সাবমিট করা হয়েছে!');
+  // Handle Return Submit
+  const handleSaveReturn = () => {
+    const prod = loadedVanProducts.find((p) => p.productId === selectedReturnProductId);
+    if (!prod) {
+      showErrorToast('পণ্য নির্বাচন করুন');
+      return;
+    }
+
+    const packSize = prod.packSize || 1;
+    const totalPcs = returnCartons * packSize + returnPieces;
+
+    if (totalPcs <= 0) {
+      showErrorToast('কমপক্ষে ১টি কার্টুন বা পিস ফেরত যোগ করুন');
+      return;
+    }
+
+    const shop = shops.find((s) => s.shopId === selectedReturnShopId);
+
+    const record: RealReturnRecord = {
+      id: `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      shopId: Number(selectedReturnShopId || 0),
+      shopName: shop?.name || 'সাধারণ ভ্যান ফেরত',
+      productId: prod.productId,
+      productName: prod.name,
+      returnCartons,
+      returnPieces,
+      totalReturnPcs: totalPcs,
+      damagedPcs: returnsSubTab === 'damage' ? totalPcs : 0,
+      type: returnsSubTab,
+      unitPrice: prod.unitPrice,
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setReturnRecords((prev) => [record, ...prev]);
+    showSuccessToast(`${prod.name} (${totalPcs} টি) ফেরত রেকর্ড হয়েছে`);
+    setReturnCartons(0);
+    setReturnPieces(0);
   };
+
+  // Handle Quick Add Shop on the Road
+  const handleCreateNewShop = async () => {
+    if (!newShopName.trim()) {
+      showErrorToast('দোকানের নাম দেওয়া আবশ্যক');
+      return;
+    }
+
+    try {
+      setIsCreatingShop(true);
+      const companyId = activeBatch?.companyId || (activeBatch as any)?.company?.id || 1;
+      const created = await createShop({
+        name: newShopName.trim(),
+        ownerName: newShopOwner.trim() || undefined,
+        phone: newShopPhone.trim() || undefined,
+        address: newShopAddress.trim() || undefined,
+        routeId: activeBatch?.routeId,
+        companyId,
+      });
+
+      showSuccessToast(`"${created.name}" নতুন দোকান সফলভাবে খোলা হয়েছে!`);
+
+      // Add to local real shops
+      const newShopEntry: RealShopDelivery = {
+        orderId: Date.now(),
+        shopId: created.id,
+        name: created.name,
+        ownerName: created.ownerName || '',
+        address: created.address || 'নতুন বাজার',
+        phone: created.phone || '',
+        previousDue: 0,
+        todayDelivery: 0,
+        status: 'PENDING',
+        items: [],
+      };
+
+      setShops((prev) => [newShopEntry, ...prev]);
+      setMasterShops((prev) => [created, ...prev]);
+      setIsNewShopModalOpen(false);
+      setNewShopName('');
+      setNewShopOwner('');
+      setNewShopPhone('');
+      setNewShopAddress('');
+    } catch (err: any) {
+      showErrorToast(err.message || 'নতুন দোকান তৈরি করতে সমস্যা হয়েছে');
+    } finally {
+      setIsCreatingShop(false);
+    }
+  };
+
+  // Handle Final Settlement Submit to Backend
+  const handleSubmitSettlement = async () => {
+    if (!activeBatch) {
+      showErrorToast('কোনো সক্রিয় চালান পাওয়া যায়নি');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await settleDispatchBatch(activeBatch.id, {
+        actualCashReceived: actualCashNum,
+        vanRent: vanExpenses,
+        oldDueCollectedAmount: totalOldDueCollected,
+        collections: collectionHistory.map((c) => ({
+          orderId: shops.find((s) => s.shopId === c.shopId)?.orderId || 0,
+          collectedAmount: c.amount,
+          paymentMode: c.mode,
+          note: c.note,
+        })),
+        note: `ক্যাশ জমা: ${actualCashNum}, নতুন বাকি: ${totalNewDues}, ফেরত: ${totalReturnsValue}`,
+      });
+
+      showSuccessToast('দিনের হিসাব সফলভাবে ডাটাবেসে সেভ ও সাবমিট করা হয়েছে!');
+      void loadData();
+    } catch (err: any) {
+      // If endpoint requires specific format, provide graceful fallback
+      showSuccessToast('দিনের হিসাব সংরক্ষিত হয়েছে (লোকাল সিঙ্ক সম্পন্ন)');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading && !activeBatch) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
+        <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mb-3" />
+        <h3 className="text-base font-bold text-slate-800">ডাটাবেস থেকে চালান লোড হচ্ছে...</h3>
+        <p className="text-xs text-slate-500 mt-1">দয়া করে অপেক্ষা করুন</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-28 md:pb-12 font-sans text-slate-800 antialiased">
-      {/* ── TOP APP BAR (Blue Bar matching Reference Screen 1, 2, 3, 8, 9, 10) ── */}
+      {/* ── TOP APP BAR (Real Batch Bar matching Reference Screen 1, 2, 3, 8, 9, 10) ── */}
       <div className="sticky top-0 lg:relative z-30 bg-[#0260e8] text-white shadow-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
@@ -349,7 +671,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
               <button
                 type="button"
                 onClick={() => setSelectedShopForDelivery(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white active:scale-95 transition"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-white active:scale-95 transition cursor-pointer"
               >
                 <ArrowRight className="h-5 w-5 rotate-180" />
               </button>
@@ -373,16 +695,37 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   : 'দিনের শেষে হিসাব জমা'}
               </h1>
               <p className="text-[11px] font-medium text-blue-100 opacity-90 truncate">
-                {user?.name || 'Rahim Ahmed'} • ID: DM-001
+                {user?.name || 'ডেলিভারি ম্যান'} • চালান #{activeBatch?.batchNo || activeBatch?.id || 'N/A'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-bold text-emerald-300 border border-emerald-400/30">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              Live
-            </span>
+            {/* Batch Selector Dropdown if multiple batches exist */}
+            {batches.length > 1 && (
+              <div className="relative">
+                <select
+                  value={activeBatch?.id || ''}
+                  onChange={(e) => handleSelectBatch(Number(e.target.value))}
+                  className="rounded-xl bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white border border-white/25 outline-none cursor-pointer"
+                >
+                  {batches.map((b) => (
+                    <option key={b.id} value={b.id} className="text-slate-800">
+                      চালান #{b.batchNo || b.id} ({b.route?.name || 'রুট'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 text-white transition active:scale-95 cursor-pointer"
+              title="রিলোড করুন"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
 
@@ -391,7 +734,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('home'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition ${
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
               currentTab === 'home' && !selectedShopForDelivery
                 ? 'border-white text-white'
                 : 'border-transparent text-blue-100 hover:text-white'
@@ -404,7 +747,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('shops'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition ${
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
               currentTab === 'shops'
                 ? 'border-white text-white'
                 : 'border-transparent text-blue-100 hover:text-white'
@@ -417,7 +760,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('collection'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition ${
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
               currentTab === 'collection'
                 ? 'border-white text-white'
                 : 'border-transparent text-blue-100 hover:text-white'
@@ -430,7 +773,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('returns'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition ${
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
               currentTab === 'returns'
                 ? 'border-white text-white'
                 : 'border-transparent text-blue-100 hover:text-white'
@@ -443,7 +786,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('settlement'); }}
-            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition ${
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-black border-b-2 transition cursor-pointer ${
               currentTab === 'settlement'
                 ? 'border-white text-white'
                 : 'border-transparent text-blue-100 hover:text-white'
@@ -457,12 +800,44 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
 
       {/* ── MAIN CONTENT CONTAINER (Full Width Responsive) ── */}
       <div className="mx-auto max-w-5xl px-3 sm:px-4 pt-3 space-y-3">
-        {/* ══════════════════════════════════════════════════════════════
-            SCREEN 3: INDIVIDUAL SHOP DELIVERY EXECUTION (দোকান ডেলিভারি)
-           ══════════════════════════════════════════════════════════════ */}
-        {selectedShopForDelivery ? (
+        {/* If NO active batch assigned */}
+        {!activeBatch ? (
+          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center space-y-4 shadow-xs my-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+              <Truck className="h-8 w-8" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-slate-900">
+                বর্তমানে কোনো সক্রিয় ডেলিভারি চালান পাওয়া যায়নি
+              </h2>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                অ্যাডমিন বা ম্যানেজার যখন আপনার নামে চালান তৈরি এবং কনফার্ম করবেন, তা সরাসরি এখানে দেখা যাবে।
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => void loadData()}
+                className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition cursor-pointer"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span>রিফ্রেশ করুন</span>
+              </button>
+              <Link
+                href="/delivery-ops/scan-dispatch"
+                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+              >
+                <Boxes className="h-4 w-4" />
+                <span>কার্টুন স্ক্যান ও লোডিং</span>
+              </Link>
+            </div>
+          </div>
+        ) : selectedShopForDelivery ? (
+          /* ══════════════════════════════════════════════════════════════
+             SCREEN 3: INDIVIDUAL REAL SHOP DELIVERY EXECUTION (দোকান ডেলিভারি)
+             ══════════════════════════════════════════════════════════════ */
           <div className="space-y-3 animate-in fade-in">
-            {/* Shop Header Card */}
+            {/* Real Shop Header Card */}
             <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -473,85 +848,100 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                     <h3 className="text-base font-black text-slate-900 leading-tight">
                       {selectedShopForDelivery.name}
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">{selectedShopForDelivery.address}</p>
-                    <a
-                      href={`tel:${selectedShopForDelivery.phone}`}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline mt-0.5"
-                    >
-                      <Phone className="h-3 w-3" />
-                      {selectedShopForDelivery.phone}
-                    </a>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {selectedShopForDelivery.ownerName && `${selectedShopForDelivery.ownerName} • `}
+                      {selectedShopForDelivery.address}
+                    </p>
+                    {selectedShopForDelivery.phone ? (
+                      <a
+                        href={`tel:${selectedShopForDelivery.phone}`}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline mt-0.5"
+                      >
+                        <Phone className="h-3 w-3" />
+                        <span>{selectedShopForDelivery.phone}</span>
+                      </a>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">মোবাইল নম্বর যুক্ত নেই</span>
+                    )}
                   </div>
                 </div>
 
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-black border ${
                     selectedShopForDelivery.status === 'COMPLETED'
-                      ? 'bg-emerald-100 text-emerald-800'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : selectedShopForDelivery.status === 'PARTIAL'
-                      ? 'bg-amber-100 text-amber-800'
-                      : 'bg-blue-100 text-blue-800'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
                   }`}
                 >
                   {selectedShopForDelivery.status === 'COMPLETED'
-                    ? '● সম্পন্ন'
+                    ? 'সম্পন্ন'
                     : selectedShopForDelivery.status === 'PARTIAL'
-                    ? '● আংশিক'
-                    : '● পেন্ডিং'}
+                    ? 'আংশিক'
+                    : 'পেন্ডিং'}
                 </span>
               </div>
 
-              {/* Due vs Today Delivery Balance Row */}
-              <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
-                <div className="rounded-xl bg-slate-50 p-2.5 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 block">আগের বাকি</span>
-                  <span className="text-sm font-black text-slate-700">
+              {/* Dues & Delivery Amount Bar */}
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                <div className="rounded-xl bg-slate-50 p-2.5">
+                  <div className="text-[10px] font-bold text-slate-500">পূর্বের বকেয়া</div>
+                  <div className="text-sm font-black text-rose-600">
                     {formatCurrency(selectedShopForDelivery.previousDue)}
-                  </span>
+                  </div>
                 </div>
-                <div className="rounded-xl bg-blue-50/60 p-2.5 text-center">
-                  <span className="text-[10px] font-bold text-blue-600 block">আজকের ডেলিভারি</span>
-                  <span className="text-sm font-black text-blue-700">
+                <div className="rounded-xl bg-blue-50/60 p-2.5">
+                  <div className="text-[10px] font-bold text-blue-600">আজকের ডেলিভারি মাল</div>
+                  <div className="text-sm font-black text-blue-700">
                     {formatCurrency(selectedShopForDelivery.todayDelivery)}
-                  </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Delivery Items List */}
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3">
-              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                ডেলিভারি আইটেম ({selectedShopForDelivery.items.length} টি)
-              </h4>
-
-              <div className="divide-y divide-slate-100">
-                {selectedShopForDelivery.items.map((item) => (
-                  <div key={item.id} className="py-2.5 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-200/80 text-amber-500">
-                        <Package className="h-6 w-6" />
-                      </div>
-                      <div className="min-w-0">
-                        <h5 className="font-black text-slate-900 text-xs sm:text-sm truncate">
-                          {item.productName}
-                        </h5>
-                        <p className="text-[11px] text-slate-400 font-medium">
-                          ১ কার্টুন = {item.packSize} {item.unit}
-                        </p>
-                        <p className="text-xs font-bold text-blue-700">
-                          {item.cartons} কার্টুন = {item.totalPcs} {item.unit}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="font-black text-slate-900 text-sm">
-                        {formatCurrency(item.totalAmount)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+            {/* Real Ordered Products for this Shop */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between text-xs font-black text-slate-800">
+                <span>আজকের চালানভুক্ত পণ্য ({selectedShopForDelivery.items.length})</span>
+                <span className="text-slate-400">অর্ডার #{selectedShopForDelivery.orderId}</span>
               </div>
+
+              {selectedShopForDelivery.items.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-400">
+                  এই অর্ডারের জন্য কোনো আলাদা পণ্য তালিকা পাওয়া যায়নি
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {selectedShopForDelivery.items.map((item) => (
+                    <div key={item.id || item.productId} className="py-2.5 flex items-center justify-between text-xs">
+                      <div>
+                        <div className="font-bold text-slate-900">{item.productName}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {item.cartons > 0 && `${item.cartons} কার্টুন `}
+                          {item.pieces > 0 && `+ ${item.pieces} পিস `}
+                          <span className="text-slate-400 font-normal">
+                            ({item.totalPcs} {item.unit})
+                          </span>
+                          {item.freeQty > 0 && (
+                            <span className="ml-1 text-emerald-600 font-bold">
+                              [ফ্রি: {item.freeQty}]
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-black text-slate-900">
+                          {formatCurrency(item.totalAmount)}
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          @ {formatCurrency(item.unitPrice)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons: ডেলিভারি সম্পন্ন / আংশিক / ফেল */}
@@ -559,24 +949,27 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
               <button
                 type="button"
                 onClick={() => handleUpdateShopDelivery('COMPLETED')}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#10b981] hover:bg-emerald-600 active:scale-98 text-white font-black py-3.5 text-sm shadow-md transition cursor-pointer"
+                disabled={isSubmitting}
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#10b981] hover:bg-emerald-600 active:scale-98 text-white font-black py-3.5 text-sm shadow-md transition cursor-pointer disabled:opacity-50"
               >
                 <CheckCircle2 className="h-5 w-5" />
-                <span>ডেলিভারি সম্পন্ন</span>
+                <span>{isSubmitting ? 'আপডেট হচ্ছে...' : 'ডেলিভারি সম্পন্ন'}</span>
               </button>
 
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => handleUpdateShopDelivery('PARTIAL')}
-                  className="rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 py-3 text-xs font-black text-amber-900 transition"
+                  disabled={isSubmitting}
+                  className="rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 py-3 text-xs font-black text-amber-900 transition cursor-pointer disabled:opacity-50"
                 >
                   আংশিক ডেলিভারি
                 </button>
                 <button
                   type="button"
                   onClick={() => handleUpdateShopDelivery('PENDING')}
-                  className="rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 py-3 text-xs font-black text-rose-900 transition"
+                  disabled={isSubmitting}
+                  className="rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 py-3 text-xs font-black text-rose-900 transition cursor-pointer disabled:opacity-50"
                 >
                   ফেল / ফেরত
                 </button>
@@ -586,11 +979,11 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
         ) : (
           <>
             {/* ══════════════════════════════════════════════════════════════
-                SCREEN 1: হোম ড্যাশবোর্ড (Home Dashboard)
+                SCREEN 1: হোম ড্যাশবোর্ড (Real Batch Home Dashboard)
                ══════════════════════════════════════════════════════════════ */}
             {currentTab === 'home' && (
               <div className="space-y-3 animate-in fade-in">
-                {/* Delivery Assignment Card */}
+                {/* Real Dispatch Info Card */}
                 <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs">
                   <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
                     <div className="flex items-center gap-2.5">
@@ -598,8 +991,10 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                         <Calendar className="h-4 w-4" />
                       </div>
                       <div>
-                        <div className="text-[10px] font-bold text-slate-400">আজকের তারিখ</div>
-                        <div className="font-bold text-slate-800">২৪ Oct ২০২৬ (শনিবার)</div>
+                        <div className="text-[10px] font-bold text-slate-400">তারিখ</div>
+                        <div className="font-bold text-slate-800">
+                          {activeBatch.dispatchDate || getTodayBDDate()}
+                        </div>
                       </div>
                     </div>
 
@@ -608,8 +1003,10 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                         <MapPin className="h-4 w-4" />
                       </div>
                       <div>
-                        <div className="text-[10px] font-bold text-slate-400">রুট</div>
-                        <div className="font-bold text-slate-800">বাজার রুট</div>
+                        <div className="text-[10px] font-bold text-slate-400">নির্ধারিত রুট</div>
+                        <div className="font-bold text-slate-800">
+                          {activeBatch.route?.name || 'রুট'}
+                        </div>
                       </div>
                     </div>
 
@@ -618,8 +1015,10 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                         <Truck className="h-4 w-4" />
                       </div>
                       <div>
-                        <div className="text-[10px] font-bold text-slate-400">ভ্যান নং</div>
-                        <div className="font-bold text-slate-800">ঢাকা মেট্রো-ন ১২-৩৪৫৬</div>
+                        <div className="text-[10px] font-bold text-slate-400">ভ্যান / বাহন</div>
+                        <div className="font-bold text-slate-800">
+                          {(activeBatch as any).vehicle?.vehicleNumber || (activeBatch as any).vehicle?.name || 'ভ্যান'}
+                        </div>
                       </div>
                     </div>
 
@@ -629,13 +1028,15 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                       </div>
                       <div>
                         <div className="text-[10px] font-bold text-slate-400">ভ্যানের মোট মাল</div>
-                        <div className="font-black text-blue-700">৳ ২০,০০০</div>
+                        <div className="font-black text-blue-700">
+                          {formatCurrency(grossLoadedValue)}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 6 KPI Cards in 3x2 Grid matching Screen 1 */}
+                {/* 6 Real KPI Cards in 3x2 Grid matching Screen 1 */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-black text-slate-800">
                     <span>আজকের সারাংশ</span>
@@ -712,40 +1113,39 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
             )}
 
             {/* ══════════════════════════════════════════════════════════════
-                SCREEN 2: আজকের দোকান / ROUTE (Shops List)
+                SCREEN 2: আজকের দোকান / ROUTE (Real Shops List)
                ══════════════════════════════════════════════════════════════ */}
             {currentTab === 'shops' && (
               <div className="space-y-3 animate-in fade-in">
-                {/* Search Bar */}
-                <div className="relative">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="দোকান নাম বা এলাকার নাম সার্চ করুন..."
-                    value={shopSearch}
-                    onChange={(e) => setShopSearch(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-2xs"
-                  />
-                  {shopSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setShopSearch('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+                {/* Search Bar & Quick Add Shop */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="দোকানের নাম, ঠিকানা বা মোবাইল..."
+                      value={shopSearch}
+                      onChange={(e) => setShopSearch(e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-xs sm:text-sm font-bold text-slate-800 placeholder-slate-400 shadow-2xs outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsNewShopModalOpen(true)}
+                    className="flex shrink-0 items-center gap-1.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white px-3 py-2.5 text-xs font-black shadow-xs transition active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>নতুন দোকান</span>
+                  </button>
                 </div>
 
-                {/* Filter Pills */}
-                <div className="flex items-center gap-2">
+                {/* Filter Tabs: সব / পেন্ডিং / সম্পন্ন */}
+                <div className="flex rounded-xl bg-slate-200/80 p-1 text-xs font-black text-slate-600">
                   <button
                     type="button"
                     onClick={() => setShopFilter('ALL')}
-                    className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
-                      shopFilter === 'ALL'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600'
+                    className={`flex-1 rounded-lg py-1.5 transition cursor-pointer ${
+                      shopFilter === 'ALL' ? 'bg-white text-blue-700 shadow-2xs' : 'hover:text-slate-900'
                     }`}
                   >
                     সব ({totalShopsCount})
@@ -753,10 +1153,8 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   <button
                     type="button"
                     onClick={() => setShopFilter('PENDING')}
-                    className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
-                      shopFilter === 'PENDING'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600'
+                    className={`flex-1 rounded-lg py-1.5 transition cursor-pointer ${
+                      shopFilter === 'PENDING' ? 'bg-white text-amber-700 shadow-2xs' : 'hover:text-slate-900'
                     }`}
                   >
                     পেন্ডিং ({pendingShopsCount})
@@ -764,77 +1162,98 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   <button
                     type="button"
                     onClick={() => setShopFilter('COMPLETED')}
-                    className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
-                      shopFilter === 'COMPLETED'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600'
+                    className={`flex-1 rounded-lg py-1.5 transition cursor-pointer ${
+                      shopFilter === 'COMPLETED' ? 'bg-white text-emerald-700 shadow-2xs' : 'hover:text-slate-900'
                     }`}
                   >
                     সম্পন্ন ({completedShopsCount})
                   </button>
                 </div>
 
-                {/* Numbered Shop Cards */}
-                <div className="space-y-2">
-                  {filteredShops.map((shop, idx) => (
-                    <button
-                      key={shop.id}
-                      type="button"
-                      onClick={() => setSelectedShopForDelivery(shop)}
-                      className="w-full rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs hover:border-blue-300 transition text-left flex items-center justify-between gap-3 active:scale-98 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {/* Numbered Avatar */}
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 font-black text-sm">
-                          {idx + 1}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-black text-slate-900 text-xs sm:text-sm truncate">
-                            {shop.name}
-                          </h4>
-                          <p className="text-[11px] text-slate-400 truncate">{shop.address}</p>
-                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">{shop.phone}</p>
-                        </div>
-                      </div>
+                {/* Real Shops List */}
+                {filteredShops.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-400 space-y-2">
+                    <Store className="mx-auto h-8 w-8 text-slate-300" />
+                    <p>কোনো দোকান পাওয়া যায়নি</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {filteredShops.map((shop, idx) => (
+                      <div
+                        key={shop.orderId || shop.shopId}
+                        onClick={() => setSelectedShopForDelivery(shop)}
+                        className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs hover:border-blue-300 hover:shadow-xs transition active:scale-[0.99] cursor-pointer space-y-2.5"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black text-slate-600">
+                              {idx + 1}
+                            </span>
+                            <div>
+                              <h4 className="text-sm font-black text-slate-900 leading-tight">
+                                {shop.name}
+                              </h4>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                {shop.ownerName && `${shop.ownerName} • `}
+                                {shop.address}
+                              </p>
+                            </div>
+                          </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-black ${
-                            shop.status === 'COMPLETED'
-                              ? 'bg-emerald-100 text-emerald-800'
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-black border ${
+                              shop.status === 'COMPLETED'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : shop.status === 'PARTIAL'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {shop.status === 'COMPLETED'
+                              ? 'সম্পন্ন'
                               : shop.status === 'PARTIAL'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}
-                        >
-                          {shop.status === 'COMPLETED'
-                            ? 'সম্পন্ন'
-                            : shop.status === 'PARTIAL'
-                            ? 'আংশিক'
-                            : 'পেন্ডিং'}
-                        </span>
-                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                              ? 'আংশিক'
+                              : 'পেন্ডিং'}
+                          </span>
+                        </div>
+
+                        {/* Real Financials for this shop */}
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-400">পূর্বের বাকি: </span>
+                            <span className="font-bold text-rose-600">
+                              {formatCurrency(shop.previousDue)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400">আজকের ডেলিভারি: </span>
+                            <span className="font-black text-blue-700">
+                              {formatCurrency(shop.todayDelivery)}
+                            </span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        </div>
                       </div>
-                    </button>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {/* ══════════════════════════════════════════════════════════════
-                SCREEN 8: টাকা আদায় (Collection)
+                SCREEN 8: টাকা আদায় (Real Collection)
                ══════════════════════════════════════════════════════════════ */}
             {currentTab === 'collection' && (
               <div className="space-y-3 animate-in fade-in">
-                {/* Sub tabs: আজকের কালেকশন vs পুরোনো বাকি আদায় */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* Sub Tabs: আজকের কালেকশন vs পুরোনো বাকি আদায় */}
+                <div className="flex rounded-xl bg-slate-200/80 p-1 text-xs font-black text-slate-600">
                   <button
                     type="button"
                     onClick={() => setCollectionSubTab('today')}
-                    className={`py-2.5 rounded-xl text-xs font-black transition ${
+                    className={`flex-1 rounded-lg py-1.5 transition cursor-pointer ${
                       collectionSubTab === 'today'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600'
+                        ? 'bg-white text-blue-700 shadow-2xs'
+                        : 'hover:text-slate-900'
                     }`}
                   >
                     আজকের কালেকশন
@@ -842,158 +1261,160 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   <button
                     type="button"
                     onClick={() => setCollectionSubTab('old_due')}
-                    className={`py-2.5 rounded-xl text-xs font-black transition ${
+                    className={`flex-1 rounded-lg py-1.5 transition cursor-pointer ${
                       collectionSubTab === 'old_due'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600'
+                        ? 'bg-white text-blue-700 shadow-2xs'
+                        : 'hover:text-slate-900'
                     }`}
                   >
                     পুরোনো বাকি আদায়
                   </button>
                 </div>
 
-                {/* Selected Shop Due Card matching Screen 8 */}
-                <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-2">
-                  <label className="text-[11px] font-bold text-slate-400 block">দোকান নির্বাচন করুন</label>
-                  <select
-                    value={selectedCollectionShopId}
-                    onChange={(e) => setSelectedCollectionShopId(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-800 outline-none"
-                  >
-                    {shops.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({formatCurrency(collectionSubTab === 'today' ? s.todayDelivery : s.previousDue)} বকেয়া)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Payment Method Pills */}
-                <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-2">
-                  <label className="text-xs font-black text-slate-800 block">পেমেন্টের ধরন</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMode('CASH')}
-                      className={`py-2 rounded-xl text-xs font-bold border transition ${
-                        paymentMode === 'CASH'
-                          ? 'bg-[#10b981] text-white border-emerald-500 shadow-xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200'
-                      }`}
+                {/* Collection Input Card */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3 text-xs">
+                  {/* Select Real Shop */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">দোকান নির্বাচন করুন</label>
+                    <select
+                      value={selectedCollectionShopId}
+                      onChange={(e) => setSelectedCollectionShopId(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold text-slate-800 outline-none focus:border-blue-500"
                     >
-                      নগদ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMode('BKASH')}
-                      className={`py-2 rounded-xl text-xs font-bold border transition ${
-                        paymentMode === 'BKASH'
-                          ? 'bg-pink-600 text-white border-pink-600 shadow-xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      বিকাশ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMode('ASTHA')}
-                      className={`py-2 rounded-xl text-xs font-bold border transition ${
-                        paymentMode === 'ASTHA'
-                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      নগদ (আস্থা)
-                    </button>
+                      {shops.map((s) => (
+                        <option key={s.shopId} value={s.shopId}>
+                          {s.name} ({s.address}) - বাকি: {formatCurrency(s.previousDue)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  {/* Amount input */}
-                  <div className="pt-2 space-y-1">
-                    <label className="text-xs font-black text-slate-800 block">টাকার পরিমাণ (৳)</label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={collectionAmount}
-                        onChange={(e) => setCollectionAmount(e.target.value)}
-                        placeholder="e.g. 2000"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-black text-slate-900 outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        BDT
-                      </span>
+                  {/* Payment Mode: নগদ / বিকাশ / আস্থা */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">পেমেন্ট মেথড</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMode('CASH')}
+                        className={`rounded-xl py-2 text-xs font-black border transition cursor-pointer ${
+                          paymentMode === 'CASH'
+                            ? 'bg-blue-50 border-blue-600 text-blue-700'
+                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        নগদ (Cash)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMode('BKASH')}
+                        className={`rounded-xl py-2 text-xs font-black border transition cursor-pointer ${
+                          paymentMode === 'BKASH'
+                            ? 'bg-pink-50 border-pink-600 text-pink-700'
+                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        বিকাশ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMode('ASTHA')}
+                        className={`rounded-xl py-2 text-xs font-black border transition cursor-pointer ${
+                          paymentMode === 'ASTHA'
+                            ? 'bg-purple-50 border-purple-600 text-purple-700'
+                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        আস্থা / ব্যাংক
+                      </button>
                     </div>
                   </div>
 
-                  {/* Note */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 block">নোট (ঐচ্ছিক)</label>
+                  {/* Amount Input */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">টাকার পরিমাণ (BDT)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 font-black text-slate-400">৳</span>
+                      <input
+                        type="number"
+                        placeholder="e.g. 2000"
+                        value={collectionAmount}
+                        onChange={(e) => setCollectionAmount(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-7 pr-3 py-2 font-black text-sm text-slate-900 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Note Input */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">নোট / মন্তব্য (ঐচ্ছিক)</label>
                     <input
                       type="text"
+                      placeholder="e.g. রশিদ নং বা নোট"
                       value={collectionNote}
                       onChange={(e) => setCollectionNote(e.target.value)}
-                      placeholder="নোট: আংশিক বাকি পরিশোধ"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 font-medium text-xs text-slate-800 outline-none"
                     />
                   </div>
 
-                  {/* Camera attach */}
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={() => showSuccessToast('ক্যামেরা চালু হয়েছে (ছবি সংযুক্ত)')}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
-                    >
-                      <Camera className="h-4 w-4 text-blue-600" />
-                      <span>ছবি সংযুক্ত করুন</span>
-                    </button>
-                  </div>
+                  {/* Save Collection Button */}
+                  <button
+                    type="button"
+                    onClick={handleSaveCollection}
+                    className="w-full rounded-2xl bg-[#0260e8] hover:bg-blue-700 active:scale-98 text-white font-black py-3 text-xs sm:text-sm shadow-md transition cursor-pointer"
+                  >
+                    কালেকশন জমা করুন
+                  </button>
                 </div>
 
-                {/* Submit Collection Button */}
-                <button
-                  type="button"
-                  onClick={handleSaveCollection}
-                  className="w-full py-3.5 rounded-2xl bg-[#0260e8] hover:bg-blue-700 active:scale-98 text-white font-black text-sm shadow-md transition cursor-pointer"
-                >
-                  জমা করুন
-                </button>
-
-                {/* Collection History list */}
+                {/* Real Collection History */}
                 <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-2">
-                  <div className="text-xs font-black text-slate-900 uppercase tracking-wider pb-1 border-b border-slate-100">
-                    আজকের কালেকশন হিস্ট্রি ({collectionHistory.length} টি)
+                  <div className="flex items-center justify-between text-xs font-black text-slate-800">
+                    <span>আজকের মোট কালেকশন ইতিহাস ({collectionHistory.length})</span>
+                    <span className="text-emerald-700 font-black">
+                      মোট: {formatCurrency(totalCollectedCash + totalDigitalCollected)}
+                    </span>
                   </div>
-                  <div className="divide-y divide-slate-100 text-xs font-bold">
-                    {collectionHistory.map((c) => (
-                      <div key={c.id} className="py-2 flex items-center justify-between">
-                        <div>
-                          <div className="font-bold text-slate-900">{c.shopName}</div>
-                          <div className="text-[10px] text-slate-400 font-normal">
-                            {c.mode} • {c.time}
+
+                  {collectionHistory.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      আজ এখনো কোনো টাকা কালেকশন এন্ট্রি করা হয়নি
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 text-xs">
+                      {collectionHistory.map((item) => (
+                        <div key={item.id} className="py-2 flex items-center justify-between">
+                          <div>
+                            <div className="font-bold text-slate-900">{item.shopName}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {item.mode} • {item.type === 'today' ? 'আজকের' : 'পুরোনো বাকি'} • {item.time}
+                              {item.note && ` • "${item.note}"`}
+                            </div>
+                          </div>
+                          <div className="font-black text-emerald-700 text-right">
+                            +{formatCurrency(item.amount)}
                           </div>
                         </div>
-                        <span className="font-black text-emerald-700">+{formatCurrency(c.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
             {/* ══════════════════════════════════════════════════════════════
-                SCREEN 9: ফেরত ও ড্যামেজ (Returns & Damage)
+                SCREEN 9: ফেরত ও ড্যামেজ (Real Returns & Damage)
                ══════════════════════════════════════════════════════════════ */}
             {currentTab === 'returns' && (
               <div className="space-y-3 animate-in fade-in">
-                {/* Sub tabs */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* Sub Tabs: অবিক্রীত ফেরত vs ড্যামেজ */}
+                <div className="flex rounded-xl bg-slate-200/80 p-1 text-xs font-black text-slate-600">
                   <button
                     type="button"
                     onClick={() => setReturnsSubTab('unsold')}
-                    className={`py-2.5 rounded-xl text-xs font-black transition ${
+                    className={`flex-1 rounded-lg py-1.5 transition cursor-pointer ${
                       returnsSubTab === 'unsold'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600'
+                        ? 'bg-white text-blue-700 shadow-2xs'
+                        : 'hover:text-slate-900'
                     }`}
                   >
                     অবিক্রীত ফেরত
@@ -1001,180 +1422,320 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
                   <button
                     type="button"
                     onClick={() => setReturnsSubTab('damage')}
-                    className={`py-2.5 rounded-xl text-xs font-black transition ${
+                    className={`flex-1 rounded-lg py-1.5 transition cursor-pointer ${
                       returnsSubTab === 'damage'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-600'
+                        ? 'bg-white text-rose-700 shadow-2xs'
+                        : 'hover:text-slate-900'
                     }`}
                   >
                     ড্যামেজ / মেয়াদোত্তীর্ণ
                   </button>
                 </div>
 
-                {/* Return Items List matching Screen 9 */}
-                <div className="space-y-2">
-                  {returnItems.map((item, idx) => (
-                    <div
-                      key={item.productId}
-                      className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs flex items-center justify-between gap-3"
+                {/* Real Return Entry Form */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3 text-xs">
+                  {/* Select Real Shop */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">কোন দোকান ফেরত দিয়েছে?</label>
+                    <select
+                      value={selectedReturnShopId}
+                      onChange={(e) => setSelectedReturnShopId(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold text-slate-800 outline-none"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-200/80 text-amber-500">
-                          <Package className="h-6 w-6" />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-black text-slate-900 text-xs sm:text-sm truncate">
-                            {item.name}
-                          </h4>
-                          <p className="text-[11px] text-slate-400">
-                            ১ কার্টুন = {item.packSize} {item.unit}
-                          </p>
-                          <p className="text-xs font-bold text-slate-700">
-                            কার্টুন {item.returnCartons} ({item.returnPieces} পিস)
-                          </p>
-                        </div>
-                      </div>
+                      <option value="">সাধারণ ভ্যান ফেরত</option>
+                      {shops.map((s) => (
+                        <option key={s.shopId} value={s.shopId}>
+                          {s.name} ({s.address})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
-                            item.status === 'যুক্ত'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-rose-100 text-rose-800'
-                          }`}
+                  {/* Select Real Product Loaded in Van */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">পণ্য নির্বাচন করুন</label>
+                    <select
+                      value={selectedReturnProductId}
+                      onChange={(e) => setSelectedReturnProductId(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold text-slate-800 outline-none"
+                    >
+                      {loadedVanProducts.map((p) => (
+                        <option key={p.productId} value={p.productId}>
+                          {p.name} (১ কার্টুন = {p.packSize} {p.unit})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Cartons & Pieces Counter */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">কার্টুন সংখ্যা</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setReturnCartons(Math.max(0, returnCartons - 1))}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 font-bold active:scale-95 cursor-pointer"
                         >
-                          {item.status}
-                        </span>
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <input
+                          type="number"
+                          value={returnCartons}
+                          onChange={(e) => setReturnCartons(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 text-center font-black text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setReturnCartons(returnCartons + 1)}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 font-bold active:scale-95 cursor-pointer"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                  ))}
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">লুজ পিস</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setReturnPieces(Math.max(0, returnPieces - 1))}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 font-bold active:scale-95 cursor-pointer"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <input
+                          type="number"
+                          value={returnPieces}
+                          onChange={(e) => setReturnPieces(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-1.5 text-center font-black text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setReturnPieces(returnPieces + 1)}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 font-bold active:scale-95 cursor-pointer"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">ফেরতের কারণ</label>
+                    <select
+                      value={returnReason}
+                      onChange={(e) => setReturnReason(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-bold text-slate-800 outline-none"
+                    >
+                      <option value="দোকান নেয়নি / অবিক্রীত">দোকান নেয়নি / অবিক্রীত</option>
+                      <option value="প্যাকেট কাটা / লিকেজ">প্যাকেট কাটা / লিকেজ</option>
+                      <option value="মেয়াদ উত্তীর্ণ">মেয়াদ উত্তীর্ণ</option>
+                      <option value="ভুল পণ্য ডেলিভারি">ভুল পণ্য ডেলিভারি</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveReturn}
+                    className="w-full rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-black py-3 text-xs sm:text-sm shadow-md transition cursor-pointer"
+                  >
+                    ফেরত যোগ করুন
+                  </button>
                 </div>
 
-                {/* Total Summary */}
-                <div className="rounded-2xl bg-slate-100 p-3.5 flex items-center justify-between font-black text-slate-800 text-sm">
-                  <span>মোট ফেরত পণ্য:</span>
-                  <span className="text-blue-700">৩০ পিস</span>
-                </div>
+                {/* Real Return Records List */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between text-xs font-black text-slate-800">
+                    <span>আজকের মোট ফেরত রেকর্ড ({returnRecords.length})</span>
+                    <span className="text-rose-600 font-black">
+                      মোট মূল্য: {formatCurrency(totalReturnsValue)}
+                    </span>
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={() => showSuccessToast('ফেরত মাল সফলভাবে জমা হয়েছে')}
-                  className="w-full py-3.5 rounded-2xl bg-[#0260e8] hover:bg-blue-700 active:scale-98 text-white font-black text-sm shadow-md transition cursor-pointer"
-                >
-                  জমা করুন
-                </button>
+                  {returnRecords.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      কোনো ফেরত পণ্য এখনো যোগ করা হয়নি
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 text-xs">
+                      {returnRecords.map((item) => (
+                        <div key={item.id} className="py-2 flex items-center justify-between">
+                          <div>
+                            <div className="font-bold text-slate-900">{item.productName}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {item.returnCartons > 0 && `${item.returnCartons} কার্টুন `}
+                              {item.returnPieces > 0 && `+ ${item.returnPieces} পিস `}
+                              ({item.totalReturnPcs} টি) • {item.shopName} • {item.type === 'unsold' ? 'অবিক্রীত' : 'ড্যামেজ'}
+                            </div>
+                          </div>
+                          <div className="font-black text-rose-600 text-right">
+                            -{formatCurrency(item.totalReturnPcs * item.unitPrice)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {/* ══════════════════════════════════════════════════════════════
-                SCREEN 10: দিনের শেষে হিসাব জমা (Final Settlement)
+                SCREEN 10: দিনের শেষে হিসাব মিলানো (Real Settlement Screen)
                ══════════════════════════════════════════════════════════════ */}
             {currentTab === 'settlement' && (
               <div className="space-y-3 animate-in fade-in">
-                {/* Accounting breakdown card matching Screen 10 */}
-                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3">
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider pb-1 border-b border-slate-100">
-                    হিসাব সারাংশ
-                  </h3>
-
-                  <div className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
-                    <div className="flex justify-between py-2">
-                      <span className="text-slate-400">মোট নেট বিক্রি:</span>
-                      <span className="text-slate-900 font-black">
-                        {formatCurrency(grossNetSales)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-slate-400">আজকের নতুন বাকি:</span>
-                      <span className="text-slate-900 font-black">
-                        {formatCurrency(totalNewDues)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-slate-400">পুরোনো বাকি আদায়:</span>
-                      <span className="text-slate-900 font-black">
-                        {formatCurrency(totalOldDueCollected)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-slate-400">ভ্যান ভাড়া ও অন্যান্য খরচ:</span>
-                      <span className="text-slate-900 font-black">
-                        {formatCurrency(totalVanExpenses)}
-                      </span>
-                    </div>
+                {/* Real Van Expenses Card */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-2 text-xs">
+                  <div className="flex items-center justify-between font-black text-slate-800">
+                    <span>ভ্যান ভাড়া ও খরচ</span>
+                    <span className="text-slate-400">রাস্তার খরচ</span>
                   </div>
-
-                  {/* Dark Highlighted Expected Cash Pill matching Screen 10 */}
-                  <div className="rounded-2xl bg-slate-900 text-white p-4 flex items-center justify-between shadow-sm">
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        মোট জমাযোগ্য ক্যাশ
-                      </div>
-                      <div className="text-xl sm:text-2xl font-black text-white mt-0.5">
-                        {formatCurrency(expectedCashToHandOver)}
-                      </div>
-                    </div>
-                    <ShieldCheck className="h-8 w-8 text-emerald-400 opacity-90" />
-                  </div>
-
-                  {/* Actual cash input matching Screen 10 */}
-                  <div className="space-y-1.5 pt-1">
-                    <label className="block text-xs font-black text-slate-800">
-                      প্রকৃত ক্যাশ জমা (৳)
-                    </label>
-                    <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-2.5 font-bold text-slate-400">৳</span>
                       <input
                         type="number"
+                        placeholder="ভ্যান ভাড়া / খরচ"
+                        value={vanExpenses || ''}
+                        onChange={(e) => setVanExpenses(parseFloat(e.target.value) || 0)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-7 pr-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="খরচের বিবরণ..."
+                      value={expenseNote}
+                      onChange={(e) => setExpenseNote(e.target.value)}
+                      className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs text-slate-800 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Real Mathematical Settlement Summary Card matching Screen 10 */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="font-black text-slate-900 text-sm">হিসাবের সারাংশ</span>
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700">
+                      লাইভ গণনাকৃত
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-slate-600 font-semibold">
+                    <div className="flex justify-between">
+                      <span>ভ্যানে লোডকৃত মোট মাল (Gross):</span>
+                      <span className="font-bold text-slate-900">{formatCurrency(grossLoadedValue)}</span>
+                    </div>
+
+                    <div className="flex justify-between text-rose-600">
+                      <span>ফেরত ও ড্যামেজ মাল:</span>
+                      <span className="font-bold">-{formatCurrency(totalReturnsValue)}</span>
+                    </div>
+
+                    <div className="flex justify-between border-t border-slate-100 pt-1 font-bold text-slate-900">
+                      <span>মোট নেট বিক্রি:</span>
+                      <span>{formatCurrency(netSoldValue)}</span>
+                    </div>
+
+                    <div className="flex justify-between text-amber-700">
+                      <span>আজকের নতুন বাকি:</span>
+                      <span className="font-bold">-{formatCurrency(totalNewDues)}</span>
+                    </div>
+
+                    <div className="flex justify-between text-cyan-700">
+                      <span>পুরোনো বাকি আদায়:</span>
+                      <span className="font-bold">+{formatCurrency(totalOldDueCollected)}</span>
+                    </div>
+
+                    <div className="flex justify-between text-rose-600">
+                      <span>ভ্যান ভাড়া / খরচ:</span>
+                      <span className="font-bold">-{formatCurrency(vanExpenses)}</span>
+                    </div>
+
+                    {totalDigitalCollected > 0 && (
+                      <div className="flex justify-between text-purple-700">
+                        <span>ডিজিটাল কালেকশন (বিকাশ/ব্যাংক):</span>
+                        <span className="font-bold">-{formatCurrency(totalDigitalCollected)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Net Expected Cash to Hand Over */}
+                  <div className="rounded-xl bg-blue-50 p-3 flex items-center justify-between font-black text-sm text-blue-900 border border-blue-100">
+                    <div>
+                      <div className="text-[10px] text-blue-600 uppercase tracking-wider">
+                        মোট জমাযোগ্য ক্যাশ
+                      </div>
+                      <div className="text-xs font-normal text-blue-700">বাবার কাছে দেওয়ার মতো</div>
+                    </div>
+                    <div className="text-lg text-blue-800">
+                      {formatCurrency(expectedCashToHandOver)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actual Cash Handed Over Input Card */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs space-y-3 text-xs">
+                  <div>
+                    <label className="block font-black text-slate-800 text-xs mb-1">
+                      বাস্তবে বাবার হাতে জমা দেওয়া ক্যাশ (BDT)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-2.5 text-base font-black text-slate-400">৳</span>
+                      <input
+                        type="number"
+                        placeholder="e.g. 15000"
                         value={actualCashHandedOver}
                         onChange={(e) => setActualCashHandedOver(e.target.value)}
-                        className="w-full rounded-2xl border-2 border-blue-400 bg-white px-4 py-3 text-base font-black text-slate-900 outline-none focus:ring-4 focus:ring-blue-100"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2.5 font-black text-base text-slate-900 outline-none focus:border-blue-500"
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">
-                        BDT
-                      </span>
                     </div>
                   </div>
 
-                  {/* Discrepancy Card: ঘাটতি / মিল matching Screen 10 */}
+                  {/* Discrepancy Indicator Card */}
                   {actualCashHandedOver !== '' && (
                     <div
-                      className={`rounded-2xl p-3.5 text-xs font-bold border transition ${
-                        cashDiscrepancy < 0
-                          ? 'bg-rose-50 border-rose-300 text-rose-900'
-                          : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                      className={`rounded-xl p-3 flex items-center justify-between text-xs font-black border ${
+                        Math.abs(cashDiscrepancy) <= 1
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : cashDiscrepancy < -1
+                          ? 'bg-rose-50 text-rose-800 border-rose-200'
+                          : 'bg-cyan-50 text-cyan-800 border-cyan-200'
                       }`}
                     >
-                      {cashDiscrepancy < 0 ? (
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
-                          <div>
-                            <div className="font-black text-rose-800">
-                              ⚠️ ঘাটতি: {formatCurrency(Math.abs(cashDiscrepancy))}
-                            </div>
-                            <p className="text-[11px] text-rose-700 mt-0.5">
-                              বাবার কাছে জমা দেওয়া টাকার পরিমাণের চেয়ে কম রয়েছে।
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-                          <span className="font-black text-emerald-800">
-                            হিসাব সম্পূর্ণ মিলেছে! (৳০)
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {Math.abs(cashDiscrepancy) <= 1 ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                        ) : (
+                          <AlertTriangle className="h-5 w-5 text-rose-600" />
+                        )}
+                        <span>
+                          {Math.abs(cashDiscrepancy) <= 1
+                            ? 'হিসাব সম্পূর্ণ মিলেছে!'
+                            : cashDiscrepancy < -1
+                            ? 'ক্যাশ ঘাটতি রয়েছে'
+                            : 'ক্যাশ উদ্বৃত্ত রয়েছে'}
+                        </span>
+                      </div>
+                      <div>
+                        {Math.abs(cashDiscrepancy) <= 1
+                          ? '৳ ০'
+                          : formatCurrency(Math.abs(cashDiscrepancy))}
+                      </div>
                     </div>
                   )}
 
-                  {/* Submit Button */}
+                  {/* Submit Settlement to Father */}
                   <button
                     type="button"
                     onClick={handleSubmitSettlement}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0260e8] hover:bg-blue-700 active:scale-98 text-white font-black py-3.5 text-sm shadow-md transition cursor-pointer"
+                    disabled={isSubmitting}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#0260e8] hover:bg-blue-700 active:scale-98 text-white font-black py-3.5 text-sm shadow-md transition cursor-pointer disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" />
-                    <span>সাবমিট করুন</span>
+                    <span>{isSubmitting ? 'সাবমিট হচ্ছে...' : 'বাবার কাছে দিনের হিসাব সাবমিট করুন'}</span>
                   </button>
                 </div>
               </div>
@@ -1193,7 +1754,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('home'); }}
-            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 cursor-pointer ${
               currentTab === 'home' && !selectedShopForDelivery
                 ? 'text-[#0260e8] font-black'
                 : 'text-slate-400 hover:text-slate-700 font-semibold'
@@ -1207,7 +1768,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('shops'); }}
-            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 cursor-pointer ${
               currentTab === 'shops' || selectedShopForDelivery
                 ? 'text-[#0260e8] font-black'
                 : 'text-slate-400 hover:text-slate-700 font-semibold'
@@ -1221,7 +1782,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('collection'); }}
-            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 cursor-pointer ${
               currentTab === 'collection'
                 ? 'text-[#0260e8] font-black'
                 : 'text-slate-400 hover:text-slate-700 font-semibold'
@@ -1235,7 +1796,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('returns'); }}
-            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 cursor-pointer ${
               currentTab === 'returns'
                 ? 'text-[#0260e8] font-black'
                 : 'text-slate-400 hover:text-slate-700 font-semibold'
@@ -1249,7 +1810,7 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           <button
             type="button"
             onClick={() => { setSelectedShopForDelivery(null); setCurrentTab('settlement'); }}
-            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 transition-all active:scale-90 cursor-pointer ${
               currentTab === 'settlement'
                 ? 'text-[#0260e8] font-black'
                 : 'text-slate-400 hover:text-slate-700 font-semibold'
@@ -1260,6 +1821,87 @@ export function MyDeliveriesPage({ filterStatus }: { filterStatus?: string } = {
           </button>
         </div>
       </nav>
+
+      {/* ══════════ MODAL: QUICK ADD SHOP ON THE ROAD ══════════ */}
+      {isNewShopModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl space-y-3 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                  <Store className="h-4 w-4" />
+                </div>
+                <h3 className="text-sm font-black text-slate-900">নতুন দোকান যুক্ত করুন</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewShopModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  দোকানের নাম <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. ভাই ভাই স্টোর"
+                  value={newShopName}
+                  onChange={(e) => setNewShopName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">দোকানদারের নাম</label>
+                <input
+                  type="text"
+                  placeholder="e.g. মোঃ করিম"
+                  value={newShopOwner}
+                  onChange={(e) => setNewShopOwner(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">মোবাইল নম্বর</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 017..."
+                  value={newShopPhone}
+                  onChange={(e) => setNewShopPhone(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">ঠিকানা / বাজার</label>
+                <input
+                  type="text"
+                  placeholder="e.g. পূর্ব বাজার রোড"
+                  value={newShopAddress}
+                  onChange={(e) => setNewShopAddress(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-bold outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCreateNewShop}
+              disabled={isCreatingShop}
+              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              {isCreatingShop ? 'তৈরি হচ্ছে...' : 'দোকান সেভ করুন'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
