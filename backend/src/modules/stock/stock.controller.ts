@@ -19,6 +19,7 @@ export class StockController {
     return this.stockService.create(dto);
   }
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('history')
   getHistory(
     @Query('companyId') companyId?: string,
@@ -42,6 +43,7 @@ export class StockController {
     });
   }
 
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('summary')
   getSummary(
     @Query('companyId') companyId?: string,

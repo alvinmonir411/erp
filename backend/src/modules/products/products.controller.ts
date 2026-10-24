@@ -38,7 +38,7 @@ export class ProductsController {
     return this.productsService.create(createProductDto);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get()
   async findAll(@Query() query: QueryProductsDto) {
     const cacheKey = `products_list_${JSON.stringify(query)}`;
@@ -50,7 +50,7 @@ export class ProductsController {
     return data;
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get('summary')
   async getSummary(@Query('companyId') companyId?: number) {
     const cacheKey = `products_summary_${companyId ?? 'all'}`;
@@ -90,7 +90,7 @@ export class ProductsController {
     return this.productsService.scanCarton(dto.cartonCode, dto.currentBatchId);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.findOne(id);

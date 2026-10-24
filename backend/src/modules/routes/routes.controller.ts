@@ -40,7 +40,7 @@ export class RoutesController {
     return this.routesService.create(createRouteDto);
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get()
   async findAll(@Query() query: QueryRoutesDto) {
     const cacheKey = `routes_list_${JSON.stringify(query)}`;
@@ -52,7 +52,7 @@ export class RoutesController {
     return data;
   }
 
-  @Roles(Role.SUPER_ADMIN, Role.MANAGER)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.SR, Role.DELIVERY_MAN)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.routesService.findOne(id);
