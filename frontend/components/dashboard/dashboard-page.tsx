@@ -203,11 +203,17 @@ export function DashboardPage() {
     );
   }
 
-  const { orders, delivery, money, stock, today, period: periodMetrics } = d.uiMetrics;
-  const periodInfo = d.periodInfo || {};
+  const ui = d?.uiMetrics || {};
+  const orders = ui.orders || {};
+  const delivery = ui.delivery || { totalDispatch: 0, delivered: 0, returns: 0, damaged: 0, pending: 0, deliveryRate: 0 };
+  const money = ui.money || {};
+  const stock = ui.stock || {};
+  const today = ui.today || {};
+  const periodMetrics = ui.period || {};
+  const periodInfo = d?.periodInfo || {};
 
-  const deliveryRate = delivery.totalDispatch > 0 
-    ? `${Math.round((delivery.delivered / delivery.totalDispatch) * 100)}%` 
+  const deliveryRate = (delivery?.totalDispatch ?? 0) > 0 
+    ? `${Math.round(((delivery?.delivered ?? 0) / delivery.totalDispatch) * 100)}%` 
     : '0%';
 
   const isCurrentMonthActive = period === 'this_month';

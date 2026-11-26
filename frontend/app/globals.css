@@ -101,6 +101,21 @@ button, a, input, select, textarea {
   }
 }
 
+/* Keep dark-themed auth inputs dark when browser autofill applies */
+.dark-auth-input {
+  color-scheme: dark;
+}
+
+.dark-auth-input:-webkit-autofill,
+.dark-auth-input:-webkit-autofill:hover,
+.dark-auth-input:-webkit-autofill:focus,
+.dark-auth-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #0c0e14 inset !important;
+  -webkit-text-fill-color: #f4f4f5 !important;
+  caret-color: #f4f4f5 !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
 /* Suppress browser print header/footer (removes URL, date, and 1/1 page numbering) */
 @media print {
   @page {

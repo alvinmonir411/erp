@@ -31,19 +31,29 @@ export class UsersService implements OnApplicationBootstrap {
 
   private async seedInitialUsersSafely() {
     try {
-      const adminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@erp.com';
-      const adminUsername = process.env.SUPER_ADMIN_USERNAME || 'admin';
-      const adminPassword = process.env.SUPER_ADMIN_PASSWORD || 'password123';
-
-      await this.createSuperAdmin({
-        email: adminEmail,
-        username: adminUsername,
-        password: adminPassword,
-        name: 'Super Admin',
+      const superAdminCount = await this.userRepository.count({
+        where: { role: Role.SUPER_ADMIN },
       });
-      this.logger.log(`Super Admin ensured: ${adminUsername} (${adminEmail})`);
+
+      if (superAdminCount === 0) {
+        const adminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@erp.com';
+        const adminUsername = process.env.SUPER_ADMIN_USERNAME || 'admin';
+        const adminPassword = process.env.SUPER_ADMIN_PASSWORD || 'password123';
+
+        await this.createSuperAdmin({
+          email: adminEmail,
+          username: adminUsername,
+          password: adminPassword,
+          name: 'Super Admin',
+        });
+        this.logger.log(`Super Admin seeded: ${adminUsername} (${adminEmail})`);
+      } else {
+        this.logger.log(
+          `Found ${superAdminCount} Super Admin account(s); preserving existing credentials.`,
+        );
+      }
     } catch (error) {
-      this.logger.error('Failed to seed Super Admin:', error);
+      this.logger.error('Failed to verify/seed Super Admin:', error);
     }
 
     try {
@@ -166,10 +176,36 @@ export class UsersService implements OnApplicationBootstrap {
     return this.userRepository.findOne({ where: { username } });
   }
 
-  async findByIdentifier(identifier: string): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: [{ email: identifier }, { username: identifier }],
+  async findByIdentifier(rawIdentifier: string): Promise<User | null> {
+    const identifier = rawIdentifier?.trim();
+    if (!identifier) {
+      return null;
+    }
+
+    // 1. Prefer exact email match, then exact username match
+    const exactEmail = await this.userRepository.findOne({
+      where: { email: identifier },
     });
+    if (exactEmail) return exactEmail;
+
+    const exactUsername = await this.userRepository.findOne({
+      where: { username: identifier },
+    });
+    if (exactUsername) return exactUsername;
+
+    // 2. Fallback to case-insensitive lookup (prefer active accounts first)
+    const ciEmail = await this.userRepository
+      .createQueryBuilder('user')
+      .where('LOWER(user.email) = LOWER(:identifier)', { identifier })
+      .orderBy("CASE WHEN user.status = 'ACTIVE' THEN 0 ELSE 1 END", 'ASC')
+      .getOne();
+    if (ciEmail) return ciEmail;
+
+    return this.userRepository
+      .createQueryBuilder('user')
+      .where('LOWER(user.username) = LOWER(:identifier)', { identifier })
+      .orderBy("CASE WHEN user.status = 'ACTIVE' THEN 0 ELSE 1 END", 'ASC')
+      .getOne();
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
@@ -214,26 +250,32 @@ export class UsersService implements OnApplicationBootstrap {
     return this.userRepository.save(user);
   }
 
-  async createSuperAdmin(data: {
-    email: string;
-    username: string;
-    password: string;
-    name: string;
-  }): Promise<User> {
+  async createSuperAdmin(
+    data: {
+      email: string;
+      username: string;
+      password: string;
+      name: string;
+    },
+    resetIfExists = false,
+  ): Promise<User> {
     const existing =
       (await this.findByIdentifier(data.email)) ||
       (await this.findByIdentifier(data.username));
 
+    if (existing) {
+      if (resetIfExists || !existing.passwordHash) {
+        const salt = await bcrypt.genSalt(10);
+        existing.passwordHash = await bcrypt.hash(data.password, salt);
+        existing.role = Role.SUPER_ADMIN;
+        existing.status = UserStatus.ACTIVE;
+        return this.userRepository.save(existing);
+      }
+      return existing;
+    }
+
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(data.password, salt);
-
-    if (existing) {
-      // Always reset password on boot if existing
-      existing.passwordHash = passwordHash;
-      existing.role = Role.SUPER_ADMIN;
-      existing.status = UserStatus.ACTIVE;
-      return this.userRepository.save(existing);
-    }
 
     const user = this.userRepository.create({
       email: data.email,

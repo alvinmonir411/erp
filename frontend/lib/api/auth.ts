@@ -7,7 +7,11 @@ export async function login(
 ): Promise<LoginResponse> {
   return apiRequest<LoginResponse>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ identifier, password }),
+    skipAuthRedirect: true,
+    body: JSON.stringify({
+      identifier: identifier.trim(),
+      password,
+    }),
   });
 }
 

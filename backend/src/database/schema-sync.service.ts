@@ -41,10 +41,42 @@ export class SchemaSyncService implements OnApplicationBootstrap {
       }
     }
 
+    // 1.5. Ensure companies table exists
+    try {
+      this.logger.log('Ensuring companies table exists...');
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS "companies" (
+          "id" SERIAL PRIMARY KEY,
+          "name" VARCHAR(150) NOT NULL,
+          "code" VARCHAR(50) UNIQUE NOT NULL,
+          "address" TEXT NOT NULL,
+          "phone" VARCHAR(30) NOT NULL,
+          "isActive" BOOLEAN NOT NULL DEFAULT true,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+        );
+      `);
+    } catch (e) {
+      this.logger.error('Failed to sync companies table:', e.message);
+    }
+
     // 2. Sync users table
     try {
       this.logger.log('Ensuring users table columns exist...');
       await this.dataSource.query(`
+        CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+        CREATE TABLE IF NOT EXISTS "users" (
+          "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          "email" VARCHAR(255) UNIQUE NOT NULL,
+          "username" VARCHAR(255) UNIQUE,
+          "passwordHash" VARCHAR(255),
+          "name" VARCHAR(255) NOT NULL,
+          "role" VARCHAR(50) NOT NULL DEFAULT 'SR',
+          "status" VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+          "allowedRouteIds" TEXT,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+        );
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "username" VARCHAR(255);
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "status" VARCHAR(50) DEFAULT 'ACTIVE';
         ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "allowedRouteIds" TEXT;
@@ -73,6 +105,30 @@ export class SchemaSyncService implements OnApplicationBootstrap {
     try {
       this.logger.log('Ensuring routes and shops table columns exist...');
       await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS "routes" (
+          "id" SERIAL PRIMARY KEY,
+          "name" VARCHAR(150) UNIQUE NOT NULL,
+          "area" VARCHAR(150),
+          "isActive" BOOLEAN NOT NULL DEFAULT true,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+        );
+
+        CREATE TABLE IF NOT EXISTS "shops" (
+          "id" SERIAL PRIMARY KEY,
+          "routeId" INTEGER NOT NULL,
+          "name" VARCHAR(150) NOT NULL,
+          "ownerName" VARCHAR(150),
+          "phone" VARCHAR(30),
+          "address" TEXT,
+          "isActive" BOOLEAN NOT NULL DEFAULT true,
+          "createdById" UUID,
+          "companyId" INTEGER,
+          "version" INTEGER NOT NULL DEFAULT 1,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+        );
+
         ALTER TABLE "routes" ADD COLUMN IF NOT EXISTS "area" VARCHAR(150);
         ALTER TABLE "routes" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true;
 
@@ -419,6 +475,80 @@ export class SchemaSyncService implements OnApplicationBootstrap {
     try {
       this.logger.log('Ensuring dispatch_batches table columns exist...');
       await this.dataSource.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'dispatch_batches_status_enum') THEN
+            CREATE TYPE "dispatch_batches_status_enum" AS ENUM ('DRAFT', 'PRINTED', 'DISPATCHED', 'RETURN_PENDING', 'PARTIALLY_SETTLED', 'SETTLED', 'CANCELLED');
+          END IF;
+        END $$;
+
+        CREATE TABLE IF NOT EXISTS "dispatch_batches" (
+          "id" SERIAL PRIMARY KEY,
+          "batchNo" VARCHAR(30) UNIQUE NOT NULL,
+          "dispatchDate" DATE NOT NULL,
+          "companyId" INTEGER,
+          "routeId" INTEGER NOT NULL,
+          "deliveryPersonId" INTEGER,
+          "assignedDeliveryManId" UUID,
+          "marketArea" VARCHAR(120),
+          "status" "public"."dispatch_batches_status_enum" NOT NULL DEFAULT 'DRAFT',
+          "totalOrders" INTEGER NOT NULL DEFAULT 0,
+          "grossDispatchedValue" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "returnAdjustedValue" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "finalSoldValue" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "totalAdvancePaid" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "totalCollectedAmount" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "totalDueAmount" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "oldDueCollectedAmount" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "shortageOrExcess" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "vanRent" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "salary" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "totalExpenses" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "isMorningPrinted" BOOLEAN NOT NULL DEFAULT false,
+          "isFinalPrinted" BOOLEAN NOT NULL DEFAULT false,
+          "morningPrintedAt" TIMESTAMP,
+          "dispatchedAt" TIMESTAMP,
+          "returnsRecordedAt" TIMESTAMP,
+          "settledAt" TIMESTAMP,
+          "note" TEXT,
+          "settlementNote" TEXT,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+          "version" INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS "dispatch_batch_orders" (
+          "id" SERIAL PRIMARY KEY,
+          "batchId" INTEGER NOT NULL,
+          "orderId" INTEGER NOT NULL,
+          "estimatedAmount" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "finalSoldAmount" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "collectedAmount" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "dueAmount" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "shortageOrExcess" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "isSettled" BOOLEAN NOT NULL DEFAULT false,
+          "deliveryStatus" VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+          "deliveryNote" TEXT,
+          "deliveryCompletedAt" TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS "dispatch_batch_items" (
+          "id" SERIAL PRIMARY KEY,
+          "batchId" INTEGER NOT NULL,
+          "productId" INTEGER NOT NULL,
+          "totalDispatchedQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "totalReturnedQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "returnedPaidQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "returnedFreeQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "totalDamagedQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "damagedPaidQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "damagedFreeQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "totalDeliveredQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "deliveredPaidQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "deliveredFreeQty" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "estimatedAmount" NUMERIC(12,2) NOT NULL DEFAULT 0,
+          "finalSoldAmount" NUMERIC(12,2) NOT NULL DEFAULT 0
+        );
+
         ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "assignedDeliveryManId" UUID;
         ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "version" INTEGER DEFAULT 1;
         ALTER TABLE "dispatch_batches" ADD COLUMN IF NOT EXISTS "shortageOrExcess" DECIMAL(12,2) DEFAULT 0;

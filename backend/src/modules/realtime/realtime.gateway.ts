@@ -1,53 +1,11 @@
-import {
-  WebSocketGateway,
-  WebSocketServer,
-  OnGatewayInit,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-} from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
-@WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
-})
 @Injectable()
-export class RealtimeGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
-{
+export class RealtimeGateway {
   private readonly logger = new Logger(RealtimeGateway.name);
 
-  @WebSocketServer()
-  server: Server;
-
-  afterInit(server: Server) {
-    this.logger.log('Websocket Gateway Initialized');
-  }
-
-  onModuleDestroy() {
-    if (this.server) {
-      try {
-        this.server.close();
-      } catch (err) {
-        // Ignore close error on shutdown
-      }
-    }
-  }
-
-  handleConnection(client: Socket, ...args: any[]) {
-    this.logger.log(`Client connected: ${client.id}`);
-  }
-
-  handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
-  }
-
-  emitPayload(event: string, payload: any) {
-    if (this.server) {
-      this.server.emit(event, payload);
-      this.logger.log(`Emitted event ${event} to all connected clients`);
-    }
+  emitPayload(event: string, payload: any): void {
+    // Socket.IO decommissioned: no-op stub preserves seamless compatibility
+    // with OrdersService, DeliveryOpsService, and RecycleBinService.
   }
 }

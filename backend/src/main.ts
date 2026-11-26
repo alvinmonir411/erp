@@ -54,6 +54,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const exceptionRes = exception instanceof HttpException ? exception.getResponse() : null;
     console.error('[AllExceptionsFilter]', JSON.stringify(exceptionRes || exception));
     const details = typeof exceptionRes === 'object' && exceptionRes !== null ? (exceptionRes as any).message : null;
+    const code = typeof exceptionRes === 'object' && exceptionRes !== null ? (exceptionRes as any).code : undefined;
     const origin = request.headers?.origin || '*';
     response.setHeader('Access-Control-Allow-Origin', origin);
     response.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -71,6 +72,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       message: details || (exception instanceof Error ? exception.message : 'Internal server error'),
+      ...(code ? { code } : {}),
     });
   }
 }

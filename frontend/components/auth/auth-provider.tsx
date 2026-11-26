@@ -24,12 +24,14 @@ function isSessionExpired() {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  setSession: (user: User, token: string, expiresAtMs: number) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
+  setSession: () => {},
   logout: () => {},
 });
 
@@ -129,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isSessionExpired()) {
         clearStoredAuth();
         setUser(null);
-        router.push('/login');
+        router.push('/login?reason=expired');
       }
     };
 
@@ -141,13 +143,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user, router]);
 
+  const setSession = (nextUser: User, token: string, expiresAtMs: number) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(nextUser));
+      localStorage.setItem(AUTH_EXPIRY_KEY, String(expiresAtMs));
+    }
+    setUser(nextUser);
+    setIsLoading(false);
+  };
+
   const logout = () => {
     clearStoredAuth();
     setUser(null);
     router.push('/login');
   };
 
-  const value = useMemo(() => ({ user, isLoading, logout }), [user, isLoading]);
+  const value = useMemo(
+    () => ({ user, isLoading, setSession, logout }),
+    [user, isLoading],
+  );
 
   return (
     <AuthContext.Provider value={value}>

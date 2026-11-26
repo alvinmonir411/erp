@@ -1027,10 +1027,19 @@ export class DashboardService {
       return {
         period: options.period || 'this_month',
         periodLabel: 'চলতি মাস',
+        periodInfo: {
+          month: options.month || new Date().getMonth() + 1,
+          year: options.year || new Date().getFullYear(),
+          monthName: '',
+          totalDays: 30,
+        },
         uiMetrics: {
           orders: { periodOrders: 0, todayOrders: 0, periodDispatched: 0, todayDispatched: 0, periodCancelled: 0, todayCancelled: 0, periodPendingDispatch: 0, periodDelivered: 0, totalOrdersCount: 0, totalCancelledCount: 0 },
+          delivery: { totalDispatch: 0, delivered: 0, returns: 0, damaged: 0, pending: 0, deliveryRate: 0 },
           money: { totalGrossAmount: 0, todayGrossAmount: 0, totalFinalSold: 0, todayFinalSold: 0, periodDue: 0, totalDue: 0, todayDue: 0, periodDueCollection: 0, todayDueCollection: 0, pendingCollected: 0, approvedCollected: 0, rejectedCollected: 0, periodProfit: 0, totalProfit: 0, lifetimeProfit: 0 },
           stock: { totalProducts: 0, activeProducts: 0, inactiveProducts: 0, lowStockProducts: 0, outOfStockProducts: 0, inStockProducts: 0, stockValue: 0 },
+          today: { ordersCount: 0, orderValue: 0, dispatchCount: 0, dispatchAmount: 0, settledValue: 0, cancelledOrders: 0, dueAmount: 0, dueCollection: 0 },
+          period: { netSales: 0, ordersCount: 0, cancelledOrders: 0, grossAmount: 0, dueAmount: 0, dueCollection: 0 },
         },
         charts: { last7Days: [], monthlyTrend: [] },
         companySummary: [],
